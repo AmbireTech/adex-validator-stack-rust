@@ -120,127 +120,127 @@
 <span id="120">120</span>
 <span id="121">121</span>
 <span id="122">122</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">slog</span>::{<span class="ident">o</span>, <span class="ident">Drain</span>, <span class="ident">Logger</span>, <span class="ident">OwnedKVList</span>, <span class="ident">Record</span>, <span class="ident">KV</span>};
-<span class="kw">use</span> <span class="ident">slog_term</span>::{
-    <span class="ident">timestamp_local</span>, <span class="ident">CompactFormatSerializer</span>, <span class="ident">CountingWriter</span>, <span class="ident">Decorator</span>, <span class="ident">RecordDecorator</span>,
-    <span class="ident">Serializer</span>, <span class="ident">ThreadSafeTimestampFn</span>,
+</pre><pre class="rust"><code><span class="kw">use </span>slog::{o, Drain, Logger, OwnedKVList, Record, KV};
+<span class="kw">use </span>slog_term::{
+    timestamp_local, CompactFormatSerializer, CountingWriter, Decorator, RecordDecorator,
+    Serializer, ThreadSafeTimestampFn,
 };
-<span class="kw">use</span> <span class="ident">std</span>::{
-    <span class="ident">cell::RefCell</span>,
-    <span class="ident">io</span>::{<span class="ident">Error</span>, <span class="prelude-ty">Result</span>, <span class="ident">Write</span>},
+<span class="kw">use </span>std::{
+    cell::RefCell,
+    io::{Error, <span class="prelude-ty">Result</span>, Write},
 };
 
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">slog_async::Async</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">slog_term::TermDecorator</span>;
+<span class="kw">pub use </span>slog_async::Async;
+<span class="kw">pub use </span>slog_term::TermDecorator;
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new_logger</span>(<span class="ident">prefix</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="ident">Logger</span> {
-    <span class="kw">let</span> <span class="ident">decorator</span> <span class="op">=</span> <span class="ident">TermDecorator::new</span>().<span class="ident">build</span>();
-    <span class="kw">let</span> <span class="ident">drain</span> <span class="op">=</span> <span class="ident">PrefixedCompactFormat::new</span>(<span class="ident">prefix</span>, <span class="ident">decorator</span>).<span class="ident">fuse</span>();
-    <span class="kw">let</span> <span class="ident">drain</span> <span class="op">=</span> <span class="ident">Async::new</span>(<span class="ident">drain</span>).<span class="ident">build</span>().<span class="ident">fuse</span>();
+<span class="kw">pub fn </span>new_logger(prefix: <span class="kw-2">&amp;</span>str) -&gt; Logger {
+    <span class="kw">let </span>decorator = TermDecorator::new().build();
+    <span class="kw">let </span>drain = PrefixedCompactFormat::new(prefix, decorator).fuse();
+    <span class="kw">let </span>drain = Async::new(drain).build().fuse();
 
-    <span class="ident">Logger::root</span>(<span class="ident">drain</span>, <span class="macro">o!</span>())
+    Logger::root(drain, <span class="macro">o!</span>())
 }
 
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">PrefixedCompactFormat</span><span class="op">&lt;</span><span class="ident">D</span><span class="op">&gt;</span>
-<span class="kw">where</span>
-    <span class="ident">D</span>: <span class="ident">Decorator</span>,
+<span class="kw">pub struct </span>PrefixedCompactFormat&lt;D&gt;
+<span class="kw">where
+    </span>D: Decorator,
 {
-    <span class="ident">decorator</span>: <span class="ident">D</span>,
-    <span class="ident">history</span>: <span class="ident">RefCell</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span>(<span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>, <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>)<span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">fn_timestamp</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">ThreadSafeTimestampFn</span><span class="op">&lt;</span><span class="ident">Output</span> <span class="op">=</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">prefix</span>: <span class="ident">String</span>,
+    decorator: D,
+    history: RefCell&lt;Vec&lt;(Vec&lt;u8&gt;, Vec&lt;u8&gt;)&gt;&gt;,
+    fn_timestamp: Box&lt;<span class="kw">dyn </span>ThreadSafeTimestampFn&lt;Output = <span class="prelude-ty">Result</span>&lt;()&gt;&gt;&gt;,
+    prefix: String,
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">D</span><span class="op">&gt;</span> <span class="ident">Drain</span> <span class="kw">for</span> <span class="ident">PrefixedCompactFormat</span><span class="op">&lt;</span><span class="ident">D</span><span class="op">&gt;</span>
-<span class="kw">where</span>
-    <span class="ident">D</span>: <span class="ident">Decorator</span>,
+<span class="kw">impl</span>&lt;D&gt; Drain <span class="kw">for </span>PrefixedCompactFormat&lt;D&gt;
+<span class="kw">where
+    </span>D: Decorator,
 {
-    <span class="kw">type</span> <span class="prelude-val">Ok</span> <span class="op">=</span> ();
-    <span class="kw">type</span> <span class="prelude-val">Err</span> <span class="op">=</span> <span class="ident">Error</span>;
+    <span class="kw">type </span><span class="prelude-val">Ok </span>= ();
+    <span class="kw">type </span><span class="prelude-val">Err </span>= Error;
 
-    <span class="kw">fn</span> <span class="ident">log</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">record</span>: <span class="kw-2">&amp;</span><span class="ident">Record</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>, <span class="ident">values</span>: <span class="kw-2">&amp;</span><span class="ident">OwnedKVList</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::Ok</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">format_compact</span>(<span class="ident">record</span>, <span class="ident">values</span>)
+    <span class="kw">fn </span>log(<span class="kw-2">&amp;</span><span class="self">self</span>, record: <span class="kw-2">&amp;</span>Record&lt;<span class="lifetime">&#39;_</span>&gt;, values: <span class="kw-2">&amp;</span>OwnedKVList) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>::Ok&gt; {
+        <span class="self">self</span>.format_compact(record, values)
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">D</span><span class="op">&gt;</span> <span class="ident">PrefixedCompactFormat</span><span class="op">&lt;</span><span class="ident">D</span><span class="op">&gt;</span>
-<span class="kw">where</span>
-    <span class="ident">D</span>: <span class="ident">Decorator</span>,
+<span class="kw">impl</span>&lt;D&gt; PrefixedCompactFormat&lt;D&gt;
+<span class="kw">where
+    </span>D: Decorator,
 {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">prefix</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">d</span>: <span class="ident">D</span>) -&gt; <span class="ident">PrefixedCompactFormat</span><span class="op">&lt;</span><span class="ident">D</span><span class="op">&gt;</span> {
-        <span class="self">Self</span> {
-            <span class="ident">fn_timestamp</span>: <span class="ident">Box::new</span>(<span class="ident">timestamp_local</span>),
-            <span class="ident">decorator</span>: <span class="ident">d</span>,
-            <span class="ident">history</span>: <span class="ident">RefCell::new</span>(<span class="macro">vec!</span>[]),
-            <span class="ident">prefix</span>: <span class="ident">prefix</span>.<span class="ident">to_owned</span>(),
+    <span class="kw">pub fn </span>new(prefix: <span class="kw-2">&amp;</span>str, d: D) -&gt; PrefixedCompactFormat&lt;D&gt; {
+        <span class="self">Self </span>{
+            fn_timestamp: Box::new(timestamp_local),
+            decorator: d,
+            history: RefCell::new(<span class="macro">vec!</span>[]),
+            prefix: prefix.to_owned(),
         }
     }
 
-    <span class="kw">fn</span> <span class="ident">format_compact</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">record</span>: <span class="kw-2">&amp;</span><span class="ident">Record</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>, <span class="ident">values</span>: <span class="kw-2">&amp;</span><span class="ident">OwnedKVList</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">decorator</span>.<span class="ident">with_record</span>(<span class="ident">record</span>, <span class="ident">values</span>, <span class="op">|</span><span class="ident">decorator</span><span class="op">|</span> {
-            <span class="kw">let</span> <span class="ident">indent</span> <span class="op">=</span> {
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">history_ref</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">history</span>.<span class="ident">borrow_mut</span>();
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">serializer</span> <span class="op">=</span> <span class="ident">CompactFormatSerializer::new</span>(<span class="ident">decorator</span>, <span class="kw-2">&amp;mut</span> <span class="kw-2">*</span><span class="ident">history_ref</span>);
+    <span class="kw">fn </span>format_compact(<span class="kw-2">&amp;</span><span class="self">self</span>, record: <span class="kw-2">&amp;</span>Record&lt;<span class="lifetime">&#39;_</span>&gt;, values: <span class="kw-2">&amp;</span>OwnedKVList) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+        <span class="self">self</span>.decorator.with_record(record, values, |decorator| {
+            <span class="kw">let </span>indent = {
+                <span class="kw">let </span><span class="kw-2">mut </span>history_ref = <span class="self">self</span>.history.borrow_mut();
+                <span class="kw">let </span><span class="kw-2">mut </span>serializer = CompactFormatSerializer::new(decorator, <span class="kw-2">&amp;mut </span>history_ref);
 
-                <span class="ident">values</span>.<span class="ident">serialize</span>(<span class="ident">record</span>, <span class="kw-2">&amp;mut</span> <span class="ident">serializer</span>)<span class="question-mark">?</span>;
+                values.serialize(record, <span class="kw-2">&amp;mut </span>serializer)<span class="question-mark">?</span>;
 
-                <span class="ident">serializer</span>.<span class="ident">finish</span>()<span class="question-mark">?</span>
-            };
+                serializer.finish()<span class="question-mark">?
+            </span>};
 
-            <span class="ident">decorator</span>.<span class="ident">start_whitespace</span>()<span class="question-mark">?</span>;
+            decorator.start_whitespace()<span class="question-mark">?</span>;
 
-            <span class="kw">for</span> <span class="kw">_</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">indent</span> {
-                <span class="macro">write!</span>(<span class="ident">decorator</span>, <span class="string">&quot; &quot;</span>)<span class="question-mark">?</span>;
+            <span class="kw">for _ in </span><span class="number">0</span>..indent {
+                <span class="macro">write!</span>(decorator, <span class="string">&quot; &quot;</span>)<span class="question-mark">?</span>;
             }
 
-            <span class="kw">let</span> <span class="ident">comma_needed</span> <span class="op">=</span>
-                <span class="ident">print_msg_header</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">prefix</span>, <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="self">self</span>.<span class="ident">fn_timestamp</span>, <span class="ident">decorator</span>, <span class="ident">record</span>)<span class="question-mark">?</span>;
+            <span class="kw">let </span>comma_needed =
+                print_msg_header(<span class="kw-2">&amp;</span><span class="self">self</span>.prefix, <span class="kw-2">&amp;*</span><span class="self">self</span>.fn_timestamp, decorator, record)<span class="question-mark">?</span>;
             {
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">serializer</span> <span class="op">=</span> <span class="ident">Serializer::new</span>(<span class="ident">decorator</span>, <span class="ident">comma_needed</span>, <span class="bool-val">false</span>);
+                <span class="kw">let </span><span class="kw-2">mut </span>serializer = Serializer::new(decorator, comma_needed, <span class="bool-val">false</span>);
 
-                <span class="ident">record</span>.<span class="ident">kv</span>().<span class="ident">serialize</span>(<span class="ident">record</span>, <span class="kw-2">&amp;mut</span> <span class="ident">serializer</span>)<span class="question-mark">?</span>;
+                record.kv().serialize(record, <span class="kw-2">&amp;mut </span>serializer)<span class="question-mark">?</span>;
 
-                <span class="ident">serializer</span>.<span class="ident">finish</span>()<span class="question-mark">?</span>;
+                serializer.finish()<span class="question-mark">?</span>;
             }
 
-            <span class="ident">decorator</span>.<span class="ident">start_whitespace</span>()<span class="question-mark">?</span>;
-            <span class="macro">writeln!</span>(<span class="ident">decorator</span>)<span class="question-mark">?</span>;
+            decorator.start_whitespace()<span class="question-mark">?</span>;
+            <span class="macro">writeln!</span>(decorator)<span class="question-mark">?</span>;
 
-            <span class="ident">decorator</span>.<span class="ident">flush</span>()<span class="question-mark">?</span>;
+            decorator.flush()<span class="question-mark">?</span>;
 
             <span class="prelude-val">Ok</span>(())
         })
     }
 }
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">print_msg_header</span>(
-    <span class="ident">prefix</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>,
-    <span class="ident">fn_timestamp</span>: <span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">ThreadSafeTimestampFn</span><span class="op">&lt;</span><span class="ident">Output</span> <span class="op">=</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="kw-2">mut</span> <span class="ident">rd</span>: <span class="kw-2">&amp;mut</span> <span class="kw">dyn</span> <span class="ident">RecordDecorator</span>,
-    <span class="ident">record</span>: <span class="kw-2">&amp;</span><span class="ident">Record</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>,
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">bool</span><span class="op">&gt;</span> {
-    <span class="ident">rd</span>.<span class="ident">start_timestamp</span>()<span class="question-mark">?</span>;
-    <span class="ident">fn_timestamp</span>(<span class="kw-2">&amp;mut</span> <span class="ident">rd</span>)<span class="question-mark">?</span>;
+<span class="kw">pub fn </span>print_msg_header(
+    prefix: <span class="kw-2">&amp;</span>str,
+    fn_timestamp: <span class="kw-2">&amp;</span><span class="kw">dyn </span>ThreadSafeTimestampFn&lt;Output = <span class="prelude-ty">Result</span>&lt;()&gt;&gt;,
+    <span class="kw-2">mut </span>rd: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>RecordDecorator,
+    record: <span class="kw-2">&amp;</span>Record&lt;<span class="lifetime">&#39;_</span>&gt;,
+) -&gt; <span class="prelude-ty">Result</span>&lt;bool&gt; {
+    rd.start_timestamp()<span class="question-mark">?</span>;
+    fn_timestamp(<span class="kw-2">&amp;mut </span>rd)<span class="question-mark">?</span>;
 
-    <span class="ident">rd</span>.<span class="ident">start_whitespace</span>()<span class="question-mark">?</span>;
-    <span class="macro">write!</span>(<span class="ident">rd</span>, <span class="string">&quot; &quot;</span>)<span class="question-mark">?</span>;
+    rd.start_whitespace()<span class="question-mark">?</span>;
+    <span class="macro">write!</span>(rd, <span class="string">&quot; &quot;</span>)<span class="question-mark">?</span>;
 
-    <span class="ident">rd</span>.<span class="ident">start_level</span>()<span class="question-mark">?</span>;
-    <span class="macro">write!</span>(<span class="ident">rd</span>, <span class="string">&quot;{}&quot;</span>, <span class="ident">record</span>.<span class="ident">level</span>().<span class="ident">as_short_str</span>())<span class="question-mark">?</span>;
+    rd.start_level()<span class="question-mark">?</span>;
+    <span class="macro">write!</span>(rd, <span class="string">&quot;{}&quot;</span>, record.level().as_short_str())<span class="question-mark">?</span>;
 
-    <span class="ident">rd</span>.<span class="ident">start_whitespace</span>()<span class="question-mark">?</span>;
-    <span class="macro">write!</span>(<span class="ident">rd</span>, <span class="string">&quot; &quot;</span>)<span class="question-mark">?</span>;
+    rd.start_whitespace()<span class="question-mark">?</span>;
+    <span class="macro">write!</span>(rd, <span class="string">&quot; &quot;</span>)<span class="question-mark">?</span>;
 
-    <span class="ident">rd</span>.<span class="ident">start_msg</span>()<span class="question-mark">?</span>;
-    <span class="macro">write!</span>(<span class="ident">rd</span>, <span class="string">&quot;{}:&quot;</span>, <span class="ident">prefix</span>)<span class="question-mark">?</span>;
+    rd.start_msg()<span class="question-mark">?</span>;
+    <span class="macro">write!</span>(rd, <span class="string">&quot;{}:&quot;</span>, prefix)<span class="question-mark">?</span>;
 
-    <span class="ident">rd</span>.<span class="ident">start_whitespace</span>()<span class="question-mark">?</span>;
-    <span class="macro">write!</span>(<span class="ident">rd</span>, <span class="string">&quot; &quot;</span>)<span class="question-mark">?</span>;
+    rd.start_whitespace()<span class="question-mark">?</span>;
+    <span class="macro">write!</span>(rd, <span class="string">&quot; &quot;</span>)<span class="question-mark">?</span>;
 
-    <span class="ident">rd</span>.<span class="ident">start_msg</span>()<span class="question-mark">?</span>;
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">count_rd</span> <span class="op">=</span> <span class="ident">CountingWriter::new</span>(<span class="kw-2">&amp;mut</span> <span class="ident">rd</span>);
-    <span class="macro">write!</span>(<span class="ident">count_rd</span>, <span class="string">&quot;{}&quot;</span>, <span class="ident">record</span>.<span class="ident">msg</span>())<span class="question-mark">?</span>;
-    <span class="prelude-val">Ok</span>(<span class="ident">count_rd</span>.<span class="ident">count</span>() <span class="op">!</span><span class="op">=</span> <span class="number">0</span>)
+    rd.start_msg()<span class="question-mark">?</span>;
+    <span class="kw">let </span><span class="kw-2">mut </span>count_rd = CountingWriter::new(<span class="kw-2">&amp;mut </span>rd);
+    <span class="macro">write!</span>(count_rd, <span class="string">&quot;{}&quot;</span>, record.msg())<span class="question-mark">?</span>;
+    <span class="prelude-val">Ok</span>(count_rd.count() != <span class="number">0</span>)
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="primitives" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (20ffea693 2022-08-11)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="primitives" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>

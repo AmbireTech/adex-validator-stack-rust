@@ -85,92 +85,92 @@
 <span id="85">85</span>
 <span id="86">86</span>
 <span id="87">87</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">parse_display::Display</span>;
-<span class="kw">use</span> <span class="ident">std</span>::{<span class="ident">error::Error</span> <span class="kw">as</span> <span class="ident">StdError</span>, <span class="ident">fmt</span>};
-<span class="kw">use</span> <span class="ident">thiserror::Error</span>;
+</pre><pre class="rust"><code><span class="kw">use </span>parse_display::Display;
+<span class="kw">use </span>std::{error::Error <span class="kw">as </span>StdError, fmt};
+<span class="kw">use </span>thiserror::Error;
 
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">type</span> <span class="ident">BoxError</span> <span class="op">=</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">StdError</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Sync</span><span class="op">&gt;</span>;
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">type </span>BoxError = Box&lt;<span class="kw">dyn </span>StdError + Send + Sync&gt;;
 
-<span class="doccomment">/// The error used by the [`crate::Adapter`] to wrap any custom error from the client</span>
-<span class="doccomment">/// and the kinds of errors that the [`crate::Adapter`] can return.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Error</span>)]</span>
-<span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;{inner}&quot;</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Error</span> {
-    <span class="ident">inner</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="ident">Inner</span><span class="op">&gt;</span>,
+<span class="doccomment">/// The error used by the [`crate::Adapter`] to wrap any custom error from the client
+/// and the kinds of errors that the [`crate::Adapter`] can return.
+</span><span class="attribute">#[derive(Debug, Error)]</span>
+<span class="attribute">#[error(<span class="string">&quot;{inner}&quot;</span>)]</span>
+<span class="kw">pub struct </span>Error {
+    inner: Box&lt;Inner&gt;,
 }
 
-<span class="kw">impl</span> <span class="ident">Error</span> {
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">new</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>(<span class="ident">kind</span>: <span class="ident">Kind</span>, <span class="ident">source</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>) -&gt; <span class="self">Self</span>
-    <span class="kw">where</span>
-        <span class="ident">E</span>: <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">BoxError</span><span class="op">&gt;</span>,
+<span class="kw">impl </span>Error {
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>new&lt;E&gt;(kind: Kind, source: <span class="prelude-ty">Option</span>&lt;E&gt;) -&gt; <span class="self">Self
+    </span><span class="kw">where
+        </span>E: Into&lt;BoxError&gt;,
     {
-        <span class="self">Self</span> {
-            <span class="ident">inner</span>: <span class="ident">Box::new</span>(<span class="ident">Inner</span> {
-                <span class="ident">kind</span>,
-                <span class="ident">source</span>: <span class="ident">source</span>.<span class="ident">map</span>(<span class="ident">Into::into</span>),
+        <span class="self">Self </span>{
+            inner: Box::new(Inner {
+                kind,
+                source: source.map(Into::into),
             }),
         }
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">wallet_unlock</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>(<span class="ident">source</span>: <span class="ident">E</span>) -&gt; <span class="self">Self</span>
-    <span class="kw">where</span>
-        <span class="ident">E</span>: <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">BoxError</span><span class="op">&gt;</span>,
+    <span class="kw">pub fn </span>wallet_unlock&lt;E&gt;(source: E) -&gt; <span class="self">Self
+    </span><span class="kw">where
+        </span>E: Into&lt;BoxError&gt;,
     {
-        <span class="ident"><span class="self">Self</span>::new</span>(<span class="ident">Kind::WalletUnlock</span>, <span class="prelude-val">Some</span>(<span class="ident">source</span>))
+        <span class="self">Self</span>::new(Kind::WalletUnlock, <span class="prelude-val">Some</span>(source))
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">authentication</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>(<span class="ident">source</span>: <span class="ident">E</span>) -&gt; <span class="self">Self</span>
-    <span class="kw">where</span>
-        <span class="ident">E</span>: <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">BoxError</span><span class="op">&gt;</span>,
+    <span class="kw">pub fn </span>authentication&lt;E&gt;(source: E) -&gt; <span class="self">Self
+    </span><span class="kw">where
+        </span>E: Into&lt;BoxError&gt;,
     {
-        <span class="ident"><span class="self">Self</span>::new</span>(<span class="ident">Kind::Authentication</span>, <span class="prelude-val">Some</span>(<span class="ident">source</span>))
+        <span class="self">Self</span>::new(Kind::Authentication, <span class="prelude-val">Some</span>(source))
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">authorization</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>(<span class="ident">source</span>: <span class="ident">E</span>) -&gt; <span class="self">Self</span>
-    <span class="kw">where</span>
-        <span class="ident">E</span>: <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">BoxError</span><span class="op">&gt;</span>,
+    <span class="kw">pub fn </span>authorization&lt;E&gt;(source: E) -&gt; <span class="self">Self
+    </span><span class="kw">where
+        </span>E: Into&lt;BoxError&gt;,
     {
-        <span class="ident"><span class="self">Self</span>::new</span>(<span class="ident">Kind::Authorization</span>, <span class="prelude-val">Some</span>(<span class="ident">source</span>))
+        <span class="self">Self</span>::new(Kind::Authorization, <span class="prelude-val">Some</span>(source))
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">adapter</span><span class="op">&lt;</span><span class="ident">A</span><span class="op">&gt;</span>(<span class="ident">source</span>: <span class="ident">A</span>) -&gt; <span class="self">Self</span>
-    <span class="kw">where</span>
-        <span class="ident">A</span>: <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">BoxError</span><span class="op">&gt;</span>,
+    <span class="kw">pub fn </span>adapter&lt;A&gt;(source: A) -&gt; <span class="self">Self
+    </span><span class="kw">where
+        </span>A: Into&lt;BoxError&gt;,
     {
-        <span class="ident"><span class="self">Self</span>::new</span>(<span class="ident">Kind::Adapter</span>, <span class="prelude-val">Some</span>(<span class="ident">source</span>))
+        <span class="self">Self</span>::new(Kind::Adapter, <span class="prelude-val">Some</span>(source))
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">verify</span><span class="op">&lt;</span><span class="ident">A</span><span class="op">&gt;</span>(<span class="ident">source</span>: <span class="ident">A</span>) -&gt; <span class="self">Self</span>
-    <span class="kw">where</span>
-        <span class="ident">A</span>: <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">BoxError</span><span class="op">&gt;</span>,
+    <span class="kw">pub fn </span>verify&lt;A&gt;(source: A) -&gt; <span class="self">Self
+    </span><span class="kw">where
+        </span>A: Into&lt;BoxError&gt;,
     {
-        <span class="ident"><span class="self">Self</span>::new</span>(<span class="ident">Kind::Verify</span>, <span class="prelude-val">Some</span>(<span class="ident">source</span>))
+        <span class="self">Self</span>::new(Kind::Verify, <span class="prelude-val">Some</span>(source))
     }
 }
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Error</span>)]</span>
-<span class="kw">struct</span> <span class="ident">Inner</span> {
-    <span class="ident">kind</span>: <span class="ident">Kind</span>,
-    <span class="ident">source</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">BoxError</span><span class="op">&gt;</span>,
+<span class="attribute">#[derive(Debug, Error)]</span>
+<span class="kw">struct </span>Inner {
+    kind: Kind,
+    source: <span class="prelude-ty">Option</span>&lt;BoxError&gt;,
 }
 
-<span class="kw">impl</span> <span class="ident">fmt::Display</span> <span class="kw">for</span> <span class="ident">Inner</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="ident">fmt::Result</span> {
-        <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">source</span> {
-            <span class="comment">// Writes: &quot;Kind: Error message here&quot;</span>
-            <span class="prelude-val">Some</span>(<span class="ident">source</span>) =&gt; <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;{}: {}&quot;</span>, <span class="self">self</span>.<span class="ident">kind</span>, <span class="ident">source</span>),
-            <span class="comment">// Writes: &quot;Kind&quot;</span>
-            <span class="prelude-val">None</span> =&gt; <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;{}&quot;</span>, <span class="self">self</span>.<span class="ident">kind</span>),
+<span class="kw">impl </span>fmt::Display <span class="kw">for </span>Inner {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; fmt::Result {
+        <span class="kw">match </span><span class="kw-2">&amp;</span><span class="self">self</span>.source {
+            <span class="comment">// Writes: &quot;Kind: Error message here&quot;
+            </span><span class="prelude-val">Some</span>(source) =&gt; <span class="macro">write!</span>(f, <span class="string">&quot;{}: {}&quot;</span>, <span class="self">self</span>.kind, source),
+            <span class="comment">// Writes: &quot;Kind&quot;
+            </span><span class="prelude-val">None </span>=&gt; <span class="macro">write!</span>(f, <span class="string">&quot;{}&quot;</span>, <span class="self">self</span>.kind),
         }
     }
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Display</span>)]</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">enum</span> <span class="ident">Kind</span> {
-    <span class="ident">Adapter</span>,
-    <span class="ident">WalletUnlock</span>,
-    <span class="ident">Verify</span>,
-    <span class="ident">Authentication</span>,
-    <span class="ident">Authorization</span>,
+<span class="attribute">#[derive(Debug, Display)]</span>
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">enum </span>Kind {
+    Adapter,
+    WalletUnlock,
+    Verify,
+    Authentication,
+    Authorization,
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="adapter" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (20ffea693 2022-08-11)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="adapter" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>

@@ -922,929 +922,929 @@
 <span id="922">922</span>
 <span id="923">923</span>
 <span id="924">924</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">std::collections::HashSet</span>;
+</pre><pre class="rust"><code><span class="kw">use </span>std::collections::HashSet;
 
-<span class="kw">use</span> <span class="ident">futures::TryStreamExt</span>;
-<span class="kw">use</span> <span class="ident">primitives</span>::{
-    <span class="ident">analytics</span>::{<span class="ident">query::AllowedKey</span>, <span class="ident">AnalyticsQuery</span>, <span class="ident">AuthenticateAs</span>, <span class="ident">Metric</span>, <span class="ident">Timeframe</span>},
-    <span class="ident">sentry</span>::{<span class="ident">Analytics</span>, <span class="ident">FetchedAnalytics</span>, <span class="ident">UpdateAnalytics</span>},
+<span class="kw">use </span>futures::TryStreamExt;
+<span class="kw">use </span>primitives::{
+    analytics::{query::AllowedKey, AnalyticsQuery, AuthenticateAs, Metric, Timeframe},
+    sentry::{Analytics, FetchedAnalytics, UpdateAnalytics},
 };
-<span class="kw">use</span> <span class="ident">tokio_postgres</span>::{<span class="ident">types::ToSql</span>, <span class="ident">Row</span>};
+<span class="kw">use </span>tokio_postgres::{types::ToSql, Row};
 
-<span class="kw">use</span> <span class="kw">super</span>::{<span class="ident">DbPool</span>, <span class="ident">PoolError</span>};
+<span class="kw">use super</span>::{DbPool, PoolError};
 
-<span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">get_analytics</span>(
-    <span class="ident">pool</span>: <span class="kw-2">&amp;</span><span class="ident">DbPool</span>,
-    <span class="ident">query</span>: <span class="ident">AnalyticsQuery</span>,
-    <span class="ident">allowed_keys</span>: <span class="ident">HashSet</span><span class="op">&lt;</span><span class="ident">AllowedKey</span><span class="op">&gt;</span>,
-    <span class="ident">auth_as</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">AuthenticateAs</span><span class="op">&gt;</span>,
-    <span class="ident">limit</span>: <span class="ident">u32</span>,
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">FetchedAnalytics</span><span class="op">&gt;</span>, <span class="ident">PoolError</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">client</span> <span class="op">=</span> <span class="ident">pool</span>.<span class="ident">get</span>().<span class="kw">await</span><span class="question-mark">?</span>;
+<span class="kw">pub async fn </span>get_analytics(
+    pool: <span class="kw-2">&amp;</span>DbPool,
+    query: AnalyticsQuery,
+    allowed_keys: HashSet&lt;AllowedKey&gt;,
+    auth_as: <span class="prelude-ty">Option</span>&lt;AuthenticateAs&gt;,
+    limit: u32,
+) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;FetchedAnalytics&gt;, PoolError&gt; {
+    <span class="kw">let </span>client = pool.get().<span class="kw">await</span><span class="question-mark">?</span>;
 
-    <span class="kw">let</span> (<span class="kw-2">mut</span> <span class="ident">where_clauses</span>, <span class="ident">params</span>) <span class="op">=</span>
-        <span class="ident">analytics_query_params</span>(<span class="kw-2">&amp;</span><span class="ident">query</span>, <span class="ident">auth_as</span>.<span class="ident">as_ref</span>(), <span class="kw-2">&amp;</span><span class="ident">allowed_keys</span>);
+    <span class="kw">let </span>(<span class="kw-2">mut </span>where_clauses, params) =
+        analytics_query_params(<span class="kw-2">&amp;</span>query, auth_as.as_ref(), <span class="kw-2">&amp;</span>allowed_keys);
 
-    <span class="kw">if</span> <span class="op">!</span><span class="ident">query</span>.<span class="ident">chains</span>.<span class="ident">is_empty</span>() {
-        <span class="ident">where_clauses</span>.<span class="ident">push</span>(<span class="macro">format!</span>(
+    <span class="kw">if </span>!query.chains.is_empty() {
+        where_clauses.push(<span class="macro">format!</span>(
             <span class="string">&quot;chain_id IN ({})&quot;</span>,
-            <span class="ident">query</span>
-                .<span class="ident">chains</span>
-                .<span class="ident">iter</span>()
-                .<span class="ident">map</span>(<span class="op">|</span><span class="ident">id</span><span class="op">|</span> <span class="ident">id</span>.<span class="ident">to_u32</span>().<span class="ident">to_string</span>())
-                .<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span><span class="op">&gt;</span>()
-                .<span class="ident">join</span>(<span class="string">&quot;,&quot;</span>)
+            query
+                .chains
+                .iter()
+                .map(|id| id.to_u32().to_string())
+                .collect::&lt;Vec&lt;String&gt;&gt;()
+                .join(<span class="string">&quot;,&quot;</span>)
         ));
     }
 
-    <span class="kw">let</span> <span class="ident">time_group</span> <span class="op">=</span> <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="ident">query</span>.<span class="ident">time</span>.<span class="ident">timeframe</span> {
-        <span class="ident">Timeframe::Year</span> =&gt; <span class="string">&quot;date_trunc(&#39;month&#39;, analytics.time) as timeframe_time&quot;</span>,
-        <span class="ident">Timeframe::Month</span> =&gt; <span class="string">&quot;date_trunc(&#39;day&#39;, analytics.time) as timeframe_time&quot;</span>,
-        <span class="ident">Timeframe::Week</span> <span class="op">|</span> <span class="ident">Timeframe::Day</span> =&gt; <span class="string">&quot;date_trunc(&#39;hour&#39;, analytics.time) as timeframe_time&quot;</span>,
+    <span class="kw">let </span>time_group = <span class="kw">match </span><span class="kw-2">&amp;</span>query.time.timeframe {
+        Timeframe::Year =&gt; <span class="string">&quot;date_trunc(&#39;month&#39;, analytics.time) as timeframe_time&quot;</span>,
+        Timeframe::Month =&gt; <span class="string">&quot;date_trunc(&#39;day&#39;, analytics.time) as timeframe_time&quot;</span>,
+        Timeframe::Week | Timeframe::Day =&gt; <span class="string">&quot;date_trunc(&#39;hour&#39;, analytics.time) as timeframe_time&quot;</span>,
     };
 
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">select_clause</span> <span class="op">=</span> <span class="macro">vec!</span>[<span class="ident">time_group</span>.<span class="ident">to_string</span>()];
-    <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="ident">query</span>.<span class="ident">metric</span> {
-        <span class="ident">Metric::Paid</span> =&gt; <span class="ident">select_clause</span>.<span class="ident">push</span>(<span class="string">&quot;SUM(payout_amount)::bigint as value&quot;</span>.<span class="ident">to_string</span>()),
-        <span class="ident">Metric::Count</span> =&gt; <span class="ident">select_clause</span>.<span class="ident">push</span>(<span class="string">&quot;SUM(payout_count)::integer as value&quot;</span>.<span class="ident">to_string</span>()),
+    <span class="kw">let </span><span class="kw-2">mut </span>select_clause = <span class="macro">vec!</span>[time_group.to_string()];
+    <span class="kw">match </span><span class="kw-2">&amp;</span>query.metric {
+        Metric::Paid =&gt; select_clause.push(<span class="string">&quot;SUM(payout_amount)::bigint as value&quot;</span>.to_string()),
+        Metric::Count =&gt; select_clause.push(<span class="string">&quot;SUM(payout_count)::integer as value&quot;</span>.to_string()),
     }
-    <span class="comment">// always group first by the **date_trunc** time</span>
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">group_clause</span> <span class="op">=</span> <span class="macro">vec!</span>[<span class="string">&quot;timeframe_time&quot;</span>.<span class="ident">to_string</span>()];
+    <span class="comment">// always group first by the **date_trunc** time
+    </span><span class="kw">let </span><span class="kw-2">mut </span>group_clause = <span class="macro">vec!</span>[<span class="string">&quot;timeframe_time&quot;</span>.to_string()];
 
-    <span class="comment">// if segment by was passed, use it in group second &amp; select by it</span>
-    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">segment_by</span>) <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">query</span>.<span class="ident">segment_by</span> {
-        <span class="ident">select_clause</span>.<span class="ident">push</span>(<span class="macro">format!</span>(<span class="string">&quot;{} as segment_by&quot;</span>, <span class="ident">segment_by</span>));
-        <span class="ident">group_clause</span>.<span class="ident">push</span>(<span class="string">&quot;segment_by&quot;</span>.<span class="ident">into</span>());
+    <span class="comment">// if segment by was passed, use it in group second &amp; select by it
+    </span><span class="kw">if let </span><span class="prelude-val">Some</span>(segment_by) = <span class="kw-2">&amp;</span>query.segment_by {
+        select_clause.push(<span class="macro">format!</span>(<span class="string">&quot;{} as segment_by&quot;</span>, segment_by));
+        group_clause.push(<span class="string">&quot;segment_by&quot;</span>.into());
     }
 
-    <span class="kw">let</span> <span class="ident">sql_query</span> <span class="op">=</span> <span class="macro">format!</span>(
+    <span class="kw">let </span>sql_query = <span class="macro">format!</span>(
         <span class="string">&quot;SELECT {} FROM analytics WHERE {} GROUP BY {} ORDER BY timeframe_time ASC LIMIT {}&quot;</span>,
-        <span class="ident">select_clause</span>.<span class="ident">join</span>(<span class="string">&quot;, &quot;</span>),
-        <span class="ident">where_clauses</span>.<span class="ident">join</span>(<span class="string">&quot; AND &quot;</span>),
-        <span class="ident">group_clause</span>.<span class="ident">join</span>(<span class="string">&quot;, &quot;</span>),
-        <span class="ident">limit</span>,
+        select_clause.join(<span class="string">&quot;, &quot;</span>),
+        where_clauses.join(<span class="string">&quot; AND &quot;</span>),
+        group_clause.join(<span class="string">&quot;, &quot;</span>),
+        limit,
     );
 
-    <span class="comment">// Prepare SQL statement</span>
-    <span class="kw">let</span> <span class="ident">stmt</span> <span class="op">=</span> <span class="ident">client</span>.<span class="ident">prepare</span>(<span class="kw-2">&amp;</span><span class="ident">sql_query</span>).<span class="kw">await</span><span class="question-mark">?</span>;
-    <span class="comment">// Execute query</span>
-    <span class="kw">let</span> <span class="ident">rows</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Row</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">client</span>.<span class="ident">query_raw</span>(<span class="kw-2">&amp;</span><span class="ident">stmt</span>, <span class="ident">params</span>).<span class="kw">await</span><span class="question-mark">?</span>.<span class="ident">try_collect</span>().<span class="kw">await</span><span class="question-mark">?</span>;
+    <span class="comment">// Prepare SQL statement
+    </span><span class="kw">let </span>stmt = client.prepare(<span class="kw-2">&amp;</span>sql_query).<span class="kw">await</span><span class="question-mark">?</span>;
+    <span class="comment">// Execute query
+    </span><span class="kw">let </span>rows: Vec&lt;Row&gt; = client.query_raw(<span class="kw-2">&amp;</span>stmt, params).<span class="kw">await</span><span class="question-mark">?</span>.try_collect().<span class="kw">await</span><span class="question-mark">?</span>;
 
-    <span class="comment">// FetchedAnalytics requires context using the `AnalyticsQuery`</span>
-    <span class="comment">// this is why we use `impl From&lt;(&amp;AnalyticsQuery, &amp;Row)&gt;`</span>
-    <span class="kw">let</span> <span class="ident">analytics</span> <span class="op">=</span> <span class="ident">rows</span>
-        .<span class="ident">iter</span>()
-        .<span class="ident">map</span>(<span class="op">|</span><span class="ident">row</span><span class="op">|</span> <span class="ident">FetchedAnalytics::from</span>((<span class="kw-2">&amp;</span><span class="ident">query</span>, <span class="ident">row</span>)))
-        .<span class="ident">collect</span>();
+    <span class="comment">// FetchedAnalytics requires context using the `AnalyticsQuery`
+    // this is why we use `impl From&lt;(&amp;AnalyticsQuery, &amp;Row)&gt;`
+    </span><span class="kw">let </span>analytics = rows
+        .iter()
+        .map(|row| FetchedAnalytics::from((<span class="kw-2">&amp;</span>query, row)))
+        .collect();
 
-    <span class="prelude-val">Ok</span>(<span class="ident">analytics</span>)
+    <span class="prelude-val">Ok</span>(analytics)
 }
 
-<span class="kw">fn</span> <span class="ident">analytics_query_params</span>(
-    <span class="ident">query</span>: <span class="kw-2">&amp;</span><span class="ident">AnalyticsQuery</span>,
-    <span class="ident">auth_as</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">AuthenticateAs</span><span class="op">&gt;</span>,
-    <span class="ident">allowed_keys</span>: <span class="kw-2">&amp;</span><span class="ident">HashSet</span><span class="op">&lt;</span><span class="ident">AllowedKey</span><span class="op">&gt;</span>,
-) -&gt; (<span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>, <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Box</span><span class="op">&lt;</span>(<span class="kw">dyn</span> <span class="ident">ToSql</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="ident">Send</span>)<span class="op">&gt;</span><span class="op">&gt;</span>) {
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">where_clauses</span> <span class="op">=</span> <span class="macro">vec!</span>[<span class="string">&quot;\&quot;time\&quot; &gt;= $1&quot;</span>.<span class="ident">to_string</span>()];
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">params</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Box</span><span class="op">&lt;</span>(<span class="kw">dyn</span> <span class="ident">ToSql</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="ident">Send</span>)<span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="macro">vec!</span>[<span class="ident">Box::new</span>(<span class="ident">query</span>.<span class="ident">time</span>.<span class="ident">start</span>)];
+<span class="kw">fn </span>analytics_query_params(
+    query: <span class="kw-2">&amp;</span>AnalyticsQuery,
+    auth_as: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>AuthenticateAs&gt;,
+    allowed_keys: <span class="kw-2">&amp;</span>HashSet&lt;AllowedKey&gt;,
+) -&gt; (Vec&lt;String&gt;, Vec&lt;Box&lt;(<span class="kw">dyn </span>ToSql + Sync + Send)&gt;&gt;) {
+    <span class="kw">let </span><span class="kw-2">mut </span>where_clauses = <span class="macro">vec!</span>[<span class="string">&quot;\&quot;time\&quot; &gt;= $1&quot;</span>.to_string()];
+    <span class="kw">let </span><span class="kw-2">mut </span>params: Vec&lt;Box&lt;(<span class="kw">dyn </span>ToSql + Sync + Send)&gt;&gt; = <span class="macro">vec!</span>[Box::new(query.time.start)];
 
-    <span class="comment">// for all allowed keys of this query</span>
-    <span class="comment">// insert parameter into the SQL if there is a value set for it</span>
-    <span class="kw">for</span> <span class="ident">allowed_key</span> <span class="kw">in</span> <span class="ident">allowed_keys</span>.<span class="ident">iter</span>() {
-        <span class="comment">// IMPORTANT FOR SECURITY: AuthenticateAs must OVERRIDE the value passed to either query.publisher or query.advertiser respectively</span>
-        <span class="kw">let</span> <span class="ident">value</span> <span class="op">=</span> <span class="kw">match</span> (<span class="ident">allowed_key</span>, <span class="ident">auth_as</span>) {
-            (<span class="ident">AllowedKey::Advertiser</span>, <span class="prelude-val">Some</span>(<span class="ident">AuthenticateAs::Advertiser</span>(<span class="ident">advertiser</span>))) =&gt; {
-                <span class="prelude-val">Some</span>(<span class="ident">Box::new</span>(<span class="kw-2">*</span><span class="ident">advertiser</span>) <span class="kw">as</span> <span class="kw">_</span>)
+    <span class="comment">// for all allowed keys of this query
+    // insert parameter into the SQL if there is a value set for it
+    </span><span class="kw">for </span>allowed_key <span class="kw">in </span>allowed_keys.iter() {
+        <span class="comment">// IMPORTANT FOR SECURITY: AuthenticateAs must OVERRIDE the value passed to either query.publisher or query.advertiser respectively
+        </span><span class="kw">let </span>value = <span class="kw">match </span>(allowed_key, auth_as) {
+            (AllowedKey::Advertiser, <span class="prelude-val">Some</span>(AuthenticateAs::Advertiser(advertiser))) =&gt; {
+                <span class="prelude-val">Some</span>(Box::new(<span class="kw-2">*</span>advertiser) <span class="kw">as _</span>)
             }
-            (<span class="ident">AllowedKey::Publisher</span>, <span class="prelude-val">Some</span>(<span class="ident">AuthenticateAs::Publisher</span>(<span class="ident">publisher</span>))) =&gt; {
-                <span class="prelude-val">Some</span>(<span class="ident">Box::new</span>(<span class="kw-2">*</span><span class="ident">publisher</span>) <span class="kw">as</span> <span class="kw">_</span>)
+            (AllowedKey::Publisher, <span class="prelude-val">Some</span>(AuthenticateAs::Publisher(publisher))) =&gt; {
+                <span class="prelude-val">Some</span>(Box::new(<span class="kw-2">*</span>publisher) <span class="kw">as _</span>)
             }
-            <span class="kw">_</span> =&gt; <span class="ident">query</span>.<span class="ident">get_key</span>(<span class="kw-2">*</span><span class="ident">allowed_key</span>),
+            <span class="kw">_ </span>=&gt; query.get_key(<span class="kw-2">*</span>allowed_key),
         };
 
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">value</span>) <span class="op">=</span> <span class="ident">value</span> {
-            <span class="ident">where_clauses</span>.<span class="ident">push</span>(<span class="macro">format!</span>(<span class="string">&quot;{} = ${}&quot;</span>, <span class="ident">allowed_key</span>, <span class="ident">params</span>.<span class="ident">len</span>() <span class="op">+</span> <span class="number">1</span>));
-            <span class="ident">params</span>.<span class="ident">push</span>(<span class="ident">value</span>);
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(value) = value {
+            where_clauses.push(<span class="macro">format!</span>(<span class="string">&quot;{} = ${}&quot;</span>, allowed_key, params.len() + <span class="number">1</span>));
+            params.push(value);
         }
     }
 
-    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">end_date</span>) <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">query</span>.<span class="ident">time</span>.<span class="ident">end</span> {
-        <span class="ident">where_clauses</span>.<span class="ident">push</span>(<span class="macro">format!</span>(<span class="string">&quot;\&quot;time\&quot; &lt;= ${}&quot;</span>, <span class="ident">params</span>.<span class="ident">len</span>() <span class="op">+</span> <span class="number">1</span>));
-        <span class="ident">params</span>.<span class="ident">push</span>(<span class="ident">Box::new</span>(<span class="kw-2">*</span><span class="ident">end_date</span>));
+    <span class="kw">if let </span><span class="prelude-val">Some</span>(end_date) = <span class="kw-2">&amp;</span>query.time.end {
+        where_clauses.push(<span class="macro">format!</span>(<span class="string">&quot;\&quot;time\&quot; &lt;= ${}&quot;</span>, params.len() + <span class="number">1</span>));
+        params.push(Box::new(<span class="kw-2">*</span>end_date));
     }
-    <span class="ident">where_clauses</span>.<span class="ident">push</span>(<span class="macro">format!</span>(<span class="string">&quot;event_type = ${}&quot;</span>, <span class="ident">params</span>.<span class="ident">len</span>() <span class="op">+</span> <span class="number">1</span>));
-    <span class="ident">params</span>.<span class="ident">push</span>(<span class="ident">Box::new</span>(<span class="ident">query</span>.<span class="ident">event_type</span>));
+    where_clauses.push(<span class="macro">format!</span>(<span class="string">&quot;event_type = ${}&quot;</span>, params.len() + <span class="number">1</span>));
+    params.push(Box::new(query.event_type));
 
-    <span class="ident">where_clauses</span>.<span class="ident">push</span>(<span class="macro">format!</span>(<span class="string">&quot;{} IS NOT NULL&quot;</span>, <span class="ident">query</span>.<span class="ident">metric</span>.<span class="ident">column_name</span>()));
+    where_clauses.push(<span class="macro">format!</span>(<span class="string">&quot;{} IS NOT NULL&quot;</span>, query.metric.column_name()));
 
-    (<span class="ident">where_clauses</span>, <span class="ident">params</span>)
+    (where_clauses, params)
 }
 
-<span class="doccomment">/// This will update a record when it&#39;s present by incrementing its payout_amount and payout_count fields</span>
-<span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">update_analytics</span>(
-    <span class="ident">pool</span>: <span class="kw-2">&amp;</span><span class="ident">DbPool</span>,
-    <span class="ident">update_analytics</span>: <span class="ident">UpdateAnalytics</span>,
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Analytics</span>, <span class="ident">PoolError</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">client</span> <span class="op">=</span> <span class="ident">pool</span>.<span class="ident">get</span>().<span class="kw">await</span><span class="question-mark">?</span>;
+<span class="doccomment">/// This will update a record when it&#39;s present by incrementing its payout_amount and payout_count fields
+</span><span class="kw">pub async fn </span>update_analytics(
+    pool: <span class="kw-2">&amp;</span>DbPool,
+    update_analytics: UpdateAnalytics,
+) -&gt; <span class="prelude-ty">Result</span>&lt;Analytics, PoolError&gt; {
+    <span class="kw">let </span>client = pool.get().<span class="kw">await</span><span class="question-mark">?</span>;
 
-    <span class="kw">let</span> <span class="ident">query</span> <span class="op">=</span> <span class="string">&quot;INSERT INTO analytics(campaign_id, time, ad_unit, ad_slot, ad_slot_type, advertiser, publisher, hostname, country, os_name, chain_id, event_type, payout_amount, payout_count)
+    <span class="kw">let </span>query = <span class="string">&quot;INSERT INTO analytics(campaign_id, time, ad_unit, ad_slot, ad_slot_type, advertiser, publisher, hostname, country, os_name, chain_id, event_type, payout_amount, payout_count)
     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
     ON CONFLICT ON CONSTRAINT analytics_pkey DO UPDATE
     SET payout_amount = analytics.payout_amount + EXCLUDED.payout_amount, payout_count = analytics.payout_count + EXCLUDED.payout_count
     RETURNING campaign_id, time, ad_unit, ad_slot, ad_slot_type, advertiser, publisher, hostname, country, os_name, event_type, payout_amount, payout_count&quot;</span>;
 
-    <span class="kw">let</span> <span class="ident">stmt</span> <span class="op">=</span> <span class="ident">client</span>.<span class="ident">prepare_cached</span>(<span class="ident">query</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+    <span class="kw">let </span>stmt = client.prepare_cached(query).<span class="kw">await</span><span class="question-mark">?</span>;
 
-    <span class="kw">let</span> <span class="ident">row</span> <span class="op">=</span> <span class="ident">client</span>
-        .<span class="ident">query_one</span>(
-            <span class="kw-2">&amp;</span><span class="ident">stmt</span>,
+    <span class="kw">let </span>row = client
+        .query_one(
+            <span class="kw-2">&amp;</span>stmt,
             <span class="kw-2">&amp;</span>[
-                <span class="kw-2">&amp;</span><span class="ident">update_analytics</span>.<span class="ident">campaign_id</span>,
-                <span class="kw-2">&amp;</span><span class="ident">update_analytics</span>.<span class="ident">time</span>,
-                <span class="kw-2">&amp;</span><span class="ident">update_analytics</span>.<span class="ident">ad_unit</span>,
-                <span class="kw-2">&amp;</span><span class="ident">update_analytics</span>.<span class="ident">ad_slot</span>,
-                <span class="kw-2">&amp;</span><span class="ident">update_analytics</span>.<span class="ident">ad_slot_type</span>.<span class="ident">clone</span>().<span class="ident">unwrap_or_default</span>(),
-                <span class="kw-2">&amp;</span><span class="ident">update_analytics</span>.<span class="ident">advertiser</span>,
-                <span class="kw-2">&amp;</span><span class="ident">update_analytics</span>.<span class="ident">publisher</span>,
-                <span class="kw-2">&amp;</span><span class="ident">update_analytics</span>
-                    .<span class="ident">hostname</span>
-                    .<span class="ident">as_ref</span>()
-                    .<span class="ident">unwrap_or</span>(<span class="kw-2">&amp;</span><span class="string">&quot;&quot;</span>.<span class="ident">to_string</span>()),
-                <span class="kw-2">&amp;</span><span class="ident">update_analytics</span>.<span class="ident">country</span>.<span class="ident">as_ref</span>().<span class="ident">unwrap_or</span>(<span class="kw-2">&amp;</span><span class="string">&quot;&quot;</span>.<span class="ident">to_string</span>()),
-                <span class="kw-2">&amp;</span><span class="ident">update_analytics</span>.<span class="ident">os_name</span>.<span class="ident">to_string</span>(),
-                <span class="kw-2">&amp;</span><span class="ident">update_analytics</span>.<span class="ident">chain_id</span>,
-                <span class="kw-2">&amp;</span><span class="ident">update_analytics</span>.<span class="ident">event_type</span>,
-                <span class="kw-2">&amp;</span><span class="ident">update_analytics</span>.<span class="ident">amount_to_add</span>,
-                <span class="kw-2">&amp;</span><span class="ident">update_analytics</span>.<span class="ident">count_to_add</span>,
+                <span class="kw-2">&amp;</span>update_analytics.campaign_id,
+                <span class="kw-2">&amp;</span>update_analytics.time,
+                <span class="kw-2">&amp;</span>update_analytics.ad_unit,
+                <span class="kw-2">&amp;</span>update_analytics.ad_slot,
+                <span class="kw-2">&amp;</span>update_analytics.ad_slot_type.clone().unwrap_or_default(),
+                <span class="kw-2">&amp;</span>update_analytics.advertiser,
+                <span class="kw-2">&amp;</span>update_analytics.publisher,
+                <span class="kw-2">&amp;</span>update_analytics
+                    .hostname
+                    .as_ref()
+                    .unwrap_or(<span class="kw-2">&amp;</span><span class="string">&quot;&quot;</span>.to_string()),
+                <span class="kw-2">&amp;</span>update_analytics.country.as_ref().unwrap_or(<span class="kw-2">&amp;</span><span class="string">&quot;&quot;</span>.to_string()),
+                <span class="kw-2">&amp;</span>update_analytics.os_name.to_string(),
+                <span class="kw-2">&amp;</span>update_analytics.chain_id,
+                <span class="kw-2">&amp;</span>update_analytics.event_type,
+                <span class="kw-2">&amp;</span>update_analytics.amount_to_add,
+                <span class="kw-2">&amp;</span>update_analytics.count_to_add,
             ],
         )
         .<span class="kw">await</span><span class="question-mark">?</span>;
 
-    <span class="kw">let</span> <span class="ident">event_analytics</span> <span class="op">=</span> <span class="ident">Analytics::from</span>(<span class="kw-2">&amp;</span><span class="ident">row</span>);
+    <span class="kw">let </span>event_analytics = Analytics::from(<span class="kw-2">&amp;</span>row);
 
-    <span class="prelude-val">Ok</span>(<span class="ident">event_analytics</span>)
+    <span class="prelude-val">Ok</span>(event_analytics)
 }
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
-<span class="kw">mod</span> <span class="ident">test</span> {
-    <span class="kw">use</span> <span class="ident">std::collections::HashMap</span>;
+<span class="attribute">#[cfg(test)]</span>
+<span class="kw">mod </span>test {
+    <span class="kw">use </span>std::collections::HashMap;
 
-    <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
-    <span class="kw">use</span> <span class="ident">primitives</span>::{
-        <span class="ident">analytics</span>::{
-            <span class="ident">query</span>::{<span class="ident">Time</span>, <span class="ident">ALLOWED_KEYS</span>},
-            <span class="ident">OperatingSystem</span>,
+    <span class="kw">use super</span>::<span class="kw-2">*</span>;
+    <span class="kw">use </span>primitives::{
+        analytics::{
+            query::{Time, ALLOWED_KEYS},
+            OperatingSystem,
         },
-        <span class="ident">sentry</span>::{<span class="ident">DateHour</span>, <span class="ident">CLICK</span>, <span class="ident">IMPRESSION</span>},
-        <span class="ident">test_util</span>::{<span class="ident">CREATOR</span>, <span class="ident">DUMMY_AD_UNITS</span>, <span class="ident">DUMMY_CAMPAIGN</span>, <span class="ident">DUMMY_IPFS</span>, <span class="ident">PUBLISHER</span>, <span class="ident">PUBLISHER_2</span>},
-        <span class="ident">unified_num::FromWhole</span>,
-        <span class="ident">AdUnit</span>, <span class="ident">ChainId</span>, <span class="ident">UnifiedNum</span>, <span class="ident">ValidatorId</span>, <span class="ident">IPFS</span>,
+        sentry::{DateHour, CLICK, IMPRESSION},
+        test_util::{CREATOR, DUMMY_AD_UNITS, DUMMY_CAMPAIGN, DUMMY_IPFS, PUBLISHER, PUBLISHER_2},
+        unified_num::FromWhole,
+        AdUnit, ChainId, UnifiedNum, ValidatorId, IPFS,
     };
 
-    <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::db::tests_postgres</span>::{<span class="ident">setup_test_migrations</span>, <span class="ident">DATABASE_POOL</span>};
+    <span class="kw">use </span><span class="kw">crate</span>::db::tests_postgres::{setup_test_migrations, DATABASE_POOL};
 
-    <span class="attribute">#[<span class="ident">tokio::test</span>]</span>
-    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">insert_update_and_get_analytics</span>() {
-        <span class="kw">let</span> <span class="ident">database</span> <span class="op">=</span> <span class="ident">DATABASE_POOL</span>.<span class="ident">get</span>().<span class="kw">await</span>.<span class="ident">expect</span>(<span class="string">&quot;Should get a DB pool&quot;</span>);
+    <span class="attribute">#[tokio::test]</span>
+    <span class="kw">async fn </span>insert_update_and_get_analytics() {
+        <span class="kw">let </span>database = DATABASE_POOL.get().<span class="kw">await</span>.expect(<span class="string">&quot;Should get a DB pool&quot;</span>);
 
-        <span class="kw">let</span> <span class="ident">ad_unit</span> <span class="op">=</span> <span class="ident">DUMMY_AD_UNITS</span>[<span class="number">0</span>].<span class="ident">clone</span>();
-        <span class="kw">let</span> <span class="ident">ad_slot_ipfs</span> <span class="op">=</span> <span class="ident">DUMMY_IPFS</span>[<span class="number">0</span>];
+        <span class="kw">let </span>ad_unit = DUMMY_AD_UNITS[<span class="number">0</span>].clone();
+        <span class="kw">let </span>ad_slot_ipfs = DUMMY_IPFS[<span class="number">0</span>];
 
-        <span class="ident">setup_test_migrations</span>(<span class="ident">database</span>.<span class="ident">pool</span>.<span class="ident">clone</span>())
-            .<span class="kw">await</span>
-            .<span class="ident">expect</span>(<span class="string">&quot;Migrations should succeed&quot;</span>);
+        setup_test_migrations(database.pool.clone())
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;Migrations should succeed&quot;</span>);
 
-        <span class="comment">// Inserts a new Analytics and later updates it by adding more payout &amp; count</span>
-        {
-            <span class="kw">let</span> <span class="ident">update</span> <span class="op">=</span> <span class="ident">UpdateAnalytics</span> {
-                <span class="ident">time</span>: <span class="ident">DateHour::from_ymdh</span>(<span class="number">2021</span>, <span class="number">2</span>, <span class="number">1</span>, <span class="number">1</span>),
-                <span class="ident">campaign_id</span>: <span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">id</span>,
-                <span class="ident">ad_unit</span>: <span class="ident">ad_unit</span>.<span class="ident">ipfs</span>,
-                <span class="ident">ad_slot</span>: <span class="ident">ad_slot_ipfs</span>,
-                <span class="ident">ad_slot_type</span>: <span class="prelude-val">Some</span>(<span class="ident">ad_unit</span>.<span class="ident">ad_type</span>.<span class="ident">clone</span>()),
-                <span class="ident">advertiser</span>: <span class="kw-2">*</span><span class="ident">CREATOR</span>,
-                <span class="ident">publisher</span>: <span class="kw-2">*</span><span class="ident">PUBLISHER</span>,
-                <span class="ident">hostname</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;localhost&quot;</span>.<span class="ident">to_string</span>()),
-                <span class="ident">country</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;Bulgaria&quot;</span>.<span class="ident">to_string</span>()),
-                <span class="ident">os_name</span>: <span class="ident">OperatingSystem::Linux</span>,
-                <span class="ident">chain_id</span>: <span class="ident">ChainId::new</span>(<span class="number">1</span>),
-                <span class="ident">event_type</span>: <span class="ident">IMPRESSION</span>,
-                <span class="ident">amount_to_add</span>: <span class="ident">UnifiedNum::from_u64</span>(<span class="number">1_000_000</span>),
-                <span class="ident">count_to_add</span>: <span class="number">1</span>,
+        <span class="comment">// Inserts a new Analytics and later updates it by adding more payout &amp; count
+        </span>{
+            <span class="kw">let </span>update = UpdateAnalytics {
+                time: DateHour::from_ymdh(<span class="number">2021</span>, <span class="number">2</span>, <span class="number">1</span>, <span class="number">1</span>),
+                campaign_id: DUMMY_CAMPAIGN.id,
+                ad_unit: ad_unit.ipfs,
+                ad_slot: ad_slot_ipfs,
+                ad_slot_type: <span class="prelude-val">Some</span>(ad_unit.ad_type.clone()),
+                advertiser: <span class="kw-2">*</span>CREATOR,
+                publisher: <span class="kw-2">*</span>PUBLISHER,
+                hostname: <span class="prelude-val">Some</span>(<span class="string">&quot;localhost&quot;</span>.to_string()),
+                country: <span class="prelude-val">Some</span>(<span class="string">&quot;Bulgaria&quot;</span>.to_string()),
+                os_name: OperatingSystem::Linux,
+                chain_id: ChainId::new(<span class="number">1</span>),
+                event_type: IMPRESSION,
+                amount_to_add: UnifiedNum::from_u64(<span class="number">1_000_000</span>),
+                count_to_add: <span class="number">1</span>,
             };
 
-            <span class="kw">let</span> <span class="ident">analytics</span> <span class="op">=</span> <span class="ident">update_analytics</span>(<span class="kw-2">&amp;</span><span class="ident">database</span>.<span class="ident">clone</span>(), <span class="ident">update</span>.<span class="ident">clone</span>())
-                .<span class="kw">await</span>
-                .<span class="ident">expect</span>(<span class="string">&quot;Should insert&quot;</span>);
+            <span class="kw">let </span>analytics = update_analytics(<span class="kw-2">&amp;</span>database.clone(), update.clone())
+                .<span class="kw">await
+                </span>.expect(<span class="string">&quot;Should insert&quot;</span>);
 
-            <span class="macro">assert_eq!</span>(<span class="ident">update</span>.<span class="ident">campaign_id</span>, <span class="ident">analytics</span>.<span class="ident">campaign_id</span>);
-            <span class="macro">assert_eq!</span>(<span class="ident">update</span>.<span class="ident">time</span>.<span class="ident">date</span>, <span class="ident">analytics</span>.<span class="ident">time</span>.<span class="ident">date</span>);
-            <span class="macro">assert_eq!</span>(<span class="ident">update</span>.<span class="ident">time</span>.<span class="ident">hour</span>, <span class="ident">analytics</span>.<span class="ident">time</span>.<span class="ident">hour</span>);
-            <span class="macro">assert_eq!</span>(<span class="ident">update</span>.<span class="ident">ad_unit</span>, <span class="ident">analytics</span>.<span class="ident">ad_unit</span>);
-            <span class="macro">assert_eq!</span>(<span class="ident">update</span>.<span class="ident">ad_slot</span>, <span class="ident">analytics</span>.<span class="ident">ad_slot</span>);
-            <span class="macro">assert_eq!</span>(<span class="ident">update</span>.<span class="ident">ad_slot_type</span>, <span class="ident">analytics</span>.<span class="ident">ad_slot_type</span>);
-            <span class="macro">assert_eq!</span>(<span class="ident">update</span>.<span class="ident">advertiser</span>, <span class="ident">analytics</span>.<span class="ident">advertiser</span>);
-            <span class="macro">assert_eq!</span>(<span class="ident">update</span>.<span class="ident">publisher</span>, <span class="ident">analytics</span>.<span class="ident">publisher</span>);
-            <span class="macro">assert_eq!</span>(<span class="ident">update</span>.<span class="ident">hostname</span>, <span class="ident">analytics</span>.<span class="ident">hostname</span>);
-            <span class="macro">assert_eq!</span>(<span class="ident">update</span>.<span class="ident">country</span>, <span class="ident">analytics</span>.<span class="ident">country</span>);
-            <span class="macro">assert_eq!</span>(<span class="ident">update</span>.<span class="ident">os_name</span>, <span class="ident">analytics</span>.<span class="ident">os_name</span>);
-            <span class="macro">assert_eq!</span>(<span class="ident">update</span>.<span class="ident">event_type</span>, <span class="ident">analytics</span>.<span class="ident">event_type</span>);
+            <span class="macro">assert_eq!</span>(update.campaign_id, analytics.campaign_id);
+            <span class="macro">assert_eq!</span>(update.time.date, analytics.time.date);
+            <span class="macro">assert_eq!</span>(update.time.hour, analytics.time.hour);
+            <span class="macro">assert_eq!</span>(update.ad_unit, analytics.ad_unit);
+            <span class="macro">assert_eq!</span>(update.ad_slot, analytics.ad_slot);
+            <span class="macro">assert_eq!</span>(update.ad_slot_type, analytics.ad_slot_type);
+            <span class="macro">assert_eq!</span>(update.advertiser, analytics.advertiser);
+            <span class="macro">assert_eq!</span>(update.publisher, analytics.publisher);
+            <span class="macro">assert_eq!</span>(update.hostname, analytics.hostname);
+            <span class="macro">assert_eq!</span>(update.country, analytics.country);
+            <span class="macro">assert_eq!</span>(update.os_name, analytics.os_name);
+            <span class="macro">assert_eq!</span>(update.event_type, analytics.event_type);
 
-            <span class="macro">assert_eq!</span>(<span class="ident">UnifiedNum::from_u64</span>(<span class="number">1_000_000</span>), <span class="ident">analytics</span>.<span class="ident">payout_amount</span>);
-            <span class="macro">assert_eq!</span>(<span class="number">1</span>, <span class="ident">analytics</span>.<span class="ident">payout_count</span>);
+            <span class="macro">assert_eq!</span>(UnifiedNum::from_u64(<span class="number">1_000_000</span>), analytics.payout_amount);
+            <span class="macro">assert_eq!</span>(<span class="number">1</span>, analytics.payout_count);
 
-            <span class="kw">let</span> <span class="ident">new_update</span> <span class="op">=</span> <span class="ident">UpdateAnalytics</span> {
-                <span class="ident">time</span>: <span class="ident">DateHour::from_ymdh</span>(<span class="number">2021</span>, <span class="number">2</span>, <span class="number">1</span>, <span class="number">1</span>),
-                <span class="ident">campaign_id</span>: <span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">id</span>,
-                <span class="ident">ad_unit</span>: <span class="ident">ad_unit</span>.<span class="ident">ipfs</span>,
-                <span class="ident">ad_slot</span>: <span class="ident">ad_slot_ipfs</span>,
-                <span class="ident">ad_slot_type</span>: <span class="prelude-val">Some</span>(<span class="ident">ad_unit</span>.<span class="ident">ad_type</span>.<span class="ident">clone</span>()),
-                <span class="ident">advertiser</span>: <span class="kw-2">*</span><span class="ident">CREATOR</span>,
-                <span class="ident">publisher</span>: <span class="kw-2">*</span><span class="ident">PUBLISHER</span>,
-                <span class="ident">hostname</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;localhost&quot;</span>.<span class="ident">to_string</span>()),
-                <span class="ident">country</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;Bulgaria&quot;</span>.<span class="ident">to_string</span>()),
-                <span class="ident">os_name</span>: <span class="ident">OperatingSystem::Linux</span>,
-                <span class="ident">chain_id</span>: <span class="ident">ChainId::new</span>(<span class="number">1</span>),
-                <span class="ident">event_type</span>: <span class="ident">IMPRESSION</span>,
-                <span class="ident">amount_to_add</span>: <span class="ident">UnifiedNum::from_u64</span>(<span class="number">1_000_000</span>),
-                <span class="ident">count_to_add</span>: <span class="number">69</span>,
+            <span class="kw">let </span>new_update = UpdateAnalytics {
+                time: DateHour::from_ymdh(<span class="number">2021</span>, <span class="number">2</span>, <span class="number">1</span>, <span class="number">1</span>),
+                campaign_id: DUMMY_CAMPAIGN.id,
+                ad_unit: ad_unit.ipfs,
+                ad_slot: ad_slot_ipfs,
+                ad_slot_type: <span class="prelude-val">Some</span>(ad_unit.ad_type.clone()),
+                advertiser: <span class="kw-2">*</span>CREATOR,
+                publisher: <span class="kw-2">*</span>PUBLISHER,
+                hostname: <span class="prelude-val">Some</span>(<span class="string">&quot;localhost&quot;</span>.to_string()),
+                country: <span class="prelude-val">Some</span>(<span class="string">&quot;Bulgaria&quot;</span>.to_string()),
+                os_name: OperatingSystem::Linux,
+                chain_id: ChainId::new(<span class="number">1</span>),
+                event_type: IMPRESSION,
+                amount_to_add: UnifiedNum::from_u64(<span class="number">1_000_000</span>),
+                count_to_add: <span class="number">69</span>,
             };
 
-            <span class="kw">let</span> <span class="ident">analytics_updated</span> <span class="op">=</span> <span class="ident">update_analytics</span>(<span class="kw-2">&amp;</span><span class="ident">database</span>.<span class="ident">clone</span>(), <span class="ident">new_update</span>.<span class="ident">clone</span>())
-                .<span class="kw">await</span>
-                .<span class="ident">expect</span>(<span class="string">&quot;Should update&quot;</span>);
+            <span class="kw">let </span>analytics_updated = update_analytics(<span class="kw-2">&amp;</span>database.clone(), new_update.clone())
+                .<span class="kw">await
+                </span>.expect(<span class="string">&quot;Should update&quot;</span>);
 
             <span class="macro">assert_eq!</span>(
-                <span class="ident">analytics_updated</span>.<span class="ident">payout_amount</span>,
-                <span class="ident">UnifiedNum::from_u64</span>(<span class="number">2_000_000</span>)
+                analytics_updated.payout_amount,
+                UnifiedNum::from_u64(<span class="number">2_000_000</span>)
             );
-            <span class="macro">assert_eq!</span>(<span class="ident">analytics_updated</span>.<span class="ident">payout_count</span>, <span class="number">70</span>);
+            <span class="macro">assert_eq!</span>(analytics_updated.payout_count, <span class="number">70</span>);
         }
 
-        <span class="comment">// On empty fields marked as `NOT NULL` it should successfully insert a new analytics</span>
-        {
-            <span class="kw">let</span> <span class="ident">analytics_with_empty_fields</span> <span class="op">=</span> <span class="ident">UpdateAnalytics</span> {
-                <span class="ident">time</span>: <span class="ident">DateHour::from_ymdh</span>(<span class="number">2021</span>, <span class="number">2</span>, <span class="number">1</span>, <span class="number">1</span>),
-                <span class="ident">campaign_id</span>: <span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">id</span>,
-                <span class="ident">ad_unit</span>: <span class="ident">DUMMY_IPFS</span>[<span class="number">1</span>],
-                <span class="ident">ad_slot</span>: <span class="ident">DUMMY_IPFS</span>[<span class="number">0</span>],
-                <span class="ident">ad_slot_type</span>: <span class="prelude-val">None</span>,
-                <span class="ident">advertiser</span>: <span class="kw-2">*</span><span class="ident">CREATOR</span>,
-                <span class="ident">publisher</span>: <span class="kw-2">*</span><span class="ident">PUBLISHER</span>,
-                <span class="ident">hostname</span>: <span class="prelude-val">None</span>,
-                <span class="ident">country</span>: <span class="prelude-val">None</span>,
-                <span class="ident">os_name</span>: <span class="ident">OperatingSystem::Linux</span>,
-                <span class="ident">chain_id</span>: <span class="ident">ChainId::new</span>(<span class="number">1</span>),
-                <span class="ident">event_type</span>: <span class="ident">IMPRESSION</span>,
-                <span class="ident">amount_to_add</span>: <span class="ident">UnifiedNum::from_u64</span>(<span class="number">1_000_000</span>),
-                <span class="ident">count_to_add</span>: <span class="number">1</span>,
+        <span class="comment">// On empty fields marked as `NOT NULL` it should successfully insert a new analytics
+        </span>{
+            <span class="kw">let </span>analytics_with_empty_fields = UpdateAnalytics {
+                time: DateHour::from_ymdh(<span class="number">2021</span>, <span class="number">2</span>, <span class="number">1</span>, <span class="number">1</span>),
+                campaign_id: DUMMY_CAMPAIGN.id,
+                ad_unit: DUMMY_IPFS[<span class="number">1</span>],
+                ad_slot: DUMMY_IPFS[<span class="number">0</span>],
+                ad_slot_type: <span class="prelude-val">None</span>,
+                advertiser: <span class="kw-2">*</span>CREATOR,
+                publisher: <span class="kw-2">*</span>PUBLISHER,
+                hostname: <span class="prelude-val">None</span>,
+                country: <span class="prelude-val">None</span>,
+                os_name: OperatingSystem::Linux,
+                chain_id: ChainId::new(<span class="number">1</span>),
+                event_type: IMPRESSION,
+                amount_to_add: UnifiedNum::from_u64(<span class="number">1_000_000</span>),
+                count_to_add: <span class="number">1</span>,
             };
 
-            <span class="kw">let</span> <span class="ident">insert_res</span> <span class="op">=</span>
-                <span class="ident">update_analytics</span>(<span class="kw-2">&amp;</span><span class="ident">database</span>.<span class="ident">clone</span>(), <span class="ident">analytics_with_empty_fields</span>.<span class="ident">clone</span>())
-                    .<span class="kw">await</span>
-                    .<span class="ident">expect</span>(<span class="string">&quot;Should insert&quot;</span>);
+            <span class="kw">let </span>insert_res =
+                update_analytics(<span class="kw-2">&amp;</span>database.clone(), analytics_with_empty_fields.clone())
+                    .<span class="kw">await
+                    </span>.expect(<span class="string">&quot;Should insert&quot;</span>);
 
-            <span class="macro">assert_eq!</span>(<span class="ident">insert_res</span>.<span class="ident">ad_unit</span>, <span class="ident">analytics_with_empty_fields</span>.<span class="ident">ad_unit</span>);
-            <span class="macro">assert_eq!</span>(<span class="ident">insert_res</span>.<span class="ident">ad_slot</span>, <span class="ident">analytics_with_empty_fields</span>.<span class="ident">ad_slot</span>);
+            <span class="macro">assert_eq!</span>(insert_res.ad_unit, analytics_with_empty_fields.ad_unit);
+            <span class="macro">assert_eq!</span>(insert_res.ad_slot, analytics_with_empty_fields.ad_slot);
             <span class="macro">assert_eq!</span>(
-                <span class="ident">insert_res</span>.<span class="ident">ad_slot_type</span>,
-                <span class="ident">analytics_with_empty_fields</span>.<span class="ident">ad_slot_type</span>
+                insert_res.ad_slot_type,
+                analytics_with_empty_fields.ad_slot_type
             );
-            <span class="macro">assert_eq!</span>(<span class="ident">insert_res</span>.<span class="ident">hostname</span>, <span class="ident">analytics_with_empty_fields</span>.<span class="ident">hostname</span>);
-            <span class="macro">assert_eq!</span>(<span class="ident">insert_res</span>.<span class="ident">country</span>, <span class="ident">analytics_with_empty_fields</span>.<span class="ident">country</span>);
+            <span class="macro">assert_eq!</span>(insert_res.hostname, analytics_with_empty_fields.hostname);
+            <span class="macro">assert_eq!</span>(insert_res.country, analytics_with_empty_fields.country);
         }
     }
 
-    <span class="attribute">#[<span class="ident">tokio::test</span>]</span>
-    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">test_get_analytics_in_december</span>() {
-        <span class="kw">let</span> <span class="ident">database</span> <span class="op">=</span> <span class="ident">DATABASE_POOL</span>.<span class="ident">get</span>().<span class="kw">await</span>.<span class="ident">expect</span>(<span class="string">&quot;Should get a DB pool&quot;</span>);
+    <span class="attribute">#[tokio::test]</span>
+    <span class="kw">async fn </span>test_get_analytics_in_december() {
+        <span class="kw">let </span>database = DATABASE_POOL.get().<span class="kw">await</span>.expect(<span class="string">&quot;Should get a DB pool&quot;</span>);
 
-        <span class="kw">let</span> <span class="ident">ad_unit</span> <span class="op">=</span> <span class="ident">DUMMY_AD_UNITS</span>[<span class="number">0</span>].<span class="ident">clone</span>();
-        <span class="kw">let</span> <span class="ident">ad_unit_2</span> <span class="op">=</span> <span class="ident">DUMMY_AD_UNITS</span>[<span class="number">1</span>].<span class="ident">clone</span>();
-        <span class="kw">let</span> <span class="ident">ad_slot_ipfs</span> <span class="op">=</span> <span class="ident">DUMMY_IPFS</span>[<span class="number">0</span>];
+        <span class="kw">let </span>ad_unit = DUMMY_AD_UNITS[<span class="number">0</span>].clone();
+        <span class="kw">let </span>ad_unit_2 = DUMMY_AD_UNITS[<span class="number">1</span>].clone();
+        <span class="kw">let </span>ad_slot_ipfs = DUMMY_IPFS[<span class="number">0</span>];
 
-        <span class="ident">setup_test_migrations</span>(<span class="ident">database</span>.<span class="ident">pool</span>.<span class="ident">clone</span>())
-            .<span class="kw">await</span>
-            .<span class="ident">expect</span>(<span class="string">&quot;Migrations should succeed&quot;</span>);
+        setup_test_migrations(database.pool.clone())
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;Migrations should succeed&quot;</span>);
 
-        <span class="kw">let</span> <span class="ident">start_date</span> <span class="op">=</span> <span class="ident">DateHour::from_ymdh</span>(<span class="number">2021</span>, <span class="number">12</span>, <span class="number">1</span>, <span class="number">0</span>);
-        <span class="kw">let</span> <span class="ident">end_date</span> <span class="op">=</span> <span class="ident">DateHour::from_ymdh</span>(<span class="number">2022</span>, <span class="number">12</span>, <span class="number">31</span>, <span class="number">23</span>);
+        <span class="kw">let </span>start_date = DateHour::from_ymdh(<span class="number">2021</span>, <span class="number">12</span>, <span class="number">1</span>, <span class="number">0</span>);
+        <span class="kw">let </span>end_date = DateHour::from_ymdh(<span class="number">2022</span>, <span class="number">12</span>, <span class="number">31</span>, <span class="number">23</span>);
 
-        <span class="kw">let</span> <span class="ident">december_days</span> <span class="op">=</span> <span class="number">1</span>..<span class="op">=</span><span class="number">31_u32</span>;
-        <span class="kw">let</span> <span class="ident">hours</span> <span class="op">=</span> <span class="number">0</span>..<span class="op">=</span><span class="number">23_u32</span>;
+        <span class="kw">let </span>december_days = <span class="number">1</span>..=<span class="number">31_u32</span>;
+        <span class="kw">let </span>hours = <span class="number">0</span>..=<span class="number">23_u32</span>;
 
-        <span class="ident">generate_analytics_for_december_2021</span>(<span class="kw-2">&amp;</span><span class="ident">database</span>.<span class="ident">pool</span>, <span class="kw-2">&amp;</span><span class="ident">ad_unit</span>, <span class="ident">ad_slot_ipfs</span>).<span class="kw">await</span>;
-        <span class="comment">//</span>
-        <span class="comment">//</span>
-        <span class="comment">// TODO: throw a few more analytics in specific DateHours w/ unique Query and check if it filters the analytics correctly</span>
-        <span class="kw">let</span> <span class="ident">other_analytics</span>: <span class="ident">HashMap</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">Analytics</span><span class="op">&gt;</span> <span class="op">=</span> {
-            <span class="comment">// 5.12.2021 16:00</span>
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">click_germany</span> <span class="op">=</span> <span class="ident">make_click_analytics</span>(<span class="kw-2">&amp;</span><span class="ident">ad_unit</span>, <span class="ident">ad_slot_ipfs</span>, <span class="number">5</span>, <span class="number">16</span>);
-            <span class="ident">click_germany</span>.<span class="ident">country</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="string">&quot;Germany&quot;</span>.<span class="ident">into</span>());
-            <span class="kw">let</span> <span class="ident">click_germany</span> <span class="op">=</span> <span class="ident">update_analytics</span>(<span class="kw-2">&amp;</span><span class="ident">database</span>.<span class="ident">pool</span>, <span class="ident">click_germany</span>)
-                .<span class="kw">await</span>
-                .<span class="ident">expect</span>(<span class="string">&quot;Should update&quot;</span>);
+        generate_analytics_for_december_2021(<span class="kw-2">&amp;</span>database.pool, <span class="kw-2">&amp;</span>ad_unit, ad_slot_ipfs).<span class="kw">await</span>;
+        <span class="comment">//
+        //
+        // TODO: throw a few more analytics in specific DateHours w/ unique Query and check if it filters the analytics correctly
+        </span><span class="kw">let </span>other_analytics: HashMap&lt;<span class="kw-2">&amp;</span>str, Analytics&gt; = {
+            <span class="comment">// 5.12.2021 16:00
+            </span><span class="kw">let </span><span class="kw-2">mut </span>click_germany = make_click_analytics(<span class="kw-2">&amp;</span>ad_unit, ad_slot_ipfs, <span class="number">5</span>, <span class="number">16</span>);
+            click_germany.country = <span class="prelude-val">Some</span>(<span class="string">&quot;Germany&quot;</span>.into());
+            <span class="kw">let </span>click_germany = update_analytics(<span class="kw-2">&amp;</span>database.pool, click_germany)
+                .<span class="kw">await
+                </span>.expect(<span class="string">&quot;Should update&quot;</span>);
 
-            <span class="comment">// 6.12.2021 9:00</span>
-            <span class="kw">let</span> <span class="ident">impression_ad_unit_2</span> <span class="op">=</span> <span class="ident">make_impression_analytics</span>(<span class="kw-2">&amp;</span><span class="ident">ad_unit_2</span>, <span class="ident">ad_slot_ipfs</span>, <span class="number">6</span>, <span class="number">9</span>);
-            <span class="kw">let</span> <span class="ident">impression_ad_unit_2</span> <span class="op">=</span> <span class="ident">update_analytics</span>(<span class="kw-2">&amp;</span><span class="ident">database</span>.<span class="ident">pool</span>, <span class="ident">impression_ad_unit_2</span>)
-                .<span class="kw">await</span>
-                .<span class="ident">expect</span>(<span class="string">&quot;Should update&quot;</span>);
+            <span class="comment">// 6.12.2021 9:00
+            </span><span class="kw">let </span>impression_ad_unit_2 = make_impression_analytics(<span class="kw-2">&amp;</span>ad_unit_2, ad_slot_ipfs, <span class="number">6</span>, <span class="number">9</span>);
+            <span class="kw">let </span>impression_ad_unit_2 = update_analytics(<span class="kw-2">&amp;</span>database.pool, impression_ad_unit_2)
+                .<span class="kw">await
+                </span>.expect(<span class="string">&quot;Should update&quot;</span>);
 
-            <span class="comment">// 7.12.2021 21:00</span>
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">impression_publisher_2</span> <span class="op">=</span>
-                <span class="ident">make_impression_analytics</span>(<span class="kw-2">&amp;</span><span class="ident">ad_unit</span>, <span class="ident">ad_slot_ipfs</span>, <span class="number">7</span>, <span class="number">21</span>);
-            <span class="ident">impression_publisher_2</span>.<span class="ident">publisher</span> <span class="op">=</span> <span class="kw-2">*</span><span class="ident">PUBLISHER_2</span>;
-            <span class="kw">let</span> <span class="ident">impression_publisher_2</span> <span class="op">=</span> <span class="ident">update_analytics</span>(<span class="kw-2">&amp;</span><span class="ident">database</span>.<span class="ident">pool</span>, <span class="ident">impression_publisher_2</span>)
-                .<span class="kw">await</span>
-                .<span class="ident">expect</span>(<span class="string">&quot;Should update&quot;</span>);
+            <span class="comment">// 7.12.2021 21:00
+            </span><span class="kw">let </span><span class="kw-2">mut </span>impression_publisher_2 =
+                make_impression_analytics(<span class="kw-2">&amp;</span>ad_unit, ad_slot_ipfs, <span class="number">7</span>, <span class="number">21</span>);
+            impression_publisher_2.publisher = <span class="kw-2">*</span>PUBLISHER_2;
+            <span class="kw">let </span>impression_publisher_2 = update_analytics(<span class="kw-2">&amp;</span>database.pool, impression_publisher_2)
+                .<span class="kw">await
+                </span>.expect(<span class="string">&quot;Should update&quot;</span>);
 
             <span class="macro">vec!</span>[
-                (<span class="string">&quot;click_germany&quot;</span>, <span class="ident">click_germany</span>),
-                (<span class="string">&quot;impression_ad_unit_2&quot;</span>, <span class="ident">impression_ad_unit_2</span>),
-                (<span class="string">&quot;impression_publisher_2&quot;</span>, <span class="ident">impression_publisher_2</span>),
+                (<span class="string">&quot;click_germany&quot;</span>, click_germany),
+                (<span class="string">&quot;impression_ad_unit_2&quot;</span>, impression_ad_unit_2),
+                (<span class="string">&quot;impression_publisher_2&quot;</span>, impression_publisher_2),
             ]
-            .<span class="ident">into_iter</span>()
-            .<span class="ident">collect</span>()
+            .into_iter()
+            .collect()
         };
-        <span class="comment">//</span>
-        <span class="comment">//</span>
+        <span class="comment">//
+        //
 
-        <span class="kw">let</span> <span class="ident">amount_per_day</span>: <span class="ident">UnifiedNum</span> <span class="op">=</span> <span class="ident">hours</span>
-            .<span class="ident">clone</span>()
-            .<span class="ident">map</span>(<span class="op">|</span><span class="ident">hour</span><span class="op">|</span> <span class="ident">UnifiedNum::from_whole</span>(<span class="ident">hour</span> <span class="kw">as</span> <span class="ident">u64</span>))
-            .<span class="ident">sum</span>::<span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span><span class="op">&gt;</span>()
-            .<span class="ident">expect</span>(<span class="string">&quot;Should not overflow&quot;</span>);
-        <span class="kw">let</span> <span class="ident">amount_for_month</span>: <span class="ident">UnifiedNum</span> <span class="op">=</span> <span class="ident">december_days</span>
-            .<span class="ident">clone</span>()
-            .<span class="ident">map</span>(<span class="op">|</span><span class="ident">day_n</span><span class="op">|</span> <span class="ident">amount_per_day</span> <span class="op">*</span> <span class="ident">UnifiedNum::from_whole</span>(<span class="ident">day_n</span> <span class="kw">as</span> <span class="ident">u64</span>))
-            .<span class="ident">sum</span>::<span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">UnifiedNum</span><span class="op">&gt;</span><span class="op">&gt;</span>()
-            .<span class="ident">expect</span>(<span class="string">&quot;Should not overflow&quot;</span>);
+        </span><span class="kw">let </span>amount_per_day: UnifiedNum = hours
+            .clone()
+            .map(|hour| UnifiedNum::from_whole(hour <span class="kw">as </span>u64))
+            .sum::&lt;<span class="prelude-ty">Option</span>&lt;<span class="kw">_</span>&gt;&gt;()
+            .expect(<span class="string">&quot;Should not overflow&quot;</span>);
+        <span class="kw">let </span>amount_for_month: UnifiedNum = december_days
+            .clone()
+            .map(|day_n| amount_per_day * UnifiedNum::from_whole(day_n <span class="kw">as </span>u64))
+            .sum::&lt;<span class="prelude-ty">Option</span>&lt;UnifiedNum&gt;&gt;()
+            .expect(<span class="string">&quot;Should not overflow&quot;</span>);
 
-        <span class="kw">let</span> <span class="ident">count_sum</span> <span class="op">=</span> <span class="op">|</span><span class="ident">fetched_analytics</span>: <span class="kw-2">&amp;</span>[<span class="ident">FetchedAnalytics</span>]<span class="op">|</span> -&gt; <span class="ident">u32</span> {
-            <span class="ident">fetched_analytics</span>
-                .<span class="ident">iter</span>()
-                .<span class="ident">map</span>(<span class="op">|</span><span class="ident">analytics</span><span class="op">|</span> <span class="ident">analytics</span>.<span class="ident">value</span>.<span class="ident">get_count</span>().<span class="ident">expect</span>(<span class="string">&quot;Should be Count&quot;</span>))
-                .<span class="ident">sum</span>()
+        <span class="kw">let </span>count_sum = |fetched_analytics: <span class="kw-2">&amp;</span>[FetchedAnalytics]| -&gt; u32 {
+            fetched_analytics
+                .iter()
+                .map(|analytics| analytics.value.get_count().expect(<span class="string">&quot;Should be Count&quot;</span>))
+                .sum()
         };
 
-        <span class="kw">let</span> <span class="ident">count_per_day</span>: <span class="ident">u32</span> <span class="op">=</span> <span class="ident">hours</span>.<span class="ident">sum</span>();
-        <span class="comment">// 276 events per day</span>
-        <span class="macro">assert_eq!</span>(<span class="number">276</span>, <span class="ident">count_per_day</span>);
+        <span class="kw">let </span>count_per_day: u32 = hours.sum();
+        <span class="comment">// 276 events per day
+        </span><span class="macro">assert_eq!</span>(<span class="number">276</span>, count_per_day);
 
-        <span class="kw">let</span> <span class="ident">impression_query</span> <span class="op">=</span> <span class="ident">AnalyticsQuery</span> {
-            <span class="ident">limit</span>: <span class="number">1000</span>,
-            <span class="ident">event_type</span>: <span class="ident">IMPRESSION</span>,
-            <span class="ident">metric</span>: <span class="ident">Metric::Count</span>,
-            <span class="ident">segment_by</span>: <span class="prelude-val">Some</span>(<span class="ident">AllowedKey::Country</span>),
-            <span class="ident">time</span>: <span class="ident">Time</span> {
-                <span class="ident">timeframe</span>: <span class="ident">Timeframe::Month</span>,
-                <span class="ident">start</span>: <span class="ident">start_date</span>,
-                <span class="ident">end</span>: <span class="prelude-val">Some</span>(<span class="ident">end_date</span>),
+        <span class="kw">let </span>impression_query = AnalyticsQuery {
+            limit: <span class="number">1000</span>,
+            event_type: IMPRESSION,
+            metric: Metric::Count,
+            segment_by: <span class="prelude-val">Some</span>(AllowedKey::Country),
+            time: Time {
+                timeframe: Timeframe::Month,
+                start: start_date,
+                end: <span class="prelude-val">Some</span>(end_date),
             },
-            <span class="ident">campaign_id</span>: <span class="prelude-val">Some</span>(<span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">id</span>),
-            <span class="ident">ad_unit</span>: <span class="prelude-val">Some</span>(<span class="ident">ad_unit</span>.<span class="ident">ipfs</span>),
-            <span class="ident">ad_slot</span>: <span class="prelude-val">Some</span>(<span class="ident">ad_slot_ipfs</span>),
-            <span class="ident">ad_slot_type</span>: <span class="prelude-val">Some</span>(<span class="ident">ad_unit</span>.<span class="ident">ad_type</span>.<span class="ident">clone</span>()),
-            <span class="ident">advertiser</span>: <span class="prelude-val">Some</span>(<span class="kw-2">*</span><span class="ident">CREATOR</span>),
-            <span class="ident">publisher</span>: <span class="prelude-val">Some</span>(<span class="kw-2">*</span><span class="ident">PUBLISHER</span>),
-            <span class="ident">hostname</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;localhost&quot;</span>.<span class="ident">into</span>()),
-            <span class="ident">country</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;Bulgaria&quot;</span>.<span class="ident">into</span>()),
-            <span class="ident">os_name</span>: <span class="prelude-val">Some</span>(<span class="ident">OperatingSystem::Linux</span>),
-            <span class="ident">chains</span>: <span class="macro">vec!</span>[],
+            campaign_id: <span class="prelude-val">Some</span>(DUMMY_CAMPAIGN.id),
+            ad_unit: <span class="prelude-val">Some</span>(ad_unit.ipfs),
+            ad_slot: <span class="prelude-val">Some</span>(ad_slot_ipfs),
+            ad_slot_type: <span class="prelude-val">Some</span>(ad_unit.ad_type.clone()),
+            advertiser: <span class="prelude-val">Some</span>(<span class="kw-2">*</span>CREATOR),
+            publisher: <span class="prelude-val">Some</span>(<span class="kw-2">*</span>PUBLISHER),
+            hostname: <span class="prelude-val">Some</span>(<span class="string">&quot;localhost&quot;</span>.into()),
+            country: <span class="prelude-val">Some</span>(<span class="string">&quot;Bulgaria&quot;</span>.into()),
+            os_name: <span class="prelude-val">Some</span>(OperatingSystem::Linux),
+            chains: <span class="macro">vec!</span>[],
         };
 
-        <span class="comment">// Impression query - should count all inserted Analytics</span>
-        {
-            <span class="kw">let</span> <span class="ident">count_impressions</span> <span class="op">=</span> <span class="ident">get_analytics</span>(
-                <span class="kw-2">&amp;</span><span class="ident">database</span>.<span class="ident">pool</span>,
-                <span class="ident">impression_query</span>.<span class="ident">clone</span>(),
-                <span class="ident">ALLOWED_KEYS</span>.<span class="ident">clone</span>(),
+        <span class="comment">// Impression query - should count all inserted Analytics
+        </span>{
+            <span class="kw">let </span>count_impressions = get_analytics(
+                <span class="kw-2">&amp;</span>database.pool,
+                impression_query.clone(),
+                ALLOWED_KEYS.clone(),
                 <span class="prelude-val">None</span>,
-                <span class="ident">impression_query</span>.<span class="ident">limit</span>,
+                impression_query.limit,
             )
-            .<span class="kw">await</span>
-            .<span class="ident">expect</span>(<span class="string">&quot;Should fetch&quot;</span>);
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;Should fetch&quot;</span>);
 
-            <span class="comment">// check at least 1 day of the month to validate the expected count</span>
-            <span class="kw">let</span> <span class="ident">first_day_count</span> <span class="op">=</span> <span class="ident">count_impressions</span>
-                .<span class="ident">get</span>(<span class="number">0</span>)
-                .<span class="ident">expect</span>(<span class="string">&quot;Should have index 0&quot;</span>)
-                .<span class="ident">value</span>
-                .<span class="ident">get_count</span>()
-                .<span class="ident">expect</span>(<span class="string">&quot;Should be Count&quot;</span>);
+            <span class="comment">// check at least 1 day of the month to validate the expected count
+            </span><span class="kw">let </span>first_day_count = count_impressions
+                .get(<span class="number">0</span>)
+                .expect(<span class="string">&quot;Should have index 0&quot;</span>)
+                .value
+                .get_count()
+                .expect(<span class="string">&quot;Should be Count&quot;</span>);
 
-            <span class="macro">assert_eq!</span>(<span class="ident">count_per_day</span>, <span class="ident">first_day_count</span>);
+            <span class="macro">assert_eq!</span>(count_per_day, first_day_count);
 
-            <span class="comment">// All Counts for 31 days should match</span>
-            <span class="macro">assert_eq!</span>(<span class="number">31</span> <span class="op">*</span> <span class="ident">count_per_day</span>, <span class="ident">count_sum</span>(<span class="kw-2">&amp;</span><span class="ident">count_impressions</span>));
+            <span class="comment">// All Counts for 31 days should match
+            </span><span class="macro">assert_eq!</span>(<span class="number">31 </span>* count_per_day, count_sum(<span class="kw-2">&amp;</span>count_impressions));
 
-            <span class="comment">// Check 2 days in the month</span>
-            <span class="comment">// 2.12.2021 &amp; 3.12.2021</span>
-            <span class="kw">let</span> <span class="ident">two_days_fetched_count</span> <span class="op">=</span> <span class="ident">count_impressions</span>
-                <span class="comment">// indices should match with 2nd and 3rd December</span>
-                .<span class="ident">get</span>(<span class="number">2</span>..<span class="op">=</span><span class="number">3</span>)
-                .<span class="ident">expect</span>(<span class="string">&quot;Should have indices of the range&quot;</span>)
-                .<span class="ident">iter</span>()
-                .<span class="ident">map</span>(<span class="op">|</span><span class="ident">fetched</span><span class="op">|</span> {
-                    <span class="ident">fetched</span>
-                        .<span class="ident">value</span>
-                        .<span class="ident">get_count</span>()
-                        .<span class="ident">expect</span>(<span class="string">&quot;Should be a Metric::Count&quot;</span>)
+            <span class="comment">// Check 2 days in the month
+            // 2.12.2021 &amp; 3.12.2021
+            </span><span class="kw">let </span>two_days_fetched_count = count_impressions
+                <span class="comment">// indices should match with 2nd and 3rd December
+                </span>.get(<span class="number">2</span>..=<span class="number">3</span>)
+                .expect(<span class="string">&quot;Should have indices of the range&quot;</span>)
+                .iter()
+                .map(|fetched| {
+                    fetched
+                        .value
+                        .get_count()
+                        .expect(<span class="string">&quot;Should be a Metric::Count&quot;</span>)
                 })
-                .<span class="ident">sum</span>::<span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>();
+                .sum::&lt;u32&gt;();
 
-            <span class="macro">assert_eq!</span>(<span class="number">2</span> <span class="op">*</span> <span class="ident">count_per_day</span>, <span class="ident">two_days_fetched_count</span>);
+            <span class="macro">assert_eq!</span>(<span class="number">2 </span>* count_per_day, two_days_fetched_count);
 
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">paid_impressions_query</span> <span class="op">=</span> <span class="ident">impression_query</span>.<span class="ident">clone</span>();
-            <span class="ident">paid_impressions_query</span>.<span class="ident">metric</span> <span class="op">=</span> <span class="ident">Metric::Paid</span>;
+            <span class="kw">let </span><span class="kw-2">mut </span>paid_impressions_query = impression_query.clone();
+            paid_impressions_query.metric = Metric::Paid;
 
-            <span class="kw">let</span> <span class="ident">paid_impressions</span> <span class="op">=</span> <span class="ident">get_analytics</span>(
-                <span class="kw-2">&amp;</span><span class="ident">database</span>.<span class="ident">pool</span>,
-                <span class="ident">paid_impressions_query</span>,
-                <span class="ident">ALLOWED_KEYS</span>.<span class="ident">clone</span>(),
+            <span class="kw">let </span>paid_impressions = get_analytics(
+                <span class="kw-2">&amp;</span>database.pool,
+                paid_impressions_query,
+                ALLOWED_KEYS.clone(),
                 <span class="prelude-val">None</span>,
-                <span class="ident">impression_query</span>.<span class="ident">limit</span>,
+                impression_query.limit,
             )
-            .<span class="kw">await</span>
-            .<span class="ident">expect</span>(<span class="string">&quot;Should fetch Metric::Paid of Impressions&quot;</span>);
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;Should fetch Metric::Paid of Impressions&quot;</span>);
 
             <span class="macro">assert_eq!</span>(
-                <span class="ident">paid_impressions</span>.<span class="ident">iter</span>()
-                .<span class="ident">map</span>(<span class="op">|</span><span class="ident">analytics</span><span class="op">|</span> <span class="ident">analytics</span>.<span class="ident">value</span>.<span class="ident">get_paid</span>().<span class="ident">expect</span>(<span class="string">&quot;Should be Metric::Paid&quot;</span>))
-                    .<span class="ident">sum</span>::<span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">UnifiedNum</span><span class="op">&gt;</span><span class="op">&gt;</span>()
-                    .<span class="ident">expect</span>(<span class="string">&quot;Should not overflow&quot;</span>),
-                <span class="ident">amount_for_month</span>,
-                <span class="string">&quot;The sum of all the Fetched Analytics paid out values should match with the expected for this month&quot;</span>
-            );
+                paid_impressions.iter()
+                .map(|analytics| analytics.value.get_paid().expect(<span class="string">&quot;Should be Metric::Paid&quot;</span>))
+                    .sum::&lt;<span class="prelude-ty">Option</span>&lt;UnifiedNum&gt;&gt;()
+                    .expect(<span class="string">&quot;Should not overflow&quot;</span>),
+                amount_for_month,
+                <span class="string">&quot;The sum of all the Fetched Analytics paid out values should match with the expected for this month&quot;
+            </span>);
 
-            <span class="comment">// Check 3 days of the month</span>
-            <span class="comment">// 14.12.2021 &amp; 15.12.2021 &amp; 16.12.2021</span>
-            <span class="kw">let</span> <span class="ident">three_days_fetched_paid</span> <span class="op">=</span> <span class="ident">paid_impressions</span>
-                <span class="comment">// indices should match with 14th, 15th and 16th of December</span>
-                .<span class="ident">get</span>(<span class="number">13</span>..<span class="op">=</span><span class="number">15</span>)
-                .<span class="ident">expect</span>(<span class="string">&quot;Should have indices of the range&quot;</span>)
-                .<span class="ident">iter</span>()
-                .<span class="ident">map</span>(<span class="op">|</span><span class="ident">fetched</span><span class="op">|</span> <span class="ident">fetched</span>.<span class="ident">value</span>.<span class="ident">get_paid</span>().<span class="ident">expect</span>(<span class="string">&quot;Should be a Metric::Paid&quot;</span>))
-                .<span class="ident">sum</span>::<span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">UnifiedNum</span><span class="op">&gt;</span><span class="op">&gt;</span>()
-                .<span class="ident">expect</span>(<span class="string">&quot;Should not overflow&quot;</span>);
+            <span class="comment">// Check 3 days of the month
+            // 14.12.2021 &amp; 15.12.2021 &amp; 16.12.2021
+            </span><span class="kw">let </span>three_days_fetched_paid = paid_impressions
+                <span class="comment">// indices should match with 14th, 15th and 16th of December
+                </span>.get(<span class="number">13</span>..=<span class="number">15</span>)
+                .expect(<span class="string">&quot;Should have indices of the range&quot;</span>)
+                .iter()
+                .map(|fetched| fetched.value.get_paid().expect(<span class="string">&quot;Should be a Metric::Paid&quot;</span>))
+                .sum::&lt;<span class="prelude-ty">Option</span>&lt;UnifiedNum&gt;&gt;()
+                .expect(<span class="string">&quot;Should not overflow&quot;</span>);
 
             <span class="macro">assert_eq!</span>(
-                <span class="ident">UnifiedNum::from_whole</span>(<span class="number">14</span>) <span class="op">*</span> <span class="ident">amount_per_day</span>
-                    <span class="op">+</span> <span class="ident">UnifiedNum::from_whole</span>(<span class="number">15</span>) <span class="op">*</span> <span class="ident">amount_per_day</span>
-                    <span class="op">+</span> <span class="ident">UnifiedNum::from_whole</span>(<span class="number">16</span>) <span class="op">*</span> <span class="ident">amount_per_day</span>,
-                <span class="ident">three_days_fetched_paid</span>
+                UnifiedNum::from_whole(<span class="number">14</span>) * amount_per_day
+                    + UnifiedNum::from_whole(<span class="number">15</span>) * amount_per_day
+                    + UnifiedNum::from_whole(<span class="number">16</span>) * amount_per_day,
+                three_days_fetched_paid
             );
         }
 
-        <span class="kw">let</span> <span class="ident">click_query</span> <span class="op">=</span> <span class="ident">AnalyticsQuery</span> {
-            <span class="ident">limit</span>: <span class="number">1000</span>,
-            <span class="ident">event_type</span>: <span class="ident">CLICK</span>,
-            <span class="ident">metric</span>: <span class="ident">Metric::Count</span>,
-            <span class="ident">segment_by</span>: <span class="prelude-val">Some</span>(<span class="ident">AllowedKey::Country</span>),
-            <span class="ident">time</span>: <span class="ident">Time</span> {
-                <span class="ident">timeframe</span>: <span class="ident">Timeframe::Month</span>,
-                <span class="ident">start</span>: <span class="ident">start_date</span>,
-                <span class="ident">end</span>: <span class="prelude-val">Some</span>(<span class="ident">end_date</span>),
+        <span class="kw">let </span>click_query = AnalyticsQuery {
+            limit: <span class="number">1000</span>,
+            event_type: CLICK,
+            metric: Metric::Count,
+            segment_by: <span class="prelude-val">Some</span>(AllowedKey::Country),
+            time: Time {
+                timeframe: Timeframe::Month,
+                start: start_date,
+                end: <span class="prelude-val">Some</span>(end_date),
             },
-            <span class="ident">campaign_id</span>: <span class="prelude-val">Some</span>(<span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">id</span>),
-            <span class="ident">ad_unit</span>: <span class="prelude-val">Some</span>(<span class="ident">ad_unit</span>.<span class="ident">ipfs</span>),
-            <span class="ident">ad_slot</span>: <span class="prelude-val">Some</span>(<span class="ident">ad_slot_ipfs</span>),
-            <span class="ident">ad_slot_type</span>: <span class="prelude-val">Some</span>(<span class="ident">ad_unit</span>.<span class="ident">ad_type</span>.<span class="ident">clone</span>()),
-            <span class="ident">advertiser</span>: <span class="prelude-val">Some</span>(<span class="kw-2">*</span><span class="ident">CREATOR</span>),
-            <span class="ident">publisher</span>: <span class="prelude-val">Some</span>(<span class="kw-2">*</span><span class="ident">PUBLISHER</span>),
-            <span class="ident">hostname</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;localhost&quot;</span>.<span class="ident">into</span>()),
-            <span class="ident">country</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;Estonia&quot;</span>.<span class="ident">into</span>()),
-            <span class="ident">os_name</span>: <span class="prelude-val">Some</span>(<span class="ident">OperatingSystem::Linux</span>),
-            <span class="ident">chains</span>: <span class="macro">vec!</span>[],
+            campaign_id: <span class="prelude-val">Some</span>(DUMMY_CAMPAIGN.id),
+            ad_unit: <span class="prelude-val">Some</span>(ad_unit.ipfs),
+            ad_slot: <span class="prelude-val">Some</span>(ad_slot_ipfs),
+            ad_slot_type: <span class="prelude-val">Some</span>(ad_unit.ad_type.clone()),
+            advertiser: <span class="prelude-val">Some</span>(<span class="kw-2">*</span>CREATOR),
+            publisher: <span class="prelude-val">Some</span>(<span class="kw-2">*</span>PUBLISHER),
+            hostname: <span class="prelude-val">Some</span>(<span class="string">&quot;localhost&quot;</span>.into()),
+            country: <span class="prelude-val">Some</span>(<span class="string">&quot;Estonia&quot;</span>.into()),
+            os_name: <span class="prelude-val">Some</span>(OperatingSystem::Linux),
+            chains: <span class="macro">vec!</span>[],
         };
 
-        <span class="comment">// Click query - should count all inserted Analytics</span>
-        {
-            <span class="kw">let</span> <span class="ident">count_clicks</span> <span class="op">=</span> <span class="ident">get_analytics</span>(
-                <span class="kw-2">&amp;</span><span class="ident">database</span>.<span class="ident">pool</span>,
-                <span class="ident">click_query</span>.<span class="ident">clone</span>(),
-                <span class="ident">ALLOWED_KEYS</span>.<span class="ident">clone</span>(),
+        <span class="comment">// Click query - should count all inserted Analytics
+        </span>{
+            <span class="kw">let </span>count_clicks = get_analytics(
+                <span class="kw-2">&amp;</span>database.pool,
+                click_query.clone(),
+                ALLOWED_KEYS.clone(),
                 <span class="prelude-val">None</span>,
-                <span class="ident">click_query</span>.<span class="ident">limit</span>,
+                click_query.limit,
             )
-            .<span class="kw">await</span>
-            .<span class="ident">expect</span>(<span class="string">&quot;Should fetch&quot;</span>);
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;Should fetch&quot;</span>);
 
-            <span class="comment">// check at least 1 day of the month to validate the expected count</span>
-            <span class="kw">let</span> <span class="ident">second_day_count</span> <span class="op">=</span> <span class="ident">count_clicks</span>
-                .<span class="ident">get</span>(<span class="number">1</span>)
-                .<span class="ident">expect</span>(<span class="string">&quot;Should have index 1 corresponding to 2.12.2021&quot;</span>)
-                .<span class="ident">value</span>
-                .<span class="ident">get_count</span>()
-                .<span class="ident">expect</span>(<span class="string">&quot;Should be Count&quot;</span>);
+            <span class="comment">// check at least 1 day of the month to validate the expected count
+            </span><span class="kw">let </span>second_day_count = count_clicks
+                .get(<span class="number">1</span>)
+                .expect(<span class="string">&quot;Should have index 1 corresponding to 2.12.2021&quot;</span>)
+                .value
+                .get_count()
+                .expect(<span class="string">&quot;Should be Count&quot;</span>);
 
-            <span class="macro">assert_eq!</span>(<span class="ident">count_per_day</span>, <span class="ident">second_day_count</span>);
+            <span class="macro">assert_eq!</span>(count_per_day, second_day_count);
 
-            <span class="comment">// All Counts for 31 days should match</span>
-            <span class="macro">assert_eq!</span>(<span class="number">31</span> <span class="op">*</span> <span class="ident">count_per_day</span>, <span class="ident">count_sum</span>(<span class="kw-2">&amp;</span><span class="ident">count_clicks</span>));
+            <span class="comment">// All Counts for 31 days should match
+            </span><span class="macro">assert_eq!</span>(<span class="number">31 </span>* count_per_day, count_sum(<span class="kw-2">&amp;</span>count_clicks));
 
-            <span class="comment">// Check 2 days in the month</span>
-            <span class="comment">// 5.12.2021 &amp; 6.12.2021</span>
-            <span class="kw">let</span> <span class="ident">two_days_fetched_count</span> <span class="op">=</span> <span class="ident">count_clicks</span>
-                <span class="comment">// indices should match with 5nd and 6rd December</span>
-                .<span class="ident">get</span>(<span class="number">5</span>..<span class="op">=</span><span class="number">6</span>)
-                .<span class="ident">expect</span>(<span class="string">&quot;Should have indices of the range&quot;</span>)
-                .<span class="ident">iter</span>()
-                .<span class="ident">map</span>(<span class="op">|</span><span class="ident">fetched</span><span class="op">|</span> {
-                    <span class="ident">fetched</span>
-                        .<span class="ident">value</span>
-                        .<span class="ident">get_count</span>()
-                        .<span class="ident">expect</span>(<span class="string">&quot;Should be a Metric::Count&quot;</span>)
+            <span class="comment">// Check 2 days in the month
+            // 5.12.2021 &amp; 6.12.2021
+            </span><span class="kw">let </span>two_days_fetched_count = count_clicks
+                <span class="comment">// indices should match with 5nd and 6rd December
+                </span>.get(<span class="number">5</span>..=<span class="number">6</span>)
+                .expect(<span class="string">&quot;Should have indices of the range&quot;</span>)
+                .iter()
+                .map(|fetched| {
+                    fetched
+                        .value
+                        .get_count()
+                        .expect(<span class="string">&quot;Should be a Metric::Count&quot;</span>)
                 })
-                .<span class="ident">sum</span>::<span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>();
+                .sum::&lt;u32&gt;();
 
-            <span class="macro">assert_eq!</span>(<span class="number">2</span> <span class="op">*</span> <span class="ident">count_per_day</span>, <span class="ident">two_days_fetched_count</span>);
+            <span class="macro">assert_eq!</span>(<span class="number">2 </span>* count_per_day, two_days_fetched_count);
 
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">paid_clicks_query</span> <span class="op">=</span> <span class="ident">impression_query</span>.<span class="ident">clone</span>();
-            <span class="ident">paid_clicks_query</span>.<span class="ident">metric</span> <span class="op">=</span> <span class="ident">Metric::Paid</span>;
+            <span class="kw">let </span><span class="kw-2">mut </span>paid_clicks_query = impression_query.clone();
+            paid_clicks_query.metric = Metric::Paid;
 
-            <span class="kw">let</span> <span class="ident">paid_impressions</span> <span class="op">=</span> <span class="ident">get_analytics</span>(
-                <span class="kw-2">&amp;</span><span class="ident">database</span>.<span class="ident">pool</span>,
-                <span class="ident">paid_clicks_query</span>,
-                <span class="ident">ALLOWED_KEYS</span>.<span class="ident">clone</span>(),
+            <span class="kw">let </span>paid_impressions = get_analytics(
+                <span class="kw-2">&amp;</span>database.pool,
+                paid_clicks_query,
+                ALLOWED_KEYS.clone(),
                 <span class="prelude-val">None</span>,
-                <span class="ident">impression_query</span>.<span class="ident">limit</span>,
+                impression_query.limit,
             )
-            .<span class="kw">await</span>
-            .<span class="ident">expect</span>(<span class="string">&quot;Should fetch Metric::Paid of Impressions&quot;</span>);
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;Should fetch Metric::Paid of Impressions&quot;</span>);
 
             <span class="macro">assert_eq!</span>(
-                <span class="ident">paid_impressions</span>.<span class="ident">iter</span>()
-                .<span class="ident">map</span>(<span class="op">|</span><span class="ident">analytics</span><span class="op">|</span> <span class="ident">analytics</span>.<span class="ident">value</span>.<span class="ident">get_paid</span>().<span class="ident">expect</span>(<span class="string">&quot;Should be Metric::Paid&quot;</span>))
-                    .<span class="ident">sum</span>::<span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">UnifiedNum</span><span class="op">&gt;</span><span class="op">&gt;</span>()
-                    .<span class="ident">expect</span>(<span class="string">&quot;Should not overflow&quot;</span>),
-                <span class="ident">amount_for_month</span>,
-                <span class="string">&quot;The sum of all the Fetched Analytics paid out values should match with the expected for this month&quot;</span>
-            );
+                paid_impressions.iter()
+                .map(|analytics| analytics.value.get_paid().expect(<span class="string">&quot;Should be Metric::Paid&quot;</span>))
+                    .sum::&lt;<span class="prelude-ty">Option</span>&lt;UnifiedNum&gt;&gt;()
+                    .expect(<span class="string">&quot;Should not overflow&quot;</span>),
+                amount_for_month,
+                <span class="string">&quot;The sum of all the Fetched Analytics paid out values should match with the expected for this month&quot;
+            </span>);
 
-            <span class="comment">// Check 6 days in the month</span>
-            <span class="comment">// 10, 11, 12, 13, 14.12.2021 &amp; 15.12.2021</span>
-            <span class="kw">let</span> <span class="ident">six_days_fetched_paid</span> <span class="op">=</span> <span class="ident">paid_impressions</span>
-                <span class="comment">// indices don&#39;t match with dates, because they start at index 0</span>
-                .<span class="ident">get</span>(<span class="number">9</span>..<span class="op">=</span><span class="number">14</span>)
-                .<span class="ident">expect</span>(<span class="string">&quot;Should have indices of the range&quot;</span>)
-                .<span class="ident">iter</span>()
-                .<span class="ident">map</span>(<span class="op">|</span><span class="ident">fetched</span><span class="op">|</span> <span class="ident">fetched</span>.<span class="ident">value</span>.<span class="ident">get_paid</span>().<span class="ident">expect</span>(<span class="string">&quot;Should be a Metric::Paid&quot;</span>))
-                .<span class="ident">sum</span>::<span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">UnifiedNum</span><span class="op">&gt;</span><span class="op">&gt;</span>()
-                .<span class="ident">expect</span>(<span class="string">&quot;Should not overflow&quot;</span>);
+            <span class="comment">// Check 6 days in the month
+            // 10, 11, 12, 13, 14.12.2021 &amp; 15.12.2021
+            </span><span class="kw">let </span>six_days_fetched_paid = paid_impressions
+                <span class="comment">// indices don&#39;t match with dates, because they start at index 0
+                </span>.get(<span class="number">9</span>..=<span class="number">14</span>)
+                .expect(<span class="string">&quot;Should have indices of the range&quot;</span>)
+                .iter()
+                .map(|fetched| fetched.value.get_paid().expect(<span class="string">&quot;Should be a Metric::Paid&quot;</span>))
+                .sum::&lt;<span class="prelude-ty">Option</span>&lt;UnifiedNum&gt;&gt;()
+                .expect(<span class="string">&quot;Should not overflow&quot;</span>);
 
             <span class="macro">assert_eq!</span>(
-                <span class="ident">UnifiedNum::from_whole</span>(<span class="number">10</span>) <span class="op">*</span> <span class="ident">amount_per_day</span>
-                    <span class="op">+</span> <span class="ident">UnifiedNum::from_whole</span>(<span class="number">11</span>) <span class="op">*</span> <span class="ident">amount_per_day</span>
-                    <span class="op">+</span> <span class="ident">UnifiedNum::from_whole</span>(<span class="number">12</span>) <span class="op">*</span> <span class="ident">amount_per_day</span>
-                    <span class="op">+</span> <span class="ident">UnifiedNum::from_whole</span>(<span class="number">13</span>) <span class="op">*</span> <span class="ident">amount_per_day</span>
-                    <span class="op">+</span> <span class="ident">UnifiedNum::from_whole</span>(<span class="number">14</span>) <span class="op">*</span> <span class="ident">amount_per_day</span>
-                    <span class="op">+</span> <span class="ident">UnifiedNum::from_whole</span>(<span class="number">15</span>) <span class="op">*</span> <span class="ident">amount_per_day</span>,
-                <span class="ident">six_days_fetched_paid</span>
+                UnifiedNum::from_whole(<span class="number">10</span>) * amount_per_day
+                    + UnifiedNum::from_whole(<span class="number">11</span>) * amount_per_day
+                    + UnifiedNum::from_whole(<span class="number">12</span>) * amount_per_day
+                    + UnifiedNum::from_whole(<span class="number">13</span>) * amount_per_day
+                    + UnifiedNum::from_whole(<span class="number">14</span>) * amount_per_day
+                    + UnifiedNum::from_whole(<span class="number">15</span>) * amount_per_day,
+                six_days_fetched_paid
             );
         }
 
-        <span class="comment">// Filter by country: Germany</span>
-        <span class="comment">// Type: Click</span>
-        <span class="comment">// DateHour 5.12.2021 16:00</span>
-        <span class="comment">// Only a single analytics should show for this day</span>
-        {
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">click_germany_query</span> <span class="op">=</span> <span class="ident">click_query</span>.<span class="ident">clone</span>();
-            <span class="ident">click_germany_query</span>.<span class="ident">time</span> <span class="op">=</span> <span class="ident">Time</span> {
-                <span class="ident">timeframe</span>: <span class="ident">Timeframe::Day</span>,
-                <span class="ident">start</span>: <span class="ident">DateHour::from_ymdh</span>(<span class="number">2021</span>, <span class="number">12</span>, <span class="number">5</span>, <span class="number">0</span>),
-                <span class="ident">end</span>: <span class="prelude-val">Some</span>(<span class="ident">DateHour::from_ymdh</span>(<span class="number">2021</span>, <span class="number">12</span>, <span class="number">6</span>, <span class="number">0</span>)),
+        <span class="comment">// Filter by country: Germany
+        // Type: Click
+        // DateHour 5.12.2021 16:00
+        // Only a single analytics should show for this day
+        </span>{
+            <span class="kw">let </span><span class="kw-2">mut </span>click_germany_query = click_query.clone();
+            click_germany_query.time = Time {
+                timeframe: Timeframe::Day,
+                start: DateHour::from_ymdh(<span class="number">2021</span>, <span class="number">12</span>, <span class="number">5</span>, <span class="number">0</span>),
+                end: <span class="prelude-val">Some</span>(DateHour::from_ymdh(<span class="number">2021</span>, <span class="number">12</span>, <span class="number">6</span>, <span class="number">0</span>)),
             };
-            <span class="ident">click_germany_query</span>.<span class="ident">country</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="string">&quot;Germany&quot;</span>.<span class="ident">into</span>());
+            click_germany_query.country = <span class="prelude-val">Some</span>(<span class="string">&quot;Germany&quot;</span>.into());
 
-            <span class="kw">let</span> <span class="ident">count_clicks</span> <span class="op">=</span> <span class="ident">get_analytics</span>(
-                <span class="kw-2">&amp;</span><span class="ident">database</span>.<span class="ident">pool</span>,
-                <span class="ident">click_germany_query</span>.<span class="ident">clone</span>(),
-                <span class="ident">ALLOWED_KEYS</span>.<span class="ident">clone</span>(),
+            <span class="kw">let </span>count_clicks = get_analytics(
+                <span class="kw-2">&amp;</span>database.pool,
+                click_germany_query.clone(),
+                ALLOWED_KEYS.clone(),
                 <span class="prelude-val">None</span>,
-                <span class="ident">click_germany_query</span>.<span class="ident">limit</span>,
+                click_germany_query.limit,
             )
-            .<span class="kw">await</span>
-            .<span class="ident">expect</span>(<span class="string">&quot;Should fetch&quot;</span>);
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;Should fetch&quot;</span>);
 
-            <span class="macro">assert_eq!</span>(<span class="number">1</span>, <span class="ident">count_clicks</span>.<span class="ident">len</span>(), <span class="string">&quot;Only single analytics is expected&quot;</span>);
-            <span class="kw">let</span> <span class="ident">fetched</span> <span class="op">=</span> <span class="ident">count_clicks</span>.<span class="ident">get</span>(<span class="number">0</span>).<span class="ident">expect</span>(<span class="string">&quot;Should have index 0&quot;</span>);
+            <span class="macro">assert_eq!</span>(<span class="number">1</span>, count_clicks.len(), <span class="string">&quot;Only single analytics is expected&quot;</span>);
+            <span class="kw">let </span>fetched = count_clicks.get(<span class="number">0</span>).expect(<span class="string">&quot;Should have index 0&quot;</span>);
             <span class="macro">assert_eq!</span>(
                 <span class="number">16</span>,
-                <span class="ident">fetched</span>.<span class="ident">value</span>.<span class="ident">get_count</span>().<span class="ident">expect</span>(<span class="string">&quot;Should be Metric::Count&quot;</span>),
-                <span class="string">&quot;The fetched count should be the same as the hour of the Analytics&quot;</span>
-            );
+                fetched.value.get_count().expect(<span class="string">&quot;Should be Metric::Count&quot;</span>),
+                <span class="string">&quot;The fetched count should be the same as the hour of the Analytics&quot;
+            </span>);
             <span class="macro">assert_eq!</span>(
-                <span class="ident">other_analytics</span>[<span class="string">&quot;click_germany&quot;</span>].<span class="ident">time</span>.<span class="ident">to_datetime</span>(),
-                <span class="ident">fetched</span>.<span class="ident">time</span>,
-                <span class="string">&quot;The fetched analytics time (with hour) should be the same as the inserted Analytics&quot;</span>
-            );
+                other_analytics[<span class="string">&quot;click_germany&quot;</span>].time.to_datetime(),
+                fetched.time,
+                <span class="string">&quot;The fetched analytics time (with hour) should be the same as the inserted Analytics&quot;
+            </span>);
         }
 
-        <span class="comment">// Filter only by AdUnit 2</span>
-        <span class="comment">// Type: Impression</span>
-        <span class="comment">// DateHour 6.12.2021 9:00</span>
-        <span class="comment">// Only a single analytics should show</span>
-        {
-            <span class="kw">let</span> <span class="ident">ad_unit_2_query</span> <span class="op">=</span> <span class="ident">AnalyticsQuery</span> {
-                <span class="ident">limit</span>: <span class="number">1000</span>,
-                <span class="ident">event_type</span>: <span class="ident">IMPRESSION</span>,
-                <span class="ident">metric</span>: <span class="ident">Metric::Count</span>,
-                <span class="ident">segment_by</span>: <span class="prelude-val">Some</span>(<span class="ident">AllowedKey::Country</span>),
-                <span class="ident">time</span>: <span class="ident">Time</span> {
-                    <span class="ident">timeframe</span>: <span class="ident">Timeframe::Day</span>,
-                    <span class="ident">start</span>: <span class="ident">start_date</span>,
-                    <span class="ident">end</span>: <span class="prelude-val">Some</span>(<span class="ident">end_date</span>),
+        <span class="comment">// Filter only by AdUnit 2
+        // Type: Impression
+        // DateHour 6.12.2021 9:00
+        // Only a single analytics should show
+        </span>{
+            <span class="kw">let </span>ad_unit_2_query = AnalyticsQuery {
+                limit: <span class="number">1000</span>,
+                event_type: IMPRESSION,
+                metric: Metric::Count,
+                segment_by: <span class="prelude-val">Some</span>(AllowedKey::Country),
+                time: Time {
+                    timeframe: Timeframe::Day,
+                    start: start_date,
+                    end: <span class="prelude-val">Some</span>(end_date),
                 },
-                <span class="ident">campaign_id</span>: <span class="prelude-val">None</span>,
-                <span class="ident">ad_unit</span>: <span class="prelude-val">Some</span>(<span class="ident">ad_unit_2</span>.<span class="ident">ipfs</span>),
-                <span class="ident">ad_slot</span>: <span class="prelude-val">None</span>,
-                <span class="ident">ad_slot_type</span>: <span class="prelude-val">None</span>,
-                <span class="ident">advertiser</span>: <span class="prelude-val">None</span>,
-                <span class="ident">publisher</span>: <span class="prelude-val">None</span>,
-                <span class="ident">hostname</span>: <span class="prelude-val">None</span>,
-                <span class="ident">country</span>: <span class="prelude-val">None</span>,
-                <span class="ident">os_name</span>: <span class="prelude-val">None</span>,
-                <span class="ident">chains</span>: <span class="macro">vec!</span>[],
+                campaign_id: <span class="prelude-val">None</span>,
+                ad_unit: <span class="prelude-val">Some</span>(ad_unit_2.ipfs),
+                ad_slot: <span class="prelude-val">None</span>,
+                ad_slot_type: <span class="prelude-val">None</span>,
+                advertiser: <span class="prelude-val">None</span>,
+                publisher: <span class="prelude-val">None</span>,
+                hostname: <span class="prelude-val">None</span>,
+                country: <span class="prelude-val">None</span>,
+                os_name: <span class="prelude-val">None</span>,
+                chains: <span class="macro">vec!</span>[],
             };
 
-            <span class="kw">let</span> <span class="ident">count_impressions</span> <span class="op">=</span> <span class="ident">get_analytics</span>(
-                <span class="kw-2">&amp;</span><span class="ident">database</span>.<span class="ident">pool</span>,
-                <span class="ident">ad_unit_2_query</span>.<span class="ident">clone</span>(),
-                <span class="ident">ALLOWED_KEYS</span>.<span class="ident">clone</span>(),
+            <span class="kw">let </span>count_impressions = get_analytics(
+                <span class="kw-2">&amp;</span>database.pool,
+                ad_unit_2_query.clone(),
+                ALLOWED_KEYS.clone(),
                 <span class="prelude-val">None</span>,
-                <span class="ident">ad_unit_2_query</span>.<span class="ident">limit</span>,
+                ad_unit_2_query.limit,
             )
-            .<span class="kw">await</span>
-            .<span class="ident">expect</span>(<span class="string">&quot;Should fetch&quot;</span>);
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;Should fetch&quot;</span>);
 
             <span class="macro">assert_eq!</span>(
                 <span class="number">1</span>,
-                <span class="ident">count_impressions</span>.<span class="ident">len</span>(),
-                <span class="string">&quot;Only single analytics is expected&quot;</span>
-            );
-            <span class="kw">let</span> <span class="ident">fetched</span> <span class="op">=</span> <span class="ident">count_impressions</span>.<span class="ident">get</span>(<span class="number">0</span>).<span class="ident">expect</span>(<span class="string">&quot;Should have index 0&quot;</span>);
+                count_impressions.len(),
+                <span class="string">&quot;Only single analytics is expected&quot;
+            </span>);
+            <span class="kw">let </span>fetched = count_impressions.get(<span class="number">0</span>).expect(<span class="string">&quot;Should have index 0&quot;</span>);
             <span class="macro">assert_eq!</span>(
                 <span class="number">9</span>,
-                <span class="ident">fetched</span>.<span class="ident">value</span>.<span class="ident">get_count</span>().<span class="ident">expect</span>(<span class="string">&quot;Should be Metric::Count&quot;</span>),
-                <span class="string">&quot;The fetched count should be the same as the hour of the Analytics&quot;</span>
-            );
+                fetched.value.get_count().expect(<span class="string">&quot;Should be Metric::Count&quot;</span>),
+                <span class="string">&quot;The fetched count should be the same as the hour of the Analytics&quot;
+            </span>);
             <span class="macro">assert_eq!</span>(
-                <span class="ident">other_analytics</span>[<span class="string">&quot;impression_ad_unit_2&quot;</span>].<span class="ident">time</span>.<span class="ident">to_datetime</span>(),
-                <span class="ident">fetched</span>.<span class="ident">time</span>,
-                <span class="string">&quot;The fetched analytics date should be the same as the inserted Analytics, but with no hour because Timeframe::Day&quot;</span>
-            );
+                other_analytics[<span class="string">&quot;impression_ad_unit_2&quot;</span>].time.to_datetime(),
+                fetched.time,
+                <span class="string">&quot;The fetched analytics date should be the same as the inserted Analytics, but with no hour because Timeframe::Day&quot;
+            </span>);
         }
 
-        <span class="comment">// Filter by PUBLISHER_2</span>
-        <span class="comment">//</span>
-        <span class="comment">// Type: Impression</span>
-        <span class="comment">// DateHour 7.12.2021 21:00</span>
-        <span class="comment">// Only a single analytics should show</span>
-        {
-            <span class="kw">let</span> <span class="ident">filter_by_publisher_2_query</span> <span class="op">=</span> <span class="ident">AnalyticsQuery</span> {
-                <span class="ident">limit</span>: <span class="number">1000</span>,
-                <span class="ident">event_type</span>: <span class="ident">IMPRESSION</span>,
-                <span class="ident">metric</span>: <span class="ident">Metric::Count</span>,
-                <span class="ident">segment_by</span>: <span class="prelude-val">Some</span>(<span class="ident">AllowedKey::Publisher</span>),
-                <span class="ident">time</span>: <span class="ident">Time</span> {
-                    <span class="ident">timeframe</span>: <span class="ident">Timeframe::Day</span>,
-                    <span class="ident">start</span>: <span class="ident">DateHour::from_ymdh</span>(<span class="number">2021</span>, <span class="number">12</span>, <span class="number">7</span>, <span class="number">0</span>),
-                    <span class="ident">end</span>: <span class="prelude-val">Some</span>(<span class="ident">DateHour::from_ymdh</span>(<span class="number">2021</span>, <span class="number">12</span>, <span class="number">7</span>, <span class="number">23</span>)),
+        <span class="comment">// Filter by PUBLISHER_2
+        //
+        // Type: Impression
+        // DateHour 7.12.2021 21:00
+        // Only a single analytics should show
+        </span>{
+            <span class="kw">let </span>filter_by_publisher_2_query = AnalyticsQuery {
+                limit: <span class="number">1000</span>,
+                event_type: IMPRESSION,
+                metric: Metric::Count,
+                segment_by: <span class="prelude-val">Some</span>(AllowedKey::Publisher),
+                time: Time {
+                    timeframe: Timeframe::Day,
+                    start: DateHour::from_ymdh(<span class="number">2021</span>, <span class="number">12</span>, <span class="number">7</span>, <span class="number">0</span>),
+                    end: <span class="prelude-val">Some</span>(DateHour::from_ymdh(<span class="number">2021</span>, <span class="number">12</span>, <span class="number">7</span>, <span class="number">23</span>)),
                 },
-                <span class="ident">campaign_id</span>: <span class="prelude-val">None</span>,
-                <span class="ident">ad_unit</span>: <span class="prelude-val">None</span>,
-                <span class="ident">ad_slot</span>: <span class="prelude-val">None</span>,
-                <span class="ident">ad_slot_type</span>: <span class="prelude-val">None</span>,
-                <span class="ident">advertiser</span>: <span class="prelude-val">None</span>,
-                <span class="ident">publisher</span>: <span class="prelude-val">Some</span>(<span class="kw-2">*</span><span class="ident">PUBLISHER_2</span>),
-                <span class="ident">hostname</span>: <span class="prelude-val">None</span>,
-                <span class="ident">country</span>: <span class="prelude-val">None</span>,
-                <span class="ident">os_name</span>: <span class="prelude-val">None</span>,
-                <span class="ident">chains</span>: <span class="macro">vec!</span>[],
+                campaign_id: <span class="prelude-val">None</span>,
+                ad_unit: <span class="prelude-val">None</span>,
+                ad_slot: <span class="prelude-val">None</span>,
+                ad_slot_type: <span class="prelude-val">None</span>,
+                advertiser: <span class="prelude-val">None</span>,
+                publisher: <span class="prelude-val">Some</span>(<span class="kw-2">*</span>PUBLISHER_2),
+                hostname: <span class="prelude-val">None</span>,
+                country: <span class="prelude-val">None</span>,
+                os_name: <span class="prelude-val">None</span>,
+                chains: <span class="macro">vec!</span>[],
             };
 
-            <span class="kw">let</span> <span class="ident">count_impressions</span> <span class="op">=</span> <span class="ident">get_analytics</span>(
-                <span class="kw-2">&amp;</span><span class="ident">database</span>.<span class="ident">pool</span>,
-                <span class="ident">filter_by_publisher_2_query</span>.<span class="ident">clone</span>(),
-                <span class="ident">ALLOWED_KEYS</span>.<span class="ident">clone</span>(),
+            <span class="kw">let </span>count_impressions = get_analytics(
+                <span class="kw-2">&amp;</span>database.pool,
+                filter_by_publisher_2_query.clone(),
+                ALLOWED_KEYS.clone(),
                 <span class="prelude-val">None</span>,
-                <span class="ident">filter_by_publisher_2_query</span>.<span class="ident">limit</span>,
+                filter_by_publisher_2_query.limit,
             )
-            .<span class="kw">await</span>
-            .<span class="ident">expect</span>(<span class="string">&quot;Should fetch&quot;</span>);
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;Should fetch&quot;</span>);
 
             <span class="macro">assert_eq!</span>(
                 <span class="number">1</span>,
-                <span class="ident">count_impressions</span>.<span class="ident">len</span>(),
-                <span class="string">&quot;Should fetch the single analytics with different publisher&quot;</span>
-            );
+                count_impressions.len(),
+                <span class="string">&quot;Should fetch the single analytics with different publisher&quot;
+            </span>);
             <span class="macro">assert_eq!</span>(
                 <span class="number">21</span>,
-                <span class="ident">count_impressions</span>
-                    .<span class="ident">get</span>(<span class="number">0</span>)
-                    .<span class="ident">expect</span>(<span class="string">&quot;Should get index 0&quot;</span>)
-                    .<span class="ident">value</span>
-                    .<span class="ident">get_count</span>()
-                    .<span class="ident">expect</span>(<span class="string">&quot;Should be Metric::Count&quot;</span>),
-                <span class="string">&quot;Count value of Analytics should be the same as it&#39;s hour value&quot;</span>
-            );
+                count_impressions
+                    .get(<span class="number">0</span>)
+                    .expect(<span class="string">&quot;Should get index 0&quot;</span>)
+                    .value
+                    .get_count()
+                    .expect(<span class="string">&quot;Should be Metric::Count&quot;</span>),
+                <span class="string">&quot;Count value of Analytics should be the same as it&#39;s hour value&quot;
+            </span>);
         }
 
-        <span class="comment">// AuthenticateAs by PUBLISHER, should override the query value of `publisher`</span>
-        <span class="comment">//</span>
-        <span class="comment">// Type: Impression</span>
-        <span class="comment">// DateHour 7.12.2021 21:00</span>
-        <span class="comment">// Only a single analytics should show</span>
-        {
-            <span class="kw">let</span> <span class="ident">authenticate_as_publisher_2_query</span> <span class="op">=</span> <span class="ident">AnalyticsQuery</span> {
-                <span class="ident">limit</span>: <span class="number">1000</span>,
-                <span class="ident">event_type</span>: <span class="ident">IMPRESSION</span>,
-                <span class="ident">metric</span>: <span class="ident">Metric::Count</span>,
-                <span class="ident">segment_by</span>: <span class="prelude-val">Some</span>(<span class="ident">AllowedKey::Publisher</span>),
-                <span class="ident">time</span>: <span class="ident">Time</span> {
-                    <span class="ident">timeframe</span>: <span class="ident">Timeframe::Day</span>,
-                    <span class="ident">start</span>: <span class="ident">DateHour::from_ymdh</span>(<span class="number">2021</span>, <span class="number">12</span>, <span class="number">7</span>, <span class="number">0</span>),
-                    <span class="ident">end</span>: <span class="prelude-val">Some</span>(<span class="ident">DateHour::from_ymdh</span>(<span class="number">2021</span>, <span class="number">12</span>, <span class="number">7</span>, <span class="number">23</span>)),
+        <span class="comment">// AuthenticateAs by PUBLISHER, should override the query value of `publisher`
+        //
+        // Type: Impression
+        // DateHour 7.12.2021 21:00
+        // Only a single analytics should show
+        </span>{
+            <span class="kw">let </span>authenticate_as_publisher_2_query = AnalyticsQuery {
+                limit: <span class="number">1000</span>,
+                event_type: IMPRESSION,
+                metric: Metric::Count,
+                segment_by: <span class="prelude-val">Some</span>(AllowedKey::Publisher),
+                time: Time {
+                    timeframe: Timeframe::Day,
+                    start: DateHour::from_ymdh(<span class="number">2021</span>, <span class="number">12</span>, <span class="number">7</span>, <span class="number">0</span>),
+                    end: <span class="prelude-val">Some</span>(DateHour::from_ymdh(<span class="number">2021</span>, <span class="number">12</span>, <span class="number">7</span>, <span class="number">23</span>)),
                 },
-                <span class="ident">campaign_id</span>: <span class="prelude-val">None</span>,
-                <span class="ident">ad_unit</span>: <span class="prelude-val">None</span>,
-                <span class="ident">ad_slot</span>: <span class="prelude-val">None</span>,
-                <span class="ident">ad_slot_type</span>: <span class="prelude-val">None</span>,
-                <span class="ident">advertiser</span>: <span class="prelude-val">None</span>,
-                <span class="comment">// AuthenticateAs should override this value!</span>
-                <span class="ident">publisher</span>: <span class="prelude-val">Some</span>(<span class="kw-2">*</span><span class="ident">PUBLISHER</span>),
-                <span class="ident">hostname</span>: <span class="prelude-val">None</span>,
-                <span class="ident">country</span>: <span class="prelude-val">None</span>,
-                <span class="ident">os_name</span>: <span class="prelude-val">None</span>,
-                <span class="ident">chains</span>: <span class="macro">vec!</span>[],
+                campaign_id: <span class="prelude-val">None</span>,
+                ad_unit: <span class="prelude-val">None</span>,
+                ad_slot: <span class="prelude-val">None</span>,
+                ad_slot_type: <span class="prelude-val">None</span>,
+                advertiser: <span class="prelude-val">None</span>,
+                <span class="comment">// AuthenticateAs should override this value!
+                </span>publisher: <span class="prelude-val">Some</span>(<span class="kw-2">*</span>PUBLISHER),
+                hostname: <span class="prelude-val">None</span>,
+                country: <span class="prelude-val">None</span>,
+                os_name: <span class="prelude-val">None</span>,
+                chains: <span class="macro">vec!</span>[],
             };
 
-            <span class="kw">let</span> <span class="ident">count_impressions</span> <span class="op">=</span> <span class="ident">get_analytics</span>(
-                <span class="kw-2">&amp;</span><span class="ident">database</span>.<span class="ident">pool</span>,
-                <span class="ident">authenticate_as_publisher_2_query</span>.<span class="ident">clone</span>(),
-                <span class="ident">ALLOWED_KEYS</span>.<span class="ident">clone</span>(),
-                <span class="prelude-val">Some</span>(<span class="ident">AuthenticateAs::Publisher</span>(<span class="ident">ValidatorId::from</span>(<span class="kw-2">*</span><span class="ident">PUBLISHER_2</span>))),
-                <span class="ident">authenticate_as_publisher_2_query</span>.<span class="ident">limit</span>,
+            <span class="kw">let </span>count_impressions = get_analytics(
+                <span class="kw-2">&amp;</span>database.pool,
+                authenticate_as_publisher_2_query.clone(),
+                ALLOWED_KEYS.clone(),
+                <span class="prelude-val">Some</span>(AuthenticateAs::Publisher(ValidatorId::from(<span class="kw-2">*</span>PUBLISHER_2))),
+                authenticate_as_publisher_2_query.limit,
             )
-            .<span class="kw">await</span>
-            .<span class="ident">expect</span>(<span class="string">&quot;Should fetch&quot;</span>);
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;Should fetch&quot;</span>);
 
             <span class="macro">assert_eq!</span>(
                 <span class="number">1</span>,
-                <span class="ident">count_impressions</span>.<span class="ident">len</span>(),
-                <span class="string">&quot;Should fetch the single analytics with different publisher&quot;</span>
-            );
+                count_impressions.len(),
+                <span class="string">&quot;Should fetch the single analytics with different publisher&quot;
+            </span>);
             <span class="macro">assert_eq!</span>(
                 <span class="number">21</span>,
-                <span class="ident">count_impressions</span>
-                    .<span class="ident">get</span>(<span class="number">0</span>)
-                    .<span class="ident">expect</span>(<span class="string">&quot;Should get index 0&quot;</span>)
-                    .<span class="ident">value</span>
-                    .<span class="ident">get_count</span>()
-                    .<span class="ident">expect</span>(<span class="string">&quot;Should be Metric::Count&quot;</span>),
-                <span class="string">&quot;Count value of Analytics should be the same as it&#39;s hour value&quot;</span>
-            );
+                count_impressions
+                    .get(<span class="number">0</span>)
+                    .expect(<span class="string">&quot;Should get index 0&quot;</span>)
+                    .value
+                    .get_count()
+                    .expect(<span class="string">&quot;Should be Metric::Count&quot;</span>),
+                <span class="string">&quot;Count value of Analytics should be the same as it&#39;s hour value&quot;
+            </span>);
         }
 
-        <span class="comment">// Segment by AdUnit</span>
-        <span class="comment">// Type: Impression</span>
-        <span class="comment">// DateHour for AdUnit 2: 6.12.2021 9:00</span>
-        <span class="comment">// we should get 2 distinct AdUnits:</span>
-        <span class="comment">// - Analytics generated for the full month</span>
-        <span class="comment">// - One for a single DateHour that adds single Analytics</span>
-        {
-            <span class="kw">let</span> <span class="ident">segment_ad_units_query</span> <span class="op">=</span> <span class="ident">AnalyticsQuery</span> {
-                <span class="ident">limit</span>: <span class="number">1000</span>,
-                <span class="ident">event_type</span>: <span class="ident">IMPRESSION</span>,
-                <span class="ident">metric</span>: <span class="ident">Metric::Count</span>,
-                <span class="ident">segment_by</span>: <span class="prelude-val">Some</span>(<span class="ident">AllowedKey::AdUnit</span>),
-                <span class="ident">time</span>: <span class="ident">Time</span> {
-                    <span class="ident">timeframe</span>: <span class="ident">Timeframe::Day</span>,
-                    <span class="ident">start</span>: <span class="ident">DateHour::from_ymdh</span>(<span class="number">2021</span>, <span class="number">12</span>, <span class="number">6</span>, <span class="number">0</span>),
-                    <span class="ident">end</span>: <span class="prelude-val">Some</span>(<span class="ident">DateHour::from_ymdh</span>(<span class="number">2021</span>, <span class="number">12</span>, <span class="number">6</span>, <span class="number">23</span>)),
+        <span class="comment">// Segment by AdUnit
+        // Type: Impression
+        // DateHour for AdUnit 2: 6.12.2021 9:00
+        // we should get 2 distinct AdUnits:
+        // - Analytics generated for the full month
+        // - One for a single DateHour that adds single Analytics
+        </span>{
+            <span class="kw">let </span>segment_ad_units_query = AnalyticsQuery {
+                limit: <span class="number">1000</span>,
+                event_type: IMPRESSION,
+                metric: Metric::Count,
+                segment_by: <span class="prelude-val">Some</span>(AllowedKey::AdUnit),
+                time: Time {
+                    timeframe: Timeframe::Day,
+                    start: DateHour::from_ymdh(<span class="number">2021</span>, <span class="number">12</span>, <span class="number">6</span>, <span class="number">0</span>),
+                    end: <span class="prelude-val">Some</span>(DateHour::from_ymdh(<span class="number">2021</span>, <span class="number">12</span>, <span class="number">6</span>, <span class="number">23</span>)),
                 },
-                <span class="ident">campaign_id</span>: <span class="prelude-val">None</span>,
-                <span class="ident">ad_unit</span>: <span class="prelude-val">None</span>,
-                <span class="ident">ad_slot</span>: <span class="prelude-val">None</span>,
-                <span class="ident">ad_slot_type</span>: <span class="prelude-val">None</span>,
-                <span class="ident">advertiser</span>: <span class="prelude-val">None</span>,
-                <span class="ident">publisher</span>: <span class="prelude-val">None</span>,
-                <span class="ident">hostname</span>: <span class="prelude-val">None</span>,
-                <span class="ident">country</span>: <span class="prelude-val">None</span>,
-                <span class="ident">os_name</span>: <span class="prelude-val">None</span>,
-                <span class="ident">chains</span>: <span class="macro">vec!</span>[],
+                campaign_id: <span class="prelude-val">None</span>,
+                ad_unit: <span class="prelude-val">None</span>,
+                ad_slot: <span class="prelude-val">None</span>,
+                ad_slot_type: <span class="prelude-val">None</span>,
+                advertiser: <span class="prelude-val">None</span>,
+                publisher: <span class="prelude-val">None</span>,
+                hostname: <span class="prelude-val">None</span>,
+                country: <span class="prelude-val">None</span>,
+                os_name: <span class="prelude-val">None</span>,
+                chains: <span class="macro">vec!</span>[],
             };
 
-            <span class="kw">let</span> <span class="ident">count_impressions</span> <span class="op">=</span> <span class="ident">get_analytics</span>(
-                <span class="kw-2">&amp;</span><span class="ident">database</span>.<span class="ident">pool</span>,
-                <span class="ident">segment_ad_units_query</span>.<span class="ident">clone</span>(),
-                <span class="ident">ALLOWED_KEYS</span>.<span class="ident">clone</span>(),
+            <span class="kw">let </span>count_impressions = get_analytics(
+                <span class="kw-2">&amp;</span>database.pool,
+                segment_ad_units_query.clone(),
+                ALLOWED_KEYS.clone(),
                 <span class="prelude-val">None</span>,
-                <span class="ident">segment_ad_units_query</span>.<span class="ident">limit</span>,
+                segment_ad_units_query.limit,
             )
-            .<span class="kw">await</span>
-            .<span class="ident">expect</span>(<span class="string">&quot;Should fetch&quot;</span>);
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;Should fetch&quot;</span>);
 
             <span class="macro">assert_eq!</span>(
                 <span class="number">25</span>,
-                <span class="ident">count_impressions</span>.<span class="ident">len</span>(),
-                <span class="string">&quot;We expect a total of 24 + 1 (with different AdUnit) analytics&quot;</span>
-            );
-            <span class="kw">let</span> <span class="ident">find_ad_unit_2</span> <span class="op">=</span> <span class="ident">count_impressions</span>
-                .<span class="ident">iter</span>()
-                .<span class="ident">find</span>(<span class="op">|</span><span class="ident">fetched</span><span class="op">|</span> <span class="ident">fetched</span>.<span class="ident">segment</span> <span class="op">==</span> <span class="prelude-val">Some</span>(<span class="ident">ad_unit_2</span>.<span class="ident">ipfs</span>.<span class="ident">to_string</span>()))
-                .<span class="ident">expect</span>(<span class="string">&quot;There should be a single FetchedAnalytics with different AdUnit&quot;</span>);
+                count_impressions.len(),
+                <span class="string">&quot;We expect a total of 24 + 1 (with different AdUnit) analytics&quot;
+            </span>);
+            <span class="kw">let </span>find_ad_unit_2 = count_impressions
+                .iter()
+                .find(|fetched| fetched.segment == <span class="prelude-val">Some</span>(ad_unit_2.ipfs.to_string()))
+                .expect(<span class="string">&quot;There should be a single FetchedAnalytics with different AdUnit&quot;</span>);
 
             <span class="macro">assert_eq!</span>(
                 <span class="number">9</span>,
-                <span class="ident">find_ad_unit_2</span>
-                    .<span class="ident">value</span>
-                    .<span class="ident">get_count</span>()
-                    .<span class="ident">expect</span>(<span class="string">&quot;Should be Metric::Count&quot;</span>),
-                <span class="string">&quot;It&#39;s count should be == to the hour&quot;</span>
-            )
+                find_ad_unit_2
+                    .value
+                    .get_count()
+                    .expect(<span class="string">&quot;Should be Metric::Count&quot;</span>),
+                <span class="string">&quot;It&#39;s count should be == to the hour&quot;
+            </span>)
         }
     }
 
-    <span class="doccomment">/// Makes an [`IMPRESSION`] [`UpdateAnalytics`] for testing.</span>
-    <span class="doccomment">/// Country &quot;Bulgaria&quot;</span>
-    <span class="doccomment">/// Everything else is the same as [`make_click_analytics`].</span>
-    <span class="kw">fn</span> <span class="ident">make_impression_analytics</span>(
-        <span class="ident">ad_unit</span>: <span class="kw-2">&amp;</span><span class="ident">AdUnit</span>,
-        <span class="ident">ad_slot</span>: <span class="ident">IPFS</span>,
-        <span class="ident">day</span>: <span class="ident">u32</span>,
-        <span class="ident">hour</span>: <span class="ident">u32</span>,
-    ) -&gt; <span class="ident">UpdateAnalytics</span> {
-        <span class="ident">UpdateAnalytics</span> {
-            <span class="ident">time</span>: <span class="ident">DateHour::from_ymdh</span>(<span class="number">2021</span>, <span class="number">12</span>, <span class="ident">day</span>, <span class="ident">hour</span>),
-            <span class="ident">campaign_id</span>: <span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">id</span>,
-            <span class="ident">ad_unit</span>: <span class="ident">ad_unit</span>.<span class="ident">ipfs</span>,
-            <span class="ident">ad_slot</span>,
-            <span class="ident">ad_slot_type</span>: <span class="prelude-val">Some</span>(<span class="ident">ad_unit</span>.<span class="ident">ad_type</span>.<span class="ident">clone</span>()),
-            <span class="ident">advertiser</span>: <span class="kw-2">*</span><span class="ident">CREATOR</span>,
-            <span class="ident">publisher</span>: <span class="kw-2">*</span><span class="ident">PUBLISHER</span>,
-            <span class="ident">hostname</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;localhost&quot;</span>.<span class="ident">to_string</span>()),
-            <span class="ident">country</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;Bulgaria&quot;</span>.<span class="ident">to_string</span>()),
-            <span class="ident">os_name</span>: <span class="ident">OperatingSystem::Linux</span>,
-            <span class="ident">chain_id</span>: <span class="ident">ChainId::new</span>(<span class="number">1</span>),
-            <span class="ident">event_type</span>: <span class="ident">IMPRESSION</span>,
-            <span class="ident">amount_to_add</span>: <span class="ident">UnifiedNum::from_u64</span>(<span class="ident">day</span> <span class="kw">as</span> <span class="ident">u64</span> <span class="op">*</span> <span class="ident">hour</span> <span class="kw">as</span> <span class="ident">u64</span> <span class="op">*</span> <span class="number">100_000_000</span>),
-            <span class="ident">count_to_add</span>: <span class="ident">hour</span> <span class="kw">as</span> <span class="ident">i32</span>,
+    <span class="doccomment">/// Makes an [`IMPRESSION`] [`UpdateAnalytics`] for testing.
+    /// Country &quot;Bulgaria&quot;
+    /// Everything else is the same as [`make_click_analytics`].
+    </span><span class="kw">fn </span>make_impression_analytics(
+        ad_unit: <span class="kw-2">&amp;</span>AdUnit,
+        ad_slot: IPFS,
+        day: u32,
+        hour: u32,
+    ) -&gt; UpdateAnalytics {
+        UpdateAnalytics {
+            time: DateHour::from_ymdh(<span class="number">2021</span>, <span class="number">12</span>, day, hour),
+            campaign_id: DUMMY_CAMPAIGN.id,
+            ad_unit: ad_unit.ipfs,
+            ad_slot,
+            ad_slot_type: <span class="prelude-val">Some</span>(ad_unit.ad_type.clone()),
+            advertiser: <span class="kw-2">*</span>CREATOR,
+            publisher: <span class="kw-2">*</span>PUBLISHER,
+            hostname: <span class="prelude-val">Some</span>(<span class="string">&quot;localhost&quot;</span>.to_string()),
+            country: <span class="prelude-val">Some</span>(<span class="string">&quot;Bulgaria&quot;</span>.to_string()),
+            os_name: OperatingSystem::Linux,
+            chain_id: ChainId::new(<span class="number">1</span>),
+            event_type: IMPRESSION,
+            amount_to_add: UnifiedNum::from_u64(day <span class="kw">as </span>u64 * hour <span class="kw">as </span>u64 * <span class="number">100_000_000</span>),
+            count_to_add: hour <span class="kw">as </span>i32,
         }
     }
 
-    <span class="doccomment">/// Makes an [`CLICK`] [`UpdateAnalytics`] for testing.</span>
-    <span class="doccomment">/// Country &quot;Estonia&quot;</span>
-    <span class="doccomment">/// Everything else is the same as [`make_click_analytics`].</span>
-    <span class="kw">fn</span> <span class="ident">make_click_analytics</span>(
-        <span class="ident">ad_unit</span>: <span class="kw-2">&amp;</span><span class="ident">AdUnit</span>,
-        <span class="ident">ad_slot</span>: <span class="ident">IPFS</span>,
-        <span class="ident">day</span>: <span class="ident">u32</span>,
-        <span class="ident">hour</span>: <span class="ident">u32</span>,
-    ) -&gt; <span class="ident">UpdateAnalytics</span> {
-        <span class="ident">UpdateAnalytics</span> {
-            <span class="ident">time</span>: <span class="ident">DateHour::from_ymdh</span>(<span class="number">2021</span>, <span class="number">12</span>, <span class="ident">day</span>, <span class="ident">hour</span>),
-            <span class="ident">campaign_id</span>: <span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">id</span>,
-            <span class="ident">ad_unit</span>: <span class="ident">ad_unit</span>.<span class="ident">ipfs</span>,
-            <span class="ident">ad_slot</span>,
-            <span class="ident">ad_slot_type</span>: <span class="prelude-val">Some</span>(<span class="ident">ad_unit</span>.<span class="ident">ad_type</span>.<span class="ident">clone</span>()),
-            <span class="ident">advertiser</span>: <span class="kw-2">*</span><span class="ident">CREATOR</span>,
-            <span class="ident">publisher</span>: <span class="kw-2">*</span><span class="ident">PUBLISHER</span>,
-            <span class="ident">hostname</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;localhost&quot;</span>.<span class="ident">to_string</span>()),
-            <span class="ident">country</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;Estonia&quot;</span>.<span class="ident">to_string</span>()),
-            <span class="ident">os_name</span>: <span class="ident">OperatingSystem::Linux</span>,
-            <span class="ident">chain_id</span>: <span class="ident">ChainId::new</span>(<span class="number">1</span>),
-            <span class="ident">event_type</span>: <span class="ident">CLICK</span>,
-            <span class="ident">amount_to_add</span>: <span class="ident">UnifiedNum::from_u64</span>(<span class="ident">day</span> <span class="kw">as</span> <span class="ident">u64</span> <span class="op">*</span> <span class="ident">hour</span> <span class="kw">as</span> <span class="ident">u64</span> <span class="op">*</span> <span class="number">100_000_000</span>),
-            <span class="ident">count_to_add</span>: <span class="ident">hour</span> <span class="kw">as</span> <span class="ident">i32</span>,
+    <span class="doccomment">/// Makes an [`CLICK`] [`UpdateAnalytics`] for testing.
+    /// Country &quot;Estonia&quot;
+    /// Everything else is the same as [`make_click_analytics`].
+    </span><span class="kw">fn </span>make_click_analytics(
+        ad_unit: <span class="kw-2">&amp;</span>AdUnit,
+        ad_slot: IPFS,
+        day: u32,
+        hour: u32,
+    ) -&gt; UpdateAnalytics {
+        UpdateAnalytics {
+            time: DateHour::from_ymdh(<span class="number">2021</span>, <span class="number">12</span>, day, hour),
+            campaign_id: DUMMY_CAMPAIGN.id,
+            ad_unit: ad_unit.ipfs,
+            ad_slot,
+            ad_slot_type: <span class="prelude-val">Some</span>(ad_unit.ad_type.clone()),
+            advertiser: <span class="kw-2">*</span>CREATOR,
+            publisher: <span class="kw-2">*</span>PUBLISHER,
+            hostname: <span class="prelude-val">Some</span>(<span class="string">&quot;localhost&quot;</span>.to_string()),
+            country: <span class="prelude-val">Some</span>(<span class="string">&quot;Estonia&quot;</span>.to_string()),
+            os_name: OperatingSystem::Linux,
+            chain_id: ChainId::new(<span class="number">1</span>),
+            event_type: CLICK,
+            amount_to_add: UnifiedNum::from_u64(day <span class="kw">as </span>u64 * hour <span class="kw">as </span>u64 * <span class="number">100_000_000</span>),
+            count_to_add: hour <span class="kw">as </span>i32,
         }
     }
 
-    <span class="doccomment">/// Creates Impression &amp; Click analytics for each hour of December</span>
-    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">generate_analytics_for_december_2021</span>(
-        <span class="ident">database</span>: <span class="kw-2">&amp;</span><span class="ident">DbPool</span>,
-        <span class="ident">ad_unit</span>: <span class="kw-2">&amp;</span><span class="ident">AdUnit</span>,
-        <span class="ident">ad_slot</span>: <span class="ident">IPFS</span>,
+    <span class="doccomment">/// Creates Impression &amp; Click analytics for each hour of December
+    </span><span class="kw">async fn </span>generate_analytics_for_december_2021(
+        database: <span class="kw-2">&amp;</span>DbPool,
+        ad_unit: <span class="kw-2">&amp;</span>AdUnit,
+        ad_slot: IPFS,
     ) {
-        <span class="kw">for</span> <span class="ident">day</span> <span class="kw">in</span> <span class="number">1</span>..<span class="op">=</span><span class="number">31_u32</span> {
-            <span class="kw">for</span> <span class="ident">hour</span> <span class="kw">in</span> <span class="number">0</span>..<span class="op">=</span><span class="number">23_u32</span> {
-                <span class="kw">let</span> <span class="ident">impression_analytics</span> <span class="op">=</span> <span class="ident">make_impression_analytics</span>(<span class="ident">ad_unit</span>, <span class="ident">ad_slot</span>, <span class="ident">day</span>, <span class="ident">hour</span>);
+        <span class="kw">for </span>day <span class="kw">in </span><span class="number">1</span>..=<span class="number">31_u32 </span>{
+            <span class="kw">for </span>hour <span class="kw">in </span><span class="number">0</span>..=<span class="number">23_u32 </span>{
+                <span class="kw">let </span>impression_analytics = make_impression_analytics(ad_unit, ad_slot, day, hour);
 
-                <span class="ident">update_analytics</span>(<span class="kw-2">&amp;</span><span class="ident">database</span>.<span class="ident">clone</span>(), <span class="ident">impression_analytics</span>)
-                    .<span class="kw">await</span>
-                    .<span class="ident">expect</span>(<span class="string">&quot;Should insert&quot;</span>);
+                update_analytics(<span class="kw-2">&amp;</span>database.clone(), impression_analytics)
+                    .<span class="kw">await
+                    </span>.expect(<span class="string">&quot;Should insert&quot;</span>);
 
-                <span class="kw">let</span> <span class="ident">click_analytics</span> <span class="op">=</span> <span class="ident">make_click_analytics</span>(<span class="ident">ad_unit</span>, <span class="ident">ad_slot</span>, <span class="ident">day</span>, <span class="ident">hour</span>);
+                <span class="kw">let </span>click_analytics = make_click_analytics(ad_unit, ad_slot, day, hour);
 
-                <span class="ident">update_analytics</span>(<span class="kw-2">&amp;</span><span class="ident">database</span>.<span class="ident">clone</span>(), <span class="ident">click_analytics</span>)
-                    .<span class="kw">await</span>
-                    .<span class="ident">expect</span>(<span class="string">&quot;Should insert&quot;</span>);
+                update_analytics(<span class="kw-2">&amp;</span>database.clone(), click_analytics)
+                    .<span class="kw">await
+                    </span>.expect(<span class="string">&quot;Should insert&quot;</span>);
             }
         }
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (20ffea693 2022-08-11)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>

@@ -146,153 +146,153 @@
 <span id="146">146</span>
 <span id="147">147</span>
 <span id="148">148</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::primitives</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident">async_trait::async_trait</span>;
-<span class="kw">use</span> <span class="ident">primitives</span>::{<span class="ident">ChainId</span>, <span class="ident">ChainOf</span>, <span class="ident">Channel</span>};
-<span class="kw">use</span> <span class="ident">std</span>::{<span class="ident">marker::PhantomData</span>, <span class="ident">sync::Arc</span>};
+</pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::primitives::<span class="kw-2">*</span>;
+<span class="kw">use </span>async_trait::async_trait;
+<span class="kw">use </span>primitives::{ChainId, ChainOf, Channel};
+<span class="kw">use </span>std::{marker::PhantomData, sync::Arc};
 
-<span class="kw">use</span> <span class="kw">crate</span>::{
-    <span class="ident">client</span>::{<span class="ident">Locked</span>, <span class="ident">Unlockable</span>, <span class="ident">Unlocked</span>},
-    <span class="ident">Error</span>,
+<span class="kw">use crate</span>::{
+    client::{Locked, Unlockable, Unlocked},
+    Error,
 };
 
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod</span> <span class="ident">state</span> {
-    <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">Copy</span>)]</span>
-    <span class="doccomment">/// The `Locked` state of the [`crate::Adapter`].</span>
-    <span class="doccomment">/// See [`crate::client::Locked`]</span>
-    <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">LockedState</span>;
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>state {
+    <span class="attribute">#[derive(Debug, Clone, Copy)]</span>
+    <span class="doccomment">/// The `Locked` state of the [`crate::Adapter`].
+    /// See [`crate::client::Locked`]
+    </span><span class="kw">pub struct </span>LockedState;
 
-    <span class="doccomment">/// The `Unlocked` state of the [`crate::Adapter`].</span>
-    <span class="doccomment">/// See [`crate::client::Unlocked`]</span>
-    <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">Copy</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">UnlockedState</span>;
+    <span class="doccomment">/// The `Unlocked` state of the [`crate::Adapter`].
+    /// See [`crate::client::Unlocked`]
+    </span><span class="attribute">#[derive(Debug, Clone, Copy)]</span>
+    <span class="kw">pub struct </span>UnlockedState;
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="doccomment">/// The [`Adapter`] struct and it&#39;s states.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Used for communication with the underlying client implementation.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// # Available adapters</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// 2 Adapters are available in this crate:</span>
-<span class="doccomment">/// - Ethereum</span>
-<span class="doccomment">///   - [`crate::ethereum::LockedAdapter`] and [`crate::ethereum::UnlockedAdapter`]</span>
-<span class="doccomment">///   - Client implementation [`crate::Ethereum`] for chains compatible with EVM.</span>
-<span class="doccomment">/// - Dummy</span>
-<span class="doccomment">///   - [`crate::dummy::Adapter`] and it&#39;s client implementation [`crate::Dummy`] for testing.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Adapter</span><span class="op">&lt;</span><span class="ident">C</span>, <span class="ident">S</span> <span class="op">=</span> <span class="ident">state::LockedState</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// client in a specific state - Locked or Unlocked</span>
-    <span class="kw">pub</span> <span class="ident">client</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span>,
-    <span class="ident">_state</span>: <span class="ident">PhantomData</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span>,
+<span class="attribute">#[derive(Debug)]</span>
+<span class="doccomment">/// The [`Adapter`] struct and it&#39;s states.
+///
+/// Used for communication with the underlying client implementation.
+///
+/// # Available adapters
+///
+/// 2 Adapters are available in this crate:
+/// - Ethereum
+///   - [`crate::ethereum::LockedAdapter`] and [`crate::ethereum::UnlockedAdapter`]
+///   - Client implementation [`crate::Ethereum`] for chains compatible with EVM.
+/// - Dummy
+///   - [`crate::dummy::Adapter`] and it&#39;s client implementation [`crate::Dummy`] for testing.
+</span><span class="kw">pub struct </span>Adapter&lt;C, S = state::LockedState&gt; {
+    <span class="doccomment">/// client in a specific state - Locked or Unlocked
+    </span><span class="kw">pub </span>client: Arc&lt;C&gt;,
+    _state: PhantomData&lt;S&gt;,
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">C</span>, <span class="ident">S</span>: <span class="ident">Clone</span><span class="op">&gt;</span> <span class="ident">Clone</span> <span class="kw">for</span> <span class="ident">Adapter</span><span class="op">&lt;</span><span class="ident">C</span>, <span class="ident">S</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">clone</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="self">Self</span> {
-        <span class="self">Self</span> {
-            <span class="ident">client</span>: <span class="self">self</span>.<span class="ident">client</span>.<span class="ident">clone</span>(),
-            <span class="ident">_state</span>: <span class="self">self</span>.<span class="ident">_state</span>,
+<span class="kw">impl</span>&lt;C, S: Clone&gt; Clone <span class="kw">for </span>Adapter&lt;C, S&gt; {
+    <span class="kw">fn </span>clone(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="self">Self </span>{
+        <span class="self">Self </span>{
+            client: <span class="self">self</span>.client.clone(),
+            _state: <span class="self">self</span>._state,
         }
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">Locked</span><span class="op">&gt;</span> <span class="ident">Adapter</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// Create a new [`Adapter`] in [`Locked`] state using a [`Locked`].</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">client</span>: <span class="ident">C</span>) -&gt; <span class="ident">Adapter</span><span class="op">&lt;</span><span class="ident">C</span>, <span class="ident">state::LockedState</span><span class="op">&gt;</span> {
-        <span class="ident">Adapter</span> {
-            <span class="ident">client</span>: <span class="ident">Arc::new</span>(<span class="ident">client</span>),
-            <span class="ident">_state</span>: <span class="ident">PhantomData::default</span>(),
+<span class="kw">impl</span>&lt;C: Locked&gt; Adapter&lt;C&gt; {
+    <span class="doccomment">/// Create a new [`Adapter`] in [`Locked`] state using a [`Locked`].
+    </span><span class="kw">pub fn </span>new(client: C) -&gt; Adapter&lt;C, state::LockedState&gt; {
+        Adapter {
+            client: Arc::new(client),
+            _state: PhantomData::default(),
         }
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">Unlocked</span><span class="op">&gt;</span> <span class="ident">Adapter</span><span class="op">&lt;</span><span class="ident">C</span>, <span class="ident">state::LockedState</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// Create a new [`Adapter`] in [`state::UnlockedState`] state using an [`Unlocked`] client.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">with_unlocked</span>(<span class="ident">client</span>: <span class="ident">C</span>) -&gt; <span class="ident">Adapter</span><span class="op">&lt;</span><span class="ident">C</span>, <span class="ident">state::UnlockedState</span><span class="op">&gt;</span> {
-        <span class="ident">Adapter</span> {
-            <span class="ident">client</span>: <span class="ident">Arc::new</span>(<span class="ident">client</span>),
-            <span class="ident">_state</span>: <span class="ident">PhantomData::default</span>(),
+<span class="kw">impl</span>&lt;C: Unlocked&gt; Adapter&lt;C, state::LockedState&gt; {
+    <span class="doccomment">/// Create a new [`Adapter`] in [`state::UnlockedState`] state using an [`Unlocked`] client.
+    </span><span class="kw">pub fn </span>with_unlocked(client: C) -&gt; Adapter&lt;C, state::UnlockedState&gt; {
+        Adapter {
+            client: Arc::new(client),
+            _state: PhantomData::default(),
         }
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span> <span class="ident">Adapter</span><span class="op">&lt;</span><span class="ident">C</span>, <span class="ident">state::LockedState</span><span class="op">&gt;</span>
-<span class="kw">where</span>
-    <span class="ident">C</span>: <span class="ident">Locked</span> <span class="op">+</span> <span class="ident">Unlockable</span>,
-    <span class="op">&lt;</span><span class="ident">C::Unlocked</span> <span class="kw">as</span> <span class="ident">Locked</span><span class="op">&gt;</span><span class="ident">::Error</span>: <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">Error</span><span class="op">&gt;</span>,
-    <span class="ident">C::Error</span>: <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">Error</span><span class="op">&gt;</span>,
+<span class="kw">impl</span>&lt;C&gt; Adapter&lt;C, state::LockedState&gt;
+<span class="kw">where
+    </span>C: Locked + Unlockable,
+    &lt;C::Unlocked <span class="kw">as </span>Locked&gt;::Error: Into&lt;Error&gt;,
+    C::Error: Into&lt;Error&gt;,
 {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">unlock</span>(<span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Adapter</span><span class="op">&lt;</span><span class="ident">C::Unlocked</span>, <span class="ident">state::UnlockedState</span><span class="op">&gt;</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">unlocked</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">client</span>.<span class="ident">unlock</span>().<span class="ident">map_err</span>(<span class="ident">Into::into</span>)<span class="question-mark">?</span>;
+    <span class="kw">pub fn </span>unlock(<span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;Adapter&lt;C::Unlocked, state::UnlockedState&gt;, Error&gt; {
+        <span class="kw">let </span>unlocked = <span class="self">self</span>.client.unlock().map_err(Into::into)<span class="question-mark">?</span>;
 
-        <span class="prelude-val">Ok</span>(<span class="ident">Adapter</span> {
-            <span class="ident">client</span>: <span class="ident">Arc::new</span>(<span class="ident">unlocked</span>),
-            <span class="ident">_state</span>: <span class="ident">PhantomData::default</span>(),
+        <span class="prelude-val">Ok</span>(Adapter {
+            client: Arc::new(unlocked),
+            _state: PhantomData::default(),
         })
     }
 }
 
-<span class="attribute">#[<span class="ident">async_trait</span>]</span>
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span> <span class="ident">Unlocked</span> <span class="kw">for</span> <span class="ident">Adapter</span><span class="op">&lt;</span><span class="ident">C</span>, <span class="ident">state::UnlockedState</span><span class="op">&gt;</span>
-<span class="kw">where</span>
-    <span class="ident">C</span>: <span class="ident">Unlocked</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="ident">Send</span>,
-    <span class="ident">C::Error</span>: <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">Error</span><span class="op">&gt;</span>,
+<span class="attribute">#[async_trait]</span>
+<span class="kw">impl</span>&lt;C&gt; Unlocked <span class="kw">for </span>Adapter&lt;C, state::UnlockedState&gt;
+<span class="kw">where
+    </span>C: Unlocked + Sync + Send,
+    C::Error: Into&lt;Error&gt;,
 {
-    <span class="kw">fn</span> <span class="ident">sign</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">state_root</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">String</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">client</span>.<span class="ident">sign</span>(<span class="ident">state_root</span>).<span class="ident">map_err</span>(<span class="ident">Into::into</span>)
+    <span class="kw">fn </span>sign(<span class="kw-2">&amp;</span><span class="self">self</span>, state_root: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Result</span>&lt;String, Error&gt; {
+        <span class="self">self</span>.client.sign(state_root).map_err(Into::into)
     }
 
-    <span class="kw">fn</span> <span class="ident">get_auth</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">for_chain</span>: <span class="ident">ChainId</span>, <span class="ident">intended_for</span>: <span class="ident">ValidatorId</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">String</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">client</span>
-            .<span class="ident">get_auth</span>(<span class="ident">for_chain</span>, <span class="ident">intended_for</span>)
-            .<span class="ident">map_err</span>(<span class="ident">Into::into</span>)
+    <span class="kw">fn </span>get_auth(<span class="kw-2">&amp;</span><span class="self">self</span>, for_chain: ChainId, intended_for: ValidatorId) -&gt; <span class="prelude-ty">Result</span>&lt;String, Error&gt; {
+        <span class="self">self</span>.client
+            .get_auth(for_chain, intended_for)
+            .map_err(Into::into)
     }
 }
 
-<span class="attribute">#[<span class="ident">async_trait</span>]</span>
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">C</span>, <span class="ident">S</span><span class="op">&gt;</span> <span class="ident">Locked</span> <span class="kw">for</span> <span class="ident">Adapter</span><span class="op">&lt;</span><span class="ident">C</span>, <span class="ident">S</span><span class="op">&gt;</span>
-<span class="kw">where</span>
-    <span class="ident">C</span>: <span class="ident">Locked</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="ident">Send</span>,
-    <span class="ident">C::Error</span>: <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">Error</span><span class="op">&gt;</span>,
-    <span class="ident">S</span>: <span class="ident">Sync</span> <span class="op">+</span> <span class="ident">Send</span>,
+<span class="attribute">#[async_trait]</span>
+<span class="kw">impl</span>&lt;C, S&gt; Locked <span class="kw">for </span>Adapter&lt;C, S&gt;
+<span class="kw">where
+    </span>C: Locked + Sync + Send,
+    C::Error: Into&lt;Error&gt;,
+    S: Sync + Send,
 {
-    <span class="kw">type</span> <span class="ident">Error</span> <span class="op">=</span> <span class="ident">Error</span>;
-    <span class="doccomment">/// Get Adapter whoami</span>
-    <span class="kw">fn</span> <span class="ident">whoami</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">ValidatorId</span> {
-        <span class="self">self</span>.<span class="ident">client</span>.<span class="ident">whoami</span>()
+    <span class="kw">type </span>Error = Error;
+    <span class="doccomment">/// Get Adapter whoami
+    </span><span class="kw">fn </span>whoami(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; ValidatorId {
+        <span class="self">self</span>.client.whoami()
     }
 
-    <span class="doccomment">/// Verify, based on the signature &amp; state_root, that the signer is the same</span>
-    <span class="kw">fn</span> <span class="ident">verify</span>(
+    <span class="doccomment">/// Verify, based on the signature &amp; state_root, that the signer is the same
+    </span><span class="kw">fn </span>verify(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">signer</span>: <span class="ident">ValidatorId</span>,
-        <span class="ident">state_root</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>,
-        <span class="ident">signature</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>,
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">bool</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">client</span>
-            .<span class="ident">verify</span>(<span class="ident">signer</span>, <span class="ident">state_root</span>, <span class="ident">signature</span>)
-            .<span class="ident">map_err</span>(<span class="ident">Into::into</span>)
+        signer: ValidatorId,
+        state_root: <span class="kw-2">&amp;</span>str,
+        signature: <span class="kw-2">&amp;</span>str,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;bool, Error&gt; {
+        <span class="self">self</span>.client
+            .verify(signer, state_root, signature)
+            .map_err(Into::into)
     }
 
-    <span class="doccomment">/// Creates a `Session` from a provided Token by calling the Contract.</span>
-    <span class="doccomment">/// Does **not** cache the (`Token`, [`Session`]) pair.</span>
-    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">session_from_token</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">token</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Session</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">client</span>
-            .<span class="ident">session_from_token</span>(<span class="ident">token</span>)
-            .<span class="kw">await</span>
-            .<span class="ident">map_err</span>(<span class="ident">Into::into</span>)
+    <span class="doccomment">/// Creates a `Session` from a provided Token by calling the Contract.
+    /// Does **not** cache the (`Token`, [`Session`]) pair.
+    </span><span class="kw">async fn </span>session_from_token(<span class="kw-2">&amp;</span><span class="self">self</span>, token: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Result</span>&lt;Session, Error&gt; {
+        <span class="self">self</span>.client
+            .session_from_token(token)
+            .<span class="kw">await
+            </span>.map_err(Into::into)
     }
 
-    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">get_deposit</span>(
+    <span class="kw">async fn </span>get_deposit(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">channel_context</span>: <span class="kw-2">&amp;</span><span class="ident">ChainOf</span><span class="op">&lt;</span><span class="ident">Channel</span><span class="op">&gt;</span>,
-        <span class="ident">depositor_address</span>: <span class="ident">Address</span>,
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Deposit</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">client</span>
-            .<span class="ident">get_deposit</span>(<span class="ident">channel_context</span>, <span class="ident">depositor_address</span>)
-            .<span class="kw">await</span>
-            .<span class="ident">map_err</span>(<span class="ident">Into::into</span>)
+        channel_context: <span class="kw-2">&amp;</span>ChainOf&lt;Channel&gt;,
+        depositor_address: Address,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;Deposit, Error&gt; {
+        <span class="self">self</span>.client
+            .get_deposit(channel_context, depositor_address)
+            .<span class="kw">await
+            </span>.map_err(Into::into)
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="adapter" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (20ffea693 2022-08-11)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="adapter" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>

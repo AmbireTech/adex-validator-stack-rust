@@ -84,91 +84,91 @@
 <span id="84">84</span>
 <span id="85">85</span>
 <span id="86">86</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="kw">crate</span>::{
-    <span class="ident">error</span>::{<span class="ident">Error</span>, <span class="ident">TickError</span>},
-    <span class="ident">follower</span>, <span class="ident">leader</span>, <span class="ident">SentryApi</span>,
+</pre><pre class="rust"><code><span class="kw">use crate</span>::{
+    error::{Error, TickError},
+    follower, leader, SentryApi,
 };
 
-<span class="kw">use</span> <span class="ident">adapter::prelude</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident">primitives</span>::{<span class="ident">config::Config</span>, <span class="ident">ChainOf</span>, <span class="ident">Channel</span>, <span class="ident">ChannelId</span>};
-<span class="kw">use</span> <span class="ident">slog::info</span>;
-<span class="kw">use</span> <span class="ident">tokio::time::timeout</span>;
+<span class="kw">use </span>adapter::prelude::<span class="kw-2">*</span>;
+<span class="kw">use </span>primitives::{config::Config, ChainOf, Channel, ChannelId};
+<span class="kw">use </span>slog::info;
+<span class="kw">use </span>tokio::time::timeout;
 
-<span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">channel_tick</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">Unlocked</span> <span class="op">+</span> <span class="lifetime">&#39;static</span><span class="op">&gt;</span>(
-    <span class="ident">sentry</span>: <span class="kw-2">&amp;</span><span class="ident">SentryApi</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span>,
-    <span class="ident">config</span>: <span class="kw-2">&amp;</span><span class="ident">Config</span>,
-    <span class="ident">channel_context</span>: <span class="ident">ChainOf</span><span class="op">&lt;</span><span class="ident">Channel</span><span class="op">&gt;</span>,
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="ident">ChannelId</span>, <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">std::fmt::Debug</span><span class="op">&gt;</span>), <span class="ident">Error</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">logger</span> <span class="op">=</span> <span class="ident">sentry</span>.<span class="ident">logger</span>.<span class="ident">clone</span>();
-    <span class="kw">let</span> <span class="ident">channel</span> <span class="op">=</span> <span class="ident">channel_context</span>.<span class="ident">context</span>;
+<span class="kw">pub async fn </span>channel_tick&lt;C: Unlocked + <span class="lifetime">&#39;static</span>&gt;(
+    sentry: <span class="kw-2">&amp;</span>SentryApi&lt;C&gt;,
+    config: <span class="kw-2">&amp;</span>Config,
+    channel_context: ChainOf&lt;Channel&gt;,
+) -&gt; <span class="prelude-ty">Result</span>&lt;(ChannelId, Box&lt;<span class="kw">dyn </span>std::fmt::Debug&gt;), Error&gt; {
+    <span class="kw">let </span>logger = sentry.logger.clone();
+    <span class="kw">let </span>channel = channel_context.context;
 
-    <span class="kw">let</span> <span class="ident">adapter</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">sentry</span>.<span class="ident">adapter</span>;
-    <span class="kw">let</span> <span class="ident">tick</span> <span class="op">=</span> <span class="ident">channel_context</span>
-        .<span class="ident">context</span>
-        .<span class="ident">find_validator</span>(<span class="ident">adapter</span>.<span class="ident">whoami</span>())
-        .<span class="ident">ok_or</span>(<span class="ident">Error::ChannelNotIntendedForUs</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span>adapter = <span class="kw-2">&amp;</span>sentry.adapter;
+    <span class="kw">let </span>tick = channel_context
+        .context
+        .find_validator(adapter.whoami())
+        .ok_or(Error::ChannelNotIntendedForUs)<span class="question-mark">?</span>;
 
-    <span class="comment">// 1. `GET /channel/:id/spender/all`</span>
-    <span class="kw">let</span> <span class="ident">all_spenders</span> <span class="op">=</span> <span class="ident">sentry</span>.<span class="ident">get_all_spenders</span>(<span class="kw-2">&amp;</span><span class="ident">channel_context</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+    <span class="comment">// 1. `GET /channel/:id/spender/all`
+    </span><span class="kw">let </span>all_spenders = sentry.get_all_spenders(<span class="kw-2">&amp;</span>channel_context).<span class="kw">await</span><span class="question-mark">?</span>;
 
-    <span class="comment">// 2. `GET /channel/:id/accounting`</span>
-    <span class="comment">// Validation #1:</span>
-    <span class="comment">// sum(Accounting.spenders) == sum(Accounting.earners)</span>
-    <span class="kw">let</span> <span class="ident">accounting</span> <span class="op">=</span> <span class="ident">sentry</span>.<span class="ident">get_accounting</span>(<span class="kw-2">&amp;</span><span class="ident">channel_context</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+    <span class="comment">// 2. `GET /channel/:id/accounting`
+    // Validation #1:
+    // sum(Accounting.spenders) == sum(Accounting.earners)
+    </span><span class="kw">let </span>accounting = sentry.get_accounting(<span class="kw-2">&amp;</span>channel_context).<span class="kw">await</span><span class="question-mark">?</span>;
 
-    <span class="comment">// Validation #2:</span>
-    <span class="comment">// spender.total_deposit &gt;= accounting.balances.spenders[spender.address]</span>
-    <span class="kw">if</span> <span class="op">!</span><span class="ident">all_spenders</span>.<span class="ident">iter</span>().<span class="ident">all</span>(<span class="op">|</span>(<span class="ident">address</span>, <span class="ident">spender</span>)<span class="op">|</span> {
-        <span class="ident">spender</span>.<span class="ident">total_deposited</span>
-            <span class="op">&gt;</span><span class="op">=</span> <span class="ident">accounting</span>
-                .<span class="ident">balances</span>
-                .<span class="ident">spenders</span>
-                .<span class="ident">get</span>(<span class="ident">address</span>)
-                .<span class="ident">cloned</span>()
-                .<span class="ident">unwrap_or_default</span>()
+    <span class="comment">// Validation #2:
+    // spender.total_deposit &gt;= accounting.balances.spenders[spender.address]
+    </span><span class="kw">if </span>!all_spenders.iter().all(|(address, spender)| {
+        spender.total_deposited
+            &gt;= accounting
+                .balances
+                .spenders
+                .get(address)
+                .cloned()
+                .unwrap_or_default()
     }) {
-        <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error::Validation</span>);
+        <span class="kw">return </span><span class="prelude-val">Err</span>(Error::Validation);
     }
 
-    <span class="kw">match</span> <span class="ident">tick</span> {
-        <span class="ident">primitives::Validator::Leader</span>(<span class="ident">_v</span>) =&gt; <span class="kw">match</span> <span class="ident">timeout</span>(
-            <span class="ident">config</span>.<span class="ident">channel_tick_timeout</span>,
-            <span class="ident">leader::tick</span>(<span class="ident">sentry</span>, <span class="kw-2">&amp;</span><span class="ident">channel_context</span>, <span class="ident">accounting</span>.<span class="ident">balances</span>),
+    <span class="kw">match </span>tick {
+        primitives::Validator::Leader(_v) =&gt; <span class="kw">match </span>timeout(
+            config.channel_tick_timeout,
+            leader::tick(sentry, <span class="kw-2">&amp;</span>channel_context, accounting.balances),
         )
-        .<span class="kw">await</span>
-        {
-            <span class="prelude-val">Err</span>(<span class="ident">timeout_e</span>) =&gt; <span class="prelude-val">Err</span>(<span class="ident">Error::LeaderTick</span>(
-                <span class="ident">channel</span>.<span class="ident">id</span>(),
-                <span class="ident">TickError::TimedOut</span>(<span class="ident">timeout_e</span>),
+        .<span class="kw">await
+        </span>{
+            <span class="prelude-val">Err</span>(timeout_e) =&gt; <span class="prelude-val">Err</span>(Error::LeaderTick(
+                channel.id(),
+                TickError::TimedOut(timeout_e),
             )),
-            <span class="prelude-val">Ok</span>(<span class="prelude-val">Err</span>(<span class="ident">tick_e</span>)) =&gt; <span class="prelude-val">Err</span>(<span class="ident">Error::LeaderTick</span>(
-                <span class="ident">channel</span>.<span class="ident">id</span>(),
-                <span class="ident">TickError::Tick</span>(<span class="ident">Box::new</span>(<span class="ident">tick_e</span>)),
+            <span class="prelude-val">Ok</span>(<span class="prelude-val">Err</span>(tick_e)) =&gt; <span class="prelude-val">Err</span>(Error::LeaderTick(
+                channel.id(),
+                TickError::Tick(Box::new(tick_e)),
             )),
-            <span class="prelude-val">Ok</span>(<span class="prelude-val">Ok</span>(<span class="ident">tick_status</span>)) =&gt; {
-                <span class="macro">info!</span>(<span class="kw-2">&amp;</span><span class="ident">logger</span>, <span class="string">&quot;Leader tick&quot;</span>; <span class="string">&quot;status&quot;</span> =&gt; <span class="question-mark">?</span><span class="ident">tick_status</span>);
-                <span class="prelude-val">Ok</span>((<span class="ident">channel</span>.<span class="ident">id</span>(), <span class="ident">Box::new</span>(<span class="ident">tick_status</span>)))
+            <span class="prelude-val">Ok</span>(<span class="prelude-val">Ok</span>(tick_status)) =&gt; {
+                <span class="macro">info!</span>(<span class="kw-2">&amp;</span>logger, <span class="string">&quot;Leader tick&quot;</span>; <span class="string">&quot;status&quot; </span>=&gt; <span class="question-mark">?</span>tick_status);
+                <span class="prelude-val">Ok</span>((channel.id(), Box::new(tick_status)))
             }
         },
-        <span class="ident">primitives::Validator::Follower</span>(<span class="ident">_v</span>) =&gt; {
-            <span class="kw">let</span> <span class="ident">follower_fut</span> <span class="op">=</span>
-                <span class="ident">follower::tick</span>(<span class="ident">sentry</span>, <span class="kw-2">&amp;</span><span class="ident">channel_context</span>, <span class="ident">all_spenders</span>, <span class="ident">accounting</span>.<span class="ident">balances</span>);
-            <span class="kw">match</span> <span class="ident">timeout</span>(<span class="ident">config</span>.<span class="ident">channel_tick_timeout</span>, <span class="ident">follower_fut</span>).<span class="kw">await</span> {
-                <span class="prelude-val">Err</span>(<span class="ident">timeout_e</span>) =&gt; <span class="prelude-val">Err</span>(<span class="ident">Error::FollowerTick</span>(
-                    <span class="ident">channel</span>.<span class="ident">id</span>(),
-                    <span class="ident">TickError::TimedOut</span>(<span class="ident">timeout_e</span>),
+        primitives::Validator::Follower(_v) =&gt; {
+            <span class="kw">let </span>follower_fut =
+                follower::tick(sentry, <span class="kw-2">&amp;</span>channel_context, all_spenders, accounting.balances);
+            <span class="kw">match </span>timeout(config.channel_tick_timeout, follower_fut).<span class="kw">await </span>{
+                <span class="prelude-val">Err</span>(timeout_e) =&gt; <span class="prelude-val">Err</span>(Error::FollowerTick(
+                    channel.id(),
+                    TickError::TimedOut(timeout_e),
                 )),
-                <span class="prelude-val">Ok</span>(<span class="prelude-val">Err</span>(<span class="ident">tick_e</span>)) =&gt; <span class="prelude-val">Err</span>(<span class="ident">Error::FollowerTick</span>(
-                    <span class="ident">channel</span>.<span class="ident">id</span>(),
-                    <span class="ident">TickError::Tick</span>(<span class="ident">Box::new</span>(<span class="ident">tick_e</span>)),
+                <span class="prelude-val">Ok</span>(<span class="prelude-val">Err</span>(tick_e)) =&gt; <span class="prelude-val">Err</span>(Error::FollowerTick(
+                    channel.id(),
+                    TickError::Tick(Box::new(tick_e)),
                 )),
-                <span class="prelude-val">Ok</span>(<span class="prelude-val">Ok</span>(<span class="ident">tick_status</span>)) =&gt; {
-                    <span class="macro">info!</span>(<span class="kw-2">&amp;</span><span class="ident">logger</span>, <span class="string">&quot;Follower tick&quot;</span>; <span class="string">&quot;status&quot;</span> =&gt; <span class="question-mark">?</span><span class="ident">tick_status</span>);
-                    <span class="prelude-val">Ok</span>((<span class="ident">channel</span>.<span class="ident">id</span>(), <span class="ident">Box::new</span>(<span class="ident">tick_status</span>)))
+                <span class="prelude-val">Ok</span>(<span class="prelude-val">Ok</span>(tick_status)) =&gt; {
+                    <span class="macro">info!</span>(<span class="kw-2">&amp;</span>logger, <span class="string">&quot;Follower tick&quot;</span>; <span class="string">&quot;status&quot; </span>=&gt; <span class="question-mark">?</span>tick_status);
+                    <span class="prelude-val">Ok</span>((channel.id(), Box::new(tick_status)))
                 }
             }
         }
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="validator_worker" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (20ffea693 2022-08-11)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="validator_worker" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>

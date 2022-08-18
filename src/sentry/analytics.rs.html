@@ -320,327 +320,327 @@
 <span id="320">320</span>
 <span id="321">321</span>
 <span id="322">322</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="kw">crate</span>::{
-    <span class="ident">db</span>::{<span class="ident">analytics::update_analytics</span>, <span class="ident">DbPool</span>, <span class="ident">PoolError</span>},
-    <span class="ident">Session</span>,
+</pre><pre class="rust"><code><span class="kw">use crate</span>::{
+    db::{analytics::update_analytics, DbPool, PoolError},
+    Session,
 };
-<span class="kw">use</span> <span class="ident">futures::future::join_all</span>;
-<span class="kw">use</span> <span class="ident">primitives</span>::{
-    <span class="ident">analytics::OperatingSystem</span>,
-    <span class="ident">sentry</span>::{<span class="ident">DateHour</span>, <span class="ident">Event</span>, <span class="ident">UpdateAnalytics</span>},
-    <span class="ident">Address</span>, <span class="ident">Campaign</span>, <span class="ident">ChainOf</span>, <span class="ident">UnifiedNum</span>,
+<span class="kw">use </span>futures::future::join_all;
+<span class="kw">use </span>primitives::{
+    analytics::OperatingSystem,
+    sentry::{DateHour, Event, UpdateAnalytics},
+    Address, Campaign, ChainOf, UnifiedNum,
 };
-<span class="kw">use</span> <span class="ident">std::collections::HashMap</span>;
+<span class="kw">use </span>std::collections::HashMap;
 
-<span class="doccomment">/// Validator fees will not be included in analytics</span>
-<span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">record</span>(
-    <span class="ident">pool</span>: <span class="kw-2">&amp;</span><span class="ident">DbPool</span>,
-    <span class="ident">campaign_context</span>: <span class="kw-2">&amp;</span><span class="ident">ChainOf</span><span class="op">&lt;</span><span class="ident">Campaign</span><span class="op">&gt;</span>,
-    <span class="ident">session</span>: <span class="kw-2">&amp;</span><span class="ident">Session</span>,
-    <span class="ident">events_with_payouts</span>: <span class="kw-2">&amp;</span>[(<span class="ident">Event</span>, <span class="ident">Address</span>, <span class="ident">UnifiedNum</span>)],
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">PoolError</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">os_name</span> <span class="op">=</span> <span class="ident">session</span>
-        .<span class="ident">os</span>
-        .<span class="ident">as_ref</span>()
-        .<span class="ident">map</span>(<span class="op">|</span><span class="ident">os</span><span class="op">|</span> <span class="ident">OperatingSystem::map_os</span>(<span class="ident">os</span>))
-        .<span class="ident">unwrap_or_default</span>();
-    <span class="comment">// This DateHour is used for all events that are being recorded</span>
-    <span class="kw">let</span> <span class="ident">datehour</span> <span class="op">=</span> <span class="ident">DateHour::now</span>();
+<span class="doccomment">/// Validator fees will not be included in analytics
+</span><span class="kw">pub async fn </span>record(
+    pool: <span class="kw-2">&amp;</span>DbPool,
+    campaign_context: <span class="kw-2">&amp;</span>ChainOf&lt;Campaign&gt;,
+    session: <span class="kw-2">&amp;</span>Session,
+    events_with_payouts: <span class="kw-2">&amp;</span>[(Event, Address, UnifiedNum)],
+) -&gt; <span class="prelude-ty">Result</span>&lt;(), PoolError&gt; {
+    <span class="kw">let </span>os_name = session
+        .os
+        .as_ref()
+        .map(|os| OperatingSystem::map_os(os))
+        .unwrap_or_default();
+    <span class="comment">// This DateHour is used for all events that are being recorded
+    </span><span class="kw">let </span>datehour = DateHour::now();
 
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">batch_update</span> <span class="op">=</span> <span class="ident">HashMap</span>::<span class="op">&lt;</span><span class="ident">Event</span>, <span class="ident">UpdateAnalytics</span><span class="op">&gt;</span><span class="ident">::new</span>();
+    <span class="kw">let </span><span class="kw-2">mut </span>batch_update = HashMap::&lt;Event, UpdateAnalytics&gt;::new();
 
-    <span class="kw">for</span> (<span class="ident">event</span>, <span class="ident">_payout_addr</span>, <span class="ident">payout_amount</span>) <span class="kw">in</span> <span class="ident">events_with_payouts</span> {
-        <span class="kw">let</span> <span class="ident">event_type</span> <span class="op">=</span> <span class="ident">event</span>.<span class="ident">event_type</span>();
-        <span class="kw">let</span> (<span class="ident">publisher</span>, <span class="ident">ad_unit</span>, <span class="ident">referrer</span>, <span class="ident">ad_slot</span>, <span class="ident">ad_slot_type</span>) <span class="op">=</span> {
-            <span class="kw">let</span> (<span class="ident">publisher</span>, <span class="ident">event_ad_unit</span>, <span class="ident">referrer</span>, <span class="ident">ad_slot</span>) <span class="op">=</span> <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="ident">event</span> {
-                <span class="ident">Event::Impression</span> {
-                    <span class="ident">publisher</span>,
-                    <span class="ident">ad_unit</span>,
-                    <span class="ident">referrer</span>,
-                    <span class="ident">ad_slot</span>,
-                } =&gt; (<span class="kw-2">*</span><span class="ident">publisher</span>, <span class="kw-2">*</span><span class="ident">ad_unit</span>, <span class="ident">referrer</span>.<span class="ident">clone</span>(), <span class="kw-2">*</span><span class="ident">ad_slot</span>),
-                <span class="ident">Event::Click</span> {
-                    <span class="ident">publisher</span>,
-                    <span class="ident">ad_unit</span>,
-                    <span class="ident">referrer</span>,
-                    <span class="ident">ad_slot</span>,
-                } =&gt; (<span class="kw-2">*</span><span class="ident">publisher</span>, <span class="kw-2">*</span><span class="ident">ad_unit</span>, <span class="ident">referrer</span>.<span class="ident">clone</span>(), <span class="kw-2">*</span><span class="ident">ad_slot</span>),
+    <span class="kw">for </span>(event, _payout_addr, payout_amount) <span class="kw">in </span>events_with_payouts {
+        <span class="kw">let </span>event_type = event.event_type();
+        <span class="kw">let </span>(publisher, ad_unit, referrer, ad_slot, ad_slot_type) = {
+            <span class="kw">let </span>(publisher, event_ad_unit, referrer, ad_slot) = <span class="kw">match </span><span class="kw-2">&amp;</span>event {
+                Event::Impression {
+                    publisher,
+                    ad_unit,
+                    referrer,
+                    ad_slot,
+                } =&gt; (<span class="kw-2">*</span>publisher, <span class="kw-2">*</span>ad_unit, referrer.clone(), <span class="kw-2">*</span>ad_slot),
+                Event::Click {
+                    publisher,
+                    ad_unit,
+                    referrer,
+                    ad_slot,
+                } =&gt; (<span class="kw-2">*</span>publisher, <span class="kw-2">*</span>ad_unit, referrer.clone(), <span class="kw-2">*</span>ad_slot),
             };
-            <span class="kw">let</span> <span class="ident">ad_unit</span> <span class="op">=</span> <span class="ident">campaign_context</span>
-                .<span class="ident">context</span>
-                .<span class="ident">ad_units</span>
-                .<span class="ident">iter</span>()
-                .<span class="ident">find</span>(<span class="op">|</span><span class="ident">ad_unit</span><span class="op">|</span> <span class="ident">ad_unit</span>.<span class="ident">ipfs</span> <span class="op">==</span> <span class="ident">event_ad_unit</span>);
+            <span class="kw">let </span>ad_unit = campaign_context
+                .context
+                .ad_units
+                .iter()
+                .find(|ad_unit| ad_unit.ipfs == event_ad_unit);
 
-            <span class="kw">let</span> <span class="ident">ad_slot_type</span> <span class="op">=</span> <span class="ident">ad_unit</span>.<span class="ident">as_ref</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">unit</span><span class="op">|</span> <span class="ident">unit</span>.<span class="ident">ad_type</span>.<span class="ident">clone</span>());
+            <span class="kw">let </span>ad_slot_type = ad_unit.as_ref().map(|unit| unit.ad_type.clone());
 
-            (<span class="ident">publisher</span>, <span class="ident">event_ad_unit</span>, <span class="ident">referrer</span>, <span class="ident">ad_slot</span>, <span class="ident">ad_slot_type</span>)
+            (publisher, event_ad_unit, referrer, ad_slot, ad_slot_type)
         };
 
-        <span class="kw">let</span> <span class="ident">hostname</span> <span class="op">=</span> <span class="kw">match</span> (<span class="kw-2">&amp;</span><span class="ident">referrer</span>, <span class="ident">session</span>.<span class="ident">referrer_header</span>.<span class="ident">as_ref</span>()) {
-            (<span class="prelude-val">Some</span>(<span class="ident">referrer</span>), <span class="prelude-val">None</span>) <span class="op">|</span> (<span class="prelude-val">None</span>, <span class="prelude-val">Some</span>(<span class="ident">referrer</span>)) <span class="op">|</span> (<span class="prelude-val">Some</span>(<span class="ident">referrer</span>), <span class="prelude-val">Some</span>(<span class="kw">_</span>)) =&gt; <span class="ident">referrer</span>
-                .<span class="ident">split</span>(<span class="string">&#39;/&#39;</span>)
-                .<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">str</span><span class="op">&gt;</span><span class="op">&gt;</span>()
-                .<span class="ident">get</span>(<span class="number">2</span>)
-                .<span class="ident">map</span>(<span class="op">|</span><span class="ident">hostname</span><span class="op">|</span> <span class="ident">hostname</span>.<span class="ident">to_string</span>()),
+        <span class="kw">let </span>hostname = <span class="kw">match </span>(<span class="kw-2">&amp;</span>referrer, session.referrer_header.as_ref()) {
+            (<span class="prelude-val">Some</span>(referrer), <span class="prelude-val">None</span>) | (<span class="prelude-val">None</span>, <span class="prelude-val">Some</span>(referrer)) | (<span class="prelude-val">Some</span>(referrer), <span class="prelude-val">Some</span>(<span class="kw">_</span>)) =&gt; referrer
+                .split(<span class="string">&#39;/&#39;</span>)
+                .collect::&lt;Vec&lt;<span class="kw-2">&amp;</span>str&gt;&gt;()
+                .get(<span class="number">2</span>)
+                .map(|hostname| hostname.to_string()),
 
             (<span class="prelude-val">None</span>, <span class="prelude-val">None</span>) =&gt; <span class="prelude-val">None</span>,
         };
 
-        <span class="ident">batch_update</span>
-            .<span class="ident">entry</span>(<span class="ident">event</span>.<span class="ident">clone</span>())
-            .<span class="ident">and_modify</span>(<span class="op">|</span><span class="ident">analytics</span><span class="op">|</span> {
-                <span class="ident">analytics</span>.<span class="ident">amount_to_add</span> <span class="op">+</span><span class="op">=</span> <span class="ident">payout_amount</span>;
-                <span class="ident">analytics</span>.<span class="ident">count_to_add</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+        batch_update
+            .entry(event.clone())
+            .and_modify(|analytics| {
+                analytics.amount_to_add += payout_amount;
+                analytics.count_to_add += <span class="number">1</span>;
             })
-            .<span class="ident">or_insert_with</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">UpdateAnalytics</span> {
-                <span class="ident">campaign_id</span>: <span class="ident">campaign_context</span>.<span class="ident">context</span>.<span class="ident">id</span>,
-                <span class="ident">time</span>: <span class="ident">datehour</span>,
-                <span class="ident">ad_unit</span>,
-                <span class="ident">ad_slot</span>,
-                <span class="ident">ad_slot_type</span>,
-                <span class="ident">advertiser</span>: <span class="ident">campaign_context</span>.<span class="ident">context</span>.<span class="ident">creator</span>,
-                <span class="ident">publisher</span>,
-                <span class="ident">hostname</span>,
-                <span class="ident">country</span>: <span class="ident">session</span>.<span class="ident">country</span>.<span class="ident">to_owned</span>(),
-                <span class="ident">os_name</span>: <span class="ident">os_name</span>.<span class="ident">clone</span>(),
-                <span class="ident">chain_id</span>: <span class="ident">campaign_context</span>.<span class="ident">chain</span>.<span class="ident">chain_id</span>,
-                <span class="ident">event_type</span>,
-                <span class="ident">amount_to_add</span>: <span class="kw-2">*</span><span class="ident">payout_amount</span>,
-                <span class="ident">count_to_add</span>: <span class="number">1</span>,
+            .or_insert_with(|| UpdateAnalytics {
+                campaign_id: campaign_context.context.id,
+                time: datehour,
+                ad_unit,
+                ad_slot,
+                ad_slot_type,
+                advertiser: campaign_context.context.creator,
+                publisher,
+                hostname,
+                country: session.country.to_owned(),
+                os_name: os_name.clone(),
+                chain_id: campaign_context.chain.chain_id,
+                event_type,
+                amount_to_add: <span class="kw-2">*</span>payout_amount,
+                count_to_add: <span class="number">1</span>,
             });
     }
 
-    <span class="kw">let</span> <span class="ident">batch_futures</span> <span class="op">=</span> <span class="ident">join_all</span>(
-        <span class="ident">batch_update</span>
-            .<span class="ident">into_iter</span>()
-            .<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">_event</span>, <span class="ident">update</span>)<span class="op">|</span> <span class="ident">update_analytics</span>(<span class="ident">pool</span>, <span class="ident">update</span>)),
+    <span class="kw">let </span>batch_futures = join_all(
+        batch_update
+            .into_iter()
+            .map(|(_event, update)| update_analytics(pool, update)),
     );
 
-    <span class="comment">// execute the batched futures, collect the result afterwards,</span>
-    <span class="comment">// in order execute all futures first and then return an error if occurred</span>
-    <span class="ident">batch_futures</span>
-        .<span class="kw">await</span>
-        .<span class="ident">into_iter</span>()
-        .<span class="ident">collect</span>::<span class="op">&lt;</span><span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span>, <span class="kw">_</span><span class="op">&gt;</span><span class="op">&gt;</span>()<span class="question-mark">?</span>;
+    <span class="comment">// execute the batched futures, collect the result afterwards,
+    // in order execute all futures first and then return an error if occurred
+    </span>batch_futures
+        .<span class="kw">await
+        </span>.into_iter()
+        .collect::&lt;<span class="prelude-ty">Result</span>&lt;Vec&lt;<span class="kw">_</span>&gt;, <span class="kw">_</span>&gt;&gt;()<span class="question-mark">?</span>;
 
     <span class="prelude-val">Ok</span>(())
 }
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
-<span class="kw">mod</span> <span class="ident">test</span> {
-    <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
-    <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::test_util::setup_dummy_app</span>;
-    <span class="kw">use</span> <span class="ident">primitives</span>::{
-        <span class="ident">sentry</span>::{<span class="ident">Analytics</span>, <span class="ident">CLICK</span>, <span class="ident">IMPRESSION</span>},
-        <span class="ident">test_util</span>::{<span class="ident">DUMMY_CAMPAIGN</span>, <span class="ident">DUMMY_IPFS</span>, <span class="ident">PUBLISHER</span>},
-        <span class="ident">UnifiedNum</span>,
+<span class="attribute">#[cfg(test)]</span>
+<span class="kw">mod </span>test {
+    <span class="kw">use super</span>::<span class="kw-2">*</span>;
+    <span class="kw">use </span><span class="kw">crate</span>::test_util::setup_dummy_app;
+    <span class="kw">use </span>primitives::{
+        sentry::{Analytics, CLICK, IMPRESSION},
+        test_util::{DUMMY_CAMPAIGN, DUMMY_IPFS, PUBLISHER},
+        UnifiedNum,
     };
 
-    <span class="comment">// Currently used for testing</span>
-    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">get_all_analytics</span>(<span class="ident">pool</span>: <span class="kw-2">&amp;</span><span class="ident">DbPool</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Analytics</span><span class="op">&gt;</span>, <span class="ident">PoolError</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">client</span> <span class="op">=</span> <span class="ident">pool</span>.<span class="ident">get</span>().<span class="kw">await</span><span class="question-mark">?</span>;
+    <span class="comment">// Currently used for testing
+    </span><span class="kw">async fn </span>get_all_analytics(pool: <span class="kw-2">&amp;</span>DbPool) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;Analytics&gt;, PoolError&gt; {
+        <span class="kw">let </span>client = pool.get().<span class="kw">await</span><span class="question-mark">?</span>;
 
-        <span class="kw">let</span> <span class="ident">query</span> <span class="op">=</span> <span class="string">&quot;SELECT * FROM analytics&quot;</span>;
-        <span class="kw">let</span> <span class="ident">stmt</span> <span class="op">=</span> <span class="ident">client</span>.<span class="ident">prepare</span>(<span class="ident">query</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+        <span class="kw">let </span>query = <span class="string">&quot;SELECT * FROM analytics&quot;</span>;
+        <span class="kw">let </span>stmt = client.prepare(query).<span class="kw">await</span><span class="question-mark">?</span>;
 
-        <span class="kw">let</span> <span class="ident">rows</span> <span class="op">=</span> <span class="ident">client</span>.<span class="ident">query</span>(<span class="kw-2">&amp;</span><span class="ident">stmt</span>, <span class="kw-2">&amp;</span>[]).<span class="kw">await</span><span class="question-mark">?</span>;
+        <span class="kw">let </span>rows = client.query(<span class="kw-2">&amp;</span>stmt, <span class="kw-2">&amp;</span>[]).<span class="kw">await</span><span class="question-mark">?</span>;
 
-        <span class="kw">let</span> <span class="ident">event_analytics</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Analytics</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">rows</span>.<span class="ident">iter</span>().<span class="ident">map</span>(<span class="ident">Analytics::from</span>).<span class="ident">collect</span>();
-        <span class="prelude-val">Ok</span>(<span class="ident">event_analytics</span>)
+        <span class="kw">let </span>event_analytics: Vec&lt;Analytics&gt; = rows.iter().map(Analytics::from).collect();
+        <span class="prelude-val">Ok</span>(event_analytics)
     }
 
-    <span class="kw">fn</span> <span class="ident">get_test_events</span>() -&gt; <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">String</span>, (<span class="ident">Event</span>, <span class="ident">Address</span>, <span class="ident">UnifiedNum</span>)<span class="op">&gt;</span> {
+    <span class="kw">fn </span>get_test_events() -&gt; HashMap&lt;String, (Event, Address, UnifiedNum)&gt; {
         <span class="macro">vec!</span>[
             (
-                <span class="string">&quot;click&quot;</span>.<span class="ident">into</span>(),
+                <span class="string">&quot;click&quot;</span>.into(),
                 (
-                    <span class="ident">Event::Click</span> {
-                        <span class="ident">publisher</span>: <span class="kw-2">*</span><span class="ident">PUBLISHER</span>,
-                        <span class="ident">ad_unit</span>: <span class="ident">DUMMY_IPFS</span>[<span class="number">0</span>],
-                        <span class="ident">ad_slot</span>: <span class="ident">DUMMY_IPFS</span>[<span class="number">1</span>],
-                        <span class="ident">referrer</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;http://127.0.0.1&quot;</span>.<span class="ident">into</span>()),
+                    Event::Click {
+                        publisher: <span class="kw-2">*</span>PUBLISHER,
+                        ad_unit: DUMMY_IPFS[<span class="number">0</span>],
+                        ad_slot: DUMMY_IPFS[<span class="number">1</span>],
+                        referrer: <span class="prelude-val">Some</span>(<span class="string">&quot;http://127.0.0.1&quot;</span>.into()),
                     },
-                    <span class="kw-2">*</span><span class="ident">PUBLISHER</span>,
-                    <span class="ident">UnifiedNum::from_u64</span>(<span class="number">1_000_000</span>),
+                    <span class="kw-2">*</span>PUBLISHER,
+                    UnifiedNum::from_u64(<span class="number">1_000_000</span>),
                 ),
             ),
             (
-                <span class="string">&quot;click_with_different_data&quot;</span>.<span class="ident">into</span>(),
+                <span class="string">&quot;click_with_different_data&quot;</span>.into(),
                 (
-                    <span class="ident">Event::Click</span> {
-                        <span class="ident">publisher</span>: <span class="kw-2">*</span><span class="ident">PUBLISHER</span>,
-                        <span class="ident">ad_unit</span>: <span class="ident">DUMMY_IPFS</span>[<span class="number">2</span>],
-                        <span class="ident">ad_slot</span>: <span class="ident">DUMMY_IPFS</span>[<span class="number">3</span>],
-                        <span class="ident">referrer</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;http://127.0.0.1&quot;</span>.<span class="ident">into</span>()),
+                    Event::Click {
+                        publisher: <span class="kw-2">*</span>PUBLISHER,
+                        ad_unit: DUMMY_IPFS[<span class="number">2</span>],
+                        ad_slot: DUMMY_IPFS[<span class="number">3</span>],
+                        referrer: <span class="prelude-val">Some</span>(<span class="string">&quot;http://127.0.0.1&quot;</span>.into()),
                     },
-                    <span class="kw-2">*</span><span class="ident">PUBLISHER</span>,
-                    <span class="ident">UnifiedNum::from_u64</span>(<span class="number">1_000_000</span>),
+                    <span class="kw-2">*</span>PUBLISHER,
+                    UnifiedNum::from_u64(<span class="number">1_000_000</span>),
                 ),
             ),
             (
-                <span class="string">&quot;impression&quot;</span>.<span class="ident">into</span>(),
+                <span class="string">&quot;impression&quot;</span>.into(),
                 (
-                    <span class="ident">Event::Impression</span> {
-                        <span class="ident">publisher</span>: <span class="kw-2">*</span><span class="ident">PUBLISHER</span>,
-                        <span class="ident">ad_unit</span>: <span class="ident">DUMMY_IPFS</span>[<span class="number">0</span>],
-                        <span class="ident">ad_slot</span>: <span class="ident">DUMMY_IPFS</span>[<span class="number">1</span>],
-                        <span class="ident">referrer</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;http://127.0.0.1&quot;</span>.<span class="ident">into</span>()),
+                    Event::Impression {
+                        publisher: <span class="kw-2">*</span>PUBLISHER,
+                        ad_unit: DUMMY_IPFS[<span class="number">0</span>],
+                        ad_slot: DUMMY_IPFS[<span class="number">1</span>],
+                        referrer: <span class="prelude-val">Some</span>(<span class="string">&quot;http://127.0.0.1&quot;</span>.into()),
                     },
-                    <span class="kw-2">*</span><span class="ident">PUBLISHER</span>,
-                    <span class="ident">UnifiedNum::from_u64</span>(<span class="number">1_000_000</span>),
+                    <span class="kw-2">*</span>PUBLISHER,
+                    UnifiedNum::from_u64(<span class="number">1_000_000</span>),
                 ),
             ),
         ]
-        .<span class="ident">into_iter</span>()
-        .<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">String</span>, <span class="kw">_</span><span class="op">&gt;</span><span class="op">&gt;</span>()
+        .into_iter()
+        .collect::&lt;HashMap&lt;String, <span class="kw">_</span>&gt;&gt;()
     }
 
-    <span class="attribute">#[<span class="ident">tokio::test</span>]</span>
-    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">test_analytics_recording_with_empty_events</span>() {
-        <span class="kw">let</span> <span class="ident">app</span> <span class="op">=</span> <span class="ident">setup_dummy_app</span>().<span class="kw">await</span>;
+    <span class="attribute">#[tokio::test]</span>
+    <span class="kw">async fn </span>test_analytics_recording_with_empty_events() {
+        <span class="kw">let </span>app = setup_dummy_app().<span class="kw">await</span>;
 
-        <span class="kw">let</span> <span class="ident">test_events</span> <span class="op">=</span> <span class="ident">get_test_events</span>();
+        <span class="kw">let </span>test_events = get_test_events();
 
-        <span class="kw">let</span> <span class="ident">campaign</span> <span class="op">=</span> <span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">clone</span>();
+        <span class="kw">let </span>campaign = DUMMY_CAMPAIGN.clone();
 
-        <span class="kw">let</span> <span class="ident">session</span> <span class="op">=</span> <span class="ident">Session</span> {
-            <span class="ident">ip</span>: <span class="prelude-val">None</span>,
-            <span class="ident">country</span>: <span class="prelude-val">None</span>,
-            <span class="ident">referrer_header</span>: <span class="prelude-val">None</span>,
-            <span class="ident">os</span>: <span class="prelude-val">None</span>,
+        <span class="kw">let </span>session = Session {
+            ip: <span class="prelude-val">None</span>,
+            country: <span class="prelude-val">None</span>,
+            referrer_header: <span class="prelude-val">None</span>,
+            os: <span class="prelude-val">None</span>,
         };
 
-        <span class="kw">let</span> <span class="ident">input_events</span> <span class="op">=</span> <span class="macro">vec!</span>[
-            <span class="ident">test_events</span>[<span class="string">&quot;click&quot;</span>].<span class="ident">clone</span>(),
-            <span class="ident">test_events</span>[<span class="string">&quot;impression&quot;</span>].<span class="ident">clone</span>(),
-            <span class="ident">test_events</span>[<span class="string">&quot;impression&quot;</span>].<span class="ident">clone</span>(),
+        <span class="kw">let </span>input_events = <span class="macro">vec!</span>[
+            test_events[<span class="string">&quot;click&quot;</span>].clone(),
+            test_events[<span class="string">&quot;impression&quot;</span>].clone(),
+            test_events[<span class="string">&quot;impression&quot;</span>].clone(),
         ];
 
-        <span class="kw">let</span> <span class="ident">dummy_channel</span> <span class="op">=</span> <span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">channel</span>;
-        <span class="kw">let</span> <span class="ident">channel_chain</span> <span class="op">=</span> <span class="ident">app</span>
-            .<span class="ident">config</span>
-            .<span class="ident">find_chain_of</span>(<span class="ident">dummy_channel</span>.<span class="ident">token</span>)
-            .<span class="ident">expect</span>(<span class="string">&quot;Channel token should be whitelisted in config!&quot;</span>);
-        <span class="kw">let</span> <span class="ident">channel_context</span> <span class="op">=</span> <span class="ident">channel_chain</span>.<span class="ident">with_channel</span>(<span class="ident">dummy_channel</span>);
-        <span class="kw">let</span> <span class="ident">campaign_context</span> <span class="op">=</span> <span class="ident">channel_context</span>.<span class="ident">clone</span>().<span class="ident">with</span>(<span class="ident">campaign</span>);
+        <span class="kw">let </span>dummy_channel = DUMMY_CAMPAIGN.channel;
+        <span class="kw">let </span>channel_chain = app
+            .config
+            .find_chain_of(dummy_channel.token)
+            .expect(<span class="string">&quot;Channel token should be whitelisted in config!&quot;</span>);
+        <span class="kw">let </span>channel_context = channel_chain.with_channel(dummy_channel);
+        <span class="kw">let </span>campaign_context = channel_context.clone().with(campaign);
 
-        <span class="ident">record</span>(<span class="kw-2">&amp;</span><span class="ident">app</span>.<span class="ident">pool</span>, <span class="kw-2">&amp;</span><span class="ident">campaign_context</span>, <span class="kw-2">&amp;</span><span class="ident">session</span>, <span class="kw-2">&amp;</span><span class="ident">input_events</span>)
-            .<span class="kw">await</span>
-            .<span class="ident">expect</span>(<span class="string">&quot;should record&quot;</span>);
+        record(<span class="kw-2">&amp;</span>app.pool, <span class="kw-2">&amp;</span>campaign_context, <span class="kw-2">&amp;</span>session, <span class="kw-2">&amp;</span>input_events)
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;should record&quot;</span>);
 
-        <span class="kw">let</span> <span class="ident">analytics</span> <span class="op">=</span> <span class="ident">get_all_analytics</span>(<span class="kw-2">&amp;</span><span class="ident">app</span>.<span class="ident">pool</span>)
-            .<span class="kw">await</span>
-            .<span class="ident">expect</span>(<span class="string">&quot;should get all analytics&quot;</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">analytics</span>.<span class="ident">len</span>(), <span class="number">2</span>);
+        <span class="kw">let </span>analytics = get_all_analytics(<span class="kw-2">&amp;</span>app.pool)
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;should get all analytics&quot;</span>);
+        <span class="macro">assert_eq!</span>(analytics.len(), <span class="number">2</span>);
 
-        <span class="kw">let</span> <span class="ident">click_analytics</span> <span class="op">=</span> <span class="ident">analytics</span>
-            .<span class="ident">iter</span>()
-            .<span class="ident">find</span>(<span class="op">|</span><span class="ident">a</span><span class="op">|</span> <span class="ident">a</span>.<span class="ident">event_type</span> <span class="op">==</span> <span class="ident">CLICK</span>)
-            .<span class="ident">expect</span>(<span class="string">&quot;There should be a click Analytics&quot;</span>);
-        <span class="kw">let</span> <span class="ident">impression_analytics</span> <span class="op">=</span> <span class="ident">analytics</span>
-            .<span class="ident">iter</span>()
-            .<span class="ident">find</span>(<span class="op">|</span><span class="ident">a</span><span class="op">|</span> <span class="ident">a</span>.<span class="ident">event_type</span> <span class="op">==</span> <span class="ident">IMPRESSION</span>)
-            .<span class="ident">expect</span>(<span class="string">&quot;There should be an impression Analytics&quot;</span>);
+        <span class="kw">let </span>click_analytics = analytics
+            .iter()
+            .find(|a| a.event_type == CLICK)
+            .expect(<span class="string">&quot;There should be a click Analytics&quot;</span>);
+        <span class="kw">let </span>impression_analytics = analytics
+            .iter()
+            .find(|a| a.event_type == IMPRESSION)
+            .expect(<span class="string">&quot;There should be an impression Analytics&quot;</span>);
         <span class="macro">assert_eq!</span>(
-            <span class="ident">click_analytics</span>.<span class="ident">payout_amount</span>,
-            <span class="ident">UnifiedNum::from_u64</span>(<span class="number">1_000_000</span>)
+            click_analytics.payout_amount,
+            UnifiedNum::from_u64(<span class="number">1_000_000</span>)
         );
-        <span class="macro">assert_eq!</span>(<span class="ident">click_analytics</span>.<span class="ident">payout_count</span>, <span class="number">1</span>);
+        <span class="macro">assert_eq!</span>(click_analytics.payout_count, <span class="number">1</span>);
 
         <span class="macro">assert_eq!</span>(
-            <span class="ident">impression_analytics</span>.<span class="ident">payout_amount</span>,
-            <span class="ident">UnifiedNum::from_u64</span>(<span class="number">2_000_000</span>)
+            impression_analytics.payout_amount,
+            UnifiedNum::from_u64(<span class="number">2_000_000</span>)
         );
-        <span class="macro">assert_eq!</span>(<span class="ident">impression_analytics</span>.<span class="ident">payout_count</span>, <span class="number">2</span>);
+        <span class="macro">assert_eq!</span>(impression_analytics.payout_count, <span class="number">2</span>);
     }
 
-    <span class="attribute">#[<span class="ident">tokio::test</span>]</span>
-    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">test_recording_with_session</span>() {
-        <span class="kw">let</span> <span class="ident">app</span> <span class="op">=</span> <span class="ident">setup_dummy_app</span>().<span class="kw">await</span>;
+    <span class="attribute">#[tokio::test]</span>
+    <span class="kw">async fn </span>test_recording_with_session() {
+        <span class="kw">let </span>app = setup_dummy_app().<span class="kw">await</span>;
 
-        <span class="kw">let</span> <span class="ident">test_events</span> <span class="op">=</span> <span class="ident">get_test_events</span>();
+        <span class="kw">let </span>test_events = get_test_events();
 
-        <span class="kw">let</span> <span class="ident">campaign</span> <span class="op">=</span> <span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">clone</span>();
+        <span class="kw">let </span>campaign = DUMMY_CAMPAIGN.clone();
 
-        <span class="kw">let</span> <span class="ident">session</span> <span class="op">=</span> <span class="ident">Session</span> {
-            <span class="ident">ip</span>: <span class="ident">Default::default</span>(),
-            <span class="ident">country</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;Bulgaria&quot;</span>.<span class="ident">into</span>()),
-            <span class="ident">referrer_header</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;http://127.0.0.1&quot;</span>.<span class="ident">into</span>()),
-            <span class="ident">os</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;Windows&quot;</span>.<span class="ident">into</span>()),
+        <span class="kw">let </span>session = Session {
+            ip: Default::default(),
+            country: <span class="prelude-val">Some</span>(<span class="string">&quot;Bulgaria&quot;</span>.into()),
+            referrer_header: <span class="prelude-val">Some</span>(<span class="string">&quot;http://127.0.0.1&quot;</span>.into()),
+            os: <span class="prelude-val">Some</span>(<span class="string">&quot;Windows&quot;</span>.into()),
         };
 
-        <span class="kw">let</span> <span class="ident">input_events</span> <span class="op">=</span> <span class="macro">vec!</span>[
-            <span class="ident">test_events</span>[<span class="string">&quot;click&quot;</span>].<span class="ident">clone</span>(),
-            <span class="ident">test_events</span>[<span class="string">&quot;click&quot;</span>].<span class="ident">clone</span>(),
-            <span class="ident">test_events</span>[<span class="string">&quot;click_with_different_data&quot;</span>].<span class="ident">clone</span>(),
-            <span class="ident">test_events</span>[<span class="string">&quot;click_with_different_data&quot;</span>].<span class="ident">clone</span>(),
-            <span class="ident">test_events</span>[<span class="string">&quot;click_with_different_data&quot;</span>].<span class="ident">clone</span>(),
-            <span class="ident">test_events</span>[<span class="string">&quot;impression&quot;</span>].<span class="ident">clone</span>(),
-            <span class="ident">test_events</span>[<span class="string">&quot;impression&quot;</span>].<span class="ident">clone</span>(),
-            <span class="ident">test_events</span>[<span class="string">&quot;impression&quot;</span>].<span class="ident">clone</span>(),
-            <span class="ident">test_events</span>[<span class="string">&quot;impression&quot;</span>].<span class="ident">clone</span>(),
+        <span class="kw">let </span>input_events = <span class="macro">vec!</span>[
+            test_events[<span class="string">&quot;click&quot;</span>].clone(),
+            test_events[<span class="string">&quot;click&quot;</span>].clone(),
+            test_events[<span class="string">&quot;click_with_different_data&quot;</span>].clone(),
+            test_events[<span class="string">&quot;click_with_different_data&quot;</span>].clone(),
+            test_events[<span class="string">&quot;click_with_different_data&quot;</span>].clone(),
+            test_events[<span class="string">&quot;impression&quot;</span>].clone(),
+            test_events[<span class="string">&quot;impression&quot;</span>].clone(),
+            test_events[<span class="string">&quot;impression&quot;</span>].clone(),
+            test_events[<span class="string">&quot;impression&quot;</span>].clone(),
         ];
 
-        <span class="kw">let</span> <span class="ident">dummy_channel</span> <span class="op">=</span> <span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">channel</span>;
-        <span class="kw">let</span> <span class="ident">channel_chain</span> <span class="op">=</span> <span class="ident">app</span>
-            .<span class="ident">config</span>
-            .<span class="ident">find_chain_of</span>(<span class="ident">dummy_channel</span>.<span class="ident">token</span>)
-            .<span class="ident">expect</span>(<span class="string">&quot;Channel token should be whitelisted in config!&quot;</span>);
-        <span class="kw">let</span> <span class="ident">channel_context</span> <span class="op">=</span> <span class="ident">channel_chain</span>.<span class="ident">with_channel</span>(<span class="ident">dummy_channel</span>);
-        <span class="kw">let</span> <span class="ident">campaign_context</span> <span class="op">=</span> <span class="ident">channel_context</span>.<span class="ident">clone</span>().<span class="ident">with</span>(<span class="ident">campaign</span>);
-        <span class="ident">record</span>(<span class="kw-2">&amp;</span><span class="ident">app</span>.<span class="ident">pool</span>, <span class="kw-2">&amp;</span><span class="ident">campaign_context</span>, <span class="kw-2">&amp;</span><span class="ident">session</span>, <span class="kw-2">&amp;</span><span class="ident">input_events</span>)
-            .<span class="kw">await</span>
-            .<span class="ident">expect</span>(<span class="string">&quot;should record&quot;</span>);
+        <span class="kw">let </span>dummy_channel = DUMMY_CAMPAIGN.channel;
+        <span class="kw">let </span>channel_chain = app
+            .config
+            .find_chain_of(dummy_channel.token)
+            .expect(<span class="string">&quot;Channel token should be whitelisted in config!&quot;</span>);
+        <span class="kw">let </span>channel_context = channel_chain.with_channel(dummy_channel);
+        <span class="kw">let </span>campaign_context = channel_context.clone().with(campaign);
+        record(<span class="kw-2">&amp;</span>app.pool, <span class="kw-2">&amp;</span>campaign_context, <span class="kw-2">&amp;</span>session, <span class="kw-2">&amp;</span>input_events)
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;should record&quot;</span>);
 
-        <span class="kw">let</span> <span class="ident">analytics</span> <span class="op">=</span> <span class="ident">get_all_analytics</span>(<span class="kw-2">&amp;</span><span class="ident">app</span>.<span class="ident">pool</span>)
-            .<span class="kw">await</span>
-            .<span class="ident">expect</span>(<span class="string">&quot;should find analytics&quot;</span>);
+        <span class="kw">let </span>analytics = get_all_analytics(<span class="kw-2">&amp;</span>app.pool)
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;should find analytics&quot;</span>);
 
         <span class="macro">assert!</span>(
-            <span class="ident">analytics</span>
-                .<span class="ident">iter</span>()
-                .<span class="ident">all</span>(<span class="op">|</span><span class="ident">a</span><span class="op">|</span> <span class="ident">a</span>.<span class="ident">os_name</span> <span class="op">==</span> <span class="ident">OperatingSystem::map_os</span>(<span class="string">&quot;Windows&quot;</span>)),
-            <span class="string">&quot;all analytics should have the same os as the one in the session&quot;</span>
-        );
+            analytics
+                .iter()
+                .all(|a| a.os_name == OperatingSystem::map_os(<span class="string">&quot;Windows&quot;</span>)),
+            <span class="string">&quot;all analytics should have the same os as the one in the session&quot;
+        </span>);
 
-        <span class="kw">let</span> <span class="ident">with_slot_and_unit</span>: <span class="ident">Analytics</span> <span class="op">=</span> <span class="ident">analytics</span>
-            .<span class="ident">iter</span>()
-            .<span class="ident">find</span>(<span class="op">|</span><span class="ident">a</span><span class="op">|</span> {
-                <span class="ident">a</span>.<span class="ident">ad_unit</span> <span class="op">==</span> <span class="ident">DUMMY_IPFS</span>[<span class="number">0</span>] <span class="op">&amp;&amp;</span> <span class="ident">a</span>.<span class="ident">ad_slot</span> <span class="op">==</span> <span class="ident">DUMMY_IPFS</span>[<span class="number">1</span>] <span class="op">&amp;&amp;</span> <span class="ident">a</span>.<span class="ident">event_type</span> <span class="op">==</span> <span class="ident">CLICK</span>
+        <span class="kw">let </span>with_slot_and_unit: Analytics = analytics
+            .iter()
+            .find(|a| {
+                a.ad_unit == DUMMY_IPFS[<span class="number">0</span>] &amp;&amp; a.ad_slot == DUMMY_IPFS[<span class="number">1</span>] &amp;&amp; a.event_type == CLICK
             })
-            .<span class="ident">expect</span>(<span class="string">&quot;entry should exist&quot;</span>)
-            .<span class="ident">to_owned</span>();
-        <span class="macro">assert_eq!</span>(<span class="ident">with_slot_and_unit</span>.<span class="ident">hostname</span>, <span class="prelude-val">Some</span>(<span class="string">&quot;127.0.0.1&quot;</span>.<span class="ident">to_string</span>()));
-        <span class="macro">assert_eq!</span>(<span class="ident">with_slot_and_unit</span>.<span class="ident">payout_count</span>, <span class="number">2</span>);
+            .expect(<span class="string">&quot;entry should exist&quot;</span>)
+            .to_owned();
+        <span class="macro">assert_eq!</span>(with_slot_and_unit.hostname, <span class="prelude-val">Some</span>(<span class="string">&quot;127.0.0.1&quot;</span>.to_string()));
+        <span class="macro">assert_eq!</span>(with_slot_and_unit.payout_count, <span class="number">2</span>);
         <span class="macro">assert_eq!</span>(
-            <span class="ident">with_slot_and_unit</span>.<span class="ident">payout_amount</span>,
-            <span class="ident">UnifiedNum::from_u64</span>(<span class="number">2_000_000</span>)
+            with_slot_and_unit.payout_amount,
+            UnifiedNum::from_u64(<span class="number">2_000_000</span>)
         );
 
-        <span class="kw">let</span> <span class="ident">with_different_slot_and_unit</span>: <span class="ident">Analytics</span> <span class="op">=</span> <span class="ident">analytics</span>
-            .<span class="ident">iter</span>()
-            .<span class="ident">find</span>(<span class="op">|</span><span class="ident">a</span><span class="op">|</span> <span class="ident">a</span>.<span class="ident">ad_unit</span> <span class="op">==</span> <span class="ident">DUMMY_IPFS</span>[<span class="number">2</span>] <span class="op">&amp;&amp;</span> <span class="ident">a</span>.<span class="ident">ad_slot</span> <span class="op">==</span> <span class="ident">DUMMY_IPFS</span>[<span class="number">3</span>])
-            .<span class="ident">expect</span>(<span class="string">&quot;entry should exist&quot;</span>)
-            .<span class="ident">to_owned</span>();
-        <span class="macro">assert_eq!</span>(<span class="ident">with_different_slot_and_unit</span>.<span class="ident">payout_count</span>, <span class="number">3</span>);
+        <span class="kw">let </span>with_different_slot_and_unit: Analytics = analytics
+            .iter()
+            .find(|a| a.ad_unit == DUMMY_IPFS[<span class="number">2</span>] &amp;&amp; a.ad_slot == DUMMY_IPFS[<span class="number">3</span>])
+            .expect(<span class="string">&quot;entry should exist&quot;</span>)
+            .to_owned();
+        <span class="macro">assert_eq!</span>(with_different_slot_and_unit.payout_count, <span class="number">3</span>);
         <span class="macro">assert_eq!</span>(
-            <span class="ident">with_different_slot_and_unit</span>.<span class="ident">payout_amount</span>,
-            <span class="ident">UnifiedNum::from_u64</span>(<span class="number">3_000_000</span>)
+            with_different_slot_and_unit.payout_amount,
+            UnifiedNum::from_u64(<span class="number">3_000_000</span>)
         );
 
-        <span class="kw">let</span> <span class="ident">with_referrer</span>: <span class="ident">Analytics</span> <span class="op">=</span> <span class="ident">analytics</span>
-            .<span class="ident">iter</span>()
-            .<span class="ident">find</span>(<span class="op">|</span><span class="ident">a</span><span class="op">|</span> {
-                <span class="ident">a</span>.<span class="ident">ad_unit</span> <span class="op">==</span> <span class="ident">DUMMY_IPFS</span>[<span class="number">0</span>]
-                    <span class="op">&amp;&amp;</span> <span class="ident">a</span>.<span class="ident">ad_slot</span> <span class="op">==</span> <span class="ident">DUMMY_IPFS</span>[<span class="number">1</span>]
-                    <span class="op">&amp;&amp;</span> <span class="ident">a</span>.<span class="ident">event_type</span> <span class="op">==</span> <span class="ident">IMPRESSION</span>
+        <span class="kw">let </span>with_referrer: Analytics = analytics
+            .iter()
+            .find(|a| {
+                a.ad_unit == DUMMY_IPFS[<span class="number">0</span>]
+                    &amp;&amp; a.ad_slot == DUMMY_IPFS[<span class="number">1</span>]
+                    &amp;&amp; a.event_type == IMPRESSION
             })
-            .<span class="ident">expect</span>(<span class="string">&quot;entry should exist&quot;</span>)
-            .<span class="ident">to_owned</span>();
-        <span class="macro">assert_eq!</span>(<span class="ident">with_referrer</span>.<span class="ident">payout_count</span>, <span class="number">4</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">with_referrer</span>.<span class="ident">payout_amount</span>, <span class="ident">UnifiedNum::from_u64</span>(<span class="number">4_000_000</span>));
+            .expect(<span class="string">&quot;entry should exist&quot;</span>)
+            .to_owned();
+        <span class="macro">assert_eq!</span>(with_referrer.payout_count, <span class="number">4</span>);
+        <span class="macro">assert_eq!</span>(with_referrer.payout_amount, UnifiedNum::from_u64(<span class="number">4_000_000</span>));
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (20ffea693 2022-08-11)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>

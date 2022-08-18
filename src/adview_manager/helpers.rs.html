@@ -250,43 +250,43 @@
 <span id="250">250</span>
 <span id="251">251</span>
 <span id="252">252</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">std::ops</span>::{<span class="ident">Add</span>, <span class="ident">Mul</span>};
+</pre><pre class="rust"><code><span class="kw">use </span>std::ops::{Add, Mul};
 
-<span class="kw">use</span> <span class="ident">adex_primitives</span>::{
-    <span class="ident">campaign::Validators</span>,
-    <span class="ident">sentry</span>::{<span class="ident">Event</span>, <span class="ident">EventType</span>, <span class="ident">InsertEventsRequest</span>, <span class="ident">CLICK</span>, <span class="ident">IMPRESSION</span>},
-    <span class="ident">supermarket::units_for_slot::response::AdUnit</span>,
-    <span class="ident">BigNum</span>, <span class="ident">CampaignId</span>,
+<span class="kw">use </span>adex_primitives::{
+    campaign::Validators,
+    sentry::{Event, EventType, InsertEventsRequest, CLICK, IMPRESSION},
+    supermarket::units_for_slot::response::AdUnit,
+    BigNum, CampaignId,
 };
-<span class="kw">use</span> <span class="ident">num_integer::Integer</span>;
+<span class="kw">use </span>num_integer::Integer;
 
-<span class="kw">use</span> <span class="kw">crate</span>::{
-    <span class="ident">manager</span>::{<span class="ident">Options</span>, <span class="ident">Size</span>},
-    <span class="ident">WAIT_FOR_IMPRESSION</span>,
+<span class="kw">use crate</span>::{
+    manager::{Options, Size},
+    WAIT_FOR_IMPRESSION,
 };
 
-<span class="kw">const</span> <span class="ident">IPFS_GATEWAY</span>: <span class="kw-2">&amp;</span><span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;https://ipfs.moonicorn.network/ipfs/&quot;</span>;
+<span class="kw">const </span>IPFS_GATEWAY: <span class="kw-2">&amp;</span>str = <span class="string">&quot;https://ipfs.moonicorn.network/ipfs/&quot;</span>;
 
-<span class="kw">fn</span> <span class="ident">normalize_url</span>(<span class="ident">url</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="ident">String</span> {
-    <span class="kw">if</span> <span class="ident">url</span>.<span class="ident">starts_with</span>(<span class="string">&quot;ipfs://&quot;</span>) {
-        <span class="ident">url</span>.<span class="ident">replacen</span>(<span class="string">&quot;ipfs://&quot;</span>, <span class="ident">IPFS_GATEWAY</span>, <span class="number">1</span>)
-    } <span class="kw">else</span> {
-        <span class="ident">url</span>.<span class="ident">to_string</span>()
+<span class="kw">fn </span>normalize_url(url: <span class="kw-2">&amp;</span>str) -&gt; String {
+    <span class="kw">if </span>url.starts_with(<span class="string">&quot;ipfs://&quot;</span>) {
+        url.replacen(<span class="string">&quot;ipfs://&quot;</span>, IPFS_GATEWAY, <span class="number">1</span>)
+    } <span class="kw">else </span>{
+        url.to_string()
     }
 }
 
-<span class="kw">fn</span> <span class="ident">image_html</span>(<span class="ident">on_load</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">size</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Size</span><span class="op">&gt;</span>, <span class="ident">image_url</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="ident">String</span> {
-    <span class="kw">let</span> <span class="ident">size</span> <span class="op">=</span> <span class="ident">size</span>
-        .<span class="ident">map</span>(<span class="op">|</span><span class="ident">Size</span> { <span class="ident">width</span>, <span class="ident">height</span> }<span class="op">|</span> <span class="macro">format!</span>(<span class="string">&quot;width=\&quot;{width}\&quot; height=\&quot;{height}\&quot;&quot;</span>))
-        .<span class="ident">unwrap_or_default</span>();
+<span class="kw">fn </span>image_html(on_load: <span class="kw-2">&amp;</span>str, size: <span class="prelude-ty">Option</span>&lt;Size&gt;, image_url: <span class="kw-2">&amp;</span>str) -&gt; String {
+    <span class="kw">let </span>size = size
+        .map(|Size { width, height }| <span class="macro">format!</span>(<span class="string">&quot;width=\&quot;{width}\&quot; height=\&quot;{height}\&quot;&quot;</span>))
+        .unwrap_or_default();
 
     <span class="macro">format!</span>(<span class="string">&quot;&lt;img loading=\&quot;lazy\&quot; src=\&quot;{image_url}\&quot; alt=\&quot;AdEx ad\&quot; rel=\&quot;nofollow\&quot; onload=\&quot;{on_load}\&quot; {size}&gt;&quot;</span>)
 }
 
-<span class="kw">fn</span> <span class="ident">video_html</span>(<span class="ident">on_load</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">size</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Size</span><span class="op">&gt;</span>, <span class="ident">image_url</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">media_mime</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="ident">String</span> {
-    <span class="kw">let</span> <span class="ident">size</span> <span class="op">=</span> <span class="ident">size</span>
-        .<span class="ident">map</span>(<span class="op">|</span><span class="ident">Size</span> { <span class="ident">width</span>, <span class="ident">height</span> }<span class="op">|</span> <span class="macro">format!</span>(<span class="string">&quot;width=\&quot;{width}\&quot; height=\&quot;{height}\&quot;&quot;</span>))
-        .<span class="ident">unwrap_or_default</span>();
+<span class="kw">fn </span>video_html(on_load: <span class="kw-2">&amp;</span>str, size: <span class="prelude-ty">Option</span>&lt;Size&gt;, image_url: <span class="kw-2">&amp;</span>str, media_mime: <span class="kw-2">&amp;</span>str) -&gt; String {
+    <span class="kw">let </span>size = size
+        .map(|Size { width, height }| <span class="macro">format!</span>(<span class="string">&quot;width=\&quot;{width}\&quot; height=\&quot;{height}\&quot;&quot;</span>))
+        .unwrap_or_default();
 
     <span class="macro">format!</span>(
         <span class="string">&quot;&lt;video {size} loop autoplay onloadeddata=\&quot;{on_load}\&quot; muted&gt;
@@ -295,7 +295,7 @@
     )
 }
 
-<span class="kw">fn</span> <span class="ident">adex_icon</span>() -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span> {
+<span class="kw">fn </span>adex_icon() -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str {
     <span class="string">r#&quot;&lt;a href=&quot;https://www.adex.network&quot; target=&quot;_blank&quot; rel=&quot;noopener noreferrer&quot;
             style=&quot;position: absolute; top: 0; right: 0;&quot;
         &gt;
@@ -311,196 +311,196 @@
                 &lt;path class=&quot;st1&quot; d=&quot;M14,12.1L10.9,9L14,5.9L12.1,4L9,7.1L5.9,4L4,5.9L7.1,9L4,12.1L5.9,14L9,10.9l3.1,3.1L14,12.1z M7.9,2L6.4,3.5
                     L7.9,5L9,3.9L10.1,5l1.5-1.5L10,1.9l-1-1L7.9,2 M7.9,16l-1.5-1.5L7.9,13L9,14.1l1.1-1.1l1.5,1.5L10,16.1l-1,1L7.9,16&quot;/&gt;
             &lt;/svg&gt;
-        &lt;/a&gt;&quot;#</span>
+        &lt;/a&gt;&quot;#
+</span>}
+
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>is_video(ad_unit: <span class="kw-2">&amp;</span>AdUnit) -&gt; bool {
+    ad_unit.media_mime.split(<span class="string">&#39;/&#39;</span>).next() == <span class="prelude-val">Some</span>(<span class="string">&quot;video&quot;</span>)
 }
 
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">is_video</span>(<span class="ident">ad_unit</span>: <span class="kw-2">&amp;</span><span class="ident">AdUnit</span>) -&gt; <span class="ident">bool</span> {
-    <span class="ident">ad_unit</span>.<span class="ident">media_mime</span>.<span class="ident">split</span>(<span class="string">&#39;/&#39;</span>).<span class="ident">next</span>() <span class="op">==</span> <span class="prelude-val">Some</span>(<span class="string">&quot;video&quot;</span>)
+<span class="doccomment">/// Does not copy the JS impl, instead it generates the BigNum from the IPFS CID bytes
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>randomized_sort_pos(ad_unit: <span class="kw-2">&amp;</span>AdUnit, seed: BigNum) -&gt; BigNum {
+    <span class="kw">let </span>bytes = ad_unit.id.<span class="number">0</span>.to_bytes();
+
+    <span class="kw">let </span>unit_id = BigNum::from_bytes_be(<span class="kw-2">&amp;</span>bytes);
+
+    <span class="kw">let </span>x: BigNum = unit_id.mul(seed).add(BigNum::from(<span class="number">12345</span>));
+
+    x.mod_floor(<span class="kw-2">&amp;</span>BigNum::from(<span class="number">0x80000000</span>))
 }
 
-<span class="doccomment">/// Does not copy the JS impl, instead it generates the BigNum from the IPFS CID bytes</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">randomized_sort_pos</span>(<span class="ident">ad_unit</span>: <span class="kw-2">&amp;</span><span class="ident">AdUnit</span>, <span class="ident">seed</span>: <span class="ident">BigNum</span>) -&gt; <span class="ident">BigNum</span> {
-    <span class="kw">let</span> <span class="ident">bytes</span> <span class="op">=</span> <span class="ident">ad_unit</span>.<span class="ident">id</span>.<span class="number">0</span>.<span class="ident">to_bytes</span>();
+<span class="doccomment">/// Generates the AdUnit HTML for a given ad
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>get_unit_html(
+    size: <span class="prelude-ty">Option</span>&lt;Size&gt;,
+    ad_unit: <span class="kw-2">&amp;</span>AdUnit,
+    hostname: <span class="kw-2">&amp;</span>str,
+    on_load: <span class="kw-2">&amp;</span>str,
+    on_click: <span class="kw-2">&amp;</span>str,
+) -&gt; String {
+    <span class="comment">// replace all `&quot;` quotes with a single quote `&#39;`
+    // these values are used inside `onclick` &amp; `onload` html attributes
+    </span><span class="kw">let </span>on_load = on_load.replace(<span class="string">&#39;\&quot;&#39;</span>, <span class="string">&quot;&#39;&quot;</span>);
+    <span class="kw">let </span>on_click = on_click.replace(<span class="string">&#39;\&quot;&#39;</span>, <span class="string">&quot;&#39;&quot;</span>);
+    <span class="kw">let </span>image_url = normalize_url(<span class="kw-2">&amp;</span>ad_unit.media_url);
 
-    <span class="kw">let</span> <span class="ident">unit_id</span> <span class="op">=</span> <span class="ident">BigNum::from_bytes_be</span>(<span class="kw-2">&amp;</span><span class="ident">bytes</span>);
-
-    <span class="kw">let</span> <span class="ident">x</span>: <span class="ident">BigNum</span> <span class="op">=</span> <span class="ident">unit_id</span>.<span class="ident">mul</span>(<span class="ident">seed</span>).<span class="ident">add</span>(<span class="ident">BigNum::from</span>(<span class="number">12345</span>));
-
-    <span class="ident">x</span>.<span class="ident">mod_floor</span>(<span class="kw-2">&amp;</span><span class="ident">BigNum::from</span>(<span class="number">0x80000000</span>))
-}
-
-<span class="doccomment">/// Generates the AdUnit HTML for a given ad</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">get_unit_html</span>(
-    <span class="ident">size</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Size</span><span class="op">&gt;</span>,
-    <span class="ident">ad_unit</span>: <span class="kw-2">&amp;</span><span class="ident">AdUnit</span>,
-    <span class="ident">hostname</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>,
-    <span class="ident">on_load</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>,
-    <span class="ident">on_click</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>,
-) -&gt; <span class="ident">String</span> {
-    <span class="comment">// replace all `&quot;` quotes with a single quote `&#39;`</span>
-    <span class="comment">// these values are used inside `onclick` &amp; `onload` html attributes</span>
-    <span class="kw">let</span> <span class="ident">on_load</span> <span class="op">=</span> <span class="ident">on_load</span>.<span class="ident">replace</span>(<span class="string">&#39;\&quot;&#39;</span>, <span class="string">&quot;&#39;&quot;</span>);
-    <span class="kw">let</span> <span class="ident">on_click</span> <span class="op">=</span> <span class="ident">on_click</span>.<span class="ident">replace</span>(<span class="string">&#39;\&quot;&#39;</span>, <span class="string">&quot;&#39;&quot;</span>);
-    <span class="kw">let</span> <span class="ident">image_url</span> <span class="op">=</span> <span class="ident">normalize_url</span>(<span class="kw-2">&amp;</span><span class="ident">ad_unit</span>.<span class="ident">media_url</span>);
-
-    <span class="kw">let</span> <span class="ident">element_html</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">is_video</span>(<span class="ident">ad_unit</span>) {
-        <span class="ident">video_html</span>(<span class="kw-2">&amp;</span><span class="ident">on_load</span>, <span class="ident">size</span>, <span class="kw-2">&amp;</span><span class="ident">image_url</span>, <span class="kw-2">&amp;</span><span class="ident">ad_unit</span>.<span class="ident">media_mime</span>)
-    } <span class="kw">else</span> {
-        <span class="ident">image_html</span>(<span class="kw-2">&amp;</span><span class="ident">on_load</span>, <span class="ident">size</span>, <span class="kw-2">&amp;</span><span class="ident">image_url</span>)
+    <span class="kw">let </span>element_html = <span class="kw">if </span>is_video(ad_unit) {
+        video_html(<span class="kw-2">&amp;</span>on_load, size, <span class="kw-2">&amp;</span>image_url, <span class="kw-2">&amp;</span>ad_unit.media_mime)
+    } <span class="kw">else </span>{
+        image_html(<span class="kw-2">&amp;</span>on_load, size, <span class="kw-2">&amp;</span>image_url)
     };
 
-    <span class="comment">// @TODO click protection page</span>
-    <span class="kw">let</span> <span class="ident">final_target_url</span> <span class="op">=</span> <span class="ident">ad_unit</span>.<span class="ident">target_url</span>.<span class="ident">replace</span>(
+    <span class="comment">// @TODO click protection page
+    </span><span class="kw">let </span>final_target_url = ad_unit.target_url.replace(
         <span class="string">&quot;utm_source=adex_PUBHOSTNAME&quot;</span>,
-        <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;utm_source=AdEx+({hostname})&quot;</span>, <span class="ident">hostname</span> <span class="op">=</span> <span class="ident">hostname</span>),
+        <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;utm_source=AdEx+({hostname})&quot;</span>, hostname = hostname),
     );
 
-    <span class="kw">let</span> <span class="ident">max_min_size</span> <span class="op">=</span> <span class="ident">size</span>
-        .<span class="ident">map</span>(<span class="op">|</span><span class="ident">Size</span> { <span class="ident">width</span>, <span class="ident">height</span> }<span class="op">|</span> {
+    <span class="kw">let </span>max_min_size = size
+        .map(|Size { width, height }| {
             <span class="macro">format!</span>(
                 <span class="string">&quot;max-width: {width}px; min-width: {min_width}px; height: {height}px;&quot;</span>,
-                <span class="comment">// u64 / 2 will floor the result!</span>
-                <span class="ident">min_width</span> <span class="op">=</span> <span class="ident">width</span> <span class="op">/</span> <span class="number">2</span>
-            )
+                <span class="comment">// u64 / 2 will floor the result!
+                </span>min_width = width / <span class="number">2
+            </span>)
         })
-        .<span class="ident">unwrap_or_default</span>();
+        .unwrap_or_default();
 
     <span class="macro">format!</span>(<span class="string">&quot;&lt;div style=\&quot;position: relative; overflow: hidden; {style}\&quot;&gt;
         &lt;a href=\&quot;{final_target_url}\&quot; target=\&quot;_blank\&quot; onclick=\&quot;{on_click}\&quot; rel=\&quot;noopener noreferrer\&quot;&gt;
         {element_html}
         &lt;/a&gt;
         {adex_icon}
-        &lt;/div&gt;&quot;</span>, <span class="ident">style</span><span class="op">=</span><span class="ident">max_min_size</span>, <span class="ident">adex_icon</span><span class="op">=</span><span class="ident">adex_icon</span>())
+        &lt;/div&gt;&quot;</span>, style=max_min_size, adex_icon=adex_icon())
 }
 
-<span class="doccomment">/// Generates the HTML for showing an Ad ([`AdUnit`]), as well as, the code for sending the events.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// `no_impression` - whether or not an [`IMPRESSION`] event should be sent with `onload`.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// - [`WAIT_FOR_IMPRESSION`] - The time that needs to pass before sending the [`IMPRESSION`] event to all validators.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_unit_html_with_events</span>(
-    <span class="ident">options</span>: <span class="kw-2">&amp;</span><span class="ident">Options</span>,
-    <span class="ident">ad_unit</span>: <span class="kw-2">&amp;</span><span class="ident">AdUnit</span>,
-    <span class="ident">hostname</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>,
-    <span class="ident">campaign_id</span>: <span class="ident">CampaignId</span>,
-    <span class="ident">validators</span>: <span class="kw-2">&amp;</span><span class="ident">Validators</span>,
-    <span class="ident">no_impression</span>: <span class="ident">bool</span>,
-) -&gt; <span class="ident">String</span> {
-    <span class="kw">let</span> <span class="ident">get_fetch_code</span> <span class="op">=</span> <span class="op">|</span><span class="ident">event_type</span>: <span class="ident">EventType</span><span class="op">|</span> -&gt; <span class="ident">String</span> {
-        <span class="kw">let</span> <span class="ident">event</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">event_type</span> {
-            <span class="ident">EventType::Impression</span> =&gt; <span class="ident">Event::Impression</span> {
-                <span class="ident">publisher</span>: <span class="ident">options</span>.<span class="ident">publisher_addr</span>,
-                <span class="ident">ad_unit</span>: <span class="ident">ad_unit</span>.<span class="ident">id</span>,
-                <span class="ident">ad_slot</span>: <span class="ident">options</span>.<span class="ident">market_slot</span>,
-                <span class="ident">referrer</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;document.referrer&quot;</span>.<span class="ident">to_string</span>()),
+<span class="doccomment">/// Generates the HTML for showing an Ad ([`AdUnit`]), as well as, the code for sending the events.
+///
+/// `no_impression` - whether or not an [`IMPRESSION`] event should be sent with `onload`.
+///
+/// - [`WAIT_FOR_IMPRESSION`] - The time that needs to pass before sending the [`IMPRESSION`] event to all validators.
+</span><span class="kw">pub fn </span>get_unit_html_with_events(
+    options: <span class="kw-2">&amp;</span>Options,
+    ad_unit: <span class="kw-2">&amp;</span>AdUnit,
+    hostname: <span class="kw-2">&amp;</span>str,
+    campaign_id: CampaignId,
+    validators: <span class="kw-2">&amp;</span>Validators,
+    no_impression: bool,
+) -&gt; String {
+    <span class="kw">let </span>get_fetch_code = |event_type: EventType| -&gt; String {
+        <span class="kw">let </span>event = <span class="kw">match </span>event_type {
+            EventType::Impression =&gt; Event::Impression {
+                publisher: options.publisher_addr,
+                ad_unit: ad_unit.id,
+                ad_slot: options.market_slot,
+                referrer: <span class="prelude-val">Some</span>(<span class="string">&quot;document.referrer&quot;</span>.to_string()),
             },
-            <span class="ident">EventType::Click</span> =&gt; <span class="ident">Event::Click</span> {
-                <span class="ident">publisher</span>: <span class="ident">options</span>.<span class="ident">publisher_addr</span>,
-                <span class="ident">ad_unit</span>: <span class="ident">ad_unit</span>.<span class="ident">id</span>,
-                <span class="ident">ad_slot</span>: <span class="ident">options</span>.<span class="ident">market_slot</span>,
-                <span class="ident">referrer</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;document.referrer&quot;</span>.<span class="ident">to_string</span>()),
+            EventType::Click =&gt; Event::Click {
+                publisher: options.publisher_addr,
+                ad_unit: ad_unit.id,
+                ad_slot: options.market_slot,
+                referrer: <span class="prelude-val">Some</span>(<span class="string">&quot;document.referrer&quot;</span>.to_string()),
             },
         };
-        <span class="kw">let</span> <span class="ident">events_body</span> <span class="op">=</span> <span class="ident">InsertEventsRequest</span> {
-            <span class="ident">events</span>: <span class="macro">vec!</span>[<span class="ident">event</span>],
+        <span class="kw">let </span>events_body = InsertEventsRequest {
+            events: <span class="macro">vec!</span>[event],
         };
-        <span class="kw">let</span> <span class="ident">body</span> <span class="op">=</span>
-            <span class="ident">serde_json::to_string</span>(<span class="kw-2">&amp;</span><span class="ident">events_body</span>).<span class="ident">expect</span>(<span class="string">&quot;It should always serialize EventBody&quot;</span>);
+        <span class="kw">let </span>body =
+            serde_json::to_string(<span class="kw-2">&amp;</span>events_body).expect(<span class="string">&quot;It should always serialize EventBody&quot;</span>);
 
-        <span class="comment">// TODO: check whether the JSON body with `&#39;&#39;` quotes executes correctly!</span>
-        <span class="kw">let</span> <span class="ident">fetch_opts</span> <span class="op">=</span> <span class="macro">format!</span>(<span class="string">&quot;var fetchOpts = {{ method: &#39;POST&#39;, headers: {{ &#39;content-type&#39;: &#39;application/json&#39; }}, body: {body} }};&quot;</span>);
+        <span class="comment">// TODO: check whether the JSON body with `&#39;&#39;` quotes executes correctly!
+        </span><span class="kw">let </span>fetch_opts = <span class="macro">format!</span>(<span class="string">&quot;var fetchOpts = {{ method: &#39;POST&#39;, headers: {{ &#39;content-type&#39;: &#39;application/json&#39; }}, body: {body} }};&quot;</span>);
 
-        <span class="kw">let</span> <span class="ident">validators</span>: <span class="ident">String</span> <span class="op">=</span> <span class="ident">validators</span>
-            .<span class="ident">iter</span>()
-            .<span class="ident">map</span>(<span class="op">|</span><span class="ident">validator</span><span class="op">|</span> {
-                <span class="kw">let</span> <span class="ident">fetch_url</span> <span class="op">=</span> <span class="macro">format!</span>(
+        <span class="kw">let </span>validators: String = validators
+            .iter()
+            .map(|validator| {
+                <span class="kw">let </span>fetch_url = <span class="macro">format!</span>(
                     <span class="string">&quot;{}/campaign/{}/events?pubAddr={}&quot;</span>,
-                    <span class="ident">validator</span>.<span class="ident">url</span>, <span class="ident">campaign_id</span>, <span class="ident">options</span>.<span class="ident">publisher_addr</span>
+                    validator.url, campaign_id, options.publisher_addr
                 );
 
-                <span class="macro">format!</span>(<span class="string">&quot;fetch(&#39;{}&#39;, fetchOpts)&quot;</span>, <span class="ident">fetch_url</span>)
+                <span class="macro">format!</span>(<span class="string">&quot;fetch(&#39;{}&#39;, fetchOpts)&quot;</span>, fetch_url)
             })
-            .<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span><span class="op">&gt;</span>()
-            .<span class="ident">join</span>(<span class="string">&quot;; &quot;</span>);
+            .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;()
+            .join(<span class="string">&quot;; &quot;</span>);
 
         <span class="macro">format!</span>(<span class="string">&quot;{fetch_opts} {validators}&quot;</span>)
     };
 
-    <span class="kw">let</span> <span class="ident">get_timeout_code</span> <span class="op">=</span> <span class="op">|</span><span class="ident">event_type</span>: <span class="ident">EventType</span><span class="op">|</span> -&gt; <span class="ident">String</span> {
+    <span class="kw">let </span>get_timeout_code = |event_type: EventType| -&gt; String {
         <span class="macro">format!</span>(
             <span class="string">&quot;setTimeout(function() {{ {code} }}, {timeout})&quot;</span>,
-            <span class="ident">code</span> <span class="op">=</span> <span class="ident">get_fetch_code</span>(<span class="ident">event_type</span>),
-            <span class="ident">timeout</span> <span class="op">=</span> <span class="ident">WAIT_FOR_IMPRESSION</span>.<span class="ident">num_milliseconds</span>()
+            code = get_fetch_code(event_type),
+            timeout = WAIT_FOR_IMPRESSION.num_milliseconds()
         )
     };
 
-    <span class="kw">let</span> <span class="ident">on_load</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">no_impression</span> {
-        <span class="ident">String::new</span>()
-    } <span class="kw">else</span> {
-        <span class="ident">get_timeout_code</span>(<span class="ident">IMPRESSION</span>)
+    <span class="kw">let </span>on_load = <span class="kw">if </span>no_impression {
+        String::new()
+    } <span class="kw">else </span>{
+        get_timeout_code(IMPRESSION)
     };
 
-    <span class="ident">get_unit_html</span>(
-        <span class="ident">options</span>.<span class="ident">size</span>,
-        <span class="ident">ad_unit</span>,
-        <span class="ident">hostname</span>,
-        <span class="kw-2">&amp;</span><span class="ident">on_load</span>,
-        <span class="kw-2">&amp;</span><span class="ident">get_fetch_code</span>(<span class="ident">CLICK</span>),
+    get_unit_html(
+        options.size,
+        ad_unit,
+        hostname,
+        <span class="kw-2">&amp;</span>on_load,
+        <span class="kw-2">&amp;</span>get_fetch_code(CLICK),
     )
 }
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
-<span class="kw">mod</span> <span class="ident">test</span> {
-    <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
-    <span class="kw">use</span> <span class="ident">adex_primitives::test_util::DUMMY_IPFS</span>;
+<span class="attribute">#[cfg(test)]</span>
+<span class="kw">mod </span>test {
+    <span class="kw">use super</span>::<span class="kw-2">*</span>;
+    <span class="kw">use </span>adex_primitives::test_util::DUMMY_IPFS;
 
-    <span class="kw">fn</span> <span class="ident">get_ad_unit</span>(<span class="ident">media_mime</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="ident">AdUnit</span> {
-        <span class="ident">AdUnit</span> {
-            <span class="ident">id</span>: <span class="ident">DUMMY_IPFS</span>[<span class="number">0</span>],
-            <span class="ident">media_url</span>: <span class="string">&quot;&quot;</span>.<span class="ident">to_string</span>(),
-            <span class="ident">media_mime</span>: <span class="ident">media_mime</span>.<span class="ident">to_string</span>(),
-            <span class="ident">target_url</span>: <span class="string">&quot;&quot;</span>.<span class="ident">to_string</span>(),
+    <span class="kw">fn </span>get_ad_unit(media_mime: <span class="kw-2">&amp;</span>str) -&gt; AdUnit {
+        AdUnit {
+            id: DUMMY_IPFS[<span class="number">0</span>],
+            media_url: <span class="string">&quot;&quot;</span>.to_string(),
+            media_mime: media_mime.to_string(),
+            target_url: <span class="string">&quot;&quot;</span>.to_string(),
         }
     }
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">test_is_video</span>() {
-        <span class="macro">assert!</span>(<span class="ident">is_video</span>(<span class="kw-2">&amp;</span><span class="ident">get_ad_unit</span>(<span class="string">&quot;video/avi&quot;</span>)));
-        <span class="macro">assert!</span>(<span class="op">!</span><span class="ident">is_video</span>(<span class="kw-2">&amp;</span><span class="ident">get_ad_unit</span>(<span class="string">&quot;image/jpeg&quot;</span>)));
+    <span class="attribute">#[test]</span>
+    <span class="kw">fn </span>test_is_video() {
+        <span class="macro">assert!</span>(is_video(<span class="kw-2">&amp;</span>get_ad_unit(<span class="string">&quot;video/avi&quot;</span>)));
+        <span class="macro">assert!</span>(!is_video(<span class="kw-2">&amp;</span>get_ad_unit(<span class="string">&quot;image/jpeg&quot;</span>)));
     }
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">normalization_of_url</span>() {
-        <span class="comment">// IPFS case</span>
-        <span class="macro">assert_eq!</span>(<span class="macro">format!</span>(<span class="string">&quot;{}123&quot;</span>, <span class="ident">IPFS_GATEWAY</span>), <span class="ident">normalize_url</span>(<span class="string">&quot;ipfs://123&quot;</span>));
+    <span class="attribute">#[test]</span>
+    <span class="kw">fn </span>normalization_of_url() {
+        <span class="comment">// IPFS case
+        </span><span class="macro">assert_eq!</span>(<span class="macro">format!</span>(<span class="string">&quot;{}123&quot;</span>, IPFS_GATEWAY), normalize_url(<span class="string">&quot;ipfs://123&quot;</span>));
         <span class="macro">assert_eq!</span>(
-            <span class="macro">format!</span>(<span class="string">&quot;{}123ipfs://&quot;</span>, <span class="ident">IPFS_GATEWAY</span>),
-            <span class="ident">normalize_url</span>(<span class="string">&quot;ipfs://123ipfs://&quot;</span>)
+            <span class="macro">format!</span>(<span class="string">&quot;{}123ipfs://&quot;</span>, IPFS_GATEWAY),
+            normalize_url(<span class="string">&quot;ipfs://123ipfs://&quot;</span>)
         );
 
-        <span class="comment">// Non-IPFS case</span>
-        <span class="macro">assert_eq!</span>(<span class="string">&quot;http://123&quot;</span>.<span class="ident">to_string</span>(), <span class="ident">normalize_url</span>(<span class="string">&quot;http://123&quot;</span>));
+        <span class="comment">// Non-IPFS case
+        </span><span class="macro">assert_eq!</span>(<span class="string">&quot;http://123&quot;</span>.to_string(), normalize_url(<span class="string">&quot;http://123&quot;</span>));
     }
 
-    <span class="kw">mod</span> <span class="ident">randomized_sort_pos</span> {
+    <span class="kw">mod </span>randomized_sort_pos {
 
-        <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
+        <span class="kw">use super</span>::<span class="kw-2">*</span>;
 
-        <span class="attribute">#[<span class="ident">test</span>]</span>
-        <span class="kw">fn</span> <span class="ident">test_randomized_position</span>() {
-            <span class="kw">let</span> <span class="ident">ad_unit</span> <span class="op">=</span> <span class="ident">AdUnit</span> {
-                <span class="ident">id</span>: <span class="ident">DUMMY_IPFS</span>[<span class="number">0</span>],
-                <span class="ident">media_url</span>: <span class="string">&quot;ipfs://QmWWQSuPMS6aXCbZKpEjPHPUZN2NjB3YrhJTHsV4X3vb2t&quot;</span>.<span class="ident">to_string</span>(),
-                <span class="ident">media_mime</span>: <span class="string">&quot;image/jpeg&quot;</span>.<span class="ident">to_string</span>(),
-                <span class="ident">target_url</span>: <span class="string">&quot;https://google.com&quot;</span>.<span class="ident">to_string</span>(),
+        <span class="attribute">#[test]</span>
+        <span class="kw">fn </span>test_randomized_position() {
+            <span class="kw">let </span>ad_unit = AdUnit {
+                id: DUMMY_IPFS[<span class="number">0</span>],
+                media_url: <span class="string">&quot;ipfs://QmWWQSuPMS6aXCbZKpEjPHPUZN2NjB3YrhJTHsV4X3vb2t&quot;</span>.to_string(),
+                media_mime: <span class="string">&quot;image/jpeg&quot;</span>.to_string(),
+                target_url: <span class="string">&quot;https://google.com&quot;</span>.to_string(),
             };
 
-            <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="ident">randomized_sort_pos</span>(<span class="kw-2">&amp;</span><span class="ident">ad_unit</span>, <span class="number">5</span>.<span class="ident">into</span>());
+            <span class="kw">let </span>result = randomized_sort_pos(<span class="kw-2">&amp;</span>ad_unit, <span class="number">5</span>.into());
 
-            <span class="comment">// The seed is responsible for generating different results since the AdUnit IPFS can be the same</span>
-            <span class="macro">assert_eq!</span>(<span class="ident">BigNum::from</span>(<span class="number">177_349_401</span>), <span class="ident">result</span>);
+            <span class="comment">// The seed is responsible for generating different results since the AdUnit IPFS can be the same
+            </span><span class="macro">assert_eq!</span>(BigNum::from(<span class="number">177_349_401</span>), result);
         }
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="adview_manager" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (20ffea693 2022-08-11)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="adview_manager" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>

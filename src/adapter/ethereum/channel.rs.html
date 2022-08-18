@@ -18,25 +18,25 @@
 <span id="18">18</span>
 <span id="19">19</span>
 <span id="20">20</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">primitives::Channel</span>;
-<span class="kw">use</span> <span class="ident">web3::ethabi::Token</span>;
+</pre><pre class="rust"><code><span class="kw">use </span>primitives::Channel;
+<span class="kw">use </span>web3::ethabi::Token;
 
-<span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">trait</span> <span class="ident">EthereumChannel</span> {
-    <span class="kw">fn</span> <span class="ident">tokenize</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Token</span>;
+<span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">trait </span>EthereumChannel {
+    <span class="kw">fn </span>tokenize(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Token;
 }
 
-<span class="kw">impl</span> <span class="ident">EthereumChannel</span> <span class="kw">for</span> <span class="ident">Channel</span> {
-    <span class="kw">fn</span> <span class="ident">tokenize</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Token</span> {
-        <span class="kw">let</span> <span class="ident">tokens</span> <span class="op">=</span> <span class="macro">vec!</span>[
-            <span class="ident">Token::Address</span>(<span class="self">self</span>.<span class="ident">leader</span>.<span class="ident">as_bytes</span>().<span class="ident">into</span>()),
-            <span class="ident">Token::Address</span>(<span class="self">self</span>.<span class="ident">follower</span>.<span class="ident">as_bytes</span>().<span class="ident">into</span>()),
-            <span class="ident">Token::Address</span>(<span class="self">self</span>.<span class="ident">guardian</span>.<span class="ident">as_bytes</span>().<span class="ident">into</span>()),
-            <span class="ident">Token::Address</span>(<span class="self">self</span>.<span class="ident">token</span>.<span class="ident">as_bytes</span>().<span class="ident">into</span>()),
-            <span class="ident">Token::FixedBytes</span>(<span class="self">self</span>.<span class="ident">nonce</span>.<span class="ident">to_bytes</span>().<span class="ident">to_vec</span>()),
+<span class="kw">impl </span>EthereumChannel <span class="kw">for </span>Channel {
+    <span class="kw">fn </span>tokenize(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Token {
+        <span class="kw">let </span>tokens = <span class="macro">vec!</span>[
+            Token::Address(<span class="self">self</span>.leader.as_bytes().into()),
+            Token::Address(<span class="self">self</span>.follower.as_bytes().into()),
+            Token::Address(<span class="self">self</span>.guardian.as_bytes().into()),
+            Token::Address(<span class="self">self</span>.token.as_bytes().into()),
+            Token::FixedBytes(<span class="self">self</span>.nonce.to_bytes().to_vec()),
         ];
 
-        <span class="ident">Token::Tuple</span>(<span class="ident">tokens</span>)
+        Token::Tuple(tokens)
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="adapter" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (20ffea693 2022-08-11)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="adapter" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>

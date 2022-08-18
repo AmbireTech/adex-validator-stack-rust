@@ -378,385 +378,385 @@
 <span id="378">378</span>
 <span id="379">379</span>
 <span id="380">380</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">primitives</span>::{<span class="ident">UnifiedMap</span>, <span class="ident">UnifiedNum</span>};
+</pre><pre class="rust"><code><span class="kw">use </span>primitives::{UnifiedMap, UnifiedNum};
 
-<span class="kw">static</span> <span class="ident">MAX_HEALTH</span>: <span class="ident">u64</span> <span class="op">=</span> <span class="number">1_000</span>;
+<span class="kw">static </span>MAX_HEALTH: u64 = <span class="number">1_000</span>;
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_valid_transition</span>(
-    <span class="ident">all_spenders_sum</span>: <span class="ident">UnifiedNum</span>,
-    <span class="ident">prev</span>: <span class="kw-2">&amp;</span><span class="ident">UnifiedMap</span>,
-    <span class="ident">next</span>: <span class="kw-2">&amp;</span><span class="ident">UnifiedMap</span>,
-) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">bool</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">sum_prev</span> <span class="op">=</span> <span class="ident">prev</span>.<span class="ident">values</span>().<span class="ident">sum</span>::<span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span><span class="op">&gt;</span>()<span class="question-mark">?</span>;
-    <span class="kw">let</span> <span class="ident">sum_next</span> <span class="op">=</span> <span class="ident">next</span>.<span class="ident">values</span>().<span class="ident">sum</span>::<span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span><span class="op">&gt;</span>()<span class="question-mark">?</span>;
+<span class="kw">pub fn </span>is_valid_transition(
+    all_spenders_sum: UnifiedNum,
+    prev: <span class="kw-2">&amp;</span>UnifiedMap,
+    next: <span class="kw-2">&amp;</span>UnifiedMap,
+) -&gt; <span class="prelude-ty">Option</span>&lt;bool&gt; {
+    <span class="kw">let </span>sum_prev = prev.values().sum::&lt;<span class="prelude-ty">Option</span>&lt;<span class="kw">_</span>&gt;&gt;()<span class="question-mark">?</span>;
+    <span class="kw">let </span>sum_next = next.values().sum::&lt;<span class="prelude-ty">Option</span>&lt;<span class="kw">_</span>&gt;&gt;()<span class="question-mark">?</span>;
 
-    <span class="kw">let</span> <span class="ident">prev_checks</span> <span class="op">=</span> <span class="ident">prev</span>.<span class="ident">iter</span>().<span class="ident">all</span>(<span class="op">|</span>(<span class="ident">acc</span>, <span class="ident">bal</span>)<span class="op">|</span> <span class="kw">match</span> <span class="ident">next</span>.<span class="ident">get</span>(<span class="ident">acc</span>) {
-        <span class="prelude-val">Some</span>(<span class="ident">next_bal</span>) =&gt; <span class="ident">next_bal</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">bal</span>,
-        <span class="prelude-val">None</span> =&gt; <span class="bool-val">false</span>,
+    <span class="kw">let </span>prev_checks = prev.iter().all(|(acc, bal)| <span class="kw">match </span>next.get(acc) {
+        <span class="prelude-val">Some</span>(next_bal) =&gt; next_bal &gt;= bal,
+        <span class="prelude-val">None </span>=&gt; <span class="bool-val">false</span>,
     });
 
-    <span class="comment">// no need to check if there are negative balances as we don&#39;t allow them using UnifiedNum</span>
-    <span class="prelude-val">Some</span>(<span class="ident">sum_next</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">sum_prev</span> <span class="op">&amp;&amp;</span> <span class="ident">sum_next</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">all_spenders_sum</span> <span class="op">&amp;&amp;</span> <span class="ident">prev_checks</span>)
+    <span class="comment">// no need to check if there are negative balances as we don&#39;t allow them using UnifiedNum
+    </span><span class="prelude-val">Some</span>(sum_next &gt;= sum_prev &amp;&amp; sum_next &lt;= all_spenders_sum &amp;&amp; prev_checks)
 }
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_health</span>(
-    <span class="ident">all_spenders_sum</span>: <span class="ident">UnifiedNum</span>,
-    <span class="ident">our</span>: <span class="kw-2">&amp;</span><span class="ident">UnifiedMap</span>,
-    <span class="ident">approved</span>: <span class="kw-2">&amp;</span><span class="ident">UnifiedMap</span>,
-) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">sum_our</span>: <span class="ident">UnifiedNum</span> <span class="op">=</span> <span class="ident">our</span>.<span class="ident">values</span>().<span class="ident">sum</span>::<span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span><span class="op">&gt;</span>()<span class="question-mark">?</span>;
+<span class="kw">pub fn </span>get_health(
+    all_spenders_sum: UnifiedNum,
+    our: <span class="kw-2">&amp;</span>UnifiedMap,
+    approved: <span class="kw-2">&amp;</span>UnifiedMap,
+) -&gt; <span class="prelude-ty">Option</span>&lt;u64&gt; {
+    <span class="kw">let </span>sum_our: UnifiedNum = our.values().sum::&lt;<span class="prelude-ty">Option</span>&lt;<span class="kw">_</span>&gt;&gt;()<span class="question-mark">?</span>;
 
-    <span class="kw">let</span> <span class="ident">sum_approved_mins</span> <span class="op">=</span> <span class="ident">our</span>
-        .<span class="ident">iter</span>()
-        .<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">acc</span>, <span class="ident">val</span>)<span class="op">|</span> <span class="ident">val</span>.<span class="ident">min</span>(<span class="ident">approved</span>.<span class="ident">get</span>(<span class="ident">acc</span>).<span class="ident">unwrap_or</span>(<span class="kw-2">&amp;</span><span class="ident">UnifiedNum::ZERO</span>)))
-        .<span class="ident">sum</span>::<span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span><span class="op">&gt;</span>()<span class="question-mark">?</span>;
+    <span class="kw">let </span>sum_approved_mins = our
+        .iter()
+        .map(|(acc, val)| val.min(approved.get(acc).unwrap_or(<span class="kw-2">&amp;</span>UnifiedNum::ZERO)))
+        .sum::&lt;<span class="prelude-ty">Option</span>&lt;<span class="kw">_</span>&gt;&gt;()<span class="question-mark">?</span>;
 
-    <span class="kw">if</span> <span class="ident">sum_approved_mins</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">sum_our</span> {
-        <span class="kw">return</span> <span class="prelude-val">Some</span>(<span class="ident">MAX_HEALTH</span>);
+    <span class="kw">if </span>sum_approved_mins &gt;= sum_our {
+        <span class="kw">return </span><span class="prelude-val">Some</span>(MAX_HEALTH);
     }
-    <span class="kw">let</span> <span class="ident">diff</span> <span class="op">=</span> <span class="ident">sum_our</span> <span class="op">-</span> <span class="ident">sum_approved_mins</span>;
+    <span class="kw">let </span>diff = sum_our - sum_approved_mins;
 
-    <span class="comment">// it&#39;s easier to work with `u64` instead of later dividing the `UnifiedNum`&#39;s inner `u64` with `10.pow(UnifiedNum::PRECISION)`</span>
-    <span class="kw">let</span> <span class="ident">health_penalty</span> <span class="op">=</span> <span class="ident">diff</span>
-        .<span class="ident">to_u64</span>()
-        .<span class="ident">checked_mul</span>(<span class="ident">MAX_HEALTH</span>)<span class="question-mark">?</span>
-        .<span class="ident">checked_div</span>(<span class="ident">all_spenders_sum</span>.<span class="ident">to_u64</span>())<span class="question-mark">?</span>;
+    <span class="comment">// it&#39;s easier to work with `u64` instead of later dividing the `UnifiedNum`&#39;s inner `u64` with `10.pow(UnifiedNum::PRECISION)`
+    </span><span class="kw">let </span>health_penalty = diff
+        .to_u64()
+        .checked_mul(MAX_HEALTH)<span class="question-mark">?
+        </span>.checked_div(all_spenders_sum.to_u64())<span class="question-mark">?</span>;
 
-    <span class="prelude-val">Some</span>(<span class="ident">MAX_HEALTH</span> <span class="op">-</span> <span class="ident">health_penalty</span>)
+    <span class="prelude-val">Some</span>(MAX_HEALTH - health_penalty)
 }
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
-<span class="kw">mod</span> <span class="ident">test</span> {
-    <span class="kw">use</span> <span class="ident">primitives</span>::{
-        <span class="ident">test_util</span>::{<span class="ident">PUBLISHER</span>, <span class="ident">PUBLISHER_2</span>},
-        <span class="ident">unified_num::FromWhole</span>,
+<span class="attribute">#[cfg(test)]</span>
+<span class="kw">mod </span>test {
+    <span class="kw">use </span>primitives::{
+        test_util::{PUBLISHER, PUBLISHER_2},
+        unified_num::FromWhole,
     };
 
-    <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
+    <span class="kw">use super</span>::<span class="kw-2">*</span>;
 
-    <span class="kw">const</span> <span class="ident">HEALTH_THRESHOLD</span>: <span class="ident">u64</span> <span class="op">=</span> <span class="number">950</span>;
+    <span class="kw">const </span>HEALTH_THRESHOLD: u64 = <span class="number">950</span>;
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">is_valid_transition_empty_to_empty</span>() {
+    <span class="attribute">#[test]</span>
+    <span class="kw">fn </span>is_valid_transition_empty_to_empty() {
         <span class="macro">assert!</span>(
-            <span class="ident">is_valid_transition</span>(
-                <span class="ident">UnifiedNum::from_whole</span>(<span class="number">100_u64</span>),
-                <span class="kw-2">&amp;</span><span class="ident">UnifiedMap::default</span>(),
-                <span class="kw-2">&amp;</span><span class="ident">UnifiedMap::default</span>()
+            is_valid_transition(
+                UnifiedNum::from_whole(<span class="number">100_u64</span>),
+                <span class="kw-2">&amp;</span>UnifiedMap::default(),
+                <span class="kw-2">&amp;</span>UnifiedMap::default()
             )
-            .<span class="ident">expect</span>(<span class="string">&quot;Should return health and not overflow&quot;</span>),
-            <span class="string">&quot;is valid transition&quot;</span>
-        )
+            .expect(<span class="string">&quot;Should return health and not overflow&quot;</span>),
+            <span class="string">&quot;is valid transition&quot;
+        </span>)
     }
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">is_valid_transition_a_valid_transition</span>() {
-        <span class="kw">let</span> <span class="ident">next</span> <span class="op">=</span> <span class="macro">vec!</span>[(<span class="kw-2">*</span><span class="ident">PUBLISHER</span>, <span class="ident">UnifiedNum::from_whole</span>(<span class="number">100_u64</span>))]
-            .<span class="ident">into_iter</span>()
-            .<span class="ident">collect</span>();
+    <span class="attribute">#[test]</span>
+    <span class="kw">fn </span>is_valid_transition_a_valid_transition() {
+        <span class="kw">let </span>next = <span class="macro">vec!</span>[(<span class="kw-2">*</span>PUBLISHER, UnifiedNum::from_whole(<span class="number">100_u64</span>))]
+            .into_iter()
+            .collect();
 
         <span class="macro">assert!</span>(
-            <span class="ident">is_valid_transition</span>(
-                <span class="ident">UnifiedNum::from_whole</span>(<span class="number">100_u64</span>),
-                <span class="kw-2">&amp;</span><span class="ident">UnifiedMap::default</span>(),
-                <span class="kw-2">&amp;</span><span class="ident">next</span>
+            is_valid_transition(
+                UnifiedNum::from_whole(<span class="number">100_u64</span>),
+                <span class="kw-2">&amp;</span>UnifiedMap::default(),
+                <span class="kw-2">&amp;</span>next
             )
-            .<span class="ident">expect</span>(<span class="string">&quot;Should return health and not overflow&quot;</span>),
-            <span class="string">&quot;is valid transition&quot;</span>
-        )
+            .expect(<span class="string">&quot;Should return health and not overflow&quot;</span>),
+            <span class="string">&quot;is valid transition&quot;
+        </span>)
     }
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">is_valid_transition_more_funds_than_all_spenders_sum</span>() {
-        <span class="kw">let</span> <span class="ident">next</span> <span class="op">=</span> <span class="macro">vec!</span>[
-            (<span class="kw-2">*</span><span class="ident">PUBLISHER</span>, <span class="ident">UnifiedNum::from_whole</span>(<span class="number">51_u64</span>)),
-            (<span class="kw-2">*</span><span class="ident">PUBLISHER_2</span>, <span class="ident">UnifiedNum::from_whole</span>(<span class="number">50_u64</span>)),
+    <span class="attribute">#[test]</span>
+    <span class="kw">fn </span>is_valid_transition_more_funds_than_all_spenders_sum() {
+        <span class="kw">let </span>next = <span class="macro">vec!</span>[
+            (<span class="kw-2">*</span>PUBLISHER, UnifiedNum::from_whole(<span class="number">51_u64</span>)),
+            (<span class="kw-2">*</span>PUBLISHER_2, UnifiedNum::from_whole(<span class="number">50_u64</span>)),
         ]
-        .<span class="ident">into_iter</span>()
-        .<span class="ident">collect</span>();
+        .into_iter()
+        .collect();
 
         <span class="macro">assert!</span>(
-            <span class="op">!</span><span class="ident">is_valid_transition</span>(
-                <span class="ident">UnifiedNum::from_whole</span>(<span class="number">100_u64</span>),
-                <span class="kw-2">&amp;</span><span class="ident">UnifiedMap::default</span>(),
-                <span class="kw-2">&amp;</span><span class="ident">next</span>
+            !is_valid_transition(
+                UnifiedNum::from_whole(<span class="number">100_u64</span>),
+                <span class="kw-2">&amp;</span>UnifiedMap::default(),
+                <span class="kw-2">&amp;</span>next
             )
-            .<span class="ident">expect</span>(<span class="string">&quot;Should return health and not overflow&quot;</span>),
-            <span class="string">&quot;not a valid transition&quot;</span>
-        );
+            .expect(<span class="string">&quot;Should return health and not overflow&quot;</span>),
+            <span class="string">&quot;not a valid transition&quot;
+        </span>);
     }
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">is_valid_transition_single_value_is_lower</span>() {
-        <span class="kw">let</span> <span class="ident">prev</span> <span class="op">=</span> <span class="macro">vec!</span>[(<span class="kw-2">*</span><span class="ident">PUBLISHER</span>, <span class="ident">UnifiedNum::from_whole</span>(<span class="number">55_u64</span>))]
-            .<span class="ident">into_iter</span>()
-            .<span class="ident">collect</span>();
+    <span class="attribute">#[test]</span>
+    <span class="kw">fn </span>is_valid_transition_single_value_is_lower() {
+        <span class="kw">let </span>prev = <span class="macro">vec!</span>[(<span class="kw-2">*</span>PUBLISHER, UnifiedNum::from_whole(<span class="number">55_u64</span>))]
+            .into_iter()
+            .collect();
 
-        <span class="kw">let</span> <span class="ident">next</span> <span class="op">=</span> <span class="macro">vec!</span>[(<span class="kw-2">*</span><span class="ident">PUBLISHER</span>, <span class="ident">UnifiedNum::from_whole</span>(<span class="number">54_u64</span>))]
-            .<span class="ident">into_iter</span>()
-            .<span class="ident">collect</span>();
+        <span class="kw">let </span>next = <span class="macro">vec!</span>[(<span class="kw-2">*</span>PUBLISHER, UnifiedNum::from_whole(<span class="number">54_u64</span>))]
+            .into_iter()
+            .collect();
 
         <span class="macro">assert!</span>(
-            <span class="op">!</span><span class="ident">is_valid_transition</span>(<span class="ident">UnifiedNum::from_whole</span>(<span class="number">100_u64</span>), <span class="kw-2">&amp;</span><span class="ident">prev</span>, <span class="kw-2">&amp;</span><span class="ident">next</span>)
-                .<span class="ident">expect</span>(<span class="string">&quot;Should return health and not overflow&quot;</span>),
-            <span class="string">&quot;not a valid transition&quot;</span>
-        );
+            !is_valid_transition(UnifiedNum::from_whole(<span class="number">100_u64</span>), <span class="kw-2">&amp;</span>prev, <span class="kw-2">&amp;</span>next)
+                .expect(<span class="string">&quot;Should return health and not overflow&quot;</span>),
+            <span class="string">&quot;not a valid transition&quot;
+        </span>);
     }
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">is_valid_transition_a_value_is_lower_but_overall_sum_is_higher</span>() {
-        <span class="kw">let</span> <span class="ident">prev</span> <span class="op">=</span> <span class="macro">vec!</span>[(<span class="kw-2">*</span><span class="ident">PUBLISHER</span>, <span class="ident">UnifiedNum::from_whole</span>(<span class="number">55_u64</span>))]
-            .<span class="ident">into_iter</span>()
-            .<span class="ident">collect</span>();
+    <span class="attribute">#[test]</span>
+    <span class="kw">fn </span>is_valid_transition_a_value_is_lower_but_overall_sum_is_higher() {
+        <span class="kw">let </span>prev = <span class="macro">vec!</span>[(<span class="kw-2">*</span>PUBLISHER, UnifiedNum::from_whole(<span class="number">55_u64</span>))]
+            .into_iter()
+            .collect();
 
-        <span class="kw">let</span> <span class="ident">next</span> <span class="op">=</span> <span class="macro">vec!</span>[
-            (<span class="kw-2">*</span><span class="ident">PUBLISHER</span>, <span class="ident">UnifiedNum::from_whole</span>(<span class="number">54_u64</span>)),
-            (<span class="kw-2">*</span><span class="ident">PUBLISHER_2</span>, <span class="ident">UnifiedNum::from_whole</span>(<span class="number">3_u64</span>)),
+        <span class="kw">let </span>next = <span class="macro">vec!</span>[
+            (<span class="kw-2">*</span>PUBLISHER, UnifiedNum::from_whole(<span class="number">54_u64</span>)),
+            (<span class="kw-2">*</span>PUBLISHER_2, UnifiedNum::from_whole(<span class="number">3_u64</span>)),
         ]
-        .<span class="ident">into_iter</span>()
-        .<span class="ident">collect</span>();
+        .into_iter()
+        .collect();
 
         <span class="macro">assert!</span>(
-            <span class="op">!</span><span class="ident">is_valid_transition</span>(<span class="ident">UnifiedNum::from_whole</span>(<span class="number">100_u64</span>), <span class="kw-2">&amp;</span><span class="ident">prev</span>, <span class="kw-2">&amp;</span><span class="ident">next</span>)
-                .<span class="ident">expect</span>(<span class="string">&quot;Should return health and not overflow&quot;</span>),
-            <span class="string">&quot;not a valid transition&quot;</span>
-        );
+            !is_valid_transition(UnifiedNum::from_whole(<span class="number">100_u64</span>), <span class="kw-2">&amp;</span>prev, <span class="kw-2">&amp;</span>next)
+                .expect(<span class="string">&quot;Should return health and not overflow&quot;</span>),
+            <span class="string">&quot;not a valid transition&quot;
+        </span>);
     }
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">is_valid_transition_overall_sum_is_lower</span>() {
-        <span class="kw">let</span> <span class="ident">prev</span> <span class="op">=</span> <span class="macro">vec!</span>[
-            (<span class="kw-2">*</span><span class="ident">PUBLISHER</span>, <span class="ident">UnifiedNum::from_whole</span>(<span class="number">54_u64</span>)),
-            (<span class="kw-2">*</span><span class="ident">PUBLISHER_2</span>, <span class="ident">UnifiedNum::from_whole</span>(<span class="number">3_u64</span>)),
+    <span class="attribute">#[test]</span>
+    <span class="kw">fn </span>is_valid_transition_overall_sum_is_lower() {
+        <span class="kw">let </span>prev = <span class="macro">vec!</span>[
+            (<span class="kw-2">*</span>PUBLISHER, UnifiedNum::from_whole(<span class="number">54_u64</span>)),
+            (<span class="kw-2">*</span>PUBLISHER_2, UnifiedNum::from_whole(<span class="number">3_u64</span>)),
         ]
-        .<span class="ident">into_iter</span>()
-        .<span class="ident">collect</span>();
+        .into_iter()
+        .collect();
 
-        <span class="kw">let</span> <span class="ident">next</span> <span class="op">=</span> <span class="macro">vec!</span>[(<span class="kw-2">*</span><span class="ident">PUBLISHER</span>, <span class="ident">UnifiedNum::from_whole</span>(<span class="number">54_u64</span>))]
-            .<span class="ident">into_iter</span>()
-            .<span class="ident">collect</span>();
+        <span class="kw">let </span>next = <span class="macro">vec!</span>[(<span class="kw-2">*</span>PUBLISHER, UnifiedNum::from_whole(<span class="number">54_u64</span>))]
+            .into_iter()
+            .collect();
 
         <span class="macro">assert!</span>(
-            <span class="op">!</span><span class="ident">is_valid_transition</span>(<span class="ident">UnifiedNum::from_whole</span>(<span class="number">100_u64</span>), <span class="kw-2">&amp;</span><span class="ident">prev</span>, <span class="kw-2">&amp;</span><span class="ident">next</span>)
-                .<span class="ident">expect</span>(<span class="string">&quot;Should return health and not overflow&quot;</span>),
-            <span class="string">&quot;not a valid transition&quot;</span>
-        );
+            !is_valid_transition(UnifiedNum::from_whole(<span class="number">100_u64</span>), <span class="kw-2">&amp;</span>prev, <span class="kw-2">&amp;</span>next)
+                .expect(<span class="string">&quot;Should return health and not overflow&quot;</span>),
+            <span class="string">&quot;not a valid transition&quot;
+        </span>);
     }
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">is_valid_transition_overall_sum_is_the_same_but_we_remove_an_entry</span>() {
-        <span class="kw">let</span> <span class="ident">prev</span> <span class="op">=</span> <span class="macro">vec!</span>[
-            (<span class="kw-2">*</span><span class="ident">PUBLISHER</span>, <span class="ident">UnifiedNum::from_whole</span>(<span class="number">54_u64</span>)),
-            (<span class="kw-2">*</span><span class="ident">PUBLISHER_2</span>, <span class="ident">UnifiedNum::from_whole</span>(<span class="number">3_u64</span>)),
+    <span class="attribute">#[test]</span>
+    <span class="kw">fn </span>is_valid_transition_overall_sum_is_the_same_but_we_remove_an_entry() {
+        <span class="kw">let </span>prev = <span class="macro">vec!</span>[
+            (<span class="kw-2">*</span>PUBLISHER, UnifiedNum::from_whole(<span class="number">54_u64</span>)),
+            (<span class="kw-2">*</span>PUBLISHER_2, UnifiedNum::from_whole(<span class="number">3_u64</span>)),
         ]
-        .<span class="ident">into_iter</span>()
-        .<span class="ident">collect</span>();
+        .into_iter()
+        .collect();
 
-        <span class="kw">let</span> <span class="ident">next</span> <span class="op">=</span> <span class="macro">vec!</span>[(<span class="kw-2">*</span><span class="ident">PUBLISHER</span>, <span class="ident">UnifiedNum::from_whole</span>(<span class="number">57_u64</span>))]
-            .<span class="ident">into_iter</span>()
-            .<span class="ident">collect</span>();
+        <span class="kw">let </span>next = <span class="macro">vec!</span>[(<span class="kw-2">*</span>PUBLISHER, UnifiedNum::from_whole(<span class="number">57_u64</span>))]
+            .into_iter()
+            .collect();
 
         <span class="macro">assert!</span>(
-            <span class="op">!</span><span class="ident">is_valid_transition</span>(<span class="ident">UnifiedNum::from_whole</span>(<span class="number">100_u64</span>), <span class="kw-2">&amp;</span><span class="ident">prev</span>, <span class="kw-2">&amp;</span><span class="ident">next</span>)
-                .<span class="ident">expect</span>(<span class="string">&quot;Should return health and not overflow&quot;</span>),
-            <span class="string">&quot;not a valid transition&quot;</span>
-        );
+            !is_valid_transition(UnifiedNum::from_whole(<span class="number">100_u64</span>), <span class="kw-2">&amp;</span>prev, <span class="kw-2">&amp;</span>next)
+                .expect(<span class="string">&quot;Should return health and not overflow&quot;</span>),
+            <span class="string">&quot;not a valid transition&quot;
+        </span>);
     }
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">get_health_the_approved_balance_tree_gte_our_accounting_is_healthy</span>() {
-        <span class="kw">let</span> <span class="ident">all_spenders_sum</span> <span class="op">=</span> <span class="ident">UnifiedNum::from_whole</span>(<span class="number">50_u64</span>);
-        <span class="kw">let</span> <span class="ident">our</span> <span class="op">=</span> <span class="macro">vec!</span>[(<span class="kw-2">*</span><span class="ident">PUBLISHER</span>, <span class="ident">UnifiedNum::from_whole</span>(<span class="number">50_u64</span>))]
-            .<span class="ident">into_iter</span>()
-            .<span class="ident">collect</span>();
+    <span class="attribute">#[test]</span>
+    <span class="kw">fn </span>get_health_the_approved_balance_tree_gte_our_accounting_is_healthy() {
+        <span class="kw">let </span>all_spenders_sum = UnifiedNum::from_whole(<span class="number">50_u64</span>);
+        <span class="kw">let </span>our = <span class="macro">vec!</span>[(<span class="kw-2">*</span>PUBLISHER, UnifiedNum::from_whole(<span class="number">50_u64</span>))]
+            .into_iter()
+            .collect();
 
         {
-            <span class="kw">let</span> <span class="ident">health</span> <span class="op">=</span> <span class="ident">get_health</span>(<span class="ident">all_spenders_sum</span>, <span class="kw-2">&amp;</span><span class="ident">our</span>, <span class="kw-2">&amp;</span><span class="ident">our</span>)
-                .<span class="ident">expect</span>(<span class="string">&quot;Should return health and not overflow&quot;</span>);
-            <span class="macro">assert!</span>(<span class="ident">health</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">HEALTH_THRESHOLD</span>);
+            <span class="kw">let </span>health = get_health(all_spenders_sum, <span class="kw-2">&amp;</span>our, <span class="kw-2">&amp;</span>our)
+                .expect(<span class="string">&quot;Should return health and not overflow&quot;</span>);
+            <span class="macro">assert!</span>(health &gt;= HEALTH_THRESHOLD);
         }
         {
-            <span class="kw">let</span> <span class="ident">health</span> <span class="op">=</span> <span class="ident">get_health</span>(
-                <span class="ident">all_spenders_sum</span>,
-                <span class="kw-2">&amp;</span><span class="ident">our</span>,
-                <span class="kw-2">&amp;</span><span class="macro">vec!</span>[(<span class="kw-2">*</span><span class="ident">PUBLISHER</span>, <span class="ident">UnifiedNum::from_whole</span>(<span class="number">60_u64</span>))]
-                    .<span class="ident">into_iter</span>()
-                    .<span class="ident">collect</span>(),
+            <span class="kw">let </span>health = get_health(
+                all_spenders_sum,
+                <span class="kw-2">&amp;</span>our,
+                <span class="kw-2">&amp;</span><span class="macro">vec!</span>[(<span class="kw-2">*</span>PUBLISHER, UnifiedNum::from_whole(<span class="number">60_u64</span>))]
+                    .into_iter()
+                    .collect(),
             )
-            .<span class="ident">expect</span>(<span class="string">&quot;Should return health and not overflow&quot;</span>);
-            <span class="macro">assert!</span>(<span class="ident">health</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">HEALTH_THRESHOLD</span>);
+            .expect(<span class="string">&quot;Should return health and not overflow&quot;</span>);
+            <span class="macro">assert!</span>(health &gt;= HEALTH_THRESHOLD);
         }
     }
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">get_health_the_approved_balance_tree_is_positive_our_accounting_is_0_and_it_is_healthy</span>() {
-        <span class="kw">let</span> <span class="ident">approved</span> <span class="op">=</span> <span class="macro">vec!</span>[(<span class="kw-2">*</span><span class="ident">PUBLISHER</span>, <span class="ident">UnifiedNum::from_whole</span>(<span class="number">50_u64</span>))]
-            .<span class="ident">into_iter</span>()
-            .<span class="ident">collect</span>();
+    <span class="attribute">#[test]</span>
+    <span class="kw">fn </span>get_health_the_approved_balance_tree_is_positive_our_accounting_is_0_and_it_is_healthy() {
+        <span class="kw">let </span>approved = <span class="macro">vec!</span>[(<span class="kw-2">*</span>PUBLISHER, UnifiedNum::from_whole(<span class="number">50_u64</span>))]
+            .into_iter()
+            .collect();
 
-        <span class="kw">let</span> <span class="ident">health</span> <span class="op">=</span> <span class="ident">get_health</span>(
-            <span class="ident">UnifiedNum::from_whole</span>(<span class="number">50_u64</span>),
-            <span class="kw-2">&amp;</span><span class="ident">UnifiedMap::default</span>(),
-            <span class="kw-2">&amp;</span><span class="ident">approved</span>,
+        <span class="kw">let </span>health = get_health(
+            UnifiedNum::from_whole(<span class="number">50_u64</span>),
+            <span class="kw-2">&amp;</span>UnifiedMap::default(),
+            <span class="kw-2">&amp;</span>approved,
         )
-        .<span class="ident">expect</span>(<span class="string">&quot;Should return health and not overflow&quot;</span>);
+        .expect(<span class="string">&quot;Should return health and not overflow&quot;</span>);
 
-        <span class="macro">assert_eq!</span>(<span class="number">1000</span>, <span class="ident">health</span>);
+        <span class="macro">assert_eq!</span>(<span class="number">1000</span>, health);
 
-        <span class="macro">assert!</span>(<span class="ident">health</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">HEALTH_THRESHOLD</span>, <span class="string">&quot;healthy&quot;</span>);
+        <span class="macro">assert!</span>(health &gt;= HEALTH_THRESHOLD, <span class="string">&quot;healthy&quot;</span>);
     }
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">get_health_the_approved_balance_tree_has_less_but_within_margin_it_is_healthy</span>() {
-        <span class="kw">let</span> <span class="ident">all_spenders_sum</span> <span class="op">=</span> <span class="ident">UnifiedNum::from_whole</span>(<span class="number">80_u64</span>);
+    <span class="attribute">#[test]</span>
+    <span class="kw">fn </span>get_health_the_approved_balance_tree_has_less_but_within_margin_it_is_healthy() {
+        <span class="kw">let </span>all_spenders_sum = UnifiedNum::from_whole(<span class="number">80_u64</span>);
 
         {
-            <span class="kw">let</span> <span class="ident">health</span> <span class="op">=</span> <span class="ident">get_health</span>(
-                <span class="ident">all_spenders_sum</span>,
-                <span class="kw-2">&amp;</span><span class="macro">vec!</span>[(<span class="kw-2">*</span><span class="ident">PUBLISHER</span>, <span class="ident">UnifiedNum::from_whole</span>(<span class="number">80_u64</span>))]
-                    .<span class="ident">into_iter</span>()
-                    .<span class="ident">collect</span>(),
-                <span class="kw-2">&amp;</span><span class="macro">vec!</span>[(<span class="kw-2">*</span><span class="ident">PUBLISHER</span>, <span class="ident">UnifiedNum::from_whole</span>(<span class="number">79_u64</span>))]
-                    .<span class="ident">into_iter</span>()
-                    .<span class="ident">collect</span>(),
+            <span class="kw">let </span>health = get_health(
+                all_spenders_sum,
+                <span class="kw-2">&amp;</span><span class="macro">vec!</span>[(<span class="kw-2">*</span>PUBLISHER, UnifiedNum::from_whole(<span class="number">80_u64</span>))]
+                    .into_iter()
+                    .collect(),
+                <span class="kw-2">&amp;</span><span class="macro">vec!</span>[(<span class="kw-2">*</span>PUBLISHER, UnifiedNum::from_whole(<span class="number">79_u64</span>))]
+                    .into_iter()
+                    .collect(),
             )
-            .<span class="ident">expect</span>(<span class="string">&quot;Should return health and not overflow&quot;</span>);
+            .expect(<span class="string">&quot;Should return health and not overflow&quot;</span>);
 
-            <span class="macro">assert_eq!</span>(<span class="ident">health</span>, <span class="number">988</span>, <span class="string">&quot;Very small difference from all spender sum&quot;</span>);
-            <span class="macro">assert!</span>(<span class="ident">health</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">HEALTH_THRESHOLD</span>, <span class="string">&quot;healthy&quot;</span>);
+            <span class="macro">assert_eq!</span>(health, <span class="number">988</span>, <span class="string">&quot;Very small difference from all spender sum&quot;</span>);
+            <span class="macro">assert!</span>(health &gt;= HEALTH_THRESHOLD, <span class="string">&quot;healthy&quot;</span>);
         }
 
         {
-            <span class="kw">let</span> <span class="ident">health</span> <span class="op">=</span> <span class="ident">get_health</span>(
-                <span class="ident">all_spenders_sum</span>,
-                <span class="kw-2">&amp;</span><span class="macro">vec!</span>[(<span class="kw-2">*</span><span class="ident">PUBLISHER</span>, <span class="ident">UnifiedNum::from_whole</span>(<span class="number">2_u64</span>))]
-                    .<span class="ident">into_iter</span>()
-                    .<span class="ident">collect</span>(),
-                <span class="kw-2">&amp;</span><span class="macro">vec!</span>[(<span class="kw-2">*</span><span class="ident">PUBLISHER</span>, <span class="ident">UnifiedNum::from_whole</span>(<span class="number">1_u64</span>))]
-                    .<span class="ident">into_iter</span>()
-                    .<span class="ident">collect</span>(),
+            <span class="kw">let </span>health = get_health(
+                all_spenders_sum,
+                <span class="kw-2">&amp;</span><span class="macro">vec!</span>[(<span class="kw-2">*</span>PUBLISHER, UnifiedNum::from_whole(<span class="number">2_u64</span>))]
+                    .into_iter()
+                    .collect(),
+                <span class="kw-2">&amp;</span><span class="macro">vec!</span>[(<span class="kw-2">*</span>PUBLISHER, UnifiedNum::from_whole(<span class="number">1_u64</span>))]
+                    .into_iter()
+                    .collect(),
             )
-            .<span class="ident">expect</span>(<span class="string">&quot;Should return health and not overflow&quot;</span>);
-            <span class="macro">assert_eq!</span>(<span class="ident">health</span>, <span class="number">988</span>, <span class="string">&quot;Major difference from all spenders sum&quot;</span>);
+            .expect(<span class="string">&quot;Should return health and not overflow&quot;</span>);
+            <span class="macro">assert_eq!</span>(health, <span class="number">988</span>, <span class="string">&quot;Major difference from all spenders sum&quot;</span>);
 
-            <span class="macro">assert!</span>(<span class="ident">health</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">HEALTH_THRESHOLD</span>, <span class="string">&quot;healthy&quot;</span>);
+            <span class="macro">assert!</span>(health &gt;= HEALTH_THRESHOLD, <span class="string">&quot;healthy&quot;</span>);
         }
     }
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">get_health_the_approved_balance_tree_has_less_it_is_unhealthy</span>() {
-        <span class="kw">let</span> <span class="ident">health</span> <span class="op">=</span> <span class="ident">get_health</span>(
-            <span class="ident">UnifiedNum::from_whole</span>(<span class="number">80_u64</span>),
-            <span class="kw-2">&amp;</span><span class="macro">vec!</span>[(<span class="kw-2">*</span><span class="ident">PUBLISHER</span>, <span class="ident">UnifiedNum::from_whole</span>(<span class="number">80_u64</span>))]
-                .<span class="ident">into_iter</span>()
-                .<span class="ident">collect</span>(),
-            <span class="kw-2">&amp;</span><span class="macro">vec!</span>[(<span class="kw-2">*</span><span class="ident">PUBLISHER</span>, <span class="ident">UnifiedNum::from_whole</span>(<span class="number">70_u64</span>))]
-                .<span class="ident">into_iter</span>()
-                .<span class="ident">collect</span>(),
+    <span class="attribute">#[test]</span>
+    <span class="kw">fn </span>get_health_the_approved_balance_tree_has_less_it_is_unhealthy() {
+        <span class="kw">let </span>health = get_health(
+            UnifiedNum::from_whole(<span class="number">80_u64</span>),
+            <span class="kw-2">&amp;</span><span class="macro">vec!</span>[(<span class="kw-2">*</span>PUBLISHER, UnifiedNum::from_whole(<span class="number">80_u64</span>))]
+                .into_iter()
+                .collect(),
+            <span class="kw-2">&amp;</span><span class="macro">vec!</span>[(<span class="kw-2">*</span>PUBLISHER, UnifiedNum::from_whole(<span class="number">70_u64</span>))]
+                .into_iter()
+                .collect(),
         )
-        .<span class="ident">expect</span>(<span class="string">&quot;Should return health and not overflow&quot;</span>);
+        .expect(<span class="string">&quot;Should return health and not overflow&quot;</span>);
 
-        <span class="macro">assert_eq!</span>(<span class="number">875</span>, <span class="ident">health</span>);
-        <span class="macro">assert!</span>(<span class="ident">health</span> <span class="op">&lt;</span> <span class="ident">HEALTH_THRESHOLD</span>, <span class="string">&quot;unhealthy&quot;</span>);
+        <span class="macro">assert_eq!</span>(<span class="number">875</span>, health);
+        <span class="macro">assert!</span>(health &lt; HEALTH_THRESHOLD, <span class="string">&quot;unhealthy&quot;</span>);
     }
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">get_health_they_have_the_same_sum_but_different_entities_are_earning</span>() {
-        <span class="kw">let</span> <span class="ident">all_spenders_sum</span> <span class="op">=</span> <span class="ident">UnifiedNum::from_whole</span>(<span class="number">80_u64</span>);
+    <span class="attribute">#[test]</span>
+    <span class="kw">fn </span>get_health_they_have_the_same_sum_but_different_entities_are_earning() {
+        <span class="kw">let </span>all_spenders_sum = UnifiedNum::from_whole(<span class="number">80_u64</span>);
 
-        <span class="comment">// Unhealthy</span>
-        {
-            <span class="kw">let</span> <span class="ident">health</span> <span class="op">=</span> <span class="ident">get_health</span>(
-                <span class="ident">all_spenders_sum</span>,
-                <span class="kw-2">&amp;</span><span class="macro">vec!</span>[(<span class="kw-2">*</span><span class="ident">PUBLISHER</span>, <span class="ident">UnifiedNum::from_whole</span>(<span class="number">80_u64</span>))]
-                    .<span class="ident">into_iter</span>()
-                    .<span class="ident">collect</span>(),
-                <span class="kw-2">&amp;</span><span class="macro">vec!</span>[(<span class="kw-2">*</span><span class="ident">PUBLISHER_2</span>, <span class="ident">UnifiedNum::from_whole</span>(<span class="number">80_u64</span>))]
-                    .<span class="ident">into_iter</span>()
-                    .<span class="ident">collect</span>(),
+        <span class="comment">// Unhealthy
+        </span>{
+            <span class="kw">let </span>health = get_health(
+                all_spenders_sum,
+                <span class="kw-2">&amp;</span><span class="macro">vec!</span>[(<span class="kw-2">*</span>PUBLISHER, UnifiedNum::from_whole(<span class="number">80_u64</span>))]
+                    .into_iter()
+                    .collect(),
+                <span class="kw-2">&amp;</span><span class="macro">vec!</span>[(<span class="kw-2">*</span>PUBLISHER_2, UnifiedNum::from_whole(<span class="number">80_u64</span>))]
+                    .into_iter()
+                    .collect(),
             )
-            .<span class="ident">expect</span>(<span class="string">&quot;Should return health and not overflow&quot;</span>);
-            <span class="macro">assert_eq!</span>(<span class="ident">health</span>, <span class="number">0</span>, <span class="string">&quot;None of the spenders match in ours/approved&quot;</span>);
-            <span class="macro">assert!</span>(<span class="ident">health</span> <span class="op">&lt;</span> <span class="ident">HEALTH_THRESHOLD</span>, <span class="string">&quot;unhealthy&quot;</span>);
+            .expect(<span class="string">&quot;Should return health and not overflow&quot;</span>);
+            <span class="macro">assert_eq!</span>(health, <span class="number">0</span>, <span class="string">&quot;None of the spenders match in ours/approved&quot;</span>);
+            <span class="macro">assert!</span>(health &lt; HEALTH_THRESHOLD, <span class="string">&quot;unhealthy&quot;</span>);
         }
 
-        <span class="comment">// Unhealthy</span>
-        {
-            <span class="kw">let</span> <span class="ident">health</span> <span class="op">=</span> <span class="ident">get_health</span>(
-                <span class="ident">all_spenders_sum</span>,
-                <span class="kw-2">&amp;</span><span class="macro">vec!</span>[(<span class="kw-2">*</span><span class="ident">PUBLISHER</span>, <span class="ident">UnifiedNum::from_whole</span>(<span class="number">80_u64</span>))]
-                    .<span class="ident">into_iter</span>()
-                    .<span class="ident">collect</span>(),
+        <span class="comment">// Unhealthy
+        </span>{
+            <span class="kw">let </span>health = get_health(
+                all_spenders_sum,
+                <span class="kw-2">&amp;</span><span class="macro">vec!</span>[(<span class="kw-2">*</span>PUBLISHER, UnifiedNum::from_whole(<span class="number">80_u64</span>))]
+                    .into_iter()
+                    .collect(),
                 <span class="kw-2">&amp;</span><span class="macro">vec!</span>[
-                    (<span class="kw-2">*</span><span class="ident">PUBLISHER_2</span>, <span class="ident">UnifiedNum::from_whole</span>(<span class="number">40_u64</span>)),
-                    (<span class="kw-2">*</span><span class="ident">PUBLISHER</span>, <span class="ident">UnifiedNum::from_whole</span>(<span class="number">40_u64</span>)),
+                    (<span class="kw-2">*</span>PUBLISHER_2, UnifiedNum::from_whole(<span class="number">40_u64</span>)),
+                    (<span class="kw-2">*</span>PUBLISHER, UnifiedNum::from_whole(<span class="number">40_u64</span>)),
                 ]
-                .<span class="ident">into_iter</span>()
-                .<span class="ident">collect</span>(),
+                .into_iter()
+                .collect(),
             )
-            .<span class="ident">expect</span>(<span class="string">&quot;Should return health and not overflow&quot;</span>);
-            <span class="macro">assert_eq!</span>(<span class="ident">health</span>, <span class="number">500</span>, <span class="string">&quot;Exactly half of the health&quot;</span>);
-            <span class="macro">assert!</span>(<span class="ident">health</span> <span class="op">&lt;</span> <span class="ident">HEALTH_THRESHOLD</span>, <span class="string">&quot;unhealthy&quot;</span>);
+            .expect(<span class="string">&quot;Should return health and not overflow&quot;</span>);
+            <span class="macro">assert_eq!</span>(health, <span class="number">500</span>, <span class="string">&quot;Exactly half of the health&quot;</span>);
+            <span class="macro">assert!</span>(health &lt; HEALTH_THRESHOLD, <span class="string">&quot;unhealthy&quot;</span>);
         }
 
-        <span class="comment">// Unhealthy</span>
-        {
-            <span class="kw">let</span> <span class="ident">health</span> <span class="op">=</span> <span class="ident">get_health</span>(
-                <span class="ident">all_spenders_sum</span>,
-                <span class="kw-2">&amp;</span><span class="macro">vec!</span>[(<span class="kw-2">*</span><span class="ident">PUBLISHER</span>, <span class="ident">UnifiedNum::from_whole</span>(<span class="number">80_u64</span>))]
-                    .<span class="ident">into_iter</span>()
-                    .<span class="ident">collect</span>(),
+        <span class="comment">// Unhealthy
+        </span>{
+            <span class="kw">let </span>health = get_health(
+                all_spenders_sum,
+                <span class="kw-2">&amp;</span><span class="macro">vec!</span>[(<span class="kw-2">*</span>PUBLISHER, UnifiedNum::from_whole(<span class="number">80_u64</span>))]
+                    .into_iter()
+                    .collect(),
                 <span class="kw-2">&amp;</span><span class="macro">vec!</span>[
-                    (<span class="kw-2">*</span><span class="ident">PUBLISHER_2</span>, <span class="ident">UnifiedNum::from_whole</span>(<span class="number">20_u64</span>)),
-                    (<span class="kw-2">*</span><span class="ident">PUBLISHER</span>, <span class="ident">UnifiedNum::from_whole</span>(<span class="number">60_u64</span>)),
+                    (<span class="kw-2">*</span>PUBLISHER_2, UnifiedNum::from_whole(<span class="number">20_u64</span>)),
+                    (<span class="kw-2">*</span>PUBLISHER, UnifiedNum::from_whole(<span class="number">60_u64</span>)),
                 ]
-                .<span class="ident">into_iter</span>()
-                .<span class="ident">collect</span>(),
+                .into_iter()
+                .collect(),
             )
-            .<span class="ident">expect</span>(<span class="string">&quot;Should return health and not overflow&quot;</span>);
-            <span class="macro">assert_eq!</span>(<span class="ident">health</span>, <span class="number">750</span>, <span class="string">&quot;One fourth expected&quot;</span>);
-            <span class="macro">assert!</span>(<span class="ident">health</span> <span class="op">&lt;</span> <span class="ident">HEALTH_THRESHOLD</span>, <span class="string">&quot;unhealthy&quot;</span>);
+            .expect(<span class="string">&quot;Should return health and not overflow&quot;</span>);
+            <span class="macro">assert_eq!</span>(health, <span class="number">750</span>, <span class="string">&quot;One fourth expected&quot;</span>);
+            <span class="macro">assert!</span>(health &lt; HEALTH_THRESHOLD, <span class="string">&quot;unhealthy&quot;</span>);
         }
 
-        <span class="comment">// Healthy</span>
-        {
-            <span class="kw">let</span> <span class="ident">health</span> <span class="op">=</span> <span class="ident">get_health</span>(
-                <span class="ident">all_spenders_sum</span>,
-                <span class="kw-2">&amp;</span><span class="macro">vec!</span>[(<span class="kw-2">*</span><span class="ident">PUBLISHER</span>, <span class="ident">UnifiedNum::from_whole</span>(<span class="number">80_u64</span>))]
-                    .<span class="ident">into_iter</span>()
-                    .<span class="ident">collect</span>(),
+        <span class="comment">// Healthy
+        </span>{
+            <span class="kw">let </span>health = get_health(
+                all_spenders_sum,
+                <span class="kw-2">&amp;</span><span class="macro">vec!</span>[(<span class="kw-2">*</span>PUBLISHER, UnifiedNum::from_whole(<span class="number">80_u64</span>))]
+                    .into_iter()
+                    .collect(),
                 <span class="kw-2">&amp;</span><span class="macro">vec!</span>[
-                    (<span class="kw-2">*</span><span class="ident">PUBLISHER_2</span>, <span class="ident">UnifiedNum::from_whole</span>(<span class="number">2_u64</span>)),
-                    (<span class="kw-2">*</span><span class="ident">PUBLISHER</span>, <span class="ident">UnifiedNum::from_whole</span>(<span class="number">78_u64</span>)),
+                    (<span class="kw-2">*</span>PUBLISHER_2, UnifiedNum::from_whole(<span class="number">2_u64</span>)),
+                    (<span class="kw-2">*</span>PUBLISHER, UnifiedNum::from_whole(<span class="number">78_u64</span>)),
                 ]
-                .<span class="ident">into_iter</span>()
-                .<span class="ident">collect</span>(),
+                .into_iter()
+                .collect(),
             )
-            .<span class="ident">expect</span>(<span class="string">&quot;Should return health and not overflow&quot;</span>);
+            .expect(<span class="string">&quot;Should return health and not overflow&quot;</span>);
 
-            <span class="macro">assert_eq!</span>(<span class="ident">health</span>, <span class="number">975</span>,);
-            <span class="macro">assert!</span>(<span class="ident">health</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">HEALTH_THRESHOLD</span>, <span class="string">&quot;healthy&quot;</span>);
+            <span class="macro">assert_eq!</span>(health, <span class="number">975</span>,);
+            <span class="macro">assert!</span>(health &gt;= HEALTH_THRESHOLD, <span class="string">&quot;healthy&quot;</span>);
         }
 
-        <span class="comment">// Healthy</span>
-        {
-            <span class="kw">let</span> <span class="ident">health</span> <span class="op">=</span> <span class="ident">get_health</span>(
-                <span class="ident">all_spenders_sum</span>,
+        <span class="comment">// Healthy
+        </span>{
+            <span class="kw">let </span>health = get_health(
+                all_spenders_sum,
                 <span class="kw-2">&amp;</span><span class="macro">vec!</span>[
-                    (<span class="kw-2">*</span><span class="ident">PUBLISHER</span>, <span class="ident">UnifiedNum::from_whole</span>(<span class="number">100_u64</span>)),
-                    (<span class="kw-2">*</span><span class="ident">PUBLISHER_2</span>, <span class="ident">UnifiedNum::from_whole</span>(<span class="number">1_u64</span>)),
+                    (<span class="kw-2">*</span>PUBLISHER, UnifiedNum::from_whole(<span class="number">100_u64</span>)),
+                    (<span class="kw-2">*</span>PUBLISHER_2, UnifiedNum::from_whole(<span class="number">1_u64</span>)),
                 ]
-                .<span class="ident">into_iter</span>()
-                .<span class="ident">collect</span>(),
-                <span class="kw-2">&amp;</span><span class="macro">vec!</span>[(<span class="kw-2">*</span><span class="ident">PUBLISHER</span>, <span class="ident">UnifiedNum::from_whole</span>(<span class="number">100_u64</span>))]
-                    .<span class="ident">into_iter</span>()
-                    .<span class="ident">collect</span>(),
+                .into_iter()
+                .collect(),
+                <span class="kw-2">&amp;</span><span class="macro">vec!</span>[(<span class="kw-2">*</span>PUBLISHER, UnifiedNum::from_whole(<span class="number">100_u64</span>))]
+                    .into_iter()
+                    .collect(),
             )
-            .<span class="ident">expect</span>(<span class="string">&quot;Should return health and not overflow&quot;</span>);
-            <span class="macro">assert_eq!</span>(<span class="ident">health</span>, <span class="number">988</span>);
-            <span class="macro">assert!</span>(<span class="ident">health</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">HEALTH_THRESHOLD</span>, <span class="string">&quot;healthy&quot;</span>);
+            .expect(<span class="string">&quot;Should return health and not overflow&quot;</span>);
+            <span class="macro">assert_eq!</span>(health, <span class="number">988</span>);
+            <span class="macro">assert!</span>(health &gt;= HEALTH_THRESHOLD, <span class="string">&quot;healthy&quot;</span>);
         }
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="validator_worker" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (20ffea693 2022-08-11)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="validator_worker" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>

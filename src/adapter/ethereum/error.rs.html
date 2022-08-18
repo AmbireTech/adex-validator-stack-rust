@@ -165,172 +165,172 @@
 <span id="165">165</span>
 <span id="166">166</span>
 <span id="167">167</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::Error</span> <span class="kw">as</span> <span class="ident">AdapterError</span>;
-<span class="kw">use</span> <span class="ident">primitives</span>::{
-    <span class="ident">address::Error</span> <span class="kw">as</span> <span class="ident">AddressError</span>, <span class="ident">big_num::ParseBigIntError</span>, <span class="ident">ChainId</span>, <span class="ident">ChannelId</span>, <span class="ident">ValidatorId</span>,
+</pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::Error <span class="kw">as </span>AdapterError;
+<span class="kw">use </span>primitives::{
+    address::Error <span class="kw">as </span>AddressError, big_num::ParseBigIntError, ChainId, ChannelId, ValidatorId,
 };
-<span class="kw">use</span> <span class="ident">thiserror::Error</span>;
+<span class="kw">use </span>thiserror::Error;
 
-<span class="kw">use</span> <span class="ident"><span class="kw">super</span>::ewt::Payload</span>;
+<span class="kw">use </span><span class="kw">super</span>::ewt::Payload;
 
-<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">Error</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">AdapterError</span> {
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">error</span>: <span class="ident">Error</span>) -&gt; <span class="self">Self</span> {
-        <span class="kw">match</span> <span class="ident">error</span> {
-            <span class="ident">err</span> @ <span class="ident">Error::Keystore</span>(..) =&gt; <span class="ident">AdapterError::adapter</span>(<span class="ident">err</span>),
-            <span class="ident">Error::WalletUnlock</span>(<span class="ident">err</span>) =&gt; <span class="ident">AdapterError::wallet_unlock</span>(<span class="ident">err</span>),
-            <span class="ident">err</span> @ <span class="ident">Error::Web3</span>(..) =&gt; <span class="ident">AdapterError::adapter</span>(<span class="ident">err</span>),
-            <span class="ident">err</span> @ <span class="ident">Error::InvalidChannelId</span> { .. } =&gt; <span class="ident">AdapterError::adapter</span>(<span class="ident">err</span>),
-            <span class="ident">err</span> @ <span class="ident">Error::ChannelInactive</span>(..) =&gt; <span class="ident">AdapterError::adapter</span>(<span class="ident">err</span>),
-            <span class="ident">err</span> @ <span class="ident">Error::ChainNotWhitelisted</span>(..) =&gt; <span class="ident">AdapterError::adapter</span>(<span class="ident">err</span>),
-            <span class="ident">err</span> @ <span class="ident">Error::InvalidDepositAsset</span>(..) =&gt; <span class="ident">AdapterError::adapter</span>(<span class="ident">err</span>),
-            <span class="ident">err</span> @ <span class="ident">Error::BigNumParsing</span>(..) =&gt; <span class="ident">AdapterError::adapter</span>(<span class="ident">err</span>),
-            <span class="ident">err</span> @ <span class="ident">Error::SignMessage</span>(..) =&gt; <span class="ident">AdapterError::adapter</span>(<span class="ident">err</span>),
-            <span class="ident">err</span> @ <span class="ident">Error::VerifyMessage</span>(..) =&gt; <span class="ident">AdapterError::adapter</span>(<span class="ident">err</span>),
-            <span class="ident">err</span> @ <span class="ident">Error::ContractInitialization</span>(..) =&gt; <span class="ident">AdapterError::adapter</span>(<span class="ident">err</span>),
-            <span class="ident">err</span> @ <span class="ident">Error::ContractQuerying</span>(..) =&gt; <span class="ident">AdapterError::adapter</span>(<span class="ident">err</span>),
-            <span class="ident">err</span> @ <span class="ident">Error::VerifyAddress</span>(..) =&gt; <span class="ident">AdapterError::adapter</span>(<span class="ident">err</span>),
-            <span class="ident">err</span> @ <span class="ident">Error::AuthenticationTokenNotIntendedForUs</span> { .. } =&gt; {
-                <span class="ident">AdapterError::authentication</span>(<span class="ident">err</span>)
+<span class="kw">impl </span>From&lt;Error&gt; <span class="kw">for </span>AdapterError {
+    <span class="kw">fn </span>from(error: Error) -&gt; <span class="self">Self </span>{
+        <span class="kw">match </span>error {
+            err @ Error::Keystore(..) =&gt; AdapterError::adapter(err),
+            Error::WalletUnlock(err) =&gt; AdapterError::wallet_unlock(err),
+            err @ Error::Web3(..) =&gt; AdapterError::adapter(err),
+            err @ Error::InvalidChannelId { .. } =&gt; AdapterError::adapter(err),
+            err @ Error::ChannelInactive(..) =&gt; AdapterError::adapter(err),
+            err @ Error::ChainNotWhitelisted(..) =&gt; AdapterError::adapter(err),
+            err @ Error::InvalidDepositAsset(..) =&gt; AdapterError::adapter(err),
+            err @ Error::BigNumParsing(..) =&gt; AdapterError::adapter(err),
+            err @ Error::SignMessage(..) =&gt; AdapterError::adapter(err),
+            err @ Error::VerifyMessage(..) =&gt; AdapterError::adapter(err),
+            err @ Error::ContractInitialization(..) =&gt; AdapterError::adapter(err),
+            err @ Error::ContractQuerying(..) =&gt; AdapterError::adapter(err),
+            err @ Error::VerifyAddress(..) =&gt; AdapterError::adapter(err),
+            err @ Error::AuthenticationTokenNotIntendedForUs { .. } =&gt; {
+                AdapterError::authentication(err)
             }
-            <span class="ident">err</span> @ <span class="ident">Error::InsufficientAuthorizationPrivilege</span> { .. } =&gt; {
-                <span class="ident">AdapterError::authorization</span>(<span class="ident">err</span>)
+            err @ Error::InsufficientAuthorizationPrivilege { .. } =&gt; {
+                AdapterError::authorization(err)
             }
         }
     }
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Error</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">Error</span> {
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Keystore: {0}&quot;</span>)]</span>
-    <span class="ident">Keystore</span>(<span class="attribute">#[<span class="ident">from</span>]</span> <span class="ident">KeystoreError</span>),
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Wallet unlocking: {0}&quot;</span>)]</span>
-    <span class="ident">WalletUnlock</span>(<span class="attribute">#[<span class="ident">from</span>]</span> <span class="ident">ethsign::Error</span>),
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Web3: {0}&quot;</span>)]</span>
-    <span class="ident">Web3</span>(<span class="attribute">#[<span class="ident">from</span>]</span> <span class="ident">web3::Error</span>),
-    <span class="doccomment">/// When the ChannelId that we get from hashing the EthereumChannel with the contract address</span>
-    <span class="doccomment">/// does not align with the provided Channel</span>
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;The hashed EthereumChannel.id ({expected}) is not the same as the Channel.id ({actual}) that was provided&quot;</span>)]</span>
-    <span class="ident">InvalidChannelId</span> {
-        <span class="ident">expected</span>: <span class="ident">ChannelId</span>,
-        <span class="ident">actual</span>: <span class="ident">ChannelId</span>,
+<span class="attribute">#[derive(Debug, Error)]</span>
+<span class="kw">pub enum </span>Error {
+    <span class="attribute">#[error(<span class="string">&quot;Keystore: {0}&quot;</span>)]</span>
+    Keystore(<span class="attribute">#[from]</span> KeystoreError),
+    <span class="attribute">#[error(<span class="string">&quot;Wallet unlocking: {0}&quot;</span>)]</span>
+    WalletUnlock(<span class="attribute">#[from]</span> ethsign::Error),
+    <span class="attribute">#[error(<span class="string">&quot;Web3: {0}&quot;</span>)]</span>
+    Web3(<span class="attribute">#[from]</span> web3::Error),
+    <span class="doccomment">/// When the ChannelId that we get from hashing the EthereumChannel with the contract address
+    /// does not align with the provided Channel
+    </span><span class="attribute">#[error(<span class="string">&quot;The hashed EthereumChannel.id ({expected}) is not the same as the Channel.id ({actual}) that was provided&quot;</span>)]</span>
+    InvalidChannelId {
+        expected: ChannelId,
+        actual: ChannelId,
     },
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Channel ({0}) is not Active on the ethereum network&quot;</span>)]</span>
-    <span class="ident">ChannelInactive</span>(<span class="ident">ChannelId</span>),
-    <span class="doccomment">/// Signing of the message failed</span>
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Signing message: {0}&quot;</span>)]</span>
-    <span class="ident">SignMessage</span>(<span class="attribute">#[<span class="ident">from</span>]</span> <span class="ident">EwtSigningError</span>),
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Verifying message: {0}&quot;</span>)]</span>
-    <span class="ident">VerifyMessage</span>(<span class="attribute">#[<span class="ident">from</span>]</span> <span class="ident">EwtVerifyError</span>),
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Contract initialization: {0}&quot;</span>)]</span>
-    <span class="ident">ContractInitialization</span>(<span class="ident">web3::ethabi::Error</span>),
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Contract querying: {0}&quot;</span>)]</span>
-    <span class="ident">ContractQuerying</span>(<span class="ident">web3::contract::Error</span>),
-    <span class="doccomment">/// Error occurred during verification of Signature and/or StateRoot and/or Address</span>
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Verifying address: {0}&quot;</span>)]</span>
-    <span class="ident">VerifyAddress</span>(<span class="attribute">#[<span class="ident">from</span>]</span> <span class="ident">VerifyError</span>),
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;The intended {0:?} in the authentication token in not whitelisted&quot;</span>)]</span>
-    <span class="ident">ChainNotWhitelisted</span>(<span class="ident">ChainId</span>),
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Deposit asset {0} is invalid&quot;</span>)]</span>
-    <span class="ident">InvalidDepositAsset</span>(<span class="attribute">#[<span class="ident">from</span>]</span> <span class="ident">AddressError</span>),
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Parsing BigNum: {0}&quot;</span>)]</span>
-    <span class="ident">BigNumParsing</span>(<span class="attribute">#[<span class="ident">from</span>]</span> <span class="ident">ParseBigIntError</span>),
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Token Payload.id({}) !== whoami({whoami}): token was not intended for us&quot;</span>, .<span class="ident">payload</span>.<span class="ident">id</span>)]</span>
-    <span class="ident">AuthenticationTokenNotIntendedForUs</span> {
-        <span class="ident">payload</span>: <span class="ident">Payload</span>,
-        <span class="ident">whoami</span>: <span class="ident">ValidatorId</span>,
+    <span class="attribute">#[error(<span class="string">&quot;Channel ({0}) is not Active on the ethereum network&quot;</span>)]</span>
+    ChannelInactive(ChannelId),
+    <span class="doccomment">/// Signing of the message failed
+    </span><span class="attribute">#[error(<span class="string">&quot;Signing message: {0}&quot;</span>)]</span>
+    SignMessage(<span class="attribute">#[from]</span> EwtSigningError),
+    <span class="attribute">#[error(<span class="string">&quot;Verifying message: {0}&quot;</span>)]</span>
+    VerifyMessage(<span class="attribute">#[from]</span> EwtVerifyError),
+    <span class="attribute">#[error(<span class="string">&quot;Contract initialization: {0}&quot;</span>)]</span>
+    ContractInitialization(web3::ethabi::Error),
+    <span class="attribute">#[error(<span class="string">&quot;Contract querying: {0}&quot;</span>)]</span>
+    ContractQuerying(web3::contract::Error),
+    <span class="doccomment">/// Error occurred during verification of Signature and/or StateRoot and/or Address
+    </span><span class="attribute">#[error(<span class="string">&quot;Verifying address: {0}&quot;</span>)]</span>
+    VerifyAddress(<span class="attribute">#[from]</span> VerifyError),
+    <span class="attribute">#[error(<span class="string">&quot;The intended {0:?} in the authentication token in not whitelisted&quot;</span>)]</span>
+    ChainNotWhitelisted(ChainId),
+    <span class="attribute">#[error(<span class="string">&quot;Deposit asset {0} is invalid&quot;</span>)]</span>
+    InvalidDepositAsset(<span class="attribute">#[from]</span> AddressError),
+    <span class="attribute">#[error(<span class="string">&quot;Parsing BigNum: {0}&quot;</span>)]</span>
+    BigNumParsing(<span class="attribute">#[from]</span> ParseBigIntError),
+    <span class="attribute">#[error(<span class="string">&quot;Token Payload.id({}) !== whoami({whoami}): token was not intended for us&quot;</span>, .payload.id)]</span>
+    AuthenticationTokenNotIntendedForUs {
+        payload: Payload,
+        whoami: ValidatorId,
     },
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Insufficient privilege&quot;</span>)]</span>
-    <span class="ident">InsufficientAuthorizationPrivilege</span>,
+    <span class="attribute">#[error(<span class="string">&quot;Insufficient privilege&quot;</span>)]</span>
+    InsufficientAuthorizationPrivilege,
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Error</span>)]</span>
-<span class="doccomment">/// Error returned on `eth_adapter.verify()` when the combination of</span>
-<span class="doccomment">/// (signer, state_root, signature) **doesn&#39;t align**.</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">VerifyError</span> {
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Recovering the public key from the signature: {0}&quot;</span>)]</span>
-    <span class="doccomment">/// `secp256k1` error</span>
-    <span class="ident">PublicKeyRecovery</span>(<span class="ident">String</span>),
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Decoding state root: {0}&quot;</span>)]</span>
-    <span class="ident">StateRootDecoding</span>(<span class="attribute">#[<span class="ident">source</span>]</span> <span class="ident">hex::FromHexError</span>),
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Decoding signature: {0}&quot;</span>)]</span>
-    <span class="ident">SignatureDecoding</span>(<span class="attribute">#[<span class="ident">source</span>]</span> <span class="ident">hex::FromHexError</span>),
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Signature is not prefixed with `0x`&quot;</span>)]</span>
-    <span class="ident">SignatureNotPrefixed</span>,
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Signature length or V component of the Signature was incorrect&quot;</span>)]</span>
-    <span class="ident">SignatureInvalid</span>,
+<span class="attribute">#[derive(Debug, Error)]</span>
+<span class="doccomment">/// Error returned on `eth_adapter.verify()` when the combination of
+/// (signer, state_root, signature) **doesn&#39;t align**.
+</span><span class="kw">pub enum </span>VerifyError {
+    <span class="attribute">#[error(<span class="string">&quot;Recovering the public key from the signature: {0}&quot;</span>)]</span>
+    <span class="doccomment">/// `secp256k1` error
+    </span>PublicKeyRecovery(String),
+    <span class="attribute">#[error(<span class="string">&quot;Decoding state root: {0}&quot;</span>)]</span>
+    StateRootDecoding(<span class="attribute">#[source]</span> hex::FromHexError),
+    <span class="attribute">#[error(<span class="string">&quot;Decoding signature: {0}&quot;</span>)]</span>
+    SignatureDecoding(<span class="attribute">#[source]</span> hex::FromHexError),
+    <span class="attribute">#[error(<span class="string">&quot;Signature is not prefixed with `0x`&quot;</span>)]</span>
+    SignatureNotPrefixed,
+    <span class="attribute">#[error(<span class="string">&quot;Signature length or V component of the Signature was incorrect&quot;</span>)]</span>
+    SignatureInvalid,
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Error</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">KeystoreError</span> {
-    <span class="doccomment">/// `address` key is missing from the keystore file</span>
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;\&quot;address\&quot; key missing in keystore file&quot;</span>)]</span>
-    <span class="ident">AddressMissing</span>,
-    <span class="doccomment">/// The `address` key in the keystore file is not a valid `ValidatorId`</span>
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;\&quot;address\&quot; length should be 20 bytes&quot;</span>)]</span>
-    <span class="ident">AddressLength</span>,
-    <span class="doccomment">/// reading the keystore file failed</span>
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Reading keystore file: {0}&quot;</span>)]</span>
-    <span class="ident">ReadingFile</span>(<span class="attribute">#[<span class="ident">source</span>]</span> <span class="ident">std::io::Error</span>),
-    <span class="doccomment">/// Deserializing the keystore file failed</span>
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Deserializing keystore file: {0}&quot;</span>)]</span>
-    <span class="ident">Deserialization</span>(<span class="attribute">#[<span class="ident">source</span>]</span> <span class="ident">serde_json::Error</span>),
+<span class="attribute">#[derive(Debug, Error)]</span>
+<span class="kw">pub enum </span>KeystoreError {
+    <span class="doccomment">/// `address` key is missing from the keystore file
+    </span><span class="attribute">#[error(<span class="string">&quot;\&quot;address\&quot; key missing in keystore file&quot;</span>)]</span>
+    AddressMissing,
+    <span class="doccomment">/// The `address` key in the keystore file is not a valid `ValidatorId`
+    </span><span class="attribute">#[error(<span class="string">&quot;\&quot;address\&quot; length should be 20 bytes&quot;</span>)]</span>
+    AddressLength,
+    <span class="doccomment">/// reading the keystore file failed
+    </span><span class="attribute">#[error(<span class="string">&quot;Reading keystore file: {0}&quot;</span>)]</span>
+    ReadingFile(<span class="attribute">#[source]</span> std::io::Error),
+    <span class="doccomment">/// Deserializing the keystore file failed
+    </span><span class="attribute">#[error(<span class="string">&quot;Deserializing keystore file: {0}&quot;</span>)]</span>
+    Deserialization(<span class="attribute">#[source]</span> serde_json::Error),
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Error</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">EwtSigningError</span> {
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Header serialization: {0}&quot;</span>)]</span>
-    <span class="ident">HeaderSerialization</span>(<span class="attribute">#[<span class="ident">source</span>]</span> <span class="ident">serde_json::Error</span>),
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Payload serialization: {0}&quot;</span>)]</span>
-    <span class="ident">PayloadSerialization</span>(<span class="attribute">#[<span class="ident">source</span>]</span> <span class="ident">serde_json::Error</span>),
-    <span class="doccomment">/// we must use a [`String`] since [`ethsign`] does not export the error from</span>
-    <span class="doccomment">/// the `secp256k1` crate which is returned in the [`ethsign::SecretKey::sign()`] method.</span>
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Signing message: {0}&quot;</span>)]</span>
-    <span class="ident">SigningMessage</span>(<span class="ident">String</span>),
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Decoding hex of Signature: {0}&quot;</span>)]</span>
-    <span class="ident">DecodingHexSignature</span>(<span class="attribute">#[<span class="ident">from</span>]</span> <span class="ident">hex::FromHexError</span>),
+<span class="attribute">#[derive(Debug, Error)]</span>
+<span class="kw">pub enum </span>EwtSigningError {
+    <span class="attribute">#[error(<span class="string">&quot;Header serialization: {0}&quot;</span>)]</span>
+    HeaderSerialization(<span class="attribute">#[source]</span> serde_json::Error),
+    <span class="attribute">#[error(<span class="string">&quot;Payload serialization: {0}&quot;</span>)]</span>
+    PayloadSerialization(<span class="attribute">#[source]</span> serde_json::Error),
+    <span class="doccomment">/// we must use a [`String`] since [`ethsign`] does not export the error from
+    /// the `secp256k1` crate which is returned in the [`ethsign::SecretKey::sign()`] method.
+    </span><span class="attribute">#[error(<span class="string">&quot;Signing message: {0}&quot;</span>)]</span>
+    SigningMessage(String),
+    <span class="attribute">#[error(<span class="string">&quot;Decoding hex of Signature: {0}&quot;</span>)]</span>
+    DecodingHexSignature(<span class="attribute">#[from]</span> hex::FromHexError),
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Error</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">EwtVerifyError</span> {
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;The Ethereum Web Token header is invalid&quot;</span>)]</span>
-    <span class="ident">InvalidHeader</span>,
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;The token length should be at least 16 characters of length&quot;</span>)]</span>
-    <span class="ident">InvalidTokenLength</span>,
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;The token does not comply to the format of header.payload.signature&quot;</span>)]</span>
-    <span class="ident">InvalidToken</span>,
-    <span class="doccomment">/// We use a `String` because [`ethsign::Signature::recover()`] returns `secp256k1` error</span>
-    <span class="doccomment">/// which is not exported in `ethsign`.</span>
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Address recovery: {0}&quot;</span>)]</span>
-    <span class="ident">AddressRecovery</span>(<span class="ident">String</span>),
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Signature decoding: {0}&quot;</span>)]</span>
-    <span class="ident">SignatureDecoding</span>(<span class="attribute">#[<span class="ident">source</span>]</span> <span class="ident">base64::DecodeError</span>),
-    <span class="doccomment">/// If there is no suffix in the signature for the mode</span>
-    <span class="doccomment">/// or if Signature length is not 65 bytes</span>
-    <span class="doccomment">/// or if Signature V component is not in &quot;Electrum&quot; notation (`&lt; 27`).</span>
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Error when decoding token signature&quot;</span>)]</span>
-    <span class="ident">InvalidSignature</span>,
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Payload decoding: {0}&quot;</span>)]</span>
-    <span class="ident">PayloadDecoding</span>(<span class="attribute">#[<span class="ident">source</span>]</span> <span class="ident">base64::DecodeError</span>),
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Payload deserialization: {0}&quot;</span>)]</span>
-    <span class="ident">PayloadDeserialization</span>(<span class="attribute">#[<span class="ident">from</span>]</span> <span class="ident">serde_json::Error</span>),
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Payload is not a valid UTF-8 string: {0}&quot;</span>)]</span>
-    <span class="ident">PayloadUtf8</span>(<span class="attribute">#[<span class="ident">from</span>]</span> <span class="ident">std::str::Utf8Error</span>),
+<span class="attribute">#[derive(Debug, Error)]</span>
+<span class="kw">pub enum </span>EwtVerifyError {
+    <span class="attribute">#[error(<span class="string">&quot;The Ethereum Web Token header is invalid&quot;</span>)]</span>
+    InvalidHeader,
+    <span class="attribute">#[error(<span class="string">&quot;The token length should be at least 16 characters of length&quot;</span>)]</span>
+    InvalidTokenLength,
+    <span class="attribute">#[error(<span class="string">&quot;The token does not comply to the format of header.payload.signature&quot;</span>)]</span>
+    InvalidToken,
+    <span class="doccomment">/// We use a `String` because [`ethsign::Signature::recover()`] returns `secp256k1` error
+    /// which is not exported in `ethsign`.
+    </span><span class="attribute">#[error(<span class="string">&quot;Address recovery: {0}&quot;</span>)]</span>
+    AddressRecovery(String),
+    <span class="attribute">#[error(<span class="string">&quot;Signature decoding: {0}&quot;</span>)]</span>
+    SignatureDecoding(<span class="attribute">#[source]</span> base64::DecodeError),
+    <span class="doccomment">/// If there is no suffix in the signature for the mode
+    /// or if Signature length is not 65 bytes
+    /// or if Signature V component is not in &quot;Electrum&quot; notation (`&lt; 27`).
+    </span><span class="attribute">#[error(<span class="string">&quot;Error when decoding token signature&quot;</span>)]</span>
+    InvalidSignature,
+    <span class="attribute">#[error(<span class="string">&quot;Payload decoding: {0}&quot;</span>)]</span>
+    PayloadDecoding(<span class="attribute">#[source]</span> base64::DecodeError),
+    <span class="attribute">#[error(<span class="string">&quot;Payload deserialization: {0}&quot;</span>)]</span>
+    PayloadDeserialization(<span class="attribute">#[from]</span> serde_json::Error),
+    <span class="attribute">#[error(<span class="string">&quot;Payload is not a valid UTF-8 string: {0}&quot;</span>)]</span>
+    PayloadUtf8(<span class="attribute">#[from]</span> std::str::Utf8Error),
 }
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
-<span class="kw">mod</span> <span class="ident">test</span> {
-    <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
+<span class="attribute">#[cfg(test)]</span>
+<span class="kw">mod </span>test {
+    <span class="kw">use super</span>::<span class="kw-2">*</span>;
 
-    <span class="kw">fn</span> <span class="ident">assert_send</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Send</span><span class="op">&gt;</span>() {}
-    <span class="kw">fn</span> <span class="ident">assert_sync</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Sync</span><span class="op">&gt;</span>() {}
+    <span class="kw">fn </span>assert_send&lt;T: Send&gt;() {}
+    <span class="kw">fn </span>assert_sync&lt;T: Sync&gt;() {}
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">a_correct_error</span>() {
-        <span class="comment">// Ethereum adapter should be Send!</span>
-        <span class="ident">assert_send</span>::<span class="op">&lt;</span><span class="ident">Error</span><span class="op">&gt;</span>();
-        <span class="comment">// Ethereum adapter should be Sync!</span>
-        <span class="ident">assert_sync</span>::<span class="op">&lt;</span><span class="ident">Error</span><span class="op">&gt;</span>();
+    <span class="attribute">#[test]</span>
+    <span class="kw">fn </span>a_correct_error() {
+        <span class="comment">// Ethereum adapter should be Send!
+        </span>assert_send::&lt;Error&gt;();
+        <span class="comment">// Ethereum adapter should be Sync!
+        </span>assert_sync::&lt;Error&gt;();
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="adapter" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (20ffea693 2022-08-11)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="adapter" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>

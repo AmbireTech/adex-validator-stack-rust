@@ -143,150 +143,150 @@
 <span id="143">143</span>
 <span id="144">144</span>
 <span id="145">145</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">serde</span>::{<span class="ident">Deserialize</span>, <span class="ident">Serialize</span>};
-<span class="kw">use</span> <span class="ident">std::fmt</span>;
+</pre><pre class="rust"><code><span class="kw">use </span>serde::{Deserialize, Serialize};
+<span class="kw">use </span>std::fmt;
 
-<span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">config::TokenInfo</span>, <span class="ident">util::ApiUrl</span>, <span class="ident">Address</span>, <span class="ident">Campaign</span>, <span class="ident">Channel</span>};
-<span class="kw">use</span> <span class="ident">parse_display</span>::{<span class="ident">Display</span>, <span class="ident">FromStr</span>};
+<span class="kw">use crate</span>::{config::TokenInfo, util::ApiUrl, Address, Campaign, Channel};
+<span class="kw">use </span>parse_display::{Display, FromStr};
 
-<span class="doccomment">/// The Id of the chain</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// # Ethereum Virtual Machine</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// For all the EVM-compatible Chain IDs visit &lt;https://chainid.network&gt;</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">Hash</span>, <span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">Eq</span>, <span class="ident">PartialEq</span>, <span class="ident">Display</span>, <span class="ident">FromStr</span>)]</span>
-<span class="attribute">#[<span class="ident">serde</span>(<span class="ident">transparent</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ChainId</span>(<span class="ident">u32</span>);
+<span class="doccomment">/// The Id of the chain
+///
+/// # Ethereum Virtual Machine
+///
+/// For all the EVM-compatible Chain IDs visit &lt;https://chainid.network&gt;
+</span><span class="attribute">#[derive(Serialize, Deserialize, Hash, Clone, Copy, Eq, PartialEq, Display, FromStr)]</span>
+<span class="attribute">#[serde(transparent)]</span>
+<span class="kw">pub struct </span>ChainId(u32);
 
-<span class="kw">impl</span> <span class="ident">ChainId</span> {
-    <span class="doccomment">/// # Panics</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// If `id` is `0`.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">id</span>: <span class="ident">u32</span>) -&gt; <span class="self">Self</span> {
-        <span class="macro">assert!</span>(<span class="ident">id</span> <span class="op">!</span><span class="op">=</span> <span class="number">0</span>);
+<span class="kw">impl </span>ChainId {
+    <span class="doccomment">/// # Panics
+    ///
+    /// If `id` is `0`.
+    </span><span class="kw">pub fn </span>new(id: u32) -&gt; <span class="self">Self </span>{
+        <span class="macro">assert!</span>(id != <span class="number">0</span>);
 
-        <span class="self">Self</span>(<span class="ident">id</span>)
+        <span class="self">Self</span>(id)
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">to_u32</span>(<span class="self">self</span>) -&gt; <span class="ident">u32</span> {
-        <span class="self">self</span>.<span class="number">0</span>
-    }
+    <span class="kw">pub fn </span>to_u32(<span class="self">self</span>) -&gt; u32 {
+        <span class="self">self</span>.<span class="number">0
+    </span>}
 }
 
-<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">ChainId</span> {
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">id</span>: <span class="ident">u32</span>) -&gt; <span class="self">Self</span> {
-        <span class="ident"><span class="self">Self</span>::new</span>(<span class="ident">id</span>)
-    }
-}
-
-<span class="kw">impl</span> <span class="ident">fmt::Debug</span> <span class="kw">for</span> <span class="ident">ChainId</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="ident">fmt::Result</span> {
-        <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;ChainId({})&quot;</span>, <span class="self">self</span>.<span class="number">0</span>)
+<span class="kw">impl </span>From&lt;u32&gt; <span class="kw">for </span>ChainId {
+    <span class="kw">fn </span>from(id: u32) -&gt; <span class="self">Self </span>{
+        <span class="self">Self</span>::new(id)
     }
 }
 
-<span class="doccomment">/// Ethereum Virtual Machine Chain</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>, <span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">Hash</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Chain</span> {
-    <span class="kw">pub</span> <span class="ident">chain_id</span>: <span class="ident">ChainId</span>,
-    <span class="doccomment">/// RPC url of the chain which will be used for Blockchain interactions.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Ethereum Virtual Machine</span>
-    <span class="doccomment">/// Check out the metadata for all EVM-chains: &lt;https://github.com/ethereum-lists/chains&gt;</span>
-    <span class="doccomment">/// Or in json: &lt;https://chainid.network/chains.json&gt;</span>
-    <span class="kw">pub</span> <span class="ident">rpc</span>: <span class="ident">ApiUrl</span>,
-    <span class="doccomment">/// The OUTPACE contract address on this Chain</span>
-    <span class="kw">pub</span> <span class="ident">outpace</span>: <span class="ident">Address</span>,
+<span class="kw">impl </span>fmt::Debug <span class="kw">for </span>ChainId {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; fmt::Result {
+        <span class="macro">write!</span>(f, <span class="string">&quot;ChainId({})&quot;</span>, <span class="self">self</span>.<span class="number">0</span>)
+    }
 }
 
-<span class="doccomment">/// Context of [`TokenInfo`] &amp; [`Chain`] information for given [`Channel`] or [`Campaign`].</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// The additional context of [`Channel`] is known after checking if the `Channel` token&#39;s</span>
-<span class="doccomment">/// `Chain` &amp; `Address` are whitelisted in the configuration.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Deserialize</span>, <span class="ident">Serialize</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>, <span class="ident">Hash</span>, <span class="ident">Clone</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ChainOf</span><span class="op">&lt;</span><span class="ident">T</span> <span class="op">=</span> ()<span class="op">&gt;</span> {
-    <span class="kw">pub</span> <span class="ident">context</span>: <span class="ident">T</span>,
-    <span class="kw">pub</span> <span class="ident">chain</span>: <span class="ident">Chain</span>,
-    <span class="kw">pub</span> <span class="ident">token</span>: <span class="ident">TokenInfo</span>,
+<span class="doccomment">/// Ethereum Virtual Machine Chain
+</span><span class="attribute">#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]</span>
+<span class="kw">pub struct </span>Chain {
+    <span class="kw">pub </span>chain_id: ChainId,
+    <span class="doccomment">/// RPC url of the chain which will be used for Blockchain interactions.
+    ///
+    /// # Ethereum Virtual Machine
+    /// Check out the metadata for all EVM-chains: &lt;https://github.com/ethereum-lists/chains&gt;
+    /// Or in json: &lt;https://chainid.network/chains.json&gt;
+    </span><span class="kw">pub </span>rpc: ApiUrl,
+    <span class="doccomment">/// The OUTPACE contract address on this Chain
+    </span><span class="kw">pub </span>outpace: Address,
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="ident">ChainOf</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">with</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span>(<span class="self">self</span>, <span class="ident">context</span>: <span class="ident">C</span>) -&gt; <span class="ident">ChainOf</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span> {
-        <span class="ident">ChainOf</span> {
-            <span class="ident">context</span>,
-            <span class="ident">chain</span>: <span class="self">self</span>.<span class="ident">chain</span>,
-            <span class="ident">token</span>: <span class="self">self</span>.<span class="ident">token</span>,
+<span class="doccomment">/// Context of [`TokenInfo`] &amp; [`Chain`] information for given [`Channel`] or [`Campaign`].
+///
+/// The additional context of [`Channel`] is known after checking if the `Channel` token&#39;s
+/// `Chain` &amp; `Address` are whitelisted in the configuration.
+</span><span class="attribute">#[derive(Debug, Deserialize, Serialize, PartialEq, Eq, Hash, Clone)]</span>
+<span class="kw">pub struct </span>ChainOf&lt;T = ()&gt; {
+    <span class="kw">pub </span>context: T,
+    <span class="kw">pub </span>chain: Chain,
+    <span class="kw">pub </span>token: TokenInfo,
+}
+
+<span class="kw">impl</span>&lt;T&gt; ChainOf&lt;T&gt; {
+    <span class="kw">pub fn </span>with&lt;C&gt;(<span class="self">self</span>, context: C) -&gt; ChainOf&lt;C&gt; {
+        ChainOf {
+            context,
+            chain: <span class="self">self</span>.chain,
+            token: <span class="self">self</span>.token,
         }
     }
 }
 
-<span class="kw">impl</span> <span class="ident">ChainOf</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">chain</span>: <span class="ident">Chain</span>, <span class="ident">token</span>: <span class="ident">TokenInfo</span>) -&gt; <span class="ident">ChainOf</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-        <span class="ident">ChainOf</span> {
-            <span class="ident">context</span>: (),
-            <span class="ident">chain</span>,
-            <span class="ident">token</span>,
+<span class="kw">impl </span>ChainOf&lt;()&gt; {
+    <span class="kw">pub fn </span>new(chain: Chain, token: TokenInfo) -&gt; ChainOf&lt;()&gt; {
+        ChainOf {
+            context: (),
+            chain,
+            token,
         }
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">with_channel</span>(<span class="self">self</span>, <span class="ident">channel</span>: <span class="ident">Channel</span>) -&gt; <span class="ident">ChainOf</span><span class="op">&lt;</span><span class="ident">Channel</span><span class="op">&gt;</span> {
-        <span class="ident">ChainOf</span> {
-            <span class="ident">context</span>: <span class="ident">channel</span>,
-            <span class="ident">chain</span>: <span class="self">self</span>.<span class="ident">chain</span>,
-            <span class="ident">token</span>: <span class="self">self</span>.<span class="ident">token</span>,
+    <span class="kw">pub fn </span>with_channel(<span class="self">self</span>, channel: Channel) -&gt; ChainOf&lt;Channel&gt; {
+        ChainOf {
+            context: channel,
+            chain: <span class="self">self</span>.chain,
+            token: <span class="self">self</span>.token,
         }
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">with_campaign</span>(<span class="self">self</span>, <span class="ident">campaign</span>: <span class="ident">Campaign</span>) -&gt; <span class="ident">ChainOf</span><span class="op">&lt;</span><span class="ident">Campaign</span><span class="op">&gt;</span> {
-        <span class="ident">ChainOf</span> {
-            <span class="ident">context</span>: <span class="ident">campaign</span>,
-            <span class="ident">chain</span>: <span class="self">self</span>.<span class="ident">chain</span>,
-            <span class="ident">token</span>: <span class="self">self</span>.<span class="ident">token</span>,
-        }
-    }
-}
-
-<span class="kw">impl</span> <span class="ident">ChainOf</span><span class="op">&lt;</span><span class="ident">Campaign</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// Get a [`Channel`] with [`Chain`] &amp; [`TokenInfo`] context from</span>
-    <span class="doccomment">/// the given [`Campaign`].</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">of_channel</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">ChainOf</span><span class="op">&lt;</span><span class="ident">Channel</span><span class="op">&gt;</span> {
-        <span class="ident">ChainOf</span> {
-            <span class="ident">context</span>: <span class="self">self</span>.<span class="ident">context</span>.<span class="ident">channel</span>,
-            <span class="ident">token</span>: <span class="self">self</span>.<span class="ident">token</span>.<span class="ident">clone</span>(),
-            <span class="ident">chain</span>: <span class="self">self</span>.<span class="ident">chain</span>.<span class="ident">clone</span>(),
+    <span class="kw">pub fn </span>with_campaign(<span class="self">self</span>, campaign: Campaign) -&gt; ChainOf&lt;Campaign&gt; {
+        ChainOf {
+            context: campaign,
+            chain: <span class="self">self</span>.chain,
+            token: <span class="self">self</span>.token,
         }
     }
 }
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;postgres&quot;</span>)]</span>
-<span class="kw">mod</span> <span class="ident">postgres</span> {
-    <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::ChainId</span>;
-    <span class="kw">use</span> <span class="ident">bytes::BytesMut</span>;
-    <span class="kw">use</span> <span class="ident">std::error::Error</span>;
-    <span class="kw">use</span> <span class="ident">tokio_postgres::types</span>::{<span class="ident">accepts</span>, <span class="ident">to_sql_checked</span>, <span class="ident">FromSql</span>, <span class="ident">IsNull</span>, <span class="ident">ToSql</span>, <span class="ident">Type</span>};
-
-    <span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="ident">FromSql</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">ChainId</span> {
-        <span class="kw">fn</span> <span class="ident">from_sql</span>(<span class="ident">ty</span>: <span class="kw-2">&amp;</span><span class="ident">Type</span>, <span class="ident">raw</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> [<span class="ident">u8</span>]) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">ChainId</span>, <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Error</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-            <span class="kw">let</span> <span class="ident">value</span> <span class="op">=</span> <span class="op">&lt;</span><span class="ident">i32</span> <span class="kw">as</span> <span class="ident">FromSql</span><span class="op">&gt;</span><span class="ident">::from_sql</span>(<span class="ident">ty</span>, <span class="ident">raw</span>)<span class="question-mark">?</span>;
-
-            <span class="prelude-val">Ok</span>(<span class="ident">ChainId</span>(<span class="ident">u32::try_from</span>(<span class="ident">value</span>)<span class="question-mark">?</span>))
+<span class="kw">impl </span>ChainOf&lt;Campaign&gt; {
+    <span class="doccomment">/// Get a [`Channel`] with [`Chain`] &amp; [`TokenInfo`] context from
+    /// the given [`Campaign`].
+    </span><span class="kw">pub fn </span>of_channel(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; ChainOf&lt;Channel&gt; {
+        ChainOf {
+            context: <span class="self">self</span>.context.channel,
+            token: <span class="self">self</span>.token.clone(),
+            chain: <span class="self">self</span>.chain.clone(),
         }
-        <span class="macro">accepts!</span>(<span class="ident">INT4</span>);
+    }
+}
+
+<span class="attribute">#[cfg(feature = <span class="string">&quot;postgres&quot;</span>)]</span>
+<span class="kw">mod </span>postgres {
+    <span class="kw">use </span><span class="kw">super</span>::ChainId;
+    <span class="kw">use </span>bytes::BytesMut;
+    <span class="kw">use </span>std::error::Error;
+    <span class="kw">use </span>tokio_postgres::types::{accepts, to_sql_checked, FromSql, IsNull, ToSql, Type};
+
+    <span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; FromSql&lt;<span class="lifetime">&#39;a</span>&gt; <span class="kw">for </span>ChainId {
+        <span class="kw">fn </span>from_sql(ty: <span class="kw-2">&amp;</span>Type, raw: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>[u8]) -&gt; <span class="prelude-ty">Result</span>&lt;ChainId, Box&lt;<span class="kw">dyn </span>Error + Sync + Send&gt;&gt; {
+            <span class="kw">let </span>value = &lt;i32 <span class="kw">as </span>FromSql&gt;::from_sql(ty, raw)<span class="question-mark">?</span>;
+
+            <span class="prelude-val">Ok</span>(ChainId(u32::try_from(value)<span class="question-mark">?</span>))
+        }
+        <span class="macro">accepts!</span>(INT4);
     }
 
-    <span class="kw">impl</span> <span class="ident">ToSql</span> <span class="kw">for</span> <span class="ident">ChainId</span> {
-        <span class="kw">fn</span> <span class="ident">to_sql</span>(
+    <span class="kw">impl </span>ToSql <span class="kw">for </span>ChainId {
+        <span class="kw">fn </span>to_sql(
             <span class="kw-2">&amp;</span><span class="self">self</span>,
-            <span class="ident">ty</span>: <span class="kw-2">&amp;</span><span class="ident">Type</span>,
-            <span class="ident">w</span>: <span class="kw-2">&amp;mut</span> <span class="ident">BytesMut</span>,
-        ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">IsNull</span>, <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Error</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-            <span class="op">&lt;</span><span class="ident">i32</span> <span class="kw">as</span> <span class="ident">ToSql</span><span class="op">&gt;</span><span class="ident">::to_sql</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>.<span class="ident">try_into</span>()<span class="question-mark">?</span>, <span class="ident">ty</span>, <span class="ident">w</span>)
+            ty: <span class="kw-2">&amp;</span>Type,
+            w: <span class="kw-2">&amp;mut </span>BytesMut,
+        ) -&gt; <span class="prelude-ty">Result</span>&lt;IsNull, Box&lt;<span class="kw">dyn </span>Error + Sync + Send&gt;&gt; {
+            &lt;i32 <span class="kw">as </span>ToSql&gt;::to_sql(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>.try_into()<span class="question-mark">?</span>, ty, w)
         }
 
-        <span class="macro">accepts!</span>(<span class="ident">INT4</span>);
+        <span class="macro">accepts!</span>(INT4);
 
         <span class="macro">to_sql_checked!</span>();
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="primitives" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (20ffea693 2022-08-11)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="primitives" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>

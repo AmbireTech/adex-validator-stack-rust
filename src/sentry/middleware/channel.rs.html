@@ -63,70 +63,84 @@
 <span id="63">63</span>
 <span id="64">64</span>
 <span id="65">65</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="kw">crate</span>::{
-    <span class="ident">db::get_channel_by_id</span>, <span class="ident">middleware::Middleware</span>, <span class="ident">response::ResponseError</span>,
-    <span class="ident">routes::routers::RouteParams</span>, <span class="ident">Application</span>, <span class="ident">Auth</span>,
+<span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
+<span id="70">70</span>
+<span id="71">71</span>
+<span id="72">72</span>
+</pre><pre class="rust"><code><span class="kw">use </span>std::sync::Arc;
+
+<span class="kw">use </span>axum::{
+    extract::{Path, RequestParts},
+    middleware::Next,
 };
-<span class="kw">use</span> <span class="ident">adapter::client::Locked</span>;
-<span class="kw">use</span> <span class="ident">futures::future</span>::{<span class="ident">BoxFuture</span>, <span class="ident">FutureExt</span>};
-<span class="kw">use</span> <span class="ident">hex::FromHex</span>;
-<span class="kw">use</span> <span class="ident">hyper</span>::{<span class="ident">Body</span>, <span class="ident">Request</span>};
-<span class="kw">use</span> <span class="ident">primitives::ChannelId</span>;
+<span class="kw">use </span>serde::Deserialize;
 
-<span class="kw">use</span> <span class="ident">async_trait::async_trait</span>;
+<span class="kw">use </span>adapter::client::Locked;
+<span class="kw">use </span>primitives::ChannelId;
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ChannelLoad</span>;
+<span class="kw">use crate</span>::{db::get_channel_by_id, response::ResponseError, Application, Auth};
 
-<span class="attribute">#[<span class="ident">async_trait</span>]</span>
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">Locked</span> <span class="op">+</span> <span class="lifetime">&#39;static</span><span class="op">&gt;</span> <span class="ident">Middleware</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">ChannelLoad</span> {
-    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">call</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>(
-        <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">request</span>: <span class="ident">Request</span><span class="op">&lt;</span><span class="ident">Body</span><span class="op">&gt;</span>,
-        <span class="ident">application</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">Application</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span>,
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Request</span><span class="op">&lt;</span><span class="ident">Body</span><span class="op">&gt;</span>, <span class="ident">ResponseError</span><span class="op">&gt;</span> {
-        <span class="ident">channel_load</span>(<span class="ident">request</span>, <span class="ident">application</span>).<span class="kw">await</span>
-    }
+<span class="doccomment">/// This struct is required because of routes that have more parameters
+/// apart from the `ChannelId`
+</span><span class="attribute">#[derive(Debug, Deserialize)]</span>
+<span class="kw">struct </span>ChannelParam {
+    <span class="kw">pub </span>id: ChannelId,
 }
 
-<span class="doccomment">/// channel_load &amp; channel_if_exist</span>
-<span class="kw">fn</span> <span class="ident">channel_load</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">Locked</span><span class="op">&gt;</span>(
-    <span class="kw-2">mut</span> <span class="ident">req</span>: <span class="ident">Request</span><span class="op">&lt;</span><span class="ident">Body</span><span class="op">&gt;</span>,
-    <span class="ident">app</span>: <span class="kw-2">&amp;</span><span class="ident">Application</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span>,
-) -&gt; <span class="ident">BoxFuture</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span>, <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Request</span><span class="op">&lt;</span><span class="ident">Body</span><span class="op">&gt;</span>, <span class="ident">ResponseError</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-    <span class="kw">async</span> <span class="kw">move</span> {
-        <span class="kw">let</span> <span class="ident">id</span> <span class="op">=</span> <span class="ident">req</span>
-            .<span class="ident">extensions</span>()
-            .<span class="ident">get</span>::<span class="op">&lt;</span><span class="ident">RouteParams</span><span class="op">&gt;</span>()
-            .<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">ResponseError::BadRequest</span>(<span class="string">&quot;Route params not found&quot;</span>.<span class="ident">to_string</span>()))<span class="question-mark">?</span>
-            .<span class="ident">get</span>(<span class="number">0</span>)
-            .<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">ResponseError::BadRequest</span>(<span class="string">&quot;No id&quot;</span>.<span class="ident">to_string</span>()))<span class="question-mark">?</span>;
+<span class="kw">pub async fn </span>channel_load&lt;C: Locked + <span class="lifetime">&#39;static</span>, B&gt;(
+    request: axum::http::Request&lt;B&gt;,
+    next: Next&lt;B&gt;,
+) -&gt; <span class="prelude-ty">Result</span>&lt;axum::response::Response, ResponseError&gt;
+<span class="kw">where
+    </span>B: Send,
+{
+    <span class="kw">let </span>app = request
+        .extensions()
+        .get::&lt;Arc&lt;Application&lt;C&gt;&gt;&gt;()
+        .expect(<span class="string">&quot;Application should always be present&quot;</span>)
+        .clone();
 
-        <span class="kw">let</span> <span class="ident">channel_id</span> <span class="op">=</span> <span class="ident">ChannelId::from_hex</span>(<span class="ident">id</span>)
-            .<span class="ident">map_err</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">ResponseError::BadRequest</span>(<span class="string">&quot;Wrong Channel Id&quot;</span>.<span class="ident">to_string</span>()))<span class="question-mark">?</span>;
+    <span class="comment">// running extractors requires a `RequestParts`
+    </span><span class="kw">let </span><span class="kw-2">mut </span>request_parts = RequestParts::new(request);
 
-        <span class="kw">let</span> <span class="ident">channel</span> <span class="op">=</span> <span class="ident">get_channel_by_id</span>(<span class="kw-2">&amp;</span><span class="ident">app</span>.<span class="ident">pool</span>, <span class="kw-2">&amp;</span><span class="ident">channel_id</span>)
-            .<span class="kw">await</span><span class="question-mark">?</span>
-            .<span class="ident">ok_or</span>(<span class="ident">ResponseError::NotFound</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span>channel_param = request_parts
+        .extract::&lt;Path&lt;ChannelParam&gt;&gt;()
+        .<span class="kw">await
+        </span>.map_err(|<span class="kw">_</span>| ResponseError::BadRequest(<span class="string">&quot;Bad Channel Id&quot;</span>.to_string()))<span class="question-mark">?</span>;
 
-        <span class="kw">let</span> <span class="ident">channel_context</span> <span class="op">=</span> <span class="ident">app</span>.<span class="ident">config</span>.<span class="ident">find_chain_of</span>(<span class="ident">channel</span>.<span class="ident">token</span>).<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">ResponseError::FailedValidation</span>(<span class="string">&quot;Channel token is not whitelisted in this validator&quot;</span>.<span class="ident">into</span>()))<span class="question-mark">?</span>.<span class="ident">with_channel</span>(<span class="ident">channel</span>);
+    <span class="kw">let </span>channel = get_channel_by_id(<span class="kw-2">&amp;</span>app.pool, <span class="kw-2">&amp;</span>channel_param.id)
+        .<span class="kw">await</span><span class="question-mark">?
+        </span>.ok_or(ResponseError::NotFound)<span class="question-mark">?</span>;
 
-        <span class="comment">// If this is an authenticated call</span>
-        <span class="comment">// Check if the Channel context (Chain Id) aligns with the Authentication token Chain id</span>
-        <span class="kw">match</span> <span class="ident">req</span>.<span class="ident">extensions</span>().<span class="ident">get</span>::<span class="op">&lt;</span><span class="ident">Auth</span><span class="op">&gt;</span>() {
-            <span class="comment">// If Chain Ids differ, the requester hasn&#39;t generated Auth token</span>
-            <span class="comment">// to access the Channel in it&#39;s Chain Id.</span>
-            <span class="prelude-val">Some</span>(<span class="ident">auth</span>) <span class="kw">if</span> <span class="ident">auth</span>.<span class="ident">chain</span>.<span class="ident">chain_id</span> <span class="op">!</span><span class="op">=</span> <span class="ident">channel_context</span>.<span class="ident">chain</span>.<span class="ident">chain_id</span> =&gt; {
-                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">ResponseError::Forbidden</span>(<span class="string">&quot;Authentication token is generated for different Chain and differs from the Channel&#39;s Chain&quot;</span>.<span class="ident">into</span>()))
+    <span class="kw">let </span>channel_context = app
+        .config
+        .find_chain_of(channel.token)
+        .ok_or_else(|| {
+            ResponseError::FailedValidation(
+                <span class="string">&quot;Channel token is not whitelisted in this validator&quot;</span>.into(),
+            )
+        })<span class="question-mark">?
+        </span>.with_channel(channel);
+
+    <span class="comment">// If this is an authenticated call
+    // Check if the Channel context (Chain Id) aligns with the Authentication token Chain id
+    </span><span class="kw">match </span>request_parts.extensions().get::&lt;Auth&gt;() {
+            <span class="comment">// If Chain Ids differ, the requester hasn&#39;t generated Auth token
+            // to access the Channel in it&#39;s Chain Id.
+            </span><span class="prelude-val">Some</span>(auth) <span class="kw">if </span>auth.chain.chain_id != channel_context.chain.chain_id =&gt; {
+                <span class="kw">return </span><span class="prelude-val">Err</span>(ResponseError::Forbidden(<span class="string">&quot;Authentication token is generated for different Chain and differs from the Channel&#39;s Chain&quot;</span>.into()))
             }
-            <span class="kw">_</span> =&gt; {},
+            <span class="kw">_ </span>=&gt; {},
         }
 
-        <span class="ident">req</span>.<span class="ident">extensions_mut</span>().<span class="ident">insert</span>(<span class="ident">channel_context</span>);
+    request_parts.extensions_mut().insert(channel_context);
 
-        <span class="prelude-val">Ok</span>(<span class="ident">req</span>)
-    }
-    .<span class="ident">boxed</span>()
+    <span class="kw">let </span>request = request_parts.try_into_request().expect(<span class="string">&quot;Body extracted&quot;</span>);
+
+    <span class="prelude-val">Ok</span>(next.run(request).<span class="kw">await</span>)
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (20ffea693 2022-08-11)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>

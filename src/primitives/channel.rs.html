@@ -362,369 +362,369 @@
 <span id="362">362</span>
 <span id="363">363</span>
 <span id="364">364</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">std</span>::{<span class="ident">fmt</span>, <span class="ident">ops::Deref</span>, <span class="ident">str::FromStr</span>};
+</pre><pre class="rust"><code><span class="kw">use </span>std::{fmt, ops::Deref, str::FromStr};
 
-<span class="kw">use</span> <span class="ident">ethereum_types::U256</span>;
+<span class="kw">use </span>ethereum_types::U256;
 
-<span class="kw">use</span> <span class="ident">serde</span>::{<span class="ident">Deserialize</span>, <span class="ident">Deserializer</span>, <span class="ident">Serialize</span>};
-<span class="kw">use</span> <span class="ident">serde_hex</span>::{<span class="ident">SerHex</span>, <span class="ident">StrictPfx</span>};
+<span class="kw">use </span>serde::{Deserialize, Deserializer, Serialize};
+<span class="kw">use </span>serde_hex::{SerHex, StrictPfx};
 
-<span class="kw">use</span> <span class="ident">hex</span>::{<span class="ident">FromHex</span>, <span class="ident">FromHexError</span>};
+<span class="kw">use </span>hex::{FromHex, FromHexError};
 
-<span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">Address</span>, <span class="ident">Validator</span>, <span class="ident">ValidatorId</span>};
+<span class="kw">use crate</span>::{Address, Validator, ValidatorId};
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>, <span class="ident">Copy</span>, <span class="ident">Clone</span>, <span class="ident">Hash</span>)]</span>
-<span class="attribute">#[<span class="ident">serde</span>(<span class="ident">transparent</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ChannelId</span>(
-    <span class="attribute">#[<span class="ident">serde</span>(
-        <span class="ident">deserialize_with</span> <span class="op">=</span> <span class="string">&quot;deserialize_channel_id&quot;</span>,
-        <span class="ident">serialize_with</span> <span class="op">=</span> <span class="string">&quot;SerHex::&lt;StrictPfx&gt;::serialize&quot;</span>
-    )]</span>
-    [<span class="ident">u8</span>; <span class="number">32</span>],
+<span class="attribute">#[derive(Serialize, Deserialize, PartialEq, Eq, Copy, Clone, Hash)]</span>
+<span class="attribute">#[serde(transparent)]</span>
+<span class="kw">pub struct </span>ChannelId(
+    <span class="attribute">#[serde(
+        deserialize_with = <span class="string">&quot;deserialize_channel_id&quot;</span>,
+        serialize_with = <span class="string">&quot;SerHex::&lt;StrictPfx&gt;::serialize&quot;
+    </span>)]</span>
+    [u8; <span class="number">32</span>],
 );
 
-<span class="kw">impl</span> <span class="ident">ChannelId</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">as_bytes</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>[<span class="ident">u8</span>; <span class="number">32</span>] {
-        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>
+<span class="kw">impl </span>ChannelId {
+    <span class="kw">pub fn </span>as_bytes(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>[u8; <span class="number">32</span>] {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0
+    </span>}
+}
+
+<span class="kw">impl </span>fmt::Debug <span class="kw">for </span>ChannelId {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; fmt::Result {
+        <span class="macro">write!</span>(f, <span class="string">&quot;ChannelId({})&quot;</span>, <span class="self">self</span>)
     }
 }
 
-<span class="kw">impl</span> <span class="ident">fmt::Debug</span> <span class="kw">for</span> <span class="ident">ChannelId</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="ident">fmt::Result</span> {
-        <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;ChannelId({})&quot;</span>, <span class="self">self</span>)
-    }
-}
-
-<span class="kw">fn</span> <span class="ident">deserialize_channel_id</span><span class="op">&lt;</span><span class="lifetime">&#39;de</span>, <span class="ident">D</span><span class="op">&gt;</span>(<span class="ident">deserializer</span>: <span class="ident">D</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>[<span class="ident">u8</span>; <span class="number">32</span>], <span class="ident">D::Error</span><span class="op">&gt;</span>
-<span class="kw">where</span>
-    <span class="ident">D</span>: <span class="ident">Deserializer</span><span class="op">&lt;</span><span class="lifetime">&#39;de</span><span class="op">&gt;</span>,
+<span class="kw">fn </span>deserialize_channel_id&lt;<span class="lifetime">&#39;de</span>, D&gt;(deserializer: D) -&gt; <span class="prelude-ty">Result</span>&lt;[u8; <span class="number">32</span>], D::Error&gt;
+<span class="kw">where
+    </span>D: Deserializer&lt;<span class="lifetime">&#39;de</span>&gt;,
 {
-    <span class="kw">let</span> <span class="ident">channel_id</span> <span class="op">=</span> <span class="ident">String::deserialize</span>(<span class="ident">deserializer</span>)<span class="question-mark">?</span>;
-    <span class="ident">validate_channel_id</span>(<span class="kw-2">&amp;</span><span class="ident">channel_id</span>).<span class="ident">map_err</span>(<span class="ident">serde::de::Error::custom</span>)
+    <span class="kw">let </span>channel_id = String::deserialize(deserializer)<span class="question-mark">?</span>;
+    validate_channel_id(<span class="kw-2">&amp;</span>channel_id).map_err(serde::de::Error::custom)
 }
 
-<span class="kw">fn</span> <span class="ident">validate_channel_id</span>(<span class="ident">s</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>[<span class="ident">u8</span>; <span class="number">32</span>], <span class="ident">FromHexError</span><span class="op">&gt;</span> {
-    <span class="comment">// strip `0x` prefix</span>
-    <span class="kw">let</span> <span class="ident">hex</span> <span class="op">=</span> <span class="ident">s</span>.<span class="ident">strip_prefix</span>(<span class="string">&quot;0x&quot;</span>).<span class="ident">unwrap_or</span>(<span class="ident">s</span>);
-    <span class="comment">// FromHex will make sure to check the length and match it to 32 bytes</span>
-    <span class="op">&lt;</span>[<span class="ident">u8</span>; <span class="number">32</span>] <span class="kw">as</span> <span class="ident">FromHex</span><span class="op">&gt;</span><span class="ident">::from_hex</span>(<span class="ident">hex</span>)
+<span class="kw">fn </span>validate_channel_id(s: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Result</span>&lt;[u8; <span class="number">32</span>], FromHexError&gt; {
+    <span class="comment">// strip `0x` prefix
+    </span><span class="kw">let </span>hex = s.strip_prefix(<span class="string">&quot;0x&quot;</span>).unwrap_or(s);
+    <span class="comment">// FromHex will make sure to check the length and match it to 32 bytes
+    </span>&lt;[u8; <span class="number">32</span>] <span class="kw">as </span>FromHex&gt;::from_hex(hex)
 }
 
-<span class="kw">impl</span> <span class="ident">Deref</span> <span class="kw">for</span> <span class="ident">ChannelId</span> {
-    <span class="kw">type</span> <span class="ident">Target</span> <span class="op">=</span> [<span class="ident">u8</span>; <span class="number">32</span>];
+<span class="kw">impl </span>Deref <span class="kw">for </span>ChannelId {
+    <span class="kw">type </span>Target = [u8; <span class="number">32</span>];
 
-    <span class="kw">fn</span> <span class="ident">deref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>[<span class="ident">u8</span>; <span class="number">32</span>] {
-        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>
+    <span class="kw">fn </span>deref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>[u8; <span class="number">32</span>] {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0
+    </span>}
+}
+
+<span class="kw">impl </span>From&lt;[u8; <span class="number">32</span>]&gt; <span class="kw">for </span>ChannelId {
+    <span class="kw">fn </span>from(array: [u8; <span class="number">32</span>]) -&gt; <span class="self">Self </span>{
+        <span class="self">Self</span>(array)
     }
 }
 
-<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span>[<span class="ident">u8</span>; <span class="number">32</span>]<span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">ChannelId</span> {
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">array</span>: [<span class="ident">u8</span>; <span class="number">32</span>]) -&gt; <span class="self">Self</span> {
-        <span class="self">Self</span>(<span class="ident">array</span>)
+<span class="kw">impl </span>AsRef&lt;[u8]&gt; <span class="kw">for </span>ChannelId {
+    <span class="kw">fn </span>as_ref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>[u8] {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0
+    </span>}
+}
+
+<span class="kw">impl </span>FromHex <span class="kw">for </span>ChannelId {
+    <span class="kw">type </span>Error = FromHexError;
+
+    <span class="kw">fn </span>from_hex&lt;T: AsRef&lt;[u8]&gt;&gt;(hex: T) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, <span class="self">Self</span>::Error&gt; {
+        <span class="kw">let </span>array = hex::FromHex::from_hex(hex)<span class="question-mark">?</span>;
+
+        <span class="prelude-val">Ok</span>(<span class="self">Self</span>(array))
     }
 }
 
-<span class="kw">impl</span> <span class="ident">AsRef</span><span class="op">&lt;</span>[<span class="ident">u8</span>]<span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">ChannelId</span> {
-    <span class="kw">fn</span> <span class="ident">as_ref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>[<span class="ident">u8</span>] {
-        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>
+<span class="kw">impl </span>fmt::Display <span class="kw">for </span>ChannelId {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; fmt::Result {
+        <span class="macro">write!</span>(f, <span class="string">&quot;0x{}&quot;</span>, hex::encode(<span class="self">self</span>.<span class="number">0</span>))
     }
 }
 
-<span class="kw">impl</span> <span class="ident">FromHex</span> <span class="kw">for</span> <span class="ident">ChannelId</span> {
-    <span class="kw">type</span> <span class="ident">Error</span> <span class="op">=</span> <span class="ident">FromHexError</span>;
+<span class="kw">impl </span>FromStr <span class="kw">for </span>ChannelId {
+    <span class="kw">type </span><span class="prelude-val">Err </span>= FromHexError;
 
-    <span class="kw">fn</span> <span class="ident">from_hex</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">AsRef</span><span class="op">&lt;</span>[<span class="ident">u8</span>]<span class="op">&gt;</span><span class="op">&gt;</span>(<span class="ident">hex</span>: <span class="ident">T</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident"><span class="self">Self</span>::Error</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">array</span> <span class="op">=</span> <span class="ident">hex::FromHex::from_hex</span>(<span class="ident">hex</span>)<span class="question-mark">?</span>;
-
-        <span class="prelude-val">Ok</span>(<span class="self">Self</span>(<span class="ident">array</span>))
+    <span class="kw">fn </span>from_str(s: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, <span class="self">Self</span>::Err&gt; {
+        validate_channel_id(s).map(ChannelId)
     }
 }
 
-<span class="kw">impl</span> <span class="ident">fmt::Display</span> <span class="kw">for</span> <span class="ident">ChannelId</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="ident">fmt::Result</span> {
-        <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;0x{}&quot;</span>, <span class="ident">hex::encode</span>(<span class="self">self</span>.<span class="number">0</span>))
-    }
+<span class="attribute">#[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Eq, Hash)]</span>
+<span class="attribute">#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]</span>
+<span class="kw">pub struct </span>Channel {
+    <span class="kw">pub </span>leader: ValidatorId,
+    <span class="kw">pub </span>follower: ValidatorId,
+    <span class="kw">pub </span>guardian: Address,
+    <span class="kw">pub </span>token: Address,
+    <span class="kw">pub </span>nonce: Nonce,
 }
 
-<span class="kw">impl</span> <span class="ident">FromStr</span> <span class="kw">for</span> <span class="ident">ChannelId</span> {
-    <span class="kw">type</span> <span class="prelude-val">Err</span> <span class="op">=</span> <span class="ident">FromHexError</span>;
+<span class="kw">impl </span>Channel {
+    <span class="kw">pub fn </span>id(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; ChannelId {
+        <span class="kw">use </span>ethabi::{encode, Token};
+        <span class="kw">use </span>tiny_keccak::{Hasher, Keccak};
 
-    <span class="kw">fn</span> <span class="ident">from_str</span>(<span class="ident">s</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident"><span class="self">Self</span>::Err</span><span class="op">&gt;</span> {
-        <span class="ident">validate_channel_id</span>(<span class="ident">s</span>).<span class="ident">map</span>(<span class="ident">ChannelId</span>)
-    }
-}
-
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">Debug</span>, <span class="ident">Copy</span>, <span class="ident">Clone</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>, <span class="ident">Hash</span>)]</span>
-<span class="attribute">#[<span class="ident">serde</span>(<span class="ident">rename_all</span> <span class="op">=</span> <span class="string">&quot;camelCase&quot;</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Channel</span> {
-    <span class="kw">pub</span> <span class="ident">leader</span>: <span class="ident">ValidatorId</span>,
-    <span class="kw">pub</span> <span class="ident">follower</span>: <span class="ident">ValidatorId</span>,
-    <span class="kw">pub</span> <span class="ident">guardian</span>: <span class="ident">Address</span>,
-    <span class="kw">pub</span> <span class="ident">token</span>: <span class="ident">Address</span>,
-    <span class="kw">pub</span> <span class="ident">nonce</span>: <span class="ident">Nonce</span>,
-}
-
-<span class="kw">impl</span> <span class="ident">Channel</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">id</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">ChannelId</span> {
-        <span class="kw">use</span> <span class="ident">ethabi</span>::{<span class="ident">encode</span>, <span class="ident">Token</span>};
-        <span class="kw">use</span> <span class="ident">tiny_keccak</span>::{<span class="ident">Hasher</span>, <span class="ident">Keccak</span>};
-
-        <span class="kw">let</span> <span class="ident">tokens</span> <span class="op">=</span> [
-            <span class="ident">Token::Address</span>(<span class="self">self</span>.<span class="ident">leader</span>.<span class="ident">as_bytes</span>().<span class="ident">into</span>()),
-            <span class="ident">Token::Address</span>(<span class="self">self</span>.<span class="ident">follower</span>.<span class="ident">as_bytes</span>().<span class="ident">into</span>()),
-            <span class="ident">Token::Address</span>(<span class="self">self</span>.<span class="ident">guardian</span>.<span class="ident">as_bytes</span>().<span class="ident">into</span>()),
-            <span class="ident">Token::Address</span>(<span class="self">self</span>.<span class="ident">token</span>.<span class="ident">as_bytes</span>().<span class="ident">into</span>()),
-            <span class="ident">Token::FixedBytes</span>(<span class="self">self</span>.<span class="ident">nonce</span>.<span class="ident">to_bytes</span>().<span class="ident">to_vec</span>()),
+        <span class="kw">let </span>tokens = [
+            Token::Address(<span class="self">self</span>.leader.as_bytes().into()),
+            Token::Address(<span class="self">self</span>.follower.as_bytes().into()),
+            Token::Address(<span class="self">self</span>.guardian.as_bytes().into()),
+            Token::Address(<span class="self">self</span>.token.as_bytes().into()),
+            Token::FixedBytes(<span class="self">self</span>.nonce.to_bytes().to_vec()),
         ];
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">channel_id</span> <span class="op">=</span> [<span class="number">0_u8</span>; <span class="number">32</span>];
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">hasher</span> <span class="op">=</span> <span class="ident">Keccak::v256</span>();
-        <span class="ident">hasher</span>.<span class="ident">update</span>(<span class="kw-2">&amp;</span><span class="ident">encode</span>(<span class="kw-2">&amp;</span><span class="ident">tokens</span>));
-        <span class="ident">hasher</span>.<span class="ident">finalize</span>(<span class="kw-2">&amp;mut</span> <span class="ident">channel_id</span>);
+        <span class="kw">let </span><span class="kw-2">mut </span>channel_id = [<span class="number">0_u8</span>; <span class="number">32</span>];
+        <span class="kw">let </span><span class="kw-2">mut </span>hasher = Keccak::v256();
+        hasher.update(<span class="kw-2">&amp;</span>encode(<span class="kw-2">&amp;</span>tokens));
+        hasher.finalize(<span class="kw-2">&amp;mut </span>channel_id);
 
-        <span class="ident">ChannelId::from</span>(<span class="ident">channel_id</span>)
+        ChannelId::from(channel_id)
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">find_validator</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">validator</span>: <span class="ident">ValidatorId</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Validator</span><span class="op">&lt;</span><span class="ident">ValidatorId</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="kw">match</span> (<span class="self">self</span>.<span class="ident">leader</span>, <span class="self">self</span>.<span class="ident">follower</span>) {
-            (<span class="ident">leader</span>, <span class="kw">_</span>) <span class="kw">if</span> <span class="ident">leader</span> <span class="op">==</span> <span class="ident">validator</span> =&gt; <span class="prelude-val">Some</span>(<span class="ident">Validator::Leader</span>(<span class="ident">leader</span>)),
-            (<span class="kw">_</span>, <span class="ident">follower</span>) <span class="kw">if</span> <span class="ident">follower</span> <span class="op">==</span> <span class="ident">validator</span> =&gt; <span class="prelude-val">Some</span>(<span class="ident">Validator::Follower</span>(<span class="ident">follower</span>)),
-            <span class="kw">_</span> =&gt; <span class="prelude-val">None</span>,
+    <span class="kw">pub fn </span>find_validator(<span class="kw-2">&amp;</span><span class="self">self</span>, validator: ValidatorId) -&gt; <span class="prelude-ty">Option</span>&lt;Validator&lt;ValidatorId&gt;&gt; {
+        <span class="kw">match </span>(<span class="self">self</span>.leader, <span class="self">self</span>.follower) {
+            (leader, <span class="kw">_</span>) <span class="kw">if </span>leader == validator =&gt; <span class="prelude-val">Some</span>(Validator::Leader(leader)),
+            (<span class="kw">_</span>, follower) <span class="kw">if </span>follower == validator =&gt; <span class="prelude-val">Some</span>(Validator::Follower(follower)),
+            <span class="kw">_ </span>=&gt; <span class="prelude-val">None</span>,
         }
     }
 }
 
-<span class="doccomment">/// The nonce is an Unsigned 256 number</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>, <span class="ident">Hash</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Nonce</span>(<span class="kw">pub</span> <span class="ident">U256</span>);
+<span class="doccomment">/// The nonce is an Unsigned 256 number
+</span><span class="attribute">#[derive(Clone, Copy, PartialEq, Eq, Hash)]</span>
+<span class="kw">pub struct </span>Nonce(<span class="kw">pub </span>U256);
 
-<span class="kw">impl</span> <span class="ident">Nonce</span> {
-    <span class="doccomment">/// In Big-Endian</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">to_bytes</span>(<span class="self">self</span>) -&gt; [<span class="ident">u8</span>; <span class="number">32</span>] {
-        <span class="comment">// the impl of From&lt;U256&gt; uses BigEndian</span>
-        <span class="self">self</span>.<span class="number">0</span>.<span class="ident">into</span>()
+<span class="kw">impl </span>Nonce {
+    <span class="doccomment">/// In Big-Endian
+    </span><span class="kw">pub fn </span>to_bytes(<span class="self">self</span>) -&gt; [u8; <span class="number">32</span>] {
+        <span class="comment">// the impl of From&lt;U256&gt; uses BigEndian
+        </span><span class="self">self</span>.<span class="number">0</span>.into()
     }
 }
 
-<span class="kw">impl</span> <span class="ident">fmt::Display</span> <span class="kw">for</span> <span class="ident">Nonce</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="ident">fmt::Result</span> {
-        <span class="ident">f</span>.<span class="ident">write_str</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>.<span class="ident">to_string</span>())
+<span class="kw">impl </span>fmt::Display <span class="kw">for </span>Nonce {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; fmt::Result {
+        f.write_str(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>.to_string())
     }
 }
 
-<span class="kw">impl</span> <span class="ident">fmt::Debug</span> <span class="kw">for</span> <span class="ident">Nonce</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="ident">fmt::Result</span> {
-        <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;Nonce({})&quot;</span>, <span class="self">self</span>.<span class="number">0</span>)
+<span class="kw">impl </span>fmt::Debug <span class="kw">for </span>Nonce {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; fmt::Result {
+        <span class="macro">write!</span>(f, <span class="string">&quot;Nonce({})&quot;</span>, <span class="self">self</span>.<span class="number">0</span>)
     }
 }
 
-<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Nonce</span> {
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">value</span>: <span class="ident">u64</span>) -&gt; <span class="self">Self</span> {
-        <span class="self">Self</span>(<span class="ident">U256::from</span>(<span class="ident">value</span>))
+<span class="kw">impl </span>From&lt;u64&gt; <span class="kw">for </span>Nonce {
+    <span class="kw">fn </span>from(value: u64) -&gt; <span class="self">Self </span>{
+        <span class="self">Self</span>(U256::from(value))
     }
 }
 
-<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Nonce</span> {
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">value</span>: <span class="ident">u32</span>) -&gt; <span class="self">Self</span> {
-        <span class="self">Self</span>(<span class="ident">U256::from</span>(<span class="ident">value</span>))
+<span class="kw">impl </span>From&lt;u32&gt; <span class="kw">for </span>Nonce {
+    <span class="kw">fn </span>from(value: u32) -&gt; <span class="self">Self </span>{
+        <span class="self">Self</span>(U256::from(value))
     }
 }
 
-<span class="comment">// The U256 implementation deserializes the value from a hex String value with a prefix `0x...`</span>
-<span class="comment">// This is why we we need to impl it our selves</span>
-<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;de</span><span class="op">&gt;</span> <span class="ident">Deserialize</span><span class="op">&lt;</span><span class="lifetime">&#39;de</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Nonce</span> {
-    <span class="kw">fn</span> <span class="ident">deserialize</span><span class="op">&lt;</span><span class="ident">D</span><span class="op">&gt;</span>(<span class="ident">deserializer</span>: <span class="ident">D</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">D::Error</span><span class="op">&gt;</span>
-    <span class="kw">where</span>
-        <span class="ident">D</span>: <span class="ident">serde::Deserializer</span><span class="op">&lt;</span><span class="lifetime">&#39;de</span><span class="op">&gt;</span>,
+<span class="comment">// The U256 implementation deserializes the value from a hex String value with a prefix `0x...`
+// This is why we we need to impl it our selves
+</span><span class="kw">impl</span>&lt;<span class="lifetime">&#39;de</span>&gt; Deserialize&lt;<span class="lifetime">&#39;de</span>&gt; <span class="kw">for </span>Nonce {
+    <span class="kw">fn </span>deserialize&lt;D&gt;(deserializer: D) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, D::Error&gt;
+    <span class="kw">where
+        </span>D: serde::Deserializer&lt;<span class="lifetime">&#39;de</span>&gt;,
     {
-        <span class="kw">let</span> <span class="ident">string</span> <span class="op">=</span> <span class="ident">String::deserialize</span>(<span class="ident">deserializer</span>)<span class="question-mark">?</span>;
+        <span class="kw">let </span>string = String::deserialize(deserializer)<span class="question-mark">?</span>;
 
-        <span class="ident">U256::from_dec_str</span>(<span class="kw-2">&amp;</span><span class="ident">string</span>)
-            .<span class="ident">map_err</span>(<span class="ident">serde::de::Error::custom</span>)
-            .<span class="ident">map</span>(<span class="ident">Nonce</span>)
+        U256::from_dec_str(<span class="kw-2">&amp;</span>string)
+            .map_err(serde::de::Error::custom)
+            .map(Nonce)
     }
 }
 
-<span class="comment">// The U256 implementation serializes the value as a hex String value with a prefix `0x...`</span>
-<span class="comment">// This is why we we need to impl it our selves</span>
-<span class="kw">impl</span> <span class="ident">Serialize</span> <span class="kw">for</span> <span class="ident">Nonce</span> {
-    <span class="kw">fn</span> <span class="ident">serialize</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">serializer</span>: <span class="ident">S</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">S::Ok</span>, <span class="ident">S::Error</span><span class="op">&gt;</span>
-    <span class="kw">where</span>
-        <span class="ident">S</span>: <span class="ident">serde::Serializer</span>,
+<span class="comment">// The U256 implementation serializes the value as a hex String value with a prefix `0x...`
+// This is why we we need to impl it our selves
+</span><span class="kw">impl </span>Serialize <span class="kw">for </span>Nonce {
+    <span class="kw">fn </span>serialize&lt;S&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, serializer: S) -&gt; <span class="prelude-ty">Result</span>&lt;S::Ok, S::Error&gt;
+    <span class="kw">where
+        </span>S: serde::Serializer,
     {
-        <span class="self">self</span>.<span class="number">0</span>.<span class="ident">to_string</span>().<span class="ident">serialize</span>(<span class="ident">serializer</span>)
+        <span class="self">self</span>.<span class="number">0</span>.to_string().serialize(serializer)
     }
 }
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
-<span class="kw">mod</span> <span class="ident">test</span> {
-    <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
+<span class="attribute">#[cfg(test)]</span>
+<span class="kw">mod </span>test {
+    <span class="kw">use super</span>::<span class="kw-2">*</span>;
 
-    <span class="kw">use</span> <span class="ident">serde_json</span>::{<span class="ident">from_value</span>, <span class="ident">to_value</span>, <span class="ident">Value</span>};
+    <span class="kw">use </span>serde_json::{from_value, to_value, Value};
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">test_channel_id_</span>() {
-        <span class="kw">let</span> <span class="ident">hex_string</span> <span class="op">=</span> <span class="string">&quot;061d5e2a67d0a9a10f1c732bca12a676d83f79663a396f7d87b3e30b9b411088&quot;</span>;
-        <span class="kw">let</span> <span class="ident">prefixed_string</span> <span class="op">=</span> <span class="macro">format!</span>(<span class="string">&quot;0x{}&quot;</span>, <span class="ident">hex_string</span>);
+    <span class="attribute">#[test]</span>
+    <span class="kw">fn </span>test_channel_id_() {
+        <span class="kw">let </span>hex_string = <span class="string">&quot;061d5e2a67d0a9a10f1c732bca12a676d83f79663a396f7d87b3e30b9b411088&quot;</span>;
+        <span class="kw">let </span>prefixed_string = <span class="macro">format!</span>(<span class="string">&quot;0x{}&quot;</span>, hex_string);
 
-        <span class="kw">let</span> <span class="ident">expected_id</span> <span class="op">=</span> <span class="ident">ChannelId</span>([
+        <span class="kw">let </span>expected_id = ChannelId([
             <span class="number">0x06</span>, <span class="number">0x1d</span>, <span class="number">0x5e</span>, <span class="number">0x2a</span>, <span class="number">0x67</span>, <span class="number">0xd0</span>, <span class="number">0xa9</span>, <span class="number">0xa1</span>, <span class="number">0x0f</span>, <span class="number">0x1c</span>, <span class="number">0x73</span>, <span class="number">0x2b</span>, <span class="number">0xca</span>, <span class="number">0x12</span>,
             <span class="number">0xa6</span>, <span class="number">0x76</span>, <span class="number">0xd8</span>, <span class="number">0x3f</span>, <span class="number">0x79</span>, <span class="number">0x66</span>, <span class="number">0x3a</span>, <span class="number">0x39</span>, <span class="number">0x6f</span>, <span class="number">0x7d</span>, <span class="number">0x87</span>, <span class="number">0xb3</span>, <span class="number">0xe3</span>, <span class="number">0x0b</span>,
             <span class="number">0x9b</span>, <span class="number">0x41</span>, <span class="number">0x10</span>, <span class="number">0x88</span>,
         ]);
 
-        <span class="macro">assert_eq!</span>(<span class="ident">ChannelId::from_str</span>(<span class="ident">hex_string</span>).<span class="ident">unwrap</span>(), <span class="ident">expected_id</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">ChannelId::from_str</span>(<span class="kw-2">&amp;</span><span class="ident">prefixed_string</span>).<span class="ident">unwrap</span>(), <span class="ident">expected_id</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">ChannelId::from_hex</span>(<span class="ident">hex_string</span>).<span class="ident">unwrap</span>(), <span class="ident">expected_id</span>);
+        <span class="macro">assert_eq!</span>(ChannelId::from_str(hex_string).unwrap(), expected_id);
+        <span class="macro">assert_eq!</span>(ChannelId::from_str(<span class="kw-2">&amp;</span>prefixed_string).unwrap(), expected_id);
+        <span class="macro">assert_eq!</span>(ChannelId::from_hex(hex_string).unwrap(), expected_id);
 
-        <span class="kw">let</span> <span class="ident">hex_value</span> <span class="op">=</span> <span class="ident">serde_json::Value::String</span>(<span class="ident">hex_string</span>.<span class="ident">to_string</span>());
-        <span class="kw">let</span> <span class="ident">prefixed_value</span> <span class="op">=</span> <span class="ident">serde_json::Value::String</span>(<span class="ident">prefixed_string</span>.<span class="ident">clone</span>());
+        <span class="kw">let </span>hex_value = serde_json::Value::String(hex_string.to_string());
+        <span class="kw">let </span>prefixed_value = serde_json::Value::String(prefixed_string.clone());
 
-        <span class="comment">// Deserialization from JSON</span>
-        <span class="kw">let</span> <span class="ident">de_hex_json</span> <span class="op">=</span>
-            <span class="ident">serde_json::from_value</span>::<span class="op">&lt;</span><span class="ident">ChannelId</span><span class="op">&gt;</span>(<span class="ident">hex_value</span>).<span class="ident">expect</span>(<span class="string">&quot;Should deserialize&quot;</span>);
-        <span class="kw">let</span> <span class="ident">de_prefixed_json</span> <span class="op">=</span>
-            <span class="ident">serde_json::from_value</span>::<span class="op">&lt;</span><span class="ident">ChannelId</span><span class="op">&gt;</span>(<span class="ident">prefixed_value</span>).<span class="ident">expect</span>(<span class="string">&quot;Should deserialize&quot;</span>);
+        <span class="comment">// Deserialization from JSON
+        </span><span class="kw">let </span>de_hex_json =
+            serde_json::from_value::&lt;ChannelId&gt;(hex_value).expect(<span class="string">&quot;Should deserialize&quot;</span>);
+        <span class="kw">let </span>de_prefixed_json =
+            serde_json::from_value::&lt;ChannelId&gt;(prefixed_value).expect(<span class="string">&quot;Should deserialize&quot;</span>);
 
-        <span class="macro">assert_eq!</span>(<span class="ident">de_hex_json</span>, <span class="ident">expected_id</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">de_prefixed_json</span>, <span class="ident">expected_id</span>);
+        <span class="macro">assert_eq!</span>(de_hex_json, expected_id);
+        <span class="macro">assert_eq!</span>(de_prefixed_json, expected_id);
 
-        <span class="comment">// Serialization to JSON</span>
-        <span class="kw">let</span> <span class="ident">actual_serialized</span> <span class="op">=</span> <span class="ident">serde_json::to_value</span>(<span class="ident">expected_id</span>).<span class="ident">expect</span>(<span class="string">&quot;Should Serialize&quot;</span>);
-        <span class="comment">// we don&#39;t expect any capitalization</span>
-        <span class="macro">assert_eq!</span>(
-            <span class="ident">actual_serialized</span>,
-            <span class="ident">serde_json::Value::String</span>(<span class="ident">prefixed_string</span>)
+        <span class="comment">// Serialization to JSON
+        </span><span class="kw">let </span>actual_serialized = serde_json::to_value(expected_id).expect(<span class="string">&quot;Should Serialize&quot;</span>);
+        <span class="comment">// we don&#39;t expect any capitalization
+        </span><span class="macro">assert_eq!</span>(
+            actual_serialized,
+            serde_json::Value::String(prefixed_string)
         )
     }
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">de_serializes_nonce</span>() {
-        <span class="kw">let</span> <span class="ident">nonce_str</span> <span class="op">=</span> <span class="string">&quot;12345&quot;</span>;
-        <span class="kw">let</span> <span class="ident">json</span> <span class="op">=</span> <span class="ident">Value::String</span>(<span class="ident">nonce_str</span>.<span class="ident">into</span>());
+    <span class="attribute">#[test]</span>
+    <span class="kw">fn </span>de_serializes_nonce() {
+        <span class="kw">let </span>nonce_str = <span class="string">&quot;12345&quot;</span>;
+        <span class="kw">let </span>json = Value::String(nonce_str.into());
 
-        <span class="kw">let</span> <span class="ident">nonce</span>: <span class="ident">Nonce</span> <span class="op">=</span> <span class="ident">from_value</span>(<span class="ident">json</span>.<span class="ident">clone</span>()).<span class="ident">expect</span>(<span class="string">&quot;Should deserialize a Nonce&quot;</span>);
-        <span class="kw">let</span> <span class="ident">expected_nonce</span> <span class="op">=</span> <span class="ident">Nonce::from</span>(<span class="number">12345_u64</span>);
+        <span class="kw">let </span>nonce: Nonce = from_value(json.clone()).expect(<span class="string">&quot;Should deserialize a Nonce&quot;</span>);
+        <span class="kw">let </span>expected_nonce = Nonce::from(<span class="number">12345_u64</span>);
 
-        <span class="macro">assert_eq!</span>(<span class="kw-2">&amp;</span><span class="ident">expected_nonce</span>, <span class="kw-2">&amp;</span><span class="ident">nonce</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">json</span>, <span class="ident">to_value</span>(<span class="ident">nonce</span>).<span class="ident">expect</span>(<span class="string">&quot;Should serialize a Nonce&quot;</span>));
-        <span class="macro">assert_eq!</span>(<span class="ident">nonce_str</span>, <span class="kw-2">&amp;</span><span class="ident">nonce</span>.<span class="ident">to_string</span>());
-        <span class="macro">assert_eq!</span>(<span class="string">&quot;Nonce(12345)&quot;</span>, <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;{:?}&quot;</span>, <span class="ident">nonce</span>));
+        <span class="macro">assert_eq!</span>(<span class="kw-2">&amp;</span>expected_nonce, <span class="kw-2">&amp;</span>nonce);
+        <span class="macro">assert_eq!</span>(json, to_value(nonce).expect(<span class="string">&quot;Should serialize a Nonce&quot;</span>));
+        <span class="macro">assert_eq!</span>(nonce_str, <span class="kw-2">&amp;</span>nonce.to_string());
+        <span class="macro">assert_eq!</span>(<span class="string">&quot;Nonce(12345)&quot;</span>, <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;{:?}&quot;</span>, nonce));
     }
 }
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;postgres&quot;</span>)]</span>
-<span class="kw">mod</span> <span class="ident">postgres</span> {
-    <span class="kw">use</span> <span class="kw">super</span>::{<span class="ident">Channel</span>, <span class="ident">ChannelId</span>, <span class="ident">Nonce</span>};
-    <span class="kw">use</span> <span class="ident">bytes::BytesMut</span>;
-    <span class="kw">use</span> <span class="ident">hex::FromHex</span>;
-    <span class="kw">use</span> <span class="ident">std::error::Error</span>;
-    <span class="kw">use</span> <span class="ident">tokio_postgres::types</span>::{<span class="ident">accepts</span>, <span class="ident">to_sql_checked</span>, <span class="ident">FromSql</span>, <span class="ident">IsNull</span>, <span class="ident">ToSql</span>, <span class="ident">Type</span>};
-    <span class="kw">use</span> <span class="ident">tokio_postgres::Row</span>;
+<span class="attribute">#[cfg(feature = <span class="string">&quot;postgres&quot;</span>)]</span>
+<span class="kw">mod </span>postgres {
+    <span class="kw">use super</span>::{Channel, ChannelId, Nonce};
+    <span class="kw">use </span>bytes::BytesMut;
+    <span class="kw">use </span>hex::FromHex;
+    <span class="kw">use </span>std::error::Error;
+    <span class="kw">use </span>tokio_postgres::types::{accepts, to_sql_checked, FromSql, IsNull, ToSql, Type};
+    <span class="kw">use </span>tokio_postgres::Row;
 
-    <span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="ident">FromSql</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">ChannelId</span> {
-        <span class="kw">fn</span> <span class="ident">from_sql</span>(<span class="ident">ty</span>: <span class="kw-2">&amp;</span><span class="ident">Type</span>, <span class="ident">raw</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> [<span class="ident">u8</span>]) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Error</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-            <span class="kw">let</span> <span class="ident">str_slice</span> <span class="op">=</span> <span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">str</span> <span class="kw">as</span> <span class="ident">FromSql</span><span class="op">&gt;</span><span class="ident">::from_sql</span>(<span class="ident">ty</span>, <span class="ident">raw</span>)<span class="question-mark">?</span>;
+    <span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; FromSql&lt;<span class="lifetime">&#39;a</span>&gt; <span class="kw">for </span>ChannelId {
+        <span class="kw">fn </span>from_sql(ty: <span class="kw-2">&amp;</span>Type, raw: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>[u8]) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, Box&lt;<span class="kw">dyn </span>Error + Sync + Send&gt;&gt; {
+            <span class="kw">let </span>str_slice = &lt;<span class="kw-2">&amp;</span>str <span class="kw">as </span>FromSql&gt;::from_sql(ty, raw)<span class="question-mark">?</span>;
 
-            <span class="prelude-val">Ok</span>(<span class="ident">ChannelId::from_hex</span>(<span class="kw-2">&amp;</span><span class="ident">str_slice</span>[<span class="number">2</span>..])<span class="question-mark">?</span>)
+            <span class="prelude-val">Ok</span>(ChannelId::from_hex(<span class="kw-2">&amp;</span>str_slice[<span class="number">2</span>..])<span class="question-mark">?</span>)
         }
 
-        <span class="macro">accepts!</span>(<span class="ident">TEXT</span>, <span class="ident">VARCHAR</span>);
+        <span class="macro">accepts!</span>(TEXT, VARCHAR);
     }
 
-    <span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">Row</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">ChannelId</span> {
-        <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">row</span>: <span class="kw-2">&amp;</span><span class="ident">Row</span>) -&gt; <span class="self">Self</span> {
-            <span class="ident">row</span>.<span class="ident">get</span>(<span class="string">&quot;id&quot;</span>)
+    <span class="kw">impl </span>From&lt;<span class="kw-2">&amp;</span>Row&gt; <span class="kw">for </span>ChannelId {
+        <span class="kw">fn </span>from(row: <span class="kw-2">&amp;</span>Row) -&gt; <span class="self">Self </span>{
+            row.get(<span class="string">&quot;id&quot;</span>)
         }
     }
 
-    <span class="kw">impl</span> <span class="ident">ToSql</span> <span class="kw">for</span> <span class="ident">ChannelId</span> {
-        <span class="kw">fn</span> <span class="ident">to_sql</span>(
+    <span class="kw">impl </span>ToSql <span class="kw">for </span>ChannelId {
+        <span class="kw">fn </span>to_sql(
             <span class="kw-2">&amp;</span><span class="self">self</span>,
-            <span class="ident">ty</span>: <span class="kw-2">&amp;</span><span class="ident">Type</span>,
-            <span class="ident">w</span>: <span class="kw-2">&amp;mut</span> <span class="ident">BytesMut</span>,
-        ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">IsNull</span>, <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Error</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-            <span class="kw">let</span> <span class="ident">string</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">to_string</span>();
+            ty: <span class="kw-2">&amp;</span>Type,
+            w: <span class="kw-2">&amp;mut </span>BytesMut,
+        ) -&gt; <span class="prelude-ty">Result</span>&lt;IsNull, Box&lt;<span class="kw">dyn </span>Error + Sync + Send&gt;&gt; {
+            <span class="kw">let </span>string = <span class="self">self</span>.to_string();
 
-            <span class="op">&lt;</span><span class="ident">String</span> <span class="kw">as</span> <span class="ident">ToSql</span><span class="op">&gt;</span><span class="ident">::to_sql</span>(<span class="kw-2">&amp;</span><span class="ident">string</span>, <span class="ident">ty</span>, <span class="ident">w</span>)
+            &lt;String <span class="kw">as </span>ToSql&gt;::to_sql(<span class="kw-2">&amp;</span>string, ty, w)
         }
 
-        <span class="kw">fn</span> <span class="ident">accepts</span>(<span class="ident">ty</span>: <span class="kw-2">&amp;</span><span class="ident">Type</span>) -&gt; <span class="ident">bool</span> {
-            <span class="op">&lt;</span><span class="ident">String</span> <span class="kw">as</span> <span class="ident">ToSql</span><span class="op">&gt;</span><span class="ident">::accepts</span>(<span class="ident">ty</span>)
+        <span class="kw">fn </span>accepts(ty: <span class="kw-2">&amp;</span>Type) -&gt; bool {
+            &lt;String <span class="kw">as </span>ToSql&gt;::accepts(ty)
         }
 
         <span class="macro">to_sql_checked!</span>();
     }
 
-    <span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="ident">FromSql</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Nonce</span> {
-        <span class="kw">fn</span> <span class="ident">from_sql</span>(<span class="ident">ty</span>: <span class="kw-2">&amp;</span><span class="ident">Type</span>, <span class="ident">raw</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> [<span class="ident">u8</span>]) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Error</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-            <span class="kw">let</span> <span class="ident">nonce_string</span> <span class="op">=</span> <span class="ident">String::from_sql</span>(<span class="ident">ty</span>, <span class="ident">raw</span>)<span class="question-mark">?</span>;
+    <span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; FromSql&lt;<span class="lifetime">&#39;a</span>&gt; <span class="kw">for </span>Nonce {
+        <span class="kw">fn </span>from_sql(ty: <span class="kw-2">&amp;</span>Type, raw: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>[u8]) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, Box&lt;<span class="kw">dyn </span>Error + Sync + Send&gt;&gt; {
+            <span class="kw">let </span>nonce_string = String::from_sql(ty, raw)<span class="question-mark">?</span>;
 
-            <span class="prelude-val">Ok</span>(<span class="ident">serde_json::from_value</span>(<span class="ident">serde_json::Value::String</span>(
-                <span class="ident">nonce_string</span>,
+            <span class="prelude-val">Ok</span>(serde_json::from_value(serde_json::Value::String(
+                nonce_string,
             ))<span class="question-mark">?</span>)
         }
 
-        <span class="macro">accepts!</span>(<span class="ident">VARCHAR</span>);
+        <span class="macro">accepts!</span>(VARCHAR);
     }
 
-    <span class="kw">impl</span> <span class="ident">ToSql</span> <span class="kw">for</span> <span class="ident">Nonce</span> {
-        <span class="kw">fn</span> <span class="ident">to_sql</span>(
+    <span class="kw">impl </span>ToSql <span class="kw">for </span>Nonce {
+        <span class="kw">fn </span>to_sql(
             <span class="kw-2">&amp;</span><span class="self">self</span>,
-            <span class="ident">ty</span>: <span class="kw-2">&amp;</span><span class="ident">Type</span>,
-            <span class="ident">w</span>: <span class="kw-2">&amp;mut</span> <span class="ident">BytesMut</span>,
-        ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">IsNull</span>, <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Error</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-            <span class="self">self</span>.<span class="number">0</span>.<span class="ident">to_string</span>().<span class="ident">to_sql</span>(<span class="ident">ty</span>, <span class="ident">w</span>)
+            ty: <span class="kw-2">&amp;</span>Type,
+            w: <span class="kw-2">&amp;mut </span>BytesMut,
+        ) -&gt; <span class="prelude-ty">Result</span>&lt;IsNull, Box&lt;<span class="kw">dyn </span>Error + Sync + Send&gt;&gt; {
+            <span class="self">self</span>.<span class="number">0</span>.to_string().to_sql(ty, w)
         }
 
-        <span class="macro">accepts!</span>(<span class="ident">VARCHAR</span>);
+        <span class="macro">accepts!</span>(VARCHAR);
         <span class="macro">to_sql_checked!</span>();
     }
 
-    <span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">Row</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Channel</span> {
-        <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">row</span>: <span class="kw-2">&amp;</span><span class="ident">Row</span>) -&gt; <span class="self">Self</span> {
-            <span class="self">Self</span> {
-                <span class="ident">leader</span>: <span class="ident">row</span>.<span class="ident">get</span>(<span class="string">&quot;leader&quot;</span>),
-                <span class="ident">follower</span>: <span class="ident">row</span>.<span class="ident">get</span>(<span class="string">&quot;follower&quot;</span>),
-                <span class="ident">guardian</span>: <span class="ident">row</span>.<span class="ident">get</span>(<span class="string">&quot;guardian&quot;</span>),
-                <span class="ident">token</span>: <span class="ident">row</span>.<span class="ident">get</span>(<span class="string">&quot;token&quot;</span>),
-                <span class="ident">nonce</span>: <span class="ident">row</span>.<span class="ident">get</span>(<span class="string">&quot;nonce&quot;</span>),
+    <span class="kw">impl </span>From&lt;<span class="kw-2">&amp;</span>Row&gt; <span class="kw">for </span>Channel {
+        <span class="kw">fn </span>from(row: <span class="kw-2">&amp;</span>Row) -&gt; <span class="self">Self </span>{
+            <span class="self">Self </span>{
+                leader: row.get(<span class="string">&quot;leader&quot;</span>),
+                follower: row.get(<span class="string">&quot;follower&quot;</span>),
+                guardian: row.get(<span class="string">&quot;guardian&quot;</span>),
+                token: row.get(<span class="string">&quot;token&quot;</span>),
+                nonce: row.get(<span class="string">&quot;nonce&quot;</span>),
             }
         }
     }
 
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
-    <span class="kw">mod</span> <span class="ident">test</span> {
-        <span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">channel::Nonce</span>, <span class="ident">postgres::POSTGRES_POOL</span>};
-        <span class="attribute">#[<span class="ident">tokio::test</span>]</span>
-        <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">nonce_to_from_sql</span>() {
-            <span class="kw">let</span> <span class="ident">client</span> <span class="op">=</span> <span class="ident">POSTGRES_POOL</span>.<span class="ident">get</span>().<span class="kw">await</span>.<span class="ident">unwrap</span>();
+    <span class="attribute">#[cfg(test)]</span>
+    <span class="kw">mod </span>test {
+        <span class="kw">use crate</span>::{channel::Nonce, postgres::POSTGRES_POOL};
+        <span class="attribute">#[tokio::test]</span>
+        <span class="kw">async fn </span>nonce_to_from_sql() {
+            <span class="kw">let </span>client = POSTGRES_POOL.get().<span class="kw">await</span>.unwrap();
 
-            <span class="kw">let</span> <span class="ident">nonce</span> <span class="op">=</span> <span class="ident">Nonce::from</span>(<span class="number">123_456_789_u64</span>);
-            <span class="kw">let</span> <span class="ident">sql_type</span> <span class="op">=</span> <span class="string">&quot;VARCHAR&quot;</span>;
+            <span class="kw">let </span>nonce = Nonce::from(<span class="number">123_456_789_u64</span>);
+            <span class="kw">let </span>sql_type = <span class="string">&quot;VARCHAR&quot;</span>;
 
-            <span class="comment">// from SQL</span>
-            {
-                <span class="kw">let</span> <span class="ident">row_nonce</span> <span class="op">=</span> <span class="ident">client</span>
-                    .<span class="ident">query_one</span>(<span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="macro">format!</span>(<span class="string">&quot;SELECT &#39;{}&#39;::{}&quot;</span>, <span class="ident">nonce</span>, <span class="ident">sql_type</span>), <span class="kw-2">&amp;</span>[])
-                    .<span class="kw">await</span>
-                    .<span class="ident">unwrap</span>()
-                    .<span class="ident">get</span>(<span class="number">0</span>);
+            <span class="comment">// from SQL
+            </span>{
+                <span class="kw">let </span>row_nonce = client
+                    .query_one(<span class="kw-2">&amp;*</span><span class="macro">format!</span>(<span class="string">&quot;SELECT &#39;{}&#39;::{}&quot;</span>, nonce, sql_type), <span class="kw-2">&amp;</span>[])
+                    .<span class="kw">await
+                    </span>.unwrap()
+                    .get(<span class="number">0</span>);
 
-                <span class="macro">assert_eq!</span>(<span class="kw-2">&amp;</span><span class="ident">nonce</span>, <span class="kw-2">&amp;</span><span class="ident">row_nonce</span>);
+                <span class="macro">assert_eq!</span>(<span class="kw-2">&amp;</span>nonce, <span class="kw-2">&amp;</span>row_nonce);
             }
 
-            <span class="comment">// to SQL</span>
-            {
-                <span class="kw">let</span> <span class="ident">row_nonce</span> <span class="op">=</span> <span class="ident">client</span>
-                    .<span class="ident">query_one</span>(<span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="macro">format!</span>(<span class="string">&quot;SELECT $1::{}&quot;</span>, <span class="ident">sql_type</span>), <span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">nonce</span>])
-                    .<span class="kw">await</span>
-                    .<span class="ident">unwrap</span>()
-                    .<span class="ident">get</span>(<span class="number">0</span>);
-                <span class="macro">assert_eq!</span>(<span class="kw-2">&amp;</span><span class="ident">nonce</span>, <span class="kw-2">&amp;</span><span class="ident">row_nonce</span>);
+            <span class="comment">// to SQL
+            </span>{
+                <span class="kw">let </span>row_nonce = client
+                    .query_one(<span class="kw-2">&amp;*</span><span class="macro">format!</span>(<span class="string">&quot;SELECT $1::{}&quot;</span>, sql_type), <span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span>nonce])
+                    .<span class="kw">await
+                    </span>.unwrap()
+                    .get(<span class="number">0</span>);
+                <span class="macro">assert_eq!</span>(<span class="kw-2">&amp;</span>nonce, <span class="kw-2">&amp;</span>row_nonce);
             }
         }
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="primitives" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (20ffea693 2022-08-11)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="primitives" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>

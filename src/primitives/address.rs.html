@@ -293,300 +293,300 @@
 <span id="293">293</span>
 <span id="294">294</span>
 <span id="295">295</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">hex</span>::{<span class="ident">FromHex</span>, <span class="ident">FromHexError</span>};
-<span class="kw">use</span> <span class="ident">serde</span>::{<span class="ident">Deserialize</span>, <span class="ident">Serialize</span>, <span class="ident">Serializer</span>};
-<span class="kw">use</span> <span class="ident">std</span>::{<span class="ident">fmt</span>, <span class="ident">str::FromStr</span>};
-<span class="kw">use</span> <span class="ident">thiserror::Error</span>;
+</pre><pre class="rust"><code><span class="kw">use </span>hex::{FromHex, FromHexError};
+<span class="kw">use </span>serde::{Deserialize, Serialize, Serializer};
+<span class="kw">use </span>std::{fmt, str::FromStr};
+<span class="kw">use </span>thiserror::Error;
 
-<span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">targeting::Value</span>, <span class="ident">DomainError</span>, <span class="ident">ToETHChecksum</span>};
+<span class="kw">use crate</span>::{targeting::Value, DomainError, ToETHChecksum};
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Error</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">Error</span> {
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Expected prefix `0x`&quot;</span>)]</span>
-    <span class="ident">BadPrefix</span>,
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Expected length of 40 without or 42 with a `0x` prefix&quot;</span>)]</span>
-    <span class="ident">Length</span>,
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Invalid hex&quot;</span>)]</span>
-    <span class="ident">Hex</span>(<span class="attribute">#[<span class="ident">from</span>]</span> <span class="ident">FromHexError</span>),
+<span class="attribute">#[derive(Debug, Error)]</span>
+<span class="kw">pub enum </span>Error {
+    <span class="attribute">#[error(<span class="string">&quot;Expected prefix `0x`&quot;</span>)]</span>
+    BadPrefix,
+    <span class="attribute">#[error(<span class="string">&quot;Expected length of 40 without or 42 with a `0x` prefix&quot;</span>)]</span>
+    Length,
+    <span class="attribute">#[error(<span class="string">&quot;Invalid hex&quot;</span>)]</span>
+    Hex(<span class="attribute">#[from]</span> FromHexError),
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Deserialize</span>, <span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>, <span class="ident">PartialOrd</span>, <span class="ident">Ord</span>, <span class="ident">Hash</span>)]</span>
-<span class="attribute">#[<span class="ident">serde</span>(<span class="ident">transparent</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Address</span>(<span class="attribute">#[<span class="ident">serde</span>(<span class="ident">deserialize_with</span> <span class="op">=</span> <span class="string">&quot;de::from_bytes_insensitive&quot;</span>)]</span> [<span class="ident">u8</span>; <span class="number">20</span>]);
+<span class="attribute">#[derive(Deserialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]</span>
+<span class="attribute">#[serde(transparent)]</span>
+<span class="kw">pub struct </span>Address(<span class="attribute">#[serde(deserialize_with = <span class="string">&quot;de::from_bytes_insensitive&quot;</span>)]</span> [u8; <span class="number">20</span>]);
 
-<span class="kw">impl</span> <span class="ident">Address</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">to_bytes</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; [<span class="ident">u8</span>; <span class="number">20</span>] {
-        <span class="self">self</span>.<span class="number">0</span>
+<span class="kw">impl </span>Address {
+    <span class="kw">pub fn </span>to_bytes(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; [u8; <span class="number">20</span>] {
+        <span class="self">self</span>.<span class="number">0
+    </span>}
+
+    <span class="kw">pub fn </span>as_bytes(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>[u8; <span class="number">20</span>] {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0
+    </span>}
+
+    <span class="kw">pub fn </span>from_bytes(bytes: <span class="kw-2">&amp;</span>[u8; <span class="number">20</span>]) -&gt; <span class="self">Self </span>{
+        <span class="self">Self</span>(<span class="kw-2">*</span>bytes)
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">as_bytes</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>[<span class="ident">u8</span>; <span class="number">20</span>] {
-        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>
-    }
+    <span class="doccomment">/// Creates an address from a bytes slice.
+    ///
+    /// Returns `None` if bytes length != 20
+    </span><span class="kw">pub fn </span>from_slice(slice: <span class="kw-2">&amp;</span>[u8]) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="self">Self</span>&gt; {
+        <span class="kw">if </span>slice.len() != <span class="number">20 </span>{
+            <span class="prelude-val">None
+        </span>} <span class="kw">else </span>{
+            <span class="kw">let </span><span class="kw-2">mut </span>address = [<span class="number">0u8</span>; <span class="number">20</span>];
+            address.copy_from_slice(slice);
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">from_bytes</span>(<span class="ident">bytes</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>; <span class="number">20</span>]) -&gt; <span class="self">Self</span> {
-        <span class="self">Self</span>(<span class="kw-2">*</span><span class="ident">bytes</span>)
-    }
-
-    <span class="doccomment">/// Creates an address from a bytes slice.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Returns `None` if bytes length != 20</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">from_slice</span>(<span class="ident">slice</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="ident">slice</span>.<span class="ident">len</span>() <span class="op">!</span><span class="op">=</span> <span class="number">20</span> {
-            <span class="prelude-val">None</span>
-        } <span class="kw">else</span> {
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">address</span> <span class="op">=</span> [<span class="number">0u8</span>; <span class="number">20</span>];
-            <span class="ident">address</span>.<span class="ident">copy_from_slice</span>(<span class="ident">slice</span>);
-
-            <span class="prelude-val">Some</span>(<span class="self">Self</span>(<span class="ident">address</span>))
+            <span class="prelude-val">Some</span>(<span class="self">Self</span>(address))
         }
     }
 }
 
-<span class="kw">impl</span> <span class="ident">Serialize</span> <span class="kw">for</span> <span class="ident">Address</span> {
-    <span class="kw">fn</span> <span class="ident">serialize</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">serializer</span>: <span class="ident">S</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">S::Ok</span>, <span class="ident">S::Error</span><span class="op">&gt;</span>
-    <span class="kw">where</span>
-        <span class="ident">S</span>: <span class="ident">Serializer</span>,
+<span class="kw">impl </span>Serialize <span class="kw">for </span>Address {
+    <span class="kw">fn </span>serialize&lt;S&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, serializer: S) -&gt; <span class="prelude-ty">Result</span>&lt;S::Ok, S::Error&gt;
+    <span class="kw">where
+        </span>S: Serializer,
     {
-        <span class="kw">let</span> <span class="ident">checksum</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">to_checksum</span>();
-        <span class="ident">serializer</span>.<span class="ident">serialize_str</span>(<span class="kw-2">&amp;</span><span class="ident">checksum</span>)
+        <span class="kw">let </span>checksum = <span class="self">self</span>.to_checksum();
+        serializer.serialize_str(<span class="kw-2">&amp;</span>checksum)
     }
 }
 
-<span class="kw">impl</span> <span class="ident">fmt::Display</span> <span class="kw">for</span> <span class="ident">Address</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="ident">fmt::Result</span> {
-        <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;{}&quot;</span>, <span class="self">self</span>.<span class="ident">to_checksum</span>())
+<span class="kw">impl </span>fmt::Display <span class="kw">for </span>Address {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; fmt::Result {
+        <span class="macro">write!</span>(f, <span class="string">&quot;{}&quot;</span>, <span class="self">self</span>.to_checksum())
     }
 }
 
-<span class="kw">impl</span> <span class="ident">fmt::Debug</span> <span class="kw">for</span> <span class="ident">Address</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="ident">fmt::Result</span> {
-        <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;Address({})&quot;</span>, <span class="self">self</span>.<span class="ident">to_checksum</span>())
+<span class="kw">impl </span>fmt::Debug <span class="kw">for </span>Address {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; fmt::Result {
+        <span class="macro">write!</span>(f, <span class="string">&quot;Address({})&quot;</span>, <span class="self">self</span>.to_checksum())
     }
 }
 
-<span class="kw">impl</span> <span class="ident">ToETHChecksum</span> <span class="kw">for</span> <span class="ident">Address</span> {}
+<span class="kw">impl </span>ToETHChecksum <span class="kw">for </span>Address {}
 
-<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="kw-2">&amp;</span>[<span class="ident">u8</span>; <span class="number">20</span>]<span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Address</span> {
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">bytes</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>; <span class="number">20</span>]) -&gt; <span class="self">Self</span> {
-        <span class="self">Self</span>(<span class="kw-2">*</span><span class="ident">bytes</span>)
+<span class="kw">impl </span>From&lt;<span class="kw-2">&amp;</span>[u8; <span class="number">20</span>]&gt; <span class="kw">for </span>Address {
+    <span class="kw">fn </span>from(bytes: <span class="kw-2">&amp;</span>[u8; <span class="number">20</span>]) -&gt; <span class="self">Self </span>{
+        <span class="self">Self</span>(<span class="kw-2">*</span>bytes)
     }
 }
 
-<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span>[<span class="ident">u8</span>; <span class="number">20</span>]<span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Address</span> {
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">bytes</span>: [<span class="ident">u8</span>; <span class="number">20</span>]) -&gt; <span class="self">Self</span> {
-        <span class="self">Self</span>(<span class="ident">bytes</span>)
+<span class="kw">impl </span>From&lt;[u8; <span class="number">20</span>]&gt; <span class="kw">for </span>Address {
+    <span class="kw">fn </span>from(bytes: [u8; <span class="number">20</span>]) -&gt; <span class="self">Self </span>{
+        <span class="self">Self</span>(bytes)
     }
 }
 
-<span class="kw">impl</span> <span class="ident">AsRef</span><span class="op">&lt;</span>[<span class="ident">u8</span>]<span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Address</span> {
-    <span class="kw">fn</span> <span class="ident">as_ref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>[<span class="ident">u8</span>] {
-        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>
+<span class="kw">impl </span>AsRef&lt;[u8]&gt; <span class="kw">for </span>Address {
+    <span class="kw">fn </span>as_ref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>[u8] {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0
+    </span>}
+}
+
+<span class="kw">impl </span>AsRef&lt;[u8; <span class="number">20</span>]&gt; <span class="kw">for </span>Address {
+    <span class="kw">fn </span>as_ref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>[u8; <span class="number">20</span>] {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0
+    </span>}
+}
+
+<span class="kw">impl </span>FromStr <span class="kw">for </span>Address {
+    <span class="kw">type </span><span class="prelude-val">Err </span>= Error;
+
+    <span class="kw">fn </span>from_str(s: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, <span class="self">Self</span>::Err&gt; {
+        <span class="prelude-val">Ok</span>(<span class="self">Self</span>(parse_bytes(s, Prefix::Insensitive)<span class="question-mark">?</span>))
     }
 }
 
-<span class="kw">impl</span> <span class="ident">AsRef</span><span class="op">&lt;</span>[<span class="ident">u8</span>; <span class="number">20</span>]<span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Address</span> {
-    <span class="kw">fn</span> <span class="ident">as_ref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>[<span class="ident">u8</span>; <span class="number">20</span>] {
-        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>
+<span class="kw">impl </span>TryFrom&lt;<span class="kw-2">&amp;</span>str&gt; <span class="kw">for </span>Address {
+    <span class="kw">type </span>Error = Error;
+
+    <span class="kw">fn </span>try_from(value: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, <span class="self">Self</span>::Error&gt; {
+        <span class="prelude-val">Ok</span>(<span class="self">Self</span>(parse_bytes(value, Prefix::Insensitive)<span class="question-mark">?</span>))
     }
 }
 
-<span class="kw">impl</span> <span class="ident">FromStr</span> <span class="kw">for</span> <span class="ident">Address</span> {
-    <span class="kw">type</span> <span class="prelude-val">Err</span> <span class="op">=</span> <span class="ident">Error</span>;
+<span class="doccomment">/// When we have a string literal (`&amp;str`) representation of the `Address` in the form of bytes.
+/// Useful for creating static values from strings for testing, configuration, etc.
+///
+/// You can find a test setup example in the `crate::test_util` module (requires `test-util` feature).
+///
+/// # Example
+///
+/// ```
+/// use once_cell::sync::Lazy;
+/// use primitives::Address;
+///
+/// static ADDRESS_0: Lazy&lt;Address&gt; = Lazy::new(|| b&quot;0x80690751969B234697e9059e04ed72195c3507fa&quot;.try_into().unwrap());
+///
+/// println!(&quot;Address: {}&quot;, *ADDRESS_0);
+/// ```
+</span><span class="kw">impl </span>TryFrom&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>[u8; <span class="number">42</span>]&gt; <span class="kw">for </span>Address {
+    <span class="kw">type </span>Error = Error;
 
-    <span class="kw">fn</span> <span class="ident">from_str</span>(<span class="ident">s</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident"><span class="self">Self</span>::Err</span><span class="op">&gt;</span> {
-        <span class="prelude-val">Ok</span>(<span class="self">Self</span>(<span class="ident">parse_bytes</span>(<span class="ident">s</span>, <span class="ident">Prefix::Insensitive</span>)<span class="question-mark">?</span>))
+    <span class="kw">fn </span>try_from(value: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>[u8; <span class="number">42</span>]) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, <span class="self">Self</span>::Error&gt; {
+        <span class="prelude-val">Ok</span>(<span class="self">Self</span>(parse_bytes(value, Prefix::With)<span class="question-mark">?</span>))
     }
 }
 
-<span class="kw">impl</span> <span class="ident">TryFrom</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">str</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Address</span> {
-    <span class="kw">type</span> <span class="ident">Error</span> <span class="op">=</span> <span class="ident">Error</span>;
+<span class="kw">impl </span>TryFrom&lt;<span class="kw-2">&amp;</span>String&gt; <span class="kw">for </span>Address {
+    <span class="kw">type </span>Error = Error;
 
-    <span class="kw">fn</span> <span class="ident">try_from</span>(<span class="ident">value</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident"><span class="self">Self</span>::Error</span><span class="op">&gt;</span> {
-        <span class="prelude-val">Ok</span>(<span class="self">Self</span>(<span class="ident">parse_bytes</span>(<span class="ident">value</span>, <span class="ident">Prefix::Insensitive</span>)<span class="question-mark">?</span>))
+    <span class="kw">fn </span>try_from(value: <span class="kw-2">&amp;</span>String) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, <span class="self">Self</span>::Error&gt; {
+        <span class="self">Self</span>::try_from(value.as_str())
     }
 }
 
-<span class="doccomment">/// When we have a string literal (`&amp;str`) representation of the `Address` in the form of bytes.</span>
-<span class="doccomment">/// Useful for creating static values from strings for testing, configuration, etc.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// You can find a test setup example in the `crate::test_util` module (requires `test-util` feature).</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// # Example</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// ```</span>
-<span class="doccomment">/// use once_cell::sync::Lazy;</span>
-<span class="doccomment">/// use primitives::Address;</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// static ADDRESS_0: Lazy&lt;Address&gt; = Lazy::new(|| b&quot;0x80690751969B234697e9059e04ed72195c3507fa&quot;.try_into().unwrap());</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// println!(&quot;Address: {}&quot;, *ADDRESS_0);</span>
-<span class="doccomment">/// ```</span>
-<span class="kw">impl</span> <span class="ident">TryFrom</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> [<span class="ident">u8</span>; <span class="number">42</span>]<span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Address</span> {
-    <span class="kw">type</span> <span class="ident">Error</span> <span class="op">=</span> <span class="ident">Error</span>;
+<span class="kw">impl </span>TryFrom&lt;<span class="kw-2">&amp;</span>[u8]&gt; <span class="kw">for </span>Address {
+    <span class="kw">type </span>Error = Error;
 
-    <span class="kw">fn</span> <span class="ident">try_from</span>(<span class="ident">value</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> [<span class="ident">u8</span>; <span class="number">42</span>]) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident"><span class="self">Self</span>::Error</span><span class="op">&gt;</span> {
-        <span class="prelude-val">Ok</span>(<span class="self">Self</span>(<span class="ident">parse_bytes</span>(<span class="ident">value</span>, <span class="ident">Prefix::With</span>)<span class="question-mark">?</span>))
+    <span class="kw">fn </span>try_from(slice: <span class="kw-2">&amp;</span>[u8]) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, <span class="self">Self</span>::Error&gt; {
+        <span class="prelude-val">Ok</span>(<span class="self">Self</span>(parse_bytes(slice, Prefix::Insensitive)<span class="question-mark">?</span>))
     }
 }
 
-<span class="kw">impl</span> <span class="ident">TryFrom</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">String</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Address</span> {
-    <span class="kw">type</span> <span class="ident">Error</span> <span class="op">=</span> <span class="ident">Error</span>;
+<span class="kw">impl </span>TryFrom&lt;Value&gt; <span class="kw">for </span>Address {
+    <span class="kw">type </span>Error = DomainError;
 
-    <span class="kw">fn</span> <span class="ident">try_from</span>(<span class="ident">value</span>: <span class="kw-2">&amp;</span><span class="ident">String</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident"><span class="self">Self</span>::Error</span><span class="op">&gt;</span> {
-        <span class="ident"><span class="self">Self</span>::try_from</span>(<span class="ident">value</span>.<span class="ident">as_str</span>())
-    }
-}
-
-<span class="kw">impl</span> <span class="ident">TryFrom</span><span class="op">&lt;</span><span class="kw-2">&amp;</span>[<span class="ident">u8</span>]<span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Address</span> {
-    <span class="kw">type</span> <span class="ident">Error</span> <span class="op">=</span> <span class="ident">Error</span>;
-
-    <span class="kw">fn</span> <span class="ident">try_from</span>(<span class="ident">slice</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident"><span class="self">Self</span>::Error</span><span class="op">&gt;</span> {
-        <span class="prelude-val">Ok</span>(<span class="self">Self</span>(<span class="ident">parse_bytes</span>(<span class="ident">slice</span>, <span class="ident">Prefix::Insensitive</span>)<span class="question-mark">?</span>))
-    }
-}
-
-<span class="kw">impl</span> <span class="ident">TryFrom</span><span class="op">&lt;</span><span class="ident">Value</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Address</span> {
-    <span class="kw">type</span> <span class="ident">Error</span> <span class="op">=</span> <span class="ident">DomainError</span>;
-
-    <span class="kw">fn</span> <span class="ident">try_from</span>(<span class="ident">value</span>: <span class="ident">Value</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident"><span class="self">Self</span>::Error</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">string</span> <span class="op">=</span> <span class="ident">value</span>.<span class="ident">try_string</span>().<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">err</span><span class="op">|</span> {
-            <span class="ident">DomainError::InvalidArgument</span>(<span class="macro">format!</span>(<span class="string">&quot;Value is not a string: {}&quot;</span>, <span class="ident">err</span>))
+    <span class="kw">fn </span>try_from(value: Value) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, <span class="self">Self</span>::Error&gt; {
+        <span class="kw">let </span>string = value.try_string().map_err(|err| {
+            DomainError::InvalidArgument(<span class="macro">format!</span>(<span class="string">&quot;Value is not a string: {}&quot;</span>, err))
         })<span class="question-mark">?</span>;
 
-        <span class="ident"><span class="self">Self</span>::try_from</span>(<span class="kw-2">&amp;</span><span class="ident">string</span>).<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">err</span><span class="op">|</span> <span class="ident">DomainError::InvalidArgument</span>(<span class="ident">err</span>.<span class="ident">to_string</span>()))
+        <span class="self">Self</span>::try_from(<span class="kw-2">&amp;</span>string).map_err(|err| DomainError::InvalidArgument(err.to_string()))
     }
 }
 
-<span class="kw">mod</span> <span class="ident">de</span> {
-    <span class="kw">use</span> <span class="kw">super</span>::{<span class="ident">parse_bytes</span>, <span class="ident">Prefix</span>};
-    <span class="kw">use</span> <span class="ident">serde</span>::{<span class="ident">Deserialize</span>, <span class="ident">Deserializer</span>};
+<span class="kw">mod </span>de {
+    <span class="kw">use super</span>::{parse_bytes, Prefix};
+    <span class="kw">use </span>serde::{Deserialize, Deserializer};
 
-    <span class="doccomment">/// Deserializes the bytes with our without a `0x` prefix (insensitive)</span>
-    <span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn</span> <span class="ident">from_bytes_insensitive</span><span class="op">&lt;</span><span class="lifetime">&#39;de</span>, <span class="ident">D</span><span class="op">&gt;</span>(<span class="ident">deserializer</span>: <span class="ident">D</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>[<span class="ident">u8</span>; <span class="number">20</span>], <span class="ident">D::Error</span><span class="op">&gt;</span>
-    <span class="kw">where</span>
-        <span class="ident">D</span>: <span class="ident">Deserializer</span><span class="op">&lt;</span><span class="lifetime">&#39;de</span><span class="op">&gt;</span>,
+    <span class="doccomment">/// Deserializes the bytes with our without a `0x` prefix (insensitive)
+    </span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn </span>from_bytes_insensitive&lt;<span class="lifetime">&#39;de</span>, D&gt;(deserializer: D) -&gt; <span class="prelude-ty">Result</span>&lt;[u8; <span class="number">20</span>], D::Error&gt;
+    <span class="kw">where
+        </span>D: Deserializer&lt;<span class="lifetime">&#39;de</span>&gt;,
     {
-        <span class="kw">let</span> <span class="ident">address</span> <span class="op">=</span> <span class="ident">String::deserialize</span>(<span class="ident">deserializer</span>)<span class="question-mark">?</span>;
+        <span class="kw">let </span>address = String::deserialize(deserializer)<span class="question-mark">?</span>;
 
-        <span class="ident">parse_bytes</span>(<span class="ident">address</span>, <span class="ident">Prefix::Insensitive</span>).<span class="ident">map_err</span>(<span class="ident">serde::de::Error::custom</span>)
+        parse_bytes(address, Prefix::Insensitive).map_err(serde::de::Error::custom)
     }
 }
 
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">Prefix</span> {
-    <span class="comment">// with `0x` prefix</span>
-    <span class="ident">With</span>,
-    <span class="comment">// without `0x` prefix</span>
-    <span class="ident">Without</span>,
-    <span class="doccomment">/// Insensitive to a `0x` prefixed, it allows values with or without a prefix</span>
-    <span class="ident">Insensitive</span>,
+<span class="kw">pub enum </span>Prefix {
+    <span class="comment">// with `0x` prefix
+    </span>With,
+    <span class="comment">// without `0x` prefix
+    </span>Without,
+    <span class="doccomment">/// Insensitive to a `0x` prefixed, it allows values with or without a prefix
+    </span>Insensitive,
 }
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">parse_bytes</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">AsRef</span><span class="op">&lt;</span>[<span class="ident">u8</span>]<span class="op">&gt;</span><span class="op">&gt;</span>(<span class="ident">from</span>: <span class="ident">T</span>, <span class="ident">prefix</span>: <span class="ident">Prefix</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>[<span class="ident">u8</span>; <span class="number">20</span>], <span class="ident">Error</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">bytes</span> <span class="op">=</span> <span class="ident">from</span>.<span class="ident">as_ref</span>();
+<span class="kw">pub fn </span>parse_bytes&lt;T: AsRef&lt;[u8]&gt;&gt;(from: T, prefix: Prefix) -&gt; <span class="prelude-ty">Result</span>&lt;[u8; <span class="number">20</span>], Error&gt; {
+    <span class="kw">let </span>bytes = from.as_ref();
 
-    <span class="kw">let</span> <span class="ident">from_hex</span> <span class="op">=</span>
-        <span class="op">|</span><span class="ident">hex_bytes</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]<span class="op">|</span> <span class="op">&lt;</span>[<span class="ident">u8</span>; <span class="number">20</span>] <span class="kw">as</span> <span class="ident">FromHex</span><span class="op">&gt;</span><span class="ident">::from_hex</span>(<span class="ident">hex_bytes</span>).<span class="ident">map_err</span>(<span class="ident">Error::Hex</span>);
+    <span class="kw">let </span>from_hex =
+        |hex_bytes: <span class="kw-2">&amp;</span>[u8]| &lt;[u8; <span class="number">20</span>] <span class="kw">as </span>FromHex&gt;::from_hex(hex_bytes).map_err(Error::Hex);
 
-    <span class="comment">// this length check guards against `panic!` when we call `slice.split_at()`</span>
-    <span class="kw">match</span> (<span class="ident">prefix</span>, <span class="ident">bytes</span>.<span class="ident">len</span>()) {
-        (<span class="ident">Prefix::With</span>, <span class="number">42</span>) <span class="op">|</span> (<span class="ident">Prefix::Insensitive</span>, <span class="number">42</span>) =&gt; <span class="kw">match</span> <span class="ident">bytes</span>.<span class="ident">split_at</span>(<span class="number">2</span>) {
-            (<span class="string">b&quot;0x&quot;</span>, <span class="ident">hex_bytes</span>) =&gt; <span class="ident">from_hex</span>(<span class="ident">hex_bytes</span>),
-            <span class="kw">_</span> =&gt; <span class="prelude-val">Err</span>(<span class="ident">Error::BadPrefix</span>),
+    <span class="comment">// this length check guards against `panic!` when we call `slice.split_at()`
+    </span><span class="kw">match </span>(prefix, bytes.len()) {
+        (Prefix::With, <span class="number">42</span>) | (Prefix::Insensitive, <span class="number">42</span>) =&gt; <span class="kw">match </span>bytes.split_at(<span class="number">2</span>) {
+            (<span class="string">b&quot;0x&quot;</span>, hex_bytes) =&gt; from_hex(hex_bytes),
+            <span class="kw">_ </span>=&gt; <span class="prelude-val">Err</span>(Error::BadPrefix),
         },
-        (<span class="ident">Prefix::Without</span>, <span class="number">40</span>) <span class="op">|</span> (<span class="ident">Prefix::Insensitive</span>, <span class="number">40</span>) =&gt; <span class="ident">from_hex</span>(<span class="ident">bytes</span>),
-        <span class="kw">_</span> =&gt; <span class="prelude-val">Err</span>(<span class="ident">Error::Length</span>),
+        (Prefix::Without, <span class="number">40</span>) | (Prefix::Insensitive, <span class="number">40</span>) =&gt; from_hex(bytes),
+        <span class="kw">_ </span>=&gt; <span class="prelude-val">Err</span>(Error::Length),
     }
 }
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;postgres&quot;</span>)]</span>
-<span class="kw">mod</span> <span class="ident">postgres</span> {
-    <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::Address</span>;
-    <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::ToETHChecksum</span>;
-    <span class="kw">use</span> <span class="ident">bytes::BytesMut</span>;
-    <span class="kw">use</span> <span class="ident">std::error::Error</span>;
-    <span class="kw">use</span> <span class="ident">tokio_postgres::types</span>::{<span class="ident">FromSql</span>, <span class="ident">IsNull</span>, <span class="ident">ToSql</span>, <span class="ident">Type</span>};
+<span class="attribute">#[cfg(feature = <span class="string">&quot;postgres&quot;</span>)]</span>
+<span class="kw">mod </span>postgres {
+    <span class="kw">use </span><span class="kw">super</span>::Address;
+    <span class="kw">use </span><span class="kw">crate</span>::ToETHChecksum;
+    <span class="kw">use </span>bytes::BytesMut;
+    <span class="kw">use </span>std::error::Error;
+    <span class="kw">use </span>tokio_postgres::types::{FromSql, IsNull, ToSql, Type};
 
-    <span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="ident">FromSql</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Address</span> {
-        <span class="kw">fn</span> <span class="ident">from_sql</span>(<span class="ident">ty</span>: <span class="kw-2">&amp;</span><span class="ident">Type</span>, <span class="ident">raw</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> [<span class="ident">u8</span>]) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Error</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-            <span class="kw">let</span> <span class="ident">str_slice</span> <span class="op">=</span> <span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">str</span> <span class="kw">as</span> <span class="ident">FromSql</span><span class="op">&gt;</span><span class="ident">::from_sql</span>(<span class="ident">ty</span>, <span class="ident">raw</span>)<span class="question-mark">?</span>;
+    <span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; FromSql&lt;<span class="lifetime">&#39;a</span>&gt; <span class="kw">for </span>Address {
+        <span class="kw">fn </span>from_sql(ty: <span class="kw-2">&amp;</span>Type, raw: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>[u8]) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, Box&lt;<span class="kw">dyn </span>Error + Sync + Send&gt;&gt; {
+            <span class="kw">let </span>str_slice = &lt;<span class="kw-2">&amp;</span>str <span class="kw">as </span>FromSql&gt;::from_sql(ty, raw)<span class="question-mark">?</span>;
 
-            <span class="prelude-val">Ok</span>(<span class="ident">str_slice</span>.<span class="ident">parse</span>()<span class="question-mark">?</span>)
+            <span class="prelude-val">Ok</span>(str_slice.parse()<span class="question-mark">?</span>)
         }
 
-        <span class="kw">fn</span> <span class="ident">accepts</span>(<span class="ident">ty</span>: <span class="kw-2">&amp;</span><span class="ident">Type</span>) -&gt; <span class="ident">bool</span> {
-            <span class="macro">matches!</span>(<span class="kw-2">*</span><span class="ident">ty</span>, <span class="ident">Type::TEXT</span> <span class="op">|</span> <span class="ident">Type::VARCHAR</span>)
+        <span class="kw">fn </span>accepts(ty: <span class="kw-2">&amp;</span>Type) -&gt; bool {
+            <span class="macro">matches!</span>(<span class="kw-2">*</span>ty, Type::TEXT | Type::VARCHAR)
         }
     }
 
-    <span class="kw">impl</span> <span class="ident">ToSql</span> <span class="kw">for</span> <span class="ident">Address</span> {
-        <span class="kw">fn</span> <span class="ident">to_sql</span>(
+    <span class="kw">impl </span>ToSql <span class="kw">for </span>Address {
+        <span class="kw">fn </span>to_sql(
             <span class="kw-2">&amp;</span><span class="self">self</span>,
-            <span class="ident">ty</span>: <span class="kw-2">&amp;</span><span class="ident">Type</span>,
-            <span class="ident">w</span>: <span class="kw-2">&amp;mut</span> <span class="ident">BytesMut</span>,
-        ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">IsNull</span>, <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Error</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-            <span class="self">self</span>.<span class="ident">to_checksum</span>().<span class="ident">to_sql</span>(<span class="ident">ty</span>, <span class="ident">w</span>)
+            ty: <span class="kw-2">&amp;</span>Type,
+            w: <span class="kw-2">&amp;mut </span>BytesMut,
+        ) -&gt; <span class="prelude-ty">Result</span>&lt;IsNull, Box&lt;<span class="kw">dyn </span>Error + Sync + Send&gt;&gt; {
+            <span class="self">self</span>.to_checksum().to_sql(ty, w)
         }
 
-        <span class="kw">fn</span> <span class="ident">accepts</span>(<span class="ident">ty</span>: <span class="kw-2">&amp;</span><span class="ident">Type</span>) -&gt; <span class="ident">bool</span> {
-            <span class="op">&lt;</span><span class="ident">String</span> <span class="kw">as</span> <span class="ident">ToSql</span><span class="op">&gt;</span><span class="ident">::accepts</span>(<span class="ident">ty</span>)
+        <span class="kw">fn </span>accepts(ty: <span class="kw-2">&amp;</span>Type) -&gt; bool {
+            &lt;String <span class="kw">as </span>ToSql&gt;::accepts(ty)
         }
 
-        <span class="kw">fn</span> <span class="ident">to_sql_checked</span>(
+        <span class="kw">fn </span>to_sql_checked(
             <span class="kw-2">&amp;</span><span class="self">self</span>,
-            <span class="ident">ty</span>: <span class="kw-2">&amp;</span><span class="ident">Type</span>,
-            <span class="ident">out</span>: <span class="kw-2">&amp;mut</span> <span class="ident">BytesMut</span>,
-        ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">IsNull</span>, <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Error</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-            <span class="self">self</span>.<span class="ident">to_checksum</span>().<span class="ident">to_sql_checked</span>(<span class="ident">ty</span>, <span class="ident">out</span>)
+            ty: <span class="kw-2">&amp;</span>Type,
+            out: <span class="kw-2">&amp;mut </span>BytesMut,
+        ) -&gt; <span class="prelude-ty">Result</span>&lt;IsNull, Box&lt;<span class="kw">dyn </span>Error + Sync + Send&gt;&gt; {
+            <span class="self">self</span>.to_checksum().to_sql_checked(ty, out)
         }
     }
 }
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
-<span class="kw">mod</span> <span class="ident">test</span> {
-    <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
+<span class="attribute">#[cfg(test)]</span>
+<span class="kw">mod </span>test {
+    <span class="kw">use super</span>::<span class="kw-2">*</span>;
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">test_de_serialization_of_address</span>() {
-        <span class="kw">let</span> <span class="ident">prefixed_checksum</span> <span class="op">=</span> <span class="string">&quot;0x80690751969B234697e9059e04ed72195c3507fa&quot;</span>;
-        <span class="kw">let</span> <span class="ident">prefixed_lower</span> <span class="op">=</span> <span class="ident">prefixed_checksum</span>.<span class="ident">to_lowercase</span>();
-        <span class="kw">let</span> <span class="ident">no_prefix_checksum</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">prefixed_checksum</span>[<span class="number">2</span>..];
-        <span class="kw">let</span> <span class="ident">no_prefix_lower</span> <span class="op">=</span> <span class="ident">no_prefix_checksum</span>.<span class="ident">to_lowercase</span>();
+    <span class="attribute">#[test]</span>
+    <span class="kw">fn </span>test_de_serialization_of_address() {
+        <span class="kw">let </span>prefixed_checksum = <span class="string">&quot;0x80690751969B234697e9059e04ed72195c3507fa&quot;</span>;
+        <span class="kw">let </span>prefixed_lower = prefixed_checksum.to_lowercase();
+        <span class="kw">let </span>no_prefix_checksum = <span class="kw-2">&amp;</span>prefixed_checksum[<span class="number">2</span>..];
+        <span class="kw">let </span>no_prefix_lower = no_prefix_checksum.to_lowercase();
 
-        <span class="kw">let</span> <span class="ident">address</span> <span class="op">=</span> <span class="ident">prefixed_checksum</span>.<span class="ident">parse</span>::<span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span>().<span class="ident">expect</span>(<span class="string">&quot;Valid Address&quot;</span>);
+        <span class="kw">let </span>address = prefixed_checksum.parse::&lt;Address&gt;().expect(<span class="string">&quot;Valid Address&quot;</span>);
 
-        <span class="comment">// prefixed checksum</span>
-        {
-            <span class="kw">let</span> <span class="ident">json</span> <span class="op">=</span> <span class="ident">serde_json::to_value</span>(<span class="ident">address</span>).<span class="ident">expect</span>(<span class="string">&quot;Should serialize&quot;</span>);
+        <span class="comment">// prefixed checksum
+        </span>{
+            <span class="kw">let </span>json = serde_json::to_value(address).expect(<span class="string">&quot;Should serialize&quot;</span>);
 
             <span class="macro">assert_eq!</span>(
-                <span class="ident">serde_json::Value::String</span>(<span class="ident">prefixed_checksum</span>.<span class="ident">to_string</span>()),
-                <span class="ident">json</span>
+                serde_json::Value::String(prefixed_checksum.to_string()),
+                json
             );
-            <span class="kw">let</span> <span class="ident">from_json</span> <span class="op">=</span> <span class="ident">serde_json::from_value</span>(<span class="ident">json</span>).<span class="ident">expect</span>(<span class="string">&quot;Should deserialize&quot;</span>);
+            <span class="kw">let </span>from_json = serde_json::from_value(json).expect(<span class="string">&quot;Should deserialize&quot;</span>);
 
-            <span class="macro">assert_eq!</span>(<span class="ident">address</span>, <span class="ident">from_json</span>);
+            <span class="macro">assert_eq!</span>(address, from_json);
         }
 
-        <span class="comment">// prefixed lower</span>
-        <span class="macro">assert_eq!</span>(
-            <span class="ident">prefixed_lower</span>.<span class="ident">parse</span>::<span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span>().<span class="ident">expect</span>(<span class="string">&quot;Valid Address&quot;</span>),
-            <span class="ident">address</span>
+        <span class="comment">// prefixed lower
+        </span><span class="macro">assert_eq!</span>(
+            prefixed_lower.parse::&lt;Address&gt;().expect(<span class="string">&quot;Valid Address&quot;</span>),
+            address
         );
 
-        <span class="comment">// no prefix checksum</span>
-        <span class="macro">assert_eq!</span>(
-            <span class="ident">no_prefix_checksum</span>
-                .<span class="ident">parse</span>::<span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span>()
-                .<span class="ident">expect</span>(<span class="string">&quot;Valid Address&quot;</span>),
-            <span class="ident">address</span>
+        <span class="comment">// no prefix checksum
+        </span><span class="macro">assert_eq!</span>(
+            no_prefix_checksum
+                .parse::&lt;Address&gt;()
+                .expect(<span class="string">&quot;Valid Address&quot;</span>),
+            address
         );
 
-        <span class="comment">// no prefix lower case</span>
-        <span class="macro">assert_eq!</span>(
-            <span class="ident">no_prefix_lower</span>.<span class="ident">parse</span>::<span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span>().<span class="ident">expect</span>(<span class="string">&quot;Valid Address&quot;</span>),
-            <span class="ident">address</span>
+        <span class="comment">// no prefix lower case
+        </span><span class="macro">assert_eq!</span>(
+            no_prefix_lower.parse::&lt;Address&gt;().expect(<span class="string">&quot;Valid Address&quot;</span>),
+            address
         );
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="primitives" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (20ffea693 2022-08-11)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="primitives" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>

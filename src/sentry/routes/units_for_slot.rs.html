@@ -408,417 +408,415 @@
 <span id="408">408</span>
 <span id="409">409</span>
 <span id="410">410</span>
-<span id="411">411</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">std::collections::HashSet</span>;
+</pre><pre class="rust"><code><span class="kw">use </span>std::{collections::HashSet, sync::Arc};
 
-<span class="kw">use</span> <span class="ident">adapter::client::Locked</span>;
-<span class="kw">use</span> <span class="ident">chrono::Utc</span>;
-<span class="kw">use</span> <span class="ident">futures::future::try_join_all</span>;
-<span class="kw">use</span> <span class="ident">hyper</span>::{<span class="ident">header::USER_AGENT</span>, <span class="ident">Body</span>, <span class="ident">Request</span>, <span class="ident">Response</span>};
-<span class="kw">use</span> <span class="ident">hyper</span>::{
-    <span class="ident">header</span>::{<span class="ident">HeaderName</span>, <span class="ident">CONTENT_TYPE</span>},
-    <span class="ident">StatusCode</span>,
-};
-<span class="kw">use</span> <span class="ident">once_cell::sync::Lazy</span>;
-<span class="kw">use</span> <span class="ident">primitives</span>::{
-    <span class="ident">sentry::IMPRESSION</span>,
-    <span class="ident">supermarket::units_for_slot::response</span>,
-    <span class="ident">supermarket::units_for_slot::response::Response</span> <span class="kw">as</span> <span class="ident">UnitsForSlotResponse</span>,
-    <span class="ident">targeting</span>::{<span class="ident">eval_with_callback</span>, <span class="ident">get_pricing_bounds</span>, <span class="ident">input</span>, <span class="ident">input::Input</span>, <span class="ident">Output</span>},
-    <span class="ident">AdSlot</span>, <span class="ident">AdUnit</span>, <span class="ident">Address</span>, <span class="ident">Campaign</span>, <span class="ident">Config</span>, <span class="ident">UnifiedNum</span>, <span class="ident">ValidatorId</span>,
-};
-<span class="kw">use</span> <span class="ident">reqwest::Url</span>;
-<span class="kw">use</span> <span class="ident">serde</span>::{<span class="ident">Deserialize</span>, <span class="ident">Serialize</span>};
-<span class="kw">use</span> <span class="ident">slog</span>::{<span class="ident">debug</span>, <span class="ident">error</span>, <span class="ident">warn</span>, <span class="ident">Logger</span>};
-<span class="kw">use</span> <span class="ident">woothee</span>::{<span class="ident">parser::Parser</span>, <span class="ident">woothee::VALUE_UNKNOWN</span>};
-
-<span class="kw">use</span> <span class="kw">crate</span>::{
-    <span class="ident">db</span>::{
-        <span class="ident">accounting</span>::{<span class="ident">get_accounting</span>, <span class="ident">Side</span>},
-        <span class="ident">units_for_slot_get_campaigns</span>, <span class="ident">CampaignRemaining</span>, <span class="ident">DbPool</span>,
+<span class="kw">use </span>axum::{
+    body::Body,
+    extract::TypedHeader,
+    headers::UserAgent,
+    http::{
+        header::{HeaderMap, HeaderName, CONTENT_TYPE},
+        Response, StatusCode,
     },
-    <span class="ident">response::ResponseError</span>,
-    <span class="ident">Application</span>,
+    Extension, Json,
+};
+<span class="kw">use </span>chrono::Utc;
+<span class="kw">use </span>futures::future::try_join_all;
+<span class="kw">use </span>once_cell::sync::Lazy;
+<span class="kw">use </span>reqwest::Url;
+<span class="kw">use </span>serde::{Deserialize, Serialize};
+<span class="kw">use </span>slog::{debug, error, warn, Logger};
+<span class="kw">use </span>woothee::{parser::Parser, woothee::VALUE_UNKNOWN};
+
+<span class="kw">use </span>adapter::client::Locked;
+<span class="kw">use </span>primitives::{
+    sentry::IMPRESSION,
+    supermarket::units_for_slot::response,
+    supermarket::units_for_slot::response::Response <span class="kw">as </span>UnitsForSlotResponse,
+    targeting::{eval_with_callback, get_pricing_bounds, input, input::Input, Output},
+    AdSlot, AdUnit, Address, Campaign, Config, UnifiedNum, ValidatorId,
 };
 
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">static</span> <span class="ident">CLOUDFLARE_IPCOUNTRY_HEADER</span>: <span class="ident">Lazy</span><span class="op">&lt;</span><span class="ident">HeaderName</span><span class="op">&gt;</span> <span class="op">=</span>
-    <span class="ident">Lazy::new</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">HeaderName::from_static</span>(<span class="string">&quot;cf-ipcountry&quot;</span>));
+<span class="kw">use crate</span>::{
+    db::{
+        accounting::{get_accounting, Side},
+        units_for_slot_get_campaigns, CampaignRemaining, DbPool,
+    },
+    response::ResponseError,
+    Application,
+};
 
-<span class="comment">// #[cfg(test)]</span>
-<span class="comment">// #[path = &quot;units_for_slot_test.rs&quot;]</span>
-<span class="comment">// pub mod test;</span>
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">static </span>CLOUDFLARE_IPCOUNTRY_HEADER: Lazy&lt;HeaderName&gt; =
+    Lazy::new(|| HeaderName::from_static(<span class="string">&quot;cf-ipcountry&quot;</span>));
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Serialize</span>, <span class="ident">Deserialize</span>)]</span>
-<span class="attribute">#[<span class="ident">serde</span>(<span class="ident">rename_all</span> <span class="op">=</span> <span class="string">&quot;camelCase&quot;</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">RequestBody</span> {
-    <span class="kw">pub</span> <span class="ident">ad_slot</span>: <span class="ident">AdSlot</span>,
-    <span class="kw">pub</span> <span class="ident">deposit_assets</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">HashSet</span><span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+<span class="comment">// #[cfg(test)]
+// #[path = &quot;units_for_slot_test.rs&quot;]
+// pub mod test;
+
+</span><span class="attribute">#[derive(Debug, Serialize, Deserialize)]</span>
+<span class="attribute">#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]</span>
+<span class="kw">pub struct </span>RequestBody {
+    <span class="kw">pub </span>ad_slot: AdSlot,
+    <span class="kw">pub </span>deposit_assets: <span class="prelude-ty">Option</span>&lt;HashSet&lt;Address&gt;&gt;,
 }
 
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">not_found</span>() -&gt; <span class="ident">Response</span><span class="op">&lt;</span><span class="ident">Body</span><span class="op">&gt;</span> {
-    <span class="ident">Response::builder</span>()
-        .<span class="ident">status</span>(<span class="ident">StatusCode::NOT_FOUND</span>)
-        .<span class="ident">body</span>(<span class="ident">Body::empty</span>())
-        .<span class="ident">expect</span>(<span class="string">&quot;Not Found response should be valid&quot;</span>)
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>not_found() -&gt; Response&lt;Body&gt; {
+    Response::builder()
+        .status(StatusCode::NOT_FOUND)
+        .body(Body::empty())
+        .expect(<span class="string">&quot;Not Found response should be valid&quot;</span>)
 }
 
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">service_unavailable</span>() -&gt; <span class="ident">Response</span><span class="op">&lt;</span><span class="ident">Body</span><span class="op">&gt;</span> {
-    <span class="ident">Response::builder</span>()
-        .<span class="ident">status</span>(<span class="ident">StatusCode::SERVICE_UNAVAILABLE</span>)
-        .<span class="ident">body</span>(<span class="ident">Body::empty</span>())
-        .<span class="ident">expect</span>(<span class="string">&quot;Bad Request response should be valid&quot;</span>)
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>service_unavailable() -&gt; Response&lt;Body&gt; {
+    Response::builder()
+        .status(StatusCode::SERVICE_UNAVAILABLE)
+        .body(Body::empty())
+        .expect(<span class="string">&quot;Bad Request response should be valid&quot;</span>)
 }
 
-<span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">post_units_for_slot</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span>(
-    <span class="ident">req</span>: <span class="ident">Request</span><span class="op">&lt;</span><span class="ident">Body</span><span class="op">&gt;</span>,
-    <span class="ident">app</span>: <span class="kw-2">&amp;</span><span class="ident">Application</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span>,
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Response</span><span class="op">&lt;</span><span class="ident">Body</span><span class="op">&gt;</span>, <span class="ident">ResponseError</span><span class="op">&gt;</span>
-<span class="kw">where</span>
-    <span class="ident">C</span>: <span class="ident">Locked</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
+<span class="kw">pub async fn </span>post_units_for_slot&lt;C&gt;(
+    Extension(app): Extension&lt;Arc&lt;Application&lt;C&gt;&gt;&gt;,
+    Json(request_body): Json&lt;RequestBody&gt;,
+    user_agent: <span class="prelude-ty">Option</span>&lt;TypedHeader&lt;UserAgent&gt;&gt;,
+    headers: HeaderMap,
+) -&gt; <span class="prelude-ty">Result</span>&lt;Response&lt;Body&gt;, ResponseError&gt;
+<span class="kw">where
+    </span>C: Locked + <span class="lifetime">&#39;static</span>,
 {
-    <span class="kw">let</span> <span class="ident">logger</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">app</span>.<span class="ident">logger</span>;
-    <span class="kw">let</span> <span class="ident">config</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">app</span>.<span class="ident">config</span>;
+    <span class="kw">let </span>logger = <span class="kw-2">&amp;</span>app.logger;
+    <span class="kw">let </span>config = <span class="kw-2">&amp;</span>app.config;
 
-    <span class="kw">let</span> (<span class="ident">request_parts</span>, <span class="ident">body</span>) <span class="op">=</span> <span class="ident">req</span>.<span class="ident">into_parts</span>();
+    <span class="kw">let </span>ad_slot = request_body.ad_slot.clone();
 
-    <span class="kw">let</span> <span class="ident">body_bytes</span> <span class="op">=</span> <span class="ident">hyper::body::to_bytes</span>(<span class="ident">body</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+    <span class="comment">// TODO: remove once we know how/where we will be fetching the rest of the information!
+    </span><span class="kw">let </span>accepted_referrers: Vec&lt;Url&gt; = <span class="macro">vec!</span>[<span class="string">&quot;TODO&quot;</span>.parse().unwrap()];
+    <span class="kw">let </span>alexa_rank = <span class="prelude-val">Some</span>(<span class="number">1.0_f64</span>);
+    <span class="kw">let </span>categories: Vec&lt;String&gt; = <span class="macro">vec!</span>[<span class="string">&quot;TODO&quot;</span>.into()];
 
-    <span class="kw">let</span> <span class="ident">request_body</span> <span class="op">=</span> <span class="ident">serde_json::from_slice</span>::<span class="op">&lt;</span><span class="ident">RequestBody</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="ident">body_bytes</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span>units = <span class="kw">match </span>app
+        .platform_api
+        .fetch_units(<span class="kw-2">&amp;</span>request_body.ad_slot.ad_type)
+        .<span class="kw">await
+    </span>{
+        <span class="prelude-val">Ok</span>(units) =&gt; units,
+        <span class="prelude-val">Err</span>(error) =&gt; {
+            <span class="macro">error!</span>(<span class="kw-2">&amp;</span>logger, <span class="string">&quot;Error fetching AdUnits for AdSlot&quot;</span>; <span class="string">&quot;AdSlot&quot; </span>=&gt; <span class="question-mark">?</span>ad_slot, <span class="string">&quot;error&quot; </span>=&gt; <span class="question-mark">?</span>error);
 
-    <span class="kw">let</span> <span class="ident">ad_slot</span> <span class="op">=</span> <span class="ident">request_body</span>.<span class="ident">ad_slot</span>.<span class="ident">clone</span>();
-
-    <span class="comment">// TODO: remove once we know how/where we will be fetching the rest of the information!</span>
-    <span class="kw">let</span> <span class="ident">accepted_referrers</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Url</span><span class="op">&gt;</span> <span class="op">=</span> <span class="macro">vec!</span>[<span class="string">&quot;TODO&quot;</span>.<span class="ident">parse</span>().<span class="ident">unwrap</span>()];
-    <span class="kw">let</span> <span class="ident">alexa_rank</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="number">1.0_f64</span>);
-    <span class="kw">let</span> <span class="ident">categories</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span> <span class="op">=</span> <span class="macro">vec!</span>[<span class="string">&quot;TODO&quot;</span>.<span class="ident">into</span>()];
-
-    <span class="kw">let</span> <span class="ident">units</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">app</span>
-        .<span class="ident">platform_api</span>
-        .<span class="ident">fetch_units</span>(<span class="kw-2">&amp;</span><span class="ident">request_body</span>.<span class="ident">ad_slot</span>.<span class="ident">ad_type</span>)
-        .<span class="kw">await</span>
-    {
-        <span class="prelude-val">Ok</span>(<span class="ident">units</span>) =&gt; <span class="ident">units</span>,
-        <span class="prelude-val">Err</span>(<span class="ident">error</span>) =&gt; {
-            <span class="macro">error!</span>(<span class="kw-2">&amp;</span><span class="ident">logger</span>, <span class="string">&quot;Error fetching AdUnits for AdSlot&quot;</span>; <span class="string">&quot;AdSlot&quot;</span> =&gt; <span class="question-mark">?</span><span class="ident">ad_slot</span>, <span class="string">&quot;error&quot;</span> =&gt; <span class="question-mark">?</span><span class="ident">error</span>);
-
-            <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">service_unavailable</span>());
+            <span class="kw">return </span><span class="prelude-val">Ok</span>(service_unavailable());
         }
     };
 
-    <span class="kw">let</span> <span class="ident">fallback_unit</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">AdUnit</span><span class="op">&gt;</span> <span class="op">=</span> <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="ident">ad_slot</span>.<span class="ident">fallback_unit</span> {
-        <span class="prelude-val">Some</span>(<span class="ident">unit_ipfs</span>) =&gt; {
-            <span class="kw">let</span> <span class="ident">ad_unit_response</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">app</span>.<span class="ident">platform_api</span>.<span class="ident">fetch_unit</span>(<span class="kw-2">*</span><span class="ident">unit_ipfs</span>).<span class="kw">await</span> {
-                <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">response</span>)) =&gt; {
-                    <span class="macro">debug!</span>(<span class="kw-2">&amp;</span><span class="ident">logger</span>, <span class="string">&quot;Fetched AdUnit {:?}&quot;</span>, <span class="ident">unit_ipfs</span>; <span class="string">&quot;AdUnit&quot;</span> =&gt; <span class="question-mark">?</span><span class="ident">unit_ipfs</span>);
-                    <span class="ident">response</span>
+    <span class="kw">let </span>fallback_unit: <span class="prelude-ty">Option</span>&lt;AdUnit&gt; = <span class="kw">match </span><span class="kw-2">&amp;</span>ad_slot.fallback_unit {
+        <span class="prelude-val">Some</span>(unit_ipfs) =&gt; {
+            <span class="kw">let </span>ad_unit_response = <span class="kw">match </span>app.platform_api.fetch_unit(<span class="kw-2">*</span>unit_ipfs).<span class="kw">await </span>{
+                <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(response)) =&gt; {
+                    <span class="macro">debug!</span>(<span class="kw-2">&amp;</span>logger, <span class="string">&quot;Fetched AdUnit {:?}&quot;</span>, unit_ipfs; <span class="string">&quot;AdUnit&quot; </span>=&gt; <span class="question-mark">?</span>unit_ipfs);
+                    response
                 }
                 <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>) =&gt; {
                     <span class="macro">warn!</span>(
-                        <span class="kw-2">&amp;</span><span class="ident">logger</span>,
+                        <span class="kw-2">&amp;</span>logger,
                         <span class="string">&quot;AdSlot fallback AdUnit {} not found in Platform&quot;</span>,
-                        <span class="ident">unit_ipfs</span>;
-                        <span class="string">&quot;AdUnit&quot;</span> =&gt; <span class="question-mark">?</span><span class="ident">unit_ipfs</span>,
-                        <span class="string">&quot;AdSlot&quot;</span> =&gt; <span class="question-mark">?</span><span class="ident">ad_slot</span>,
+                        unit_ipfs;
+                        <span class="string">&quot;AdUnit&quot; </span>=&gt; <span class="question-mark">?</span>unit_ipfs,
+                        <span class="string">&quot;AdSlot&quot; </span>=&gt; <span class="question-mark">?</span>ad_slot,
                     );
 
-                    <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">not_found</span>());
+                    <span class="kw">return </span><span class="prelude-val">Ok</span>(not_found());
                 }
-                <span class="prelude-val">Err</span>(<span class="ident">error</span>) =&gt; {
-                    <span class="macro">error!</span>(<span class="kw-2">&amp;</span><span class="ident">logger</span>,
+                <span class="prelude-val">Err</span>(error) =&gt; {
+                    <span class="macro">error!</span>(<span class="kw-2">&amp;</span>logger,
                         <span class="string">&quot;Error when fetching AdSlot fallback AdUnit ({}) from Platform&quot;</span>,
-                        <span class="ident">unit_ipfs</span>;
-                        <span class="string">&quot;AdSlot&quot;</span> =&gt; <span class="question-mark">?</span><span class="ident">ad_slot</span>,
-                        <span class="string">&quot;Fallback AdUnit&quot;</span> =&gt; <span class="question-mark">?</span><span class="ident">unit_ipfs</span>,
-                        <span class="string">&quot;error&quot;</span> =&gt; <span class="question-mark">?</span><span class="ident">error</span>
+                        unit_ipfs;
+                        <span class="string">&quot;AdSlot&quot; </span>=&gt; <span class="question-mark">?</span>ad_slot,
+                        <span class="string">&quot;Fallback AdUnit&quot; </span>=&gt; <span class="question-mark">?</span>unit_ipfs,
+                        <span class="string">&quot;error&quot; </span>=&gt; <span class="question-mark">?</span>error
                     );
 
-                    <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">service_unavailable</span>());
+                    <span class="kw">return </span><span class="prelude-val">Ok</span>(service_unavailable());
                 }
             };
 
-            <span class="prelude-val">Some</span>(<span class="ident">ad_unit_response</span>.<span class="ident">unit</span>)
+            <span class="prelude-val">Some</span>(ad_unit_response.unit)
         }
-        <span class="prelude-val">None</span> =&gt; <span class="prelude-val">None</span>,
+        <span class="prelude-val">None </span>=&gt; <span class="prelude-val">None</span>,
     };
 
-    <span class="macro">debug!</span>(<span class="kw-2">&amp;</span><span class="ident">logger</span>, <span class="string">&quot;Fetched {} AdUnits for AdSlot&quot;</span>, <span class="ident">units</span>.<span class="ident">len</span>(); <span class="string">&quot;AdSlot&quot;</span> =&gt; <span class="question-mark">?</span><span class="ident">ad_slot</span>);
+    <span class="macro">debug!</span>(<span class="kw-2">&amp;</span>logger, <span class="string">&quot;Fetched {} AdUnits for AdSlot&quot;</span>, units.len(); <span class="string">&quot;AdSlot&quot; </span>=&gt; <span class="question-mark">?</span>ad_slot);
 
-    <span class="comment">// For each adUnits apply input</span>
-    <span class="kw">let</span> <span class="ident">ua_parser</span> <span class="op">=</span> <span class="ident">Parser::new</span>();
-    <span class="kw">let</span> <span class="ident">user_agent</span> <span class="op">=</span> <span class="ident">request_parts</span>
-        .<span class="ident">headers</span>
-        .<span class="ident">get</span>(<span class="ident">USER_AGENT</span>)
-        .<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">h</span><span class="op">|</span> <span class="ident">h</span>.<span class="ident">to_str</span>().<span class="ident">map</span>(<span class="ident">ToString::to_string</span>).<span class="ident">ok</span>())
-        .<span class="ident">unwrap_or_default</span>();
-    <span class="kw">let</span> <span class="ident">parsed</span> <span class="op">=</span> <span class="ident">ua_parser</span>.<span class="ident">parse</span>(<span class="kw-2">&amp;</span><span class="ident">user_agent</span>);
-    <span class="comment">// WARNING! This will return only the OS type, e.g. `Linux` and not the actual distribution name e.g. `Ubuntu`</span>
-    <span class="comment">// By contrast `ua-parser-js` will return `Ubuntu` (distribution) and not the OS type `Linux`.</span>
-    <span class="comment">// `UAParser(...).os.name` (`ua-parser-js: 0.7.22`)</span>
-    <span class="kw">let</span> <span class="ident">user_agent_os</span> <span class="op">=</span> <span class="ident">parsed</span>.<span class="ident">as_ref</span>().<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">p</span><span class="op">|</span> {
-        <span class="kw">if</span> <span class="ident">p</span>.<span class="ident">os</span> <span class="op">!</span><span class="op">=</span> <span class="ident">VALUE_UNKNOWN</span> {
-            <span class="prelude-val">Some</span>(<span class="ident">p</span>.<span class="ident">os</span>.<span class="ident">to_string</span>())
-        } <span class="kw">else</span> {
-            <span class="prelude-val">None</span>
-        }
+    <span class="comment">// For each adUnits apply input
+    </span><span class="kw">let </span>ua_parser = Parser::new();
+    <span class="kw">let </span>user_agent = user_agent
+        .map(|h| h.as_str().to_string())
+        .unwrap_or_default();
+    <span class="kw">let </span>parsed = ua_parser.parse(<span class="kw-2">&amp;</span>user_agent);
+    <span class="comment">// WARNING! This will return only the OS type, e.g. `Linux` and not the actual distribution name e.g. `Ubuntu`
+    // By contrast `ua-parser-js` will return `Ubuntu` (distribution) and not the OS type `Linux`.
+    // `UAParser(...).os.name` (`ua-parser-js: 0.7.22`)
+    </span><span class="kw">let </span>user_agent_os = parsed.as_ref().and_then(|p| {
+        <span class="kw">if </span>p.os != VALUE_UNKNOWN {
+            <span class="prelude-val">Some</span>(p.os.to_string())
+        } <span class="kw">else </span>{
+            <span class="prelude-val">None
+        </span>}
     });
 
-    <span class="comment">// Corresponds to `UAParser(...).browser.name` (`ua-parser-js: 0.7.22`)</span>
-    <span class="kw">let</span> <span class="ident">user_agent_browser_family</span> <span class="op">=</span> <span class="ident">parsed</span>.<span class="ident">as_ref</span>().<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">p</span><span class="op">|</span> {
-        <span class="kw">if</span> <span class="ident">p</span>.<span class="ident">name</span> <span class="op">!</span><span class="op">=</span> <span class="ident">VALUE_UNKNOWN</span> {
-            <span class="prelude-val">Some</span>(<span class="ident">p</span>.<span class="ident">name</span>.<span class="ident">to_string</span>())
-        } <span class="kw">else</span> {
-            <span class="prelude-val">None</span>
-        }
+    <span class="comment">// Corresponds to `UAParser(...).browser.name` (`ua-parser-js: 0.7.22`)
+    </span><span class="kw">let </span>user_agent_browser_family = parsed.as_ref().and_then(|p| {
+        <span class="kw">if </span>p.name != VALUE_UNKNOWN {
+            <span class="prelude-val">Some</span>(p.name.to_string())
+        } <span class="kw">else </span>{
+            <span class="prelude-val">None
+        </span>}
     });
 
-    <span class="kw">let</span> <span class="ident">country</span> <span class="op">=</span> <span class="ident">request_parts</span>
-        .<span class="ident">headers</span>
-        .<span class="ident">get</span>(<span class="ident">CLOUDFLARE_IPCOUNTRY_HEADER</span>.<span class="ident">clone</span>())
-        .<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">h</span><span class="op">|</span> <span class="ident">h</span>.<span class="ident">to_str</span>().<span class="ident">map</span>(<span class="ident">ToString::to_string</span>).<span class="ident">ok</span>());
+    <span class="kw">let </span>country = headers
+        .get(CLOUDFLARE_IPCOUNTRY_HEADER.clone())
+        .and_then(|h| h.to_str().map(ToString::to_string).ok());
 
-    <span class="kw">let</span> <span class="ident">hostname</span> <span class="op">=</span> <span class="ident">Url::parse</span>(<span class="kw-2">&amp;</span><span class="ident">ad_slot</span>.<span class="ident">website</span>.<span class="ident">clone</span>().<span class="ident">unwrap_or_default</span>())
-        .<span class="ident">ok</span>()
-        .<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">url</span><span class="op">|</span> <span class="ident">url</span>.<span class="ident">host</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">h</span><span class="op">|</span> <span class="ident">h</span>.<span class="ident">to_string</span>()))
-        .<span class="ident">unwrap_or_default</span>();
+    <span class="kw">let </span>hostname = Url::parse(<span class="kw-2">&amp;</span>ad_slot.website.clone().unwrap_or_default())
+        .ok()
+        .and_then(|url| url.host().map(|h| h.to_string()))
+        .unwrap_or_default();
 
-    <span class="kw">let</span> <span class="ident">publisher_id</span> <span class="op">=</span> <span class="ident">ad_slot</span>.<span class="ident">owner</span>;
+    <span class="kw">let </span>publisher_id = ad_slot.owner;
 
-    <span class="kw">let</span> <span class="ident">campaigns_limited_by_earner</span> <span class="op">=</span> <span class="ident">get_campaigns</span>(
-        <span class="ident">app</span>.<span class="ident">pool</span>.<span class="ident">clone</span>(),
-        <span class="ident">app</span>.<span class="ident">campaign_remaining</span>.<span class="ident">clone</span>(),
-        <span class="ident">config</span>,
-        <span class="kw-2">&amp;</span><span class="ident">request_body</span>.<span class="ident">deposit_assets</span>,
-        <span class="ident">publisher_id</span>,
+    <span class="kw">let </span>campaigns_limited_by_earner = get_campaigns(
+        app.pool.clone(),
+        app.campaign_remaining.clone(),
+        config,
+        <span class="kw-2">&amp;</span>request_body.deposit_assets,
+        publisher_id,
     )
-    .<span class="kw">await</span>
-    <span class="comment">// TODO: Fix mapping this error and Log the error!</span>
-    .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">err</span><span class="op">|</span> <span class="ident">ResponseError::BadRequest</span>(<span class="ident">err</span>.<span class="ident">to_string</span>()))<span class="question-mark">?</span>;
+    .<span class="kw">await
+    </span><span class="comment">// TODO: Fix mapping this error and Log the error!
+    </span>.map_err(|err| ResponseError::BadRequest(err.to_string()))<span class="question-mark">?</span>;
 
-    <span class="macro">debug!</span>(<span class="kw-2">&amp;</span><span class="ident">logger</span>, <span class="string">&quot;Fetched Cache campaigns limited by earner (publisher)&quot;</span>; <span class="string">&quot;campaigns&quot;</span> =&gt; <span class="ident">campaigns_limited_by_earner</span>.<span class="ident">len</span>(), <span class="string">&quot;publisher_id&quot;</span> =&gt; <span class="op">%</span><span class="ident">publisher_id</span>);
+    <span class="macro">debug!</span>(<span class="kw-2">&amp;</span>logger, <span class="string">&quot;Fetched Cache campaigns limited by earner (publisher)&quot;</span>; <span class="string">&quot;campaigns&quot; </span>=&gt; campaigns_limited_by_earner.len(), <span class="string">&quot;publisher_id&quot; </span>=&gt; %publisher_id);
 
-    <span class="comment">// We return those in the result (which means AdView would have those) but we don&#39;t actually use them</span>
-    <span class="comment">// we do that in order to have the same variables as the validator, so that the `price` is the same</span>
-    <span class="kw">let</span> <span class="ident">targeting_input_ad_slot</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">input::AdSlot</span> {
-        <span class="ident">categories</span>: <span class="ident">categories</span>.<span class="ident">clone</span>(),
-        <span class="ident">hostname</span>,
-        <span class="ident">alexa_rank</span>,
+    <span class="comment">// We return those in the result (which means AdView would have those) but we don&#39;t actually use them
+    // we do that in order to have the same variables as the validator, so that the `price` is the same
+    </span><span class="kw">let </span>targeting_input_ad_slot = <span class="prelude-val">Some</span>(input::AdSlot {
+        categories: categories.clone(),
+        hostname,
+        alexa_rank,
     });
 
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">targeting_input_base</span> <span class="op">=</span> <span class="ident">Input</span> {
-        <span class="ident">ad_view</span>: <span class="prelude-val">None</span>,
-        <span class="ident">global</span>: <span class="ident">input::Global</span> {
-            <span class="ident">ad_slot_id</span>: <span class="ident">ad_slot</span>.<span class="ident">ipfs</span>,
-            <span class="ident">ad_slot_type</span>: <span class="ident">ad_slot</span>.<span class="ident">ad_type</span>.<span class="ident">clone</span>(),
-            <span class="ident">publisher_id</span>: <span class="ident">publisher_id</span>.<span class="ident">to_address</span>(),
-            <span class="ident">country</span>,
-            <span class="ident">event_type</span>: <span class="ident">IMPRESSION</span>,
-            <span class="ident">seconds_since_epoch</span>: <span class="ident">Utc::now</span>(),
-            <span class="ident">user_agent_os</span>,
-            <span class="ident">user_agent_browser_family</span>: <span class="ident">user_agent_browser_family</span>.<span class="ident">clone</span>(),
+    <span class="kw">let </span><span class="kw-2">mut </span>targeting_input_base = Input {
+        ad_view: <span class="prelude-val">None</span>,
+        global: input::Global {
+            ad_slot_id: ad_slot.ipfs,
+            ad_slot_type: ad_slot.ad_type.clone(),
+            publisher_id: publisher_id.to_address(),
+            country,
+            event_type: IMPRESSION,
+            seconds_since_epoch: Utc::now(),
+            user_agent_os,
+            user_agent_browser_family: user_agent_browser_family.clone(),
         },
-        <span class="ident">ad_unit_id</span>: <span class="prelude-val">None</span>,
-        <span class="ident">balances</span>: <span class="prelude-val">None</span>,
-        <span class="ident">campaign</span>: <span class="prelude-val">None</span>,
-        <span class="ident">ad_slot</span>: <span class="prelude-val">None</span>,
+        ad_unit_id: <span class="prelude-val">None</span>,
+        balances: <span class="prelude-val">None</span>,
+        campaign: <span class="prelude-val">None</span>,
+        ad_slot: <span class="prelude-val">None</span>,
     };
 
-    <span class="kw">let</span> <span class="ident">campaigns</span> <span class="op">=</span> <span class="ident">apply_targeting</span>(
-        <span class="ident">config</span>,
-        <span class="ident">logger</span>,
-        <span class="ident">campaigns_limited_by_earner</span>,
-        <span class="ident">targeting_input_base</span>.<span class="ident">clone</span>(),
-        <span class="ident">ad_slot</span>,
+    <span class="kw">let </span>campaigns = apply_targeting(
+        config,
+        logger,
+        campaigns_limited_by_earner,
+        targeting_input_base.clone(),
+        ad_slot,
     )
     .<span class="kw">await</span>;
 
-    <span class="ident">targeting_input_base</span>.<span class="ident">ad_slot</span> <span class="op">=</span> <span class="ident">targeting_input_ad_slot</span>;
+    targeting_input_base.ad_slot = targeting_input_ad_slot;
 
-    <span class="kw">let</span> <span class="ident">response</span> <span class="op">=</span> <span class="ident">UnitsForSlotResponse</span> {
-        <span class="ident">targeting_input_base</span>,
-        <span class="ident">accepted_referrers</span>,
-        <span class="ident">campaigns</span>,
-        <span class="ident">fallback_unit</span>: <span class="ident">fallback_unit</span>.<span class="ident">map</span>(<span class="op">|</span><span class="ident">ad_unit</span><span class="op">|</span> <span class="ident">response::AdUnit::from</span>(<span class="kw-2">&amp;</span><span class="ident">ad_unit</span>)),
+    <span class="kw">let </span>response = UnitsForSlotResponse {
+        targeting_input_base,
+        accepted_referrers,
+        campaigns,
+        fallback_unit: fallback_unit.map(|ad_unit| response::AdUnit::from(<span class="kw-2">&amp;</span>ad_unit)),
     };
 
-    <span class="prelude-val">Ok</span>(<span class="ident">Response::builder</span>()
-        .<span class="ident">status</span>(<span class="ident">StatusCode::OK</span>)
-        .<span class="ident">header</span>(<span class="ident">CONTENT_TYPE</span>, <span class="string">&quot;application/json&quot;</span>)
-        .<span class="ident">body</span>(<span class="ident">Body::from</span>(<span class="ident">serde_json::to_string</span>(<span class="kw-2">&amp;</span><span class="ident">response</span>)<span class="question-mark">?</span>))
-        .<span class="ident">expect</span>(<span class="string">&quot;Should create response&quot;</span>))
+    <span class="prelude-val">Ok</span>(Response::builder()
+        .status(StatusCode::OK)
+        .header(CONTENT_TYPE, <span class="string">&quot;application/json&quot;</span>)
+        .body(Body::from(serde_json::to_string(<span class="kw-2">&amp;</span>response)<span class="question-mark">?</span>))
+        .expect(<span class="string">&quot;Should create response&quot;</span>))
 }
 
-<span class="comment">// TODO: Use error instead of std::error::Error</span>
-<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">get_campaigns</span>(
-    <span class="ident">pool</span>: <span class="ident">DbPool</span>,
-    <span class="ident">campaign_remaining</span>: <span class="ident">CampaignRemaining</span>,
-    <span class="ident">config</span>: <span class="kw-2">&amp;</span><span class="ident">Config</span>,
-    <span class="ident">deposit_assets</span>: <span class="kw-2">&amp;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">HashSet</span><span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">publisher_id</span>: <span class="ident">ValidatorId</span>,
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Campaign</span><span class="op">&gt;</span>, <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">std::error::Error</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-    <span class="comment">// 1. Fetch active Campaigns: (postgres)</span>
-    <span class="comment">//  Creator = publisher_id</span>
-    <span class="comment">// if deposit asset &gt; 0 =&gt; filter by deposit_asset</span>
-    <span class="kw">let</span> <span class="ident">active_campaigns</span> <span class="op">=</span> <span class="ident">units_for_slot_get_campaigns</span>(
-        <span class="kw-2">&amp;</span><span class="ident">pool</span>,
-        <span class="ident">deposit_assets</span>.<span class="ident">as_ref</span>(),
-        <span class="ident">publisher_id</span>.<span class="ident">to_address</span>(),
-        <span class="ident">Utc::now</span>(),
+<span class="comment">// TODO: Use error instead of std::error::Error
+</span><span class="kw">async fn </span>get_campaigns(
+    pool: DbPool,
+    campaign_remaining: CampaignRemaining,
+    config: <span class="kw-2">&amp;</span>Config,
+    deposit_assets: <span class="kw-2">&amp;</span><span class="prelude-ty">Option</span>&lt;HashSet&lt;Address&gt;&gt;,
+    publisher_id: ValidatorId,
+) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;Campaign&gt;, Box&lt;<span class="kw">dyn </span>std::error::Error&gt;&gt; {
+    <span class="comment">// 1. Fetch active Campaigns: (postgres)
+    //  Creator = publisher_id
+    // if deposit asset &gt; 0 =&gt; filter by deposit_asset
+    </span><span class="kw">let </span>active_campaigns = units_for_slot_get_campaigns(
+        <span class="kw-2">&amp;</span>pool,
+        deposit_assets.as_ref(),
+        publisher_id.to_address(),
+        Utc::now(),
     )
     .<span class="kw">await</span><span class="question-mark">?</span>;
 
-    <span class="kw">let</span> <span class="ident">active_campaign_ids</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">active_campaigns</span>
-        .<span class="ident">iter</span>()
-        .<span class="ident">map</span>(<span class="op">|</span><span class="ident">campaign</span><span class="op">|</span> <span class="ident">campaign</span>.<span class="ident">id</span>)
-        .<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span><span class="op">&gt;</span>();
+    <span class="kw">let </span>active_campaign_ids = <span class="kw-2">&amp;</span>active_campaigns
+        .iter()
+        .map(|campaign| campaign.id)
+        .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
 
-    <span class="comment">// 2. Check those Campaigns if `Campaign remaining &gt; 0` (in redis)</span>
-    <span class="kw">let</span> <span class="ident">campaigns_remaining</span> <span class="op">=</span> <span class="ident">campaign_remaining</span>
-        .<span class="ident">get_multiple_with_ids</span>(<span class="ident">active_campaign_ids</span>)
+    <span class="comment">// 2. Check those Campaigns if `Campaign remaining &gt; 0` (in redis)
+    </span><span class="kw">let </span>campaigns_remaining = campaign_remaining
+        .get_multiple_with_ids(active_campaign_ids)
         .<span class="kw">await</span><span class="question-mark">?</span>;
 
-    <span class="kw">let</span> <span class="ident">campaigns_with_remaining</span> <span class="op">=</span> <span class="ident">campaigns_remaining</span>
-        .<span class="ident">into_iter</span>()
-        .<span class="ident">filter_map</span>(<span class="op">|</span>(<span class="ident">campaign_id</span>, <span class="ident">remaining</span>)<span class="op">|</span> {
-            <span class="comment">// remaining should not be `0`</span>
-            <span class="kw">if</span> <span class="ident">remaining</span> <span class="op">&gt;</span> <span class="ident">UnifiedNum::from</span>(<span class="number">0</span>) {
-                <span class="comment">// and we have to find the `Campaign` instance</span>
-                <span class="ident">active_campaigns</span>
-                    .<span class="ident">iter</span>()
-                    .<span class="ident">find</span>(<span class="op">|</span><span class="ident">campaign</span><span class="op">|</span> <span class="ident">campaign</span>.<span class="ident">id</span> <span class="op">==</span> <span class="ident">campaign_id</span>)
-                    .<span class="ident">cloned</span>()
-            } <span class="kw">else</span> {
-                <span class="prelude-val">None</span>
-            }
+    <span class="kw">let </span>campaigns_with_remaining = campaigns_remaining
+        .into_iter()
+        .filter_map(|(campaign_id, remaining)| {
+            <span class="comment">// remaining should not be `0`
+            </span><span class="kw">if </span>remaining &gt; UnifiedNum::from(<span class="number">0</span>) {
+                <span class="comment">// and we have to find the `Campaign` instance
+                </span>active_campaigns
+                    .iter()
+                    .find(|campaign| campaign.id == campaign_id)
+                    .cloned()
+            } <span class="kw">else </span>{
+                <span class="prelude-val">None
+            </span>}
         })
-        .<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span><span class="op">&gt;</span>();
+        .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
 
-    <span class="kw">let</span> <span class="ident">channels</span> <span class="op">=</span> <span class="ident">campaigns_with_remaining</span>
-        .<span class="ident">iter</span>()
-        .<span class="ident">map</span>(<span class="op">|</span><span class="ident">campaign</span><span class="op">|</span> <span class="ident">campaign</span>.<span class="ident">channel</span>.<span class="ident">id</span>())
-        .<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">HashSet</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span><span class="op">&gt;</span>();
+    <span class="kw">let </span>channels = campaigns_with_remaining
+        .iter()
+        .map(|campaign| campaign.channel.id())
+        .collect::&lt;HashSet&lt;<span class="kw">_</span>&gt;&gt;();
 
-    <span class="kw">let</span> <span class="ident">publisher_accountings</span> <span class="op">=</span> <span class="ident">try_join_all</span>(<span class="ident">channels</span>.<span class="ident">iter</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">channel_id</span><span class="op">|</span> {
-        <span class="ident">get_accounting</span>(
-            <span class="ident">pool</span>.<span class="ident">clone</span>(),
-            <span class="kw-2">*</span><span class="ident">channel_id</span>,
-            <span class="ident">publisher_id</span>.<span class="ident">to_address</span>(),
-            <span class="ident">Side::Spender</span>,
+    <span class="kw">let </span>publisher_accountings = try_join_all(channels.iter().map(|channel_id| {
+        get_accounting(
+            pool.clone(),
+            <span class="kw-2">*</span>channel_id,
+            publisher_id.to_address(),
+            Side::Spender,
         )
     }))
-    .<span class="kw">await</span><span class="question-mark">?</span>
-    .<span class="ident">into_iter</span>()
-    .<span class="ident">flatten</span>()
-    .<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span><span class="op">&gt;</span>();
+    .<span class="kw">await</span><span class="question-mark">?
+    </span>.into_iter()
+    .flatten()
+    .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
 
-    <span class="comment">// 3. Filter `Campaign`s, that include the `publisher_id` in the Channel balances.</span>
-    <span class="kw">let</span> (<span class="kw-2">mut</span> <span class="ident">campaigns_by_earner</span>, <span class="ident">rest_of_campaigns</span>): (<span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Campaign</span><span class="op">&gt;</span>, <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Campaign</span><span class="op">&gt;</span>) <span class="op">=</span>
-        <span class="ident">campaigns_with_remaining</span>.<span class="ident">into_iter</span>().<span class="ident">partition</span>(<span class="op">|</span><span class="ident">campaign</span><span class="op">|</span> {
-            <span class="ident">publisher_accountings</span>
-                .<span class="ident">iter</span>()
-                .<span class="ident">any</span>(<span class="op">|</span><span class="ident">accounting</span><span class="op">|</span> <span class="ident">accounting</span>.<span class="ident">channel_id</span> <span class="op">==</span> <span class="ident">campaign</span>.<span class="ident">channel</span>.<span class="ident">id</span>())
+    <span class="comment">// 3. Filter `Campaign`s, that include the `publisher_id` in the Channel balances.
+    </span><span class="kw">let </span>(<span class="kw-2">mut </span>campaigns_by_earner, rest_of_campaigns): (Vec&lt;Campaign&gt;, Vec&lt;Campaign&gt;) =
+        campaigns_with_remaining.into_iter().partition(|campaign| {
+            publisher_accountings
+                .iter()
+                .any(|accounting| accounting.channel_id == campaign.channel.id())
         });
 
-    <span class="kw">let</span> <span class="ident">campaigns</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">campaigns_by_earner</span>.<span class="ident">len</span>()
-        <span class="op">&gt;</span><span class="op">=</span> <span class="ident">config</span>
-            .<span class="ident">limits</span>
-            .<span class="ident">units_for_slot</span>
-            .<span class="ident">max_campaigns_earning_from</span>
-            .<span class="ident">into</span>()
+    <span class="kw">let </span>campaigns = <span class="kw">if </span>campaigns_by_earner.len()
+        &gt;= config
+            .limits
+            .units_for_slot
+            .max_campaigns_earning_from
+            .into()
     {
-        <span class="ident">campaigns_by_earner</span>
-    } <span class="kw">else</span> {
-        <span class="ident">campaigns_by_earner</span>.<span class="ident">extend</span>(<span class="ident">rest_of_campaigns</span>.<span class="ident">into_iter</span>());
+        campaigns_by_earner
+    } <span class="kw">else </span>{
+        campaigns_by_earner.extend(rest_of_campaigns.into_iter());
 
-        <span class="ident">campaigns_by_earner</span>
+        campaigns_by_earner
     };
 
-    <span class="prelude-val">Ok</span>(<span class="ident">campaigns</span>)
+    <span class="prelude-val">Ok</span>(campaigns)
 }
 
-<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">apply_targeting</span>(
-    <span class="ident">config</span>: <span class="kw-2">&amp;</span><span class="ident">Config</span>,
-    <span class="ident">logger</span>: <span class="kw-2">&amp;</span><span class="ident">Logger</span>,
-    <span class="ident">campaigns</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Campaign</span><span class="op">&gt;</span>,
-    <span class="ident">input_base</span>: <span class="ident">Input</span>,
-    <span class="ident">ad_slot</span>: <span class="ident">AdSlot</span>,
-) -&gt; <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">response::Campaign</span><span class="op">&gt;</span> {
-    <span class="ident">campaigns</span>
-            .<span class="ident">into_iter</span>()
-            .<span class="ident">filter_map</span>(<span class="op">|</span><span class="ident">campaign</span><span class="op">|</span> {
-                <span class="kw">let</span> <span class="ident">ad_units</span> <span class="op">=</span> <span class="ident">campaign</span>
-                    .<span class="ident">ad_units</span>
-                    .<span class="ident">iter</span>()
-                    .<span class="ident">filter</span>(<span class="op">|</span><span class="ident">ad_unit</span><span class="op">|</span> <span class="ident">ad_unit</span>.<span class="ident">ad_type</span> <span class="op">==</span> <span class="ident">ad_slot</span>.<span class="ident">ad_type</span>)
-                    .<span class="ident">cloned</span>()
-                    .<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span><span class="op">&gt;</span>();
+<span class="kw">async fn </span>apply_targeting(
+    config: <span class="kw-2">&amp;</span>Config,
+    logger: <span class="kw-2">&amp;</span>Logger,
+    campaigns: Vec&lt;Campaign&gt;,
+    input_base: Input,
+    ad_slot: AdSlot,
+) -&gt; Vec&lt;response::Campaign&gt; {
+    campaigns
+            .into_iter()
+            .filter_map(|campaign| {
+                <span class="kw">let </span>ad_units = campaign
+                    .ad_units
+                    .iter()
+                    .filter(|ad_unit| ad_unit.ad_type == ad_slot.ad_type)
+                    .cloned()
+                    .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
 
-                <span class="kw">if</span> <span class="ident">ad_units</span>.<span class="ident">is_empty</span>() {
-                    <span class="prelude-val">None</span>
-                } <span class="kw">else</span> {
-                    <span class="kw">let</span> <span class="ident">campaign_input</span> <span class="op">=</span> <span class="ident">input_base</span>.<span class="ident">clone</span>().<span class="ident">with_campaign</span>(<span class="ident">campaign</span>.<span class="ident">clone</span>());
+                <span class="kw">if </span>ad_units.is_empty() {
+                    <span class="prelude-val">None
+                </span>} <span class="kw">else </span>{
+                    <span class="kw">let </span>campaign_input = input_base.clone().with_campaign(campaign.clone());
 
-                    <span class="kw">let</span> <span class="ident">matching_units</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">response::UnitsWithPrice</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">ad_units</span>
-                        .<span class="ident">into_iter</span>()
-                        .<span class="ident">filter_map</span>(<span class="op">|</span><span class="ident">ad_unit</span><span class="op">|</span> {
-                            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">unit_input</span> <span class="op">=</span> <span class="ident">campaign_input</span>.<span class="ident">clone</span>();
-                            <span class="ident">unit_input</span>.<span class="ident">ad_unit_id</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">ad_unit</span>.<span class="ident">ipfs</span>);
+                    <span class="kw">let </span>matching_units: Vec&lt;response::UnitsWithPrice&gt; = ad_units
+                        .into_iter()
+                        .filter_map(|ad_unit| {
+                            <span class="kw">let </span><span class="kw-2">mut </span>unit_input = campaign_input.clone();
+                            unit_input.ad_unit_id = <span class="prelude-val">Some</span>(ad_unit.ipfs);
 
-                            <span class="kw">let</span> <span class="ident">pricing_bounds</span> <span class="op">=</span> <span class="ident">get_pricing_bounds</span>(<span class="kw-2">&amp;</span><span class="ident">campaign</span>, <span class="kw-2">&amp;</span><span class="ident">IMPRESSION</span>);
-                            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">output</span> <span class="op">=</span> <span class="ident">Output</span> {
-                                <span class="ident">show</span>: <span class="bool-val">true</span>,
-                                <span class="ident">boost</span>: <span class="number">1.0</span>,
-                                <span class="comment">// only &quot;IMPRESSION&quot; event can be used for this `Output`</span>
-                                <span class="ident">price</span>: [(<span class="ident">IMPRESSION</span>, <span class="ident">pricing_bounds</span>.<span class="ident">min</span>)]
-                                    .<span class="ident">into_iter</span>()
-                                    .<span class="ident">collect</span>(),
+                            <span class="kw">let </span>pricing_bounds = get_pricing_bounds(<span class="kw-2">&amp;</span>campaign, <span class="kw-2">&amp;</span>IMPRESSION);
+                            <span class="kw">let </span><span class="kw-2">mut </span>output = Output {
+                                show: <span class="bool-val">true</span>,
+                                boost: <span class="number">1.0</span>,
+                                <span class="comment">// only &quot;IMPRESSION&quot; event can be used for this `Output`
+                                </span>price: [(IMPRESSION, pricing_bounds.min)]
+                                    .into_iter()
+                                    .collect(),
                             };
 
-                            <span class="kw">let</span> <span class="ident">on_type_error_campaign</span> <span class="op">=</span> <span class="op">|</span><span class="ident">error</span>, <span class="ident">rule</span><span class="op">|</span> <span class="macro">error!</span>(<span class="ident">logger</span>, <span class="string">&quot;Rule evaluation error for {:?}&quot;</span>, <span class="ident">campaign</span>.<span class="ident">id</span>; <span class="string">&quot;error&quot;</span> =&gt; <span class="question-mark">?</span><span class="ident">error</span>, <span class="string">&quot;rule&quot;</span> =&gt; <span class="question-mark">?</span><span class="ident">rule</span>, <span class="string">&quot;campaign&quot;</span> =&gt; <span class="question-mark">?</span><span class="ident">campaign</span>);
-                            <span class="ident">eval_with_callback</span>(<span class="kw-2">&amp;</span><span class="ident">campaign</span>.<span class="ident">targeting_rules</span>, <span class="kw-2">&amp;</span><span class="ident">unit_input</span>, <span class="kw-2">&amp;mut</span> <span class="ident">output</span>, <span class="prelude-val">Some</span>(<span class="ident">on_type_error_campaign</span>));
+                            <span class="kw">let </span>on_type_error_campaign = |error, rule| <span class="macro">error!</span>(logger, <span class="string">&quot;Rule evaluation error for {:?}&quot;</span>, campaign.id; <span class="string">&quot;error&quot; </span>=&gt; <span class="question-mark">?</span>error, <span class="string">&quot;rule&quot; </span>=&gt; <span class="question-mark">?</span>rule, <span class="string">&quot;campaign&quot; </span>=&gt; <span class="question-mark">?</span>campaign);
+                            eval_with_callback(<span class="kw-2">&amp;</span>campaign.targeting_rules, <span class="kw-2">&amp;</span>unit_input, <span class="kw-2">&amp;mut </span>output, <span class="prelude-val">Some</span>(on_type_error_campaign));
 
-                            <span class="kw">if</span> <span class="op">!</span><span class="ident">output</span>.<span class="ident">show</span> {
-                                <span class="kw">return</span> <span class="prelude-val">None</span>;
+                            <span class="kw">if </span>!output.show {
+                                <span class="kw">return </span><span class="prelude-val">None</span>;
                             }
 
-                            <span class="kw">let</span> <span class="ident">max_price</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">output</span>.<span class="ident">price</span>.<span class="ident">get</span>(<span class="ident">IMPRESSION</span>.<span class="ident">as_str</span>()) {
-                                <span class="prelude-val">Some</span>(<span class="ident">output_price</span>) =&gt; <span class="kw-2">*</span><span class="ident">output_price</span>.<span class="ident">min</span>(<span class="kw-2">&amp;</span><span class="ident">pricing_bounds</span>.<span class="ident">max</span>),
-                                <span class="prelude-val">None</span> =&gt; <span class="ident">pricing_bounds</span>.<span class="ident">max</span>,
+                            <span class="kw">let </span>max_price = <span class="kw">match </span>output.price.get(IMPRESSION.as_str()) {
+                                <span class="prelude-val">Some</span>(output_price) =&gt; <span class="kw-2">*</span>output_price.min(<span class="kw-2">&amp;</span>pricing_bounds.max),
+                                <span class="prelude-val">None </span>=&gt; pricing_bounds.max,
                             };
-                            <span class="kw">let</span> <span class="ident">price</span> <span class="op">=</span> <span class="ident">pricing_bounds</span>.<span class="ident">min</span>.<span class="ident">max</span>(<span class="ident">max_price</span>);
+                            <span class="kw">let </span>price = pricing_bounds.min.max(max_price);
 
-                            <span class="kw">if</span> <span class="ident">price</span> <span class="op">&lt;</span> <span class="ident">config</span>.<span class="ident">limits</span>.<span class="ident">units_for_slot</span>.<span class="ident">global_min_impression_price</span> {
-                                <span class="kw">return</span> <span class="prelude-val">None</span>;
+                            <span class="kw">if </span>price &lt; config.limits.units_for_slot.global_min_impression_price {
+                                <span class="kw">return </span><span class="prelude-val">None</span>;
                             }
 
-                            <span class="comment">// Execute the adSlot rules after we&#39;ve taken the price since they&#39;re not</span>
-                            <span class="comment">// allowed to change the price</span>
-                            <span class="kw">let</span> <span class="ident">on_type_error_adslot</span> <span class="op">=</span> <span class="op">|</span><span class="ident">error</span>, <span class="ident">rule</span><span class="op">|</span> <span class="macro">error!</span>(<span class="ident">logger</span>, <span class="string">&quot;Rule evaluation error AdSlot {:?}&quot;</span>, <span class="ident">ad_slot</span>.<span class="ident">ipfs</span>; <span class="string">&quot;error&quot;</span> =&gt; <span class="question-mark">?</span><span class="ident">error</span>, <span class="string">&quot;rule&quot;</span> =&gt; <span class="question-mark">?</span><span class="ident">rule</span>);
+                            <span class="comment">// Execute the adSlot rules after we&#39;ve taken the price since they&#39;re not
+                            // allowed to change the price
+                            </span><span class="kw">let </span>on_type_error_adslot = |error, rule| <span class="macro">error!</span>(logger, <span class="string">&quot;Rule evaluation error AdSlot {:?}&quot;</span>, ad_slot.ipfs; <span class="string">&quot;error&quot; </span>=&gt; <span class="question-mark">?</span>error, <span class="string">&quot;rule&quot; </span>=&gt; <span class="question-mark">?</span>rule);
 
-                            <span class="ident">eval_with_callback</span>(<span class="kw-2">&amp;</span><span class="ident">ad_slot</span>.<span class="ident">rules</span>, <span class="kw-2">&amp;</span><span class="ident">unit_input</span>, <span class="kw-2">&amp;mut</span> <span class="ident">output</span>, <span class="prelude-val">Some</span>(<span class="ident">on_type_error_adslot</span>));
-                            <span class="kw">if</span> <span class="op">!</span><span class="ident">output</span>.<span class="ident">show</span> {
-                                <span class="kw">return</span> <span class="prelude-val">None</span>;
+                            eval_with_callback(<span class="kw-2">&amp;</span>ad_slot.rules, <span class="kw-2">&amp;</span>unit_input, <span class="kw-2">&amp;mut </span>output, <span class="prelude-val">Some</span>(on_type_error_adslot));
+                            <span class="kw">if </span>!output.show {
+                                <span class="kw">return </span><span class="prelude-val">None</span>;
                             }
 
-                            <span class="kw">let</span> <span class="ident">ad_unit</span> <span class="op">=</span> <span class="ident">response::AdUnit::from</span>(<span class="kw-2">&amp;</span><span class="ident">ad_unit</span>);
+                            <span class="kw">let </span>ad_unit = response::AdUnit::from(<span class="kw-2">&amp;</span>ad_unit);
 
-                            <span class="prelude-val">Some</span>(<span class="ident">response::UnitsWithPrice</span> {
-                                <span class="ident">unit</span>: <span class="ident">ad_unit</span>,
-                                <span class="ident">price</span>,
+                            <span class="prelude-val">Some</span>(response::UnitsWithPrice {
+                                unit: ad_unit,
+                                price,
                             })
                         })
-                        .<span class="ident">collect</span>();
+                        .collect();
 
-                    <span class="kw">if</span> <span class="ident">matching_units</span>.<span class="ident">is_empty</span>() {
-                        <span class="prelude-val">None</span>
-                    } <span class="kw">else</span> {
-                        <span class="prelude-val">Some</span>(<span class="ident">response::Campaign</span> {
-                            <span class="ident">campaign</span>,
-                            <span class="ident">units_with_price</span>: <span class="ident">matching_units</span>,
+                    <span class="kw">if </span>matching_units.is_empty() {
+                        <span class="prelude-val">None
+                    </span>} <span class="kw">else </span>{
+                        <span class="prelude-val">Some</span>(response::Campaign {
+                            campaign,
+                            units_with_price: matching_units,
                         })
                     }
                 }
             })
-            .<span class="ident">collect</span>()
+            .collect()
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (20ffea693 2022-08-11)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>

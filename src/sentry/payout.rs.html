@@ -185,88 +185,88 @@
 <span id="185">185</span>
 <span id="186">186</span>
 <span id="187">187</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::Session</span>;
-<span class="kw">use</span> <span class="ident">chrono::Utc</span>;
-<span class="kw">use</span> <span class="ident">primitives</span>::{
-    <span class="ident">sentry::Event</span>,
-    <span class="ident">targeting::Input</span>,
-    <span class="ident">targeting</span>::{<span class="ident">eval_with_callback</span>, <span class="ident">get_pricing_bounds</span>, <span class="ident">input</span>, <span class="ident">Error</span>, <span class="ident">Output</span>},
-    <span class="ident">Address</span>, <span class="ident">Campaign</span>, <span class="ident">UnifiedNum</span>,
+</pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::Session;
+<span class="kw">use </span>chrono::Utc;
+<span class="kw">use </span>primitives::{
+    sentry::Event,
+    targeting::Input,
+    targeting::{eval_with_callback, get_pricing_bounds, input, Error, Output},
+    Address, Campaign, UnifiedNum,
 };
-<span class="kw">use</span> <span class="ident">slog</span>::{<span class="ident">error</span>, <span class="ident">Logger</span>};
-<span class="kw">use</span> <span class="ident">std::cmp</span>::{<span class="ident">max</span>, <span class="ident">min</span>};
+<span class="kw">use </span>slog::{error, Logger};
+<span class="kw">use </span>std::cmp::{max, min};
 
-<span class="kw">pub</span> <span class="kw">type</span> <span class="prelude-ty">Result</span> <span class="op">=</span> <span class="ident">std::result::Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span>(<span class="ident">Address</span>, <span class="ident">UnifiedNum</span>)<span class="op">&gt;</span>, <span class="ident">Error</span><span class="op">&gt;</span>;
+<span class="kw">pub type </span><span class="prelude-ty">Result </span>= std::result::Result&lt;<span class="prelude-ty">Option</span>&lt;(Address, UnifiedNum)&gt;, Error&gt;;
 
-<span class="doccomment">/// If `None` is returned this means that the targeting rules evaluation has set `show = false`</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_payout</span>(
-    <span class="ident">logger</span>: <span class="kw-2">&amp;</span><span class="ident">Logger</span>,
-    <span class="ident">campaign</span>: <span class="kw-2">&amp;</span><span class="ident">Campaign</span>,
-    <span class="ident">event</span>: <span class="kw-2">&amp;</span><span class="ident">Event</span>,
-    <span class="ident">session</span>: <span class="kw-2">&amp;</span><span class="ident">Session</span>,
-) -&gt; <span class="prelude-ty">Result</span> {
-    <span class="kw">let</span> <span class="ident">event_type</span> <span class="op">=</span> <span class="ident">event</span>.<span class="ident">event_type</span>();
+<span class="doccomment">/// If `None` is returned this means that the targeting rules evaluation has set `show = false`
+</span><span class="kw">pub fn </span>get_payout(
+    logger: <span class="kw-2">&amp;</span>Logger,
+    campaign: <span class="kw-2">&amp;</span>Campaign,
+    event: <span class="kw-2">&amp;</span>Event,
+    session: <span class="kw-2">&amp;</span>Session,
+) -&gt; <span class="prelude-ty">Result </span>{
+    <span class="kw">let </span>event_type = event.event_type();
 
-    <span class="kw">match</span> <span class="ident">event</span> {
-        <span class="ident">Event::Impression</span> {
-            <span class="ident">publisher</span>,
-            <span class="ident">ad_unit</span>,
-            <span class="ident">ad_slot</span>,
+    <span class="kw">match </span>event {
+        Event::Impression {
+            publisher,
+            ad_unit,
+            ad_slot,
             ..
         }
-        <span class="op">|</span> <span class="ident">Event::Click</span> {
-            <span class="ident">publisher</span>,
-            <span class="ident">ad_unit</span>,
-            <span class="ident">ad_slot</span>,
+        | Event::Click {
+            publisher,
+            ad_unit,
+            ad_slot,
             ..
         } =&gt; {
-            <span class="kw">let</span> <span class="ident">targeting_rules</span> <span class="op">=</span> <span class="ident">campaign</span>.<span class="ident">targeting_rules</span>.<span class="ident">clone</span>();
+            <span class="kw">let </span>targeting_rules = campaign.targeting_rules.clone();
 
-            <span class="kw">let</span> <span class="ident">pricing</span> <span class="op">=</span> <span class="ident">get_pricing_bounds</span>(<span class="ident">campaign</span>, <span class="kw-2">&amp;</span><span class="ident">event_type</span>);
+            <span class="kw">let </span>pricing = get_pricing_bounds(campaign, <span class="kw-2">&amp;</span>event_type);
 
-            <span class="kw">if</span> <span class="ident">targeting_rules</span>.<span class="ident">is_empty</span>() {
-                <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>((<span class="kw-2">*</span><span class="ident">publisher</span>, <span class="ident">pricing</span>.<span class="ident">min</span>)))
-            } <span class="kw">else</span> {
-                <span class="comment">// Find the event&#39;s AdUnit in the Campaign.</span>
-                <span class="kw">let</span> <span class="ident">ad_unit</span> <span class="op">=</span> <span class="ident">campaign</span>.<span class="ident">ad_units</span>.<span class="ident">iter</span>().<span class="ident">find</span>(<span class="op">|</span><span class="ident">u</span><span class="op">|</span> <span class="kw-2">&amp;</span><span class="ident">u</span>.<span class="ident">ipfs</span> <span class="op">==</span> <span class="ident">ad_unit</span>);
+            <span class="kw">if </span>targeting_rules.is_empty() {
+                <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>((<span class="kw-2">*</span>publisher, pricing.min)))
+            } <span class="kw">else </span>{
+                <span class="comment">// Find the event&#39;s AdUnit in the Campaign.
+                </span><span class="kw">let </span>ad_unit = campaign.ad_units.iter().find(|u| <span class="kw-2">&amp;</span>u.ipfs == ad_unit);
 
-                <span class="kw">let</span> <span class="ident">input</span> <span class="op">=</span> <span class="ident">Input</span> {
-                    <span class="ident">ad_view</span>: <span class="prelude-val">None</span>,
-                    <span class="ident">global</span>: <span class="ident">input::Global</span> {
-                        <span class="ident">ad_slot_id</span>: <span class="kw-2">*</span><span class="ident">ad_slot</span>,
-                        <span class="ident">ad_slot_type</span>: <span class="ident">ad_unit</span>.<span class="ident">map</span>(<span class="op">|</span><span class="ident">u</span><span class="op">|</span> <span class="ident">u</span>.<span class="ident">ad_type</span>.<span class="ident">clone</span>()).<span class="ident">unwrap_or_default</span>(),
-                        <span class="ident">publisher_id</span>: <span class="kw-2">*</span><span class="ident">publisher</span>,
-                        <span class="ident">country</span>: <span class="ident">session</span>.<span class="ident">country</span>.<span class="ident">clone</span>(),
-                        <span class="ident">event_type</span>,
-                        <span class="ident">seconds_since_epoch</span>: <span class="ident">Utc::now</span>(),
-                        <span class="ident">user_agent_os</span>: <span class="ident">session</span>.<span class="ident">os</span>.<span class="ident">clone</span>(),
-                        <span class="ident">user_agent_browser_family</span>: <span class="prelude-val">None</span>,
+                <span class="kw">let </span>input = Input {
+                    ad_view: <span class="prelude-val">None</span>,
+                    global: input::Global {
+                        ad_slot_id: <span class="kw-2">*</span>ad_slot,
+                        ad_slot_type: ad_unit.map(|u| u.ad_type.clone()).unwrap_or_default(),
+                        publisher_id: <span class="kw-2">*</span>publisher,
+                        country: session.country.clone(),
+                        event_type,
+                        seconds_since_epoch: Utc::now(),
+                        user_agent_os: session.os.clone(),
+                        user_agent_browser_family: <span class="prelude-val">None</span>,
                     },
-                    <span class="ident">ad_unit_id</span>: <span class="ident">ad_unit</span>.<span class="ident">map</span>(<span class="op">|</span><span class="ident">unit</span><span class="op">|</span> <span class="kw-2">&amp;</span><span class="ident">unit</span>.<span class="ident">ipfs</span>).<span class="ident">cloned</span>(),
-                    <span class="ident">campaign</span>: <span class="prelude-val">None</span>,
-                    <span class="ident">balances</span>: <span class="prelude-val">None</span>,
-                    <span class="ident">ad_slot</span>: <span class="prelude-val">None</span>,
+                    ad_unit_id: ad_unit.map(|unit| <span class="kw-2">&amp;</span>unit.ipfs).cloned(),
+                    campaign: <span class="prelude-val">None</span>,
+                    balances: <span class="prelude-val">None</span>,
+                    ad_slot: <span class="prelude-val">None</span>,
                 }
-                .<span class="ident">with_campaign</span>(<span class="ident">campaign</span>.<span class="ident">clone</span>());
+                .with_campaign(campaign.clone());
 
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">output</span> <span class="op">=</span> <span class="ident">Output</span> {
-                    <span class="ident">show</span>: <span class="bool-val">true</span>,
-                    <span class="ident">boost</span>: <span class="number">1.0</span>,
-                    <span class="ident">price</span>: [(<span class="ident">event_type</span>, <span class="ident">pricing</span>.<span class="ident">min</span>)].<span class="ident">into_iter</span>().<span class="ident">collect</span>(),
+                <span class="kw">let </span><span class="kw-2">mut </span>output = Output {
+                    show: <span class="bool-val">true</span>,
+                    boost: <span class="number">1.0</span>,
+                    price: [(event_type, pricing.min)].into_iter().collect(),
                 };
 
-                <span class="kw">let</span> <span class="ident">on_type_error</span> <span class="op">=</span> <span class="op">|</span><span class="ident">error</span>, <span class="ident">rule</span><span class="op">|</span> <span class="macro">error!</span>(<span class="ident">logger</span>, <span class="string">&quot;Rule evaluation error for {:?}&quot;</span>, <span class="ident">campaign</span>.<span class="ident">id</span>; <span class="string">&quot;error&quot;</span> =&gt; <span class="question-mark">?</span><span class="ident">error</span>, <span class="string">&quot;rule&quot;</span> =&gt; <span class="question-mark">?</span><span class="ident">rule</span>);
+                <span class="kw">let </span>on_type_error = |error, rule| <span class="macro">error!</span>(logger, <span class="string">&quot;Rule evaluation error for {:?}&quot;</span>, campaign.id; <span class="string">&quot;error&quot; </span>=&gt; <span class="question-mark">?</span>error, <span class="string">&quot;rule&quot; </span>=&gt; <span class="question-mark">?</span>rule);
 
-                <span class="ident">eval_with_callback</span>(<span class="kw-2">&amp;</span><span class="ident">targeting_rules</span>, <span class="kw-2">&amp;</span><span class="ident">input</span>, <span class="kw-2">&amp;mut</span> <span class="ident">output</span>, <span class="prelude-val">Some</span>(<span class="ident">on_type_error</span>));
+                eval_with_callback(<span class="kw-2">&amp;</span>targeting_rules, <span class="kw-2">&amp;</span>input, <span class="kw-2">&amp;mut </span>output, <span class="prelude-val">Some</span>(on_type_error));
 
-                <span class="kw">if</span> <span class="ident">output</span>.<span class="ident">show</span> {
-                    <span class="kw">let</span> <span class="ident">price</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">output</span>.<span class="ident">price</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">event_type</span>) {
-                        <span class="prelude-val">Some</span>(<span class="ident">output_price</span>) =&gt; <span class="ident">max</span>(<span class="ident">pricing</span>.<span class="ident">min</span>, <span class="ident">min</span>(<span class="ident">pricing</span>.<span class="ident">max</span>, <span class="kw-2">*</span><span class="ident">output_price</span>)),
-                        <span class="prelude-val">None</span> =&gt; <span class="ident">max</span>(<span class="ident">pricing</span>.<span class="ident">min</span>, <span class="ident">pricing</span>.<span class="ident">max</span>),
+                <span class="kw">if </span>output.show {
+                    <span class="kw">let </span>price = <span class="kw">match </span>output.price.get(<span class="kw-2">&amp;</span>event_type) {
+                        <span class="prelude-val">Some</span>(output_price) =&gt; max(pricing.min, min(pricing.max, <span class="kw-2">*</span>output_price)),
+                        <span class="prelude-val">None </span>=&gt; max(pricing.min, pricing.max),
                     };
 
-                    <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>((<span class="kw-2">*</span><span class="ident">publisher</span>, <span class="ident">price</span>)))
-                } <span class="kw">else</span> {
+                    <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>((<span class="kw-2">*</span>publisher, price)))
+                } <span class="kw">else </span>{
                     <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>)
                 }
             }
@@ -274,103 +274,103 @@
     }
 }
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
-<span class="kw">mod</span> <span class="ident">test</span> {
-    <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
-    <span class="kw">use</span> <span class="ident">primitives</span>::{
-        <span class="ident">campaign::Pricing</span>,
-        <span class="ident">sentry</span>::{<span class="ident">CLICK</span>, <span class="ident">IMPRESSION</span>},
-        <span class="ident">test_util</span>::{<span class="ident">discard_logger</span>, <span class="ident">DUMMY_CAMPAIGN</span>, <span class="ident">DUMMY_IPFS</span>, <span class="ident">LEADER</span>, <span class="ident">PUBLISHER</span>},
+<span class="attribute">#[cfg(test)]</span>
+<span class="kw">mod </span>test {
+    <span class="kw">use super</span>::<span class="kw-2">*</span>;
+    <span class="kw">use </span>primitives::{
+        campaign::Pricing,
+        sentry::{CLICK, IMPRESSION},
+        test_util::{discard_logger, DUMMY_CAMPAIGN, DUMMY_IPFS, LEADER, PUBLISHER},
     };
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">get_event_payouts_pricing_bounds_impression_event</span>() {
-        <span class="kw">let</span> <span class="ident">logger</span> <span class="op">=</span> <span class="ident">discard_logger</span>();
+    <span class="attribute">#[test]</span>
+    <span class="kw">fn </span>get_event_payouts_pricing_bounds_impression_event() {
+        <span class="kw">let </span>logger = discard_logger();
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">campaign</span> <span class="op">=</span> <span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">clone</span>();
-        <span class="ident">campaign</span>.<span class="ident">budget</span> <span class="op">=</span> <span class="number">100</span>.<span class="ident">into</span>();
-        <span class="ident">campaign</span>.<span class="ident">pricing_bounds</span> <span class="op">=</span> <span class="macro">vec!</span>[
+        <span class="kw">let </span><span class="kw-2">mut </span>campaign = DUMMY_CAMPAIGN.clone();
+        campaign.budget = <span class="number">100</span>.into();
+        campaign.pricing_bounds = <span class="macro">vec!</span>[
             (
-                <span class="ident">IMPRESSION</span>,
-                <span class="ident">Pricing</span> {
-                    <span class="ident">min</span>: <span class="number">8</span>.<span class="ident">into</span>(),
-                    <span class="ident">max</span>: <span class="number">64</span>.<span class="ident">into</span>(),
+                IMPRESSION,
+                Pricing {
+                    min: <span class="number">8</span>.into(),
+                    max: <span class="number">64</span>.into(),
                 },
             ),
             (
-                <span class="ident">CLICK</span>,
-                <span class="ident">Pricing</span> {
-                    <span class="ident">min</span>: <span class="number">23</span>.<span class="ident">into</span>(),
-                    <span class="ident">max</span>: <span class="number">100</span>.<span class="ident">into</span>(),
+                CLICK,
+                Pricing {
+                    min: <span class="number">23</span>.into(),
+                    max: <span class="number">100</span>.into(),
                 },
             ),
         ]
-        .<span class="ident">into_iter</span>()
-        .<span class="ident">collect</span>();
+        .into_iter()
+        .collect();
 
-        <span class="kw">let</span> <span class="ident">event</span> <span class="op">=</span> <span class="ident">Event::Impression</span> {
-            <span class="ident">publisher</span>: <span class="kw-2">*</span><span class="ident">LEADER</span>,
-            <span class="ident">ad_unit</span>: <span class="ident">DUMMY_IPFS</span>[<span class="number">0</span>],
-            <span class="ident">ad_slot</span>: <span class="ident">DUMMY_IPFS</span>[<span class="number">1</span>],
-            <span class="ident">referrer</span>: <span class="prelude-val">None</span>,
+        <span class="kw">let </span>event = Event::Impression {
+            publisher: <span class="kw-2">*</span>LEADER,
+            ad_unit: DUMMY_IPFS[<span class="number">0</span>],
+            ad_slot: DUMMY_IPFS[<span class="number">1</span>],
+            referrer: <span class="prelude-val">None</span>,
         };
 
-        <span class="kw">let</span> <span class="ident">session</span> <span class="op">=</span> <span class="ident">Session</span> {
-            <span class="ident">ip</span>: <span class="prelude-val">None</span>,
-            <span class="ident">country</span>: <span class="prelude-val">None</span>,
-            <span class="ident">referrer_header</span>: <span class="prelude-val">None</span>,
-            <span class="ident">os</span>: <span class="prelude-val">None</span>,
+        <span class="kw">let </span>session = Session {
+            ip: <span class="prelude-val">None</span>,
+            country: <span class="prelude-val">None</span>,
+            referrer_header: <span class="prelude-val">None</span>,
+            os: <span class="prelude-val">None</span>,
         };
 
-        <span class="kw">let</span> <span class="ident">payout</span> <span class="op">=</span> <span class="ident">get_payout</span>(<span class="kw-2">&amp;</span><span class="ident">logger</span>, <span class="kw-2">&amp;</span><span class="ident">campaign</span>, <span class="kw-2">&amp;</span><span class="ident">event</span>, <span class="kw-2">&amp;</span><span class="ident">session</span>).<span class="ident">expect</span>(<span class="string">&quot;Should be OK&quot;</span>);
+        <span class="kw">let </span>payout = get_payout(<span class="kw-2">&amp;</span>logger, <span class="kw-2">&amp;</span>campaign, <span class="kw-2">&amp;</span>event, <span class="kw-2">&amp;</span>session).expect(<span class="string">&quot;Should be OK&quot;</span>);
 
-        <span class="kw">let</span> <span class="ident">expected_option</span> <span class="op">=</span> <span class="prelude-val">Some</span>((<span class="kw-2">*</span><span class="ident">LEADER</span>, <span class="number">8</span>.<span class="ident">into</span>()));
-        <span class="macro">assert_eq!</span>(<span class="ident">expected_option</span>, <span class="ident">payout</span>, <span class="string">&quot;pricingBounds: impression event&quot;</span>);
+        <span class="kw">let </span>expected_option = <span class="prelude-val">Some</span>((<span class="kw-2">*</span>LEADER, <span class="number">8</span>.into()));
+        <span class="macro">assert_eq!</span>(expected_option, payout, <span class="string">&quot;pricingBounds: impression event&quot;</span>);
     }
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">get_event_payouts_pricing_bounds_click_event</span>() {
-        <span class="kw">let</span> <span class="ident">logger</span> <span class="op">=</span> <span class="ident">discard_logger</span>();
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">campaign</span> <span class="op">=</span> <span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">clone</span>();
-        <span class="ident">campaign</span>.<span class="ident">budget</span> <span class="op">=</span> <span class="number">100</span>.<span class="ident">into</span>();
-        <span class="ident">campaign</span>.<span class="ident">pricing_bounds</span> <span class="op">=</span> <span class="macro">vec!</span>[
+    <span class="attribute">#[test]</span>
+    <span class="kw">fn </span>get_event_payouts_pricing_bounds_click_event() {
+        <span class="kw">let </span>logger = discard_logger();
+        <span class="kw">let </span><span class="kw-2">mut </span>campaign = DUMMY_CAMPAIGN.clone();
+        campaign.budget = <span class="number">100</span>.into();
+        campaign.pricing_bounds = <span class="macro">vec!</span>[
             (
-                <span class="ident">IMPRESSION</span>,
-                <span class="ident">Pricing</span> {
-                    <span class="ident">min</span>: <span class="number">8</span>.<span class="ident">into</span>(),
-                    <span class="ident">max</span>: <span class="number">64</span>.<span class="ident">into</span>(),
+                IMPRESSION,
+                Pricing {
+                    min: <span class="number">8</span>.into(),
+                    max: <span class="number">64</span>.into(),
                 },
             ),
             (
-                <span class="ident">CLICK</span>,
-                <span class="ident">Pricing</span> {
-                    <span class="ident">min</span>: <span class="number">23</span>.<span class="ident">into</span>(),
-                    <span class="ident">max</span>: <span class="number">100</span>.<span class="ident">into</span>(),
+                CLICK,
+                Pricing {
+                    min: <span class="number">23</span>.into(),
+                    max: <span class="number">100</span>.into(),
                 },
             ),
         ]
-        .<span class="ident">into_iter</span>()
-        .<span class="ident">collect</span>();
+        .into_iter()
+        .collect();
 
-        <span class="kw">let</span> <span class="ident">event</span> <span class="op">=</span> <span class="ident">Event::Click</span> {
-            <span class="ident">publisher</span>: <span class="kw-2">*</span><span class="ident">PUBLISHER</span>,
-            <span class="ident">ad_unit</span>: <span class="ident">DUMMY_IPFS</span>[<span class="number">0</span>],
-            <span class="ident">ad_slot</span>: <span class="ident">DUMMY_IPFS</span>[<span class="number">1</span>],
-            <span class="ident">referrer</span>: <span class="prelude-val">None</span>,
+        <span class="kw">let </span>event = Event::Click {
+            publisher: <span class="kw-2">*</span>PUBLISHER,
+            ad_unit: DUMMY_IPFS[<span class="number">0</span>],
+            ad_slot: DUMMY_IPFS[<span class="number">1</span>],
+            referrer: <span class="prelude-val">None</span>,
         };
 
-        <span class="kw">let</span> <span class="ident">session</span> <span class="op">=</span> <span class="ident">Session</span> {
-            <span class="ident">ip</span>: <span class="prelude-val">None</span>,
-            <span class="ident">country</span>: <span class="prelude-val">None</span>,
-            <span class="ident">referrer_header</span>: <span class="prelude-val">None</span>,
-            <span class="ident">os</span>: <span class="prelude-val">None</span>,
+        <span class="kw">let </span>session = Session {
+            ip: <span class="prelude-val">None</span>,
+            country: <span class="prelude-val">None</span>,
+            referrer_header: <span class="prelude-val">None</span>,
+            os: <span class="prelude-val">None</span>,
         };
 
-        <span class="kw">let</span> <span class="ident">payout</span> <span class="op">=</span> <span class="ident">get_payout</span>(<span class="kw-2">&amp;</span><span class="ident">logger</span>, <span class="kw-2">&amp;</span><span class="ident">campaign</span>, <span class="kw-2">&amp;</span><span class="ident">event</span>, <span class="kw-2">&amp;</span><span class="ident">session</span>).<span class="ident">expect</span>(<span class="string">&quot;Should be OK&quot;</span>);
+        <span class="kw">let </span>payout = get_payout(<span class="kw-2">&amp;</span>logger, <span class="kw-2">&amp;</span>campaign, <span class="kw-2">&amp;</span>event, <span class="kw-2">&amp;</span>session).expect(<span class="string">&quot;Should be OK&quot;</span>);
 
-        <span class="kw">let</span> <span class="ident">expected_option</span> <span class="op">=</span> <span class="prelude-val">Some</span>((<span class="kw-2">*</span><span class="ident">PUBLISHER</span>, <span class="number">23</span>.<span class="ident">into</span>()));
-        <span class="macro">assert_eq!</span>(<span class="ident">expected_option</span>, <span class="ident">payout</span>, <span class="string">&quot;pricingBounds: click event&quot;</span>);
+        <span class="kw">let </span>expected_option = <span class="prelude-val">Some</span>((<span class="kw-2">*</span>PUBLISHER, <span class="number">23</span>.into()));
+        <span class="macro">assert_eq!</span>(expected_option, payout, <span class="string">&quot;pricingBounds: click event&quot;</span>);
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (20ffea693 2022-08-11)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>

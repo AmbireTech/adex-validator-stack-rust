@@ -14,21 +14,21 @@
 <span id="14">14</span>
 <span id="15">15</span>
 <span id="16">16</span>
-</pre><pre class="rust"><code><span class="kw">pub</span> <span class="kw">use</span> <span class="ident">ad_unit</span>::{<span class="ident">AdUnitResponse</span>, <span class="ident">AdUnitsResponse</span>};
+</pre><pre class="rust"><code><span class="kw">pub use </span>ad_unit::{AdUnitResponse, AdUnitsResponse};
 
-<span class="kw">mod</span> <span class="ident">ad_unit</span> {
-    <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::AdUnit</span>;
-    <span class="kw">use</span> <span class="ident">serde</span>::{<span class="ident">Deserialize</span>, <span class="ident">Serialize</span>};
+<span class="kw">mod </span>ad_unit {
+    <span class="kw">use </span><span class="kw">crate</span>::AdUnit;
+    <span class="kw">use </span>serde::{Deserialize, Serialize};
 
-    <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">PartialEq</span>)]</span>
-    <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">rename_all</span> <span class="op">=</span> <span class="string">&quot;camelCase&quot;</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">AdUnitsResponse</span>(<span class="kw">pub</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">AdUnit</span><span class="op">&gt;</span>);
+    <span class="attribute">#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]</span>
+    <span class="attribute">#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]</span>
+    <span class="kw">pub struct </span>AdUnitsResponse(<span class="kw">pub </span>Vec&lt;AdUnit&gt;);
 
-    <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">PartialEq</span>)]</span>
-    <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">rename_all</span> <span class="op">=</span> <span class="string">&quot;camelCase&quot;</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">AdUnitResponse</span> {
-        <span class="kw">pub</span> <span class="ident">unit</span>: <span class="ident">AdUnit</span>,
+    <span class="attribute">#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]</span>
+    <span class="attribute">#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]</span>
+    <span class="kw">pub struct </span>AdUnitResponse {
+        <span class="kw">pub </span>unit: AdUnit,
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="primitives" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (20ffea693 2022-08-11)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="primitives" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>

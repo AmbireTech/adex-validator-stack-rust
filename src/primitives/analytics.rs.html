@@ -381,224 +381,274 @@
 <span id="381">381</span>
 <span id="382">382</span>
 <span id="383">383</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="kw">crate</span>::{
-    <span class="ident">sentry</span>::{<span class="ident">EventType</span>, <span class="ident">IMPRESSION</span>},
-    <span class="ident">Address</span>, <span class="ident">CampaignId</span>, <span class="ident">ChainId</span>, <span class="ident">ValidatorId</span>, <span class="ident">IPFS</span>,
+<span id="384">384</span>
+<span id="385">385</span>
+<span id="386">386</span>
+<span id="387">387</span>
+<span id="388">388</span>
+<span id="389">389</span>
+<span id="390">390</span>
+<span id="391">391</span>
+<span id="392">392</span>
+<span id="393">393</span>
+<span id="394">394</span>
+<span id="395">395</span>
+<span id="396">396</span>
+<span id="397">397</span>
+<span id="398">398</span>
+<span id="399">399</span>
+<span id="400">400</span>
+<span id="401">401</span>
+<span id="402">402</span>
+<span id="403">403</span>
+<span id="404">404</span>
+<span id="405">405</span>
+<span id="406">406</span>
+<span id="407">407</span>
+<span id="408">408</span>
+</pre><pre class="rust"><code><span class="kw">use crate</span>::{
+    sentry::{EventType, IMPRESSION},
+    Address, CampaignId, ChainId, ValidatorId, IPFS,
 };
-<span class="kw">use</span> <span class="ident">parse_display::Display</span>;
-<span class="kw">use</span> <span class="ident">serde</span>::{<span class="ident">Deserialize</span>, <span class="ident">Serialize</span>};
+<span class="kw">use </span>parse_display::Display;
+<span class="kw">use </span>serde::{Deserialize, Serialize};
 
-<span class="kw">use</span> <span class="ident"><span class="self">self</span>::query</span>::{<span class="ident">AllowedKey</span>, <span class="ident">Time</span>};
+<span class="kw">use </span><span class="self">self</span>::query::{AllowedKey, Time};
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;postgres&quot;</span>)]</span>
-<span class="kw">mod</span> <span class="ident">postgres</span> {
-    <span class="kw">use</span> <span class="kw">super</span>::{<span class="ident">query::AllowedKey</span>, <span class="ident">AnalyticsQuery</span>, <span class="ident">OperatingSystem</span>};
-    <span class="kw">use</span> <span class="ident">bytes::BytesMut</span>;
-    <span class="kw">use</span> <span class="ident">std::error::Error</span>;
-    <span class="kw">use</span> <span class="ident">tokio_postgres::types</span>::{<span class="ident">accepts</span>, <span class="ident">to_sql_checked</span>, <span class="ident">FromSql</span>, <span class="ident">IsNull</span>, <span class="ident">ToSql</span>, <span class="ident">Type</span>};
+<span class="attribute">#[cfg(feature = <span class="string">&quot;postgres&quot;</span>)]</span>
+<span class="kw">mod </span>postgres {
+    <span class="kw">use super</span>::{query::AllowedKey, AnalyticsQuery, OperatingSystem};
+    <span class="kw">use </span>bytes::BytesMut;
+    <span class="kw">use </span>std::error::Error;
+    <span class="kw">use </span>tokio_postgres::types::{accepts, to_sql_checked, FromSql, IsNull, ToSql, Type};
 
-    <span class="kw">impl</span> <span class="ident">AnalyticsQuery</span> {
-        <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_key</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">key</span>: <span class="ident">AllowedKey</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">ToSql</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-            <span class="kw">match</span> <span class="ident">key</span> {
-                <span class="ident">AllowedKey::CampaignId</span> =&gt; <span class="self">self</span>
-                    .<span class="ident">campaign_id</span>
-                    .<span class="ident">map</span>(<span class="op">|</span><span class="ident">campaign_id</span><span class="op">|</span> <span class="ident">Box::new</span>(<span class="ident">campaign_id</span>) <span class="kw">as</span> <span class="kw">_</span>),
-                <span class="ident">AllowedKey::AdUnit</span> =&gt; <span class="self">self</span>.<span class="ident">ad_unit</span>.<span class="ident">map</span>(<span class="op">|</span><span class="ident">ad_unit</span><span class="op">|</span> <span class="ident">Box::new</span>(<span class="ident">ad_unit</span>) <span class="kw">as</span> <span class="kw">_</span>),
-                <span class="ident">AllowedKey::AdSlot</span> =&gt; <span class="self">self</span>.<span class="ident">ad_slot</span>.<span class="ident">map</span>(<span class="op">|</span><span class="ident">ad_slot</span><span class="op">|</span> <span class="ident">Box::new</span>(<span class="ident">ad_slot</span>) <span class="kw">as</span> <span class="kw">_</span>),
-                <span class="ident">AllowedKey::AdSlotType</span> =&gt; <span class="self">self</span>
-                    .<span class="ident">ad_slot_type</span>
-                    .<span class="ident">clone</span>()
-                    .<span class="ident">map</span>(<span class="op">|</span><span class="ident">ad_slot_type</span><span class="op">|</span> <span class="ident">Box::new</span>(<span class="ident">ad_slot_type</span>) <span class="kw">as</span> <span class="kw">_</span>),
-                <span class="ident">AllowedKey::Advertiser</span> =&gt; {
-                    <span class="self">self</span>.<span class="ident">advertiser</span>.<span class="ident">map</span>(<span class="op">|</span><span class="ident">advertiser</span><span class="op">|</span> <span class="ident">Box::new</span>(<span class="ident">advertiser</span>) <span class="kw">as</span> <span class="kw">_</span>)
+    <span class="kw">impl </span>AnalyticsQuery {
+        <span class="kw">pub fn </span>get_key(<span class="kw-2">&amp;</span><span class="self">self</span>, key: AllowedKey) -&gt; <span class="prelude-ty">Option</span>&lt;Box&lt;<span class="kw">dyn </span>ToSql + Sync + Send&gt;&gt; {
+            <span class="kw">match </span>key {
+                AllowedKey::CampaignId =&gt; <span class="self">self
+                    </span>.campaign_id
+                    .map(|campaign_id| Box::new(campaign_id) <span class="kw">as _</span>),
+                AllowedKey::AdUnit =&gt; <span class="self">self</span>.ad_unit.map(|ad_unit| Box::new(ad_unit) <span class="kw">as _</span>),
+                AllowedKey::AdSlot =&gt; <span class="self">self</span>.ad_slot.map(|ad_slot| Box::new(ad_slot) <span class="kw">as _</span>),
+                AllowedKey::AdSlotType =&gt; <span class="self">self
+                    </span>.ad_slot_type
+                    .clone()
+                    .map(|ad_slot_type| Box::new(ad_slot_type) <span class="kw">as _</span>),
+                AllowedKey::Advertiser =&gt; {
+                    <span class="self">self</span>.advertiser.map(|advertiser| Box::new(advertiser) <span class="kw">as _</span>)
                 }
-                <span class="ident">AllowedKey::Publisher</span> =&gt; <span class="self">self</span>.<span class="ident">publisher</span>.<span class="ident">map</span>(<span class="op">|</span><span class="ident">publisher</span><span class="op">|</span> <span class="ident">Box::new</span>(<span class="ident">publisher</span>) <span class="kw">as</span> <span class="kw">_</span>),
-                <span class="ident">AllowedKey::Hostname</span> =&gt; <span class="self">self</span>
-                    .<span class="ident">hostname</span>
-                    .<span class="ident">clone</span>()
-                    .<span class="ident">map</span>(<span class="op">|</span><span class="ident">hostname</span><span class="op">|</span> <span class="ident">Box::new</span>(<span class="ident">hostname</span>) <span class="kw">as</span> <span class="kw">_</span>),
-                <span class="ident">AllowedKey::Country</span> =&gt; <span class="self">self</span>.<span class="ident">country</span>.<span class="ident">clone</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">country</span><span class="op">|</span> <span class="ident">Box::new</span>(<span class="ident">country</span>) <span class="kw">as</span> <span class="kw">_</span>),
-                <span class="ident">AllowedKey::OsName</span> =&gt; <span class="self">self</span>.<span class="ident">os_name</span>.<span class="ident">clone</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">os_name</span><span class="op">|</span> <span class="ident">Box::new</span>(<span class="ident">os_name</span>) <span class="kw">as</span> <span class="kw">_</span>),
+                AllowedKey::Publisher =&gt; <span class="self">self</span>.publisher.map(|publisher| Box::new(publisher) <span class="kw">as _</span>),
+                AllowedKey::Hostname =&gt; <span class="self">self
+                    </span>.hostname
+                    .clone()
+                    .map(|hostname| Box::new(hostname) <span class="kw">as _</span>),
+                AllowedKey::Country =&gt; <span class="self">self</span>.country.clone().map(|country| Box::new(country) <span class="kw">as _</span>),
+                AllowedKey::OsName =&gt; <span class="self">self</span>.os_name.clone().map(|os_name| Box::new(os_name) <span class="kw">as _</span>),
             }
         }
     }
 
-    <span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="ident">FromSql</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">OperatingSystem</span> {
-        <span class="kw">fn</span> <span class="ident">from_sql</span>(<span class="ident">ty</span>: <span class="kw-2">&amp;</span><span class="ident">Type</span>, <span class="ident">raw</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> [<span class="ident">u8</span>]) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Error</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-            <span class="kw">let</span> <span class="ident">str_slice</span> <span class="op">=</span> <span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">str</span> <span class="kw">as</span> <span class="ident">FromSql</span><span class="op">&gt;</span><span class="ident">::from_sql</span>(<span class="ident">ty</span>, <span class="ident">raw</span>)<span class="question-mark">?</span>;
-            <span class="kw">let</span> <span class="ident">os</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">str_slice</span> {
-                <span class="string">&quot;Other&quot;</span> =&gt; <span class="ident">OperatingSystem::Other</span>,
-                <span class="string">&quot;Linux&quot;</span> =&gt; <span class="ident">OperatingSystem::Linux</span>,
-                <span class="kw">_</span> =&gt; <span class="ident">OperatingSystem::Whitelisted</span>(<span class="ident">str_slice</span>.<span class="ident">to_string</span>()),
+    <span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; FromSql&lt;<span class="lifetime">&#39;a</span>&gt; <span class="kw">for </span>OperatingSystem {
+        <span class="kw">fn </span>from_sql(ty: <span class="kw-2">&amp;</span>Type, raw: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>[u8]) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, Box&lt;<span class="kw">dyn </span>Error + Sync + Send&gt;&gt; {
+            <span class="kw">let </span>str_slice = &lt;<span class="kw-2">&amp;</span>str <span class="kw">as </span>FromSql&gt;::from_sql(ty, raw)<span class="question-mark">?</span>;
+            <span class="kw">let </span>os = <span class="kw">match </span>str_slice {
+                <span class="string">&quot;Other&quot; </span>=&gt; OperatingSystem::Other,
+                <span class="string">&quot;Linux&quot; </span>=&gt; OperatingSystem::Linux,
+                <span class="kw">_ </span>=&gt; OperatingSystem::Whitelisted(str_slice.to_string()),
             };
 
-            <span class="prelude-val">Ok</span>(<span class="ident">os</span>)
+            <span class="prelude-val">Ok</span>(os)
         }
 
-        <span class="macro">accepts!</span>(<span class="ident">TEXT</span>, <span class="ident">VARCHAR</span>);
+        <span class="macro">accepts!</span>(TEXT, VARCHAR);
     }
 
-    <span class="kw">impl</span> <span class="ident">ToSql</span> <span class="kw">for</span> <span class="ident">OperatingSystem</span> {
-        <span class="kw">fn</span> <span class="ident">to_sql</span>(
+    <span class="kw">impl </span>ToSql <span class="kw">for </span>OperatingSystem {
+        <span class="kw">fn </span>to_sql(
             <span class="kw-2">&amp;</span><span class="self">self</span>,
-            <span class="ident">ty</span>: <span class="kw-2">&amp;</span><span class="ident">Type</span>,
-            <span class="ident">w</span>: <span class="kw-2">&amp;mut</span> <span class="ident">BytesMut</span>,
-        ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">IsNull</span>, <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Error</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-            <span class="self">self</span>.<span class="ident">to_string</span>().<span class="ident">to_sql</span>(<span class="ident">ty</span>, <span class="ident">w</span>)
+            ty: <span class="kw-2">&amp;</span>Type,
+            w: <span class="kw-2">&amp;mut </span>BytesMut,
+        ) -&gt; <span class="prelude-ty">Result</span>&lt;IsNull, Box&lt;<span class="kw">dyn </span>Error + Sync + Send&gt;&gt; {
+            <span class="self">self</span>.to_string().to_sql(ty, w)
         }
 
-        <span class="macro">accepts!</span>(<span class="ident">TEXT</span>, <span class="ident">VARCHAR</span>);
+        <span class="macro">accepts!</span>(TEXT, VARCHAR);
         <span class="macro">to_sql_checked!</span>();
     }
 
-    <span class="kw">impl</span> <span class="ident">ToSql</span> <span class="kw">for</span> <span class="ident">AllowedKey</span> {
-        <span class="kw">fn</span> <span class="ident">to_sql</span>(
+    <span class="kw">impl </span>ToSql <span class="kw">for </span>AllowedKey {
+        <span class="kw">fn </span>to_sql(
             <span class="kw-2">&amp;</span><span class="self">self</span>,
-            <span class="ident">ty</span>: <span class="kw-2">&amp;</span><span class="ident">Type</span>,
-            <span class="ident">w</span>: <span class="kw-2">&amp;mut</span> <span class="ident">BytesMut</span>,
-        ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">IsNull</span>, <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Error</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-            <span class="self">self</span>.<span class="ident">to_string</span>().<span class="ident">to_sql</span>(<span class="ident">ty</span>, <span class="ident">w</span>)
+            ty: <span class="kw-2">&amp;</span>Type,
+            w: <span class="kw-2">&amp;mut </span>BytesMut,
+        ) -&gt; <span class="prelude-ty">Result</span>&lt;IsNull, Box&lt;<span class="kw">dyn </span>Error + Sync + Send&gt;&gt; {
+            <span class="self">self</span>.to_string().to_sql(ty, w)
         }
 
-        <span class="macro">accepts!</span>(<span class="ident">TEXT</span>, <span class="ident">VARCHAR</span>);
+        <span class="macro">accepts!</span>(TEXT, VARCHAR);
         <span class="macro">to_sql_checked!</span>();
     }
 
-    <span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="ident">FromSql</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">AllowedKey</span> {
-        <span class="kw">fn</span> <span class="ident">from_sql</span>(<span class="ident">ty</span>: <span class="kw-2">&amp;</span><span class="ident">Type</span>, <span class="ident">raw</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> [<span class="ident">u8</span>]) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Error</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-            <span class="kw">let</span> <span class="ident">allowed_key_str</span> <span class="op">=</span> <span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">str</span> <span class="kw">as</span> <span class="ident">FromSql</span><span class="op">&gt;</span><span class="ident">::from_sql</span>(<span class="ident">ty</span>, <span class="ident">raw</span>)<span class="question-mark">?</span>;
+    <span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; FromSql&lt;<span class="lifetime">&#39;a</span>&gt; <span class="kw">for </span>AllowedKey {
+        <span class="kw">fn </span>from_sql(ty: <span class="kw-2">&amp;</span>Type, raw: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>[u8]) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, Box&lt;<span class="kw">dyn </span>Error + Sync + Send&gt;&gt; {
+            <span class="kw">let </span>allowed_key_str = &lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>str <span class="kw">as </span>FromSql&gt;::from_sql(ty, raw)<span class="question-mark">?</span>;
 
-            <span class="prelude-val">Ok</span>(<span class="ident">allowed_key_str</span>.<span class="ident">parse</span>()<span class="question-mark">?</span>)
+            <span class="prelude-val">Ok</span>(allowed_key_str.parse()<span class="question-mark">?</span>)
         }
 
-        <span class="macro">accepts!</span>(<span class="ident">TEXT</span>, <span class="ident">VARCHAR</span>);
+        <span class="macro">accepts!</span>(TEXT, VARCHAR);
     }
 }
 
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">query</span>;
+<span class="kw">pub mod </span>query;
 
-<span class="comment">// Query used for filtering analytics</span>
-<span class="comment">//</span>
-<span class="doccomment">/// # Examples:</span>
-<span class="doccomment">/// ```</span>
-<span class="attribute">#[<span class="ident">doc</span> <span class="op">=</span> <span class="macro">include_str!</span>(<span class="string">&quot;../examples/analytics_query.rs&quot;</span>)]</span>
-<span class="doccomment">/// ```</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">Clone</span>)]</span>
-<span class="attribute">#[<span class="ident">serde</span>(<span class="ident">rename_all</span> <span class="op">=</span> <span class="string">&quot;camelCase&quot;</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">AnalyticsQuery</span> {
-    <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">default</span> <span class="op">=</span> <span class="string">&quot;default_limit&quot;</span>)]</span>
-    <span class="kw">pub</span> <span class="ident">limit</span>: <span class="ident">u32</span>,
-    <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">default</span> <span class="op">=</span> <span class="string">&quot;default_event_type&quot;</span>)]</span>
-    <span class="kw">pub</span> <span class="ident">event_type</span>: <span class="ident">EventType</span>,
-    <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">default</span> <span class="op">=</span> <span class="string">&quot;default_metric&quot;</span>)]</span>
-    <span class="kw">pub</span> <span class="ident">metric</span>: <span class="ident">Metric</span>,
-    <span class="kw">pub</span> <span class="ident">segment_by</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">AllowedKey</span><span class="op">&gt;</span>,
-    <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">flatten</span>)]</span>
-    <span class="kw">pub</span> <span class="ident">time</span>: <span class="ident">Time</span>,
-    <span class="kw">pub</span> <span class="ident">campaign_id</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">CampaignId</span><span class="op">&gt;</span>,
-    <span class="kw">pub</span> <span class="ident">ad_unit</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">IPFS</span><span class="op">&gt;</span>,
-    <span class="kw">pub</span> <span class="ident">ad_slot</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">IPFS</span><span class="op">&gt;</span>,
-    <span class="kw">pub</span> <span class="ident">ad_slot_type</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>,
-    <span class="kw">pub</span> <span class="ident">advertiser</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span>,
-    <span class="kw">pub</span> <span class="ident">publisher</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span>,
-    <span class="kw">pub</span> <span class="ident">hostname</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>,
-    <span class="kw">pub</span> <span class="ident">country</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>,
-    <span class="kw">pub</span> <span class="ident">os_name</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">OperatingSystem</span><span class="op">&gt;</span>,
-    <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">default</span>)]</span>
-    <span class="kw">pub</span> <span class="ident">chains</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">ChainId</span><span class="op">&gt;</span>,
+<span class="comment">// Query used for filtering analytics
+//
+</span><span class="doccomment">/// # Examples:
+/// ```
+</span><span class="attribute">#[doc = <span class="macro">include_str!</span>(<span class="string">&quot;../examples/analytics_query.rs&quot;</span>)]</span>
+<span class="doccomment">/// ```
+</span><span class="attribute">#[derive(Debug, Serialize, Deserialize, Clone)]</span>
+<span class="attribute">#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]</span>
+<span class="kw">pub struct </span>AnalyticsQuery {
+    <span class="doccomment">/// Default: `100`
+    </span><span class="attribute">#[serde(default = <span class="string">&quot;default_limit&quot;</span>)]</span>
+    <span class="kw">pub </span>limit: u32,
+    <span class="doccomment">/// Default: [`EventType::Impression`]
+    </span><span class="attribute">#[serde(default = <span class="string">&quot;default_event_type&quot;</span>)]</span>
+    <span class="kw">pub </span>event_type: EventType,
+    <span class="comment">// Default: [`Metric::Count`]
+    </span><span class="attribute">#[serde(default = <span class="string">&quot;default_metric&quot;</span>)]</span>
+    <span class="kw">pub </span>metric: Metric,
+    <span class="kw">pub </span>segment_by: <span class="prelude-ty">Option</span>&lt;AllowedKey&gt;,
+    <span class="attribute">#[serde(flatten)]</span>
+    <span class="kw">pub </span>time: Time,
+    <span class="kw">pub </span>campaign_id: <span class="prelude-ty">Option</span>&lt;CampaignId&gt;,
+    <span class="kw">pub </span>ad_unit: <span class="prelude-ty">Option</span>&lt;IPFS&gt;,
+    <span class="kw">pub </span>ad_slot: <span class="prelude-ty">Option</span>&lt;IPFS&gt;,
+    <span class="kw">pub </span>ad_slot_type: <span class="prelude-ty">Option</span>&lt;String&gt;,
+    <span class="kw">pub </span>advertiser: <span class="prelude-ty">Option</span>&lt;Address&gt;,
+    <span class="kw">pub </span>publisher: <span class="prelude-ty">Option</span>&lt;Address&gt;,
+    <span class="kw">pub </span>hostname: <span class="prelude-ty">Option</span>&lt;String&gt;,
+    <span class="kw">pub </span>country: <span class="prelude-ty">Option</span>&lt;String&gt;,
+    <span class="kw">pub </span>os_name: <span class="prelude-ty">Option</span>&lt;OperatingSystem&gt;,
+    <span class="attribute">#[serde(default)]</span>
+    <span class="kw">pub </span>chains: Vec&lt;ChainId&gt;,
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">PartialEq</span>, <span class="ident">Display</span>, <span class="ident">Hash</span>, <span class="ident">Eq</span>)]</span>
-<span class="attribute">#[<span class="ident">serde</span>(<span class="ident">untagged</span>, <span class="ident">into</span> <span class="op">=</span> <span class="string">&quot;String&quot;</span>, <span class="ident">from</span> <span class="op">=</span> <span class="string">&quot;String&quot;</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">OperatingSystem</span> {
-    <span class="ident">Linux</span>,
-    <span class="attribute">#[<span class="ident">display</span>(<span class="string">&quot;{0}&quot;</span>)]</span>
-    <span class="ident">Whitelisted</span>(<span class="ident">String</span>),
-    <span class="ident">Other</span>,
-}
-
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">Display</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>)]</span>
-<span class="attribute">#[<span class="ident">serde</span>(<span class="ident">rename_all</span> <span class="op">=</span> <span class="string">&quot;camelCase&quot;</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">Timeframe</span> {
-    <span class="doccomment">/// [`Timeframe::Year`] returns analytics grouped by month.</span>
-    <span class="ident">Year</span>,
-    <span class="doccomment">/// [`Timeframe::Month`] returns analytics grouped by day.</span>
-    <span class="ident">Month</span>,
-    <span class="doccomment">/// [`Timeframe::Week`] returns analytics grouped by hour.</span>
-    <span class="doccomment">/// Same as [`Timeframe::Day`].</span>
-    <span class="ident">Week</span>,
-    <span class="doccomment">/// [`Timeframe::Day`] returns analytics grouped by hour.</span>
-    <span class="doccomment">/// Same as [`Timeframe::Week`].</span>
-    <span class="ident">Day</span>,
-}
-
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">Display</span>)]</span>
-<span class="attribute">#[<span class="ident">serde</span>(<span class="ident">rename_all</span> <span class="op">=</span> <span class="string">&quot;camelCase&quot;</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">Metric</span> {
-    <span class="ident">Count</span>,
-    <span class="ident">Paid</span>,
-}
-
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">Display</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">AuthenticateAs</span> {
-    <span class="attribute">#[<span class="ident">display</span>(<span class="string">&quot;{0}&quot;</span>)]</span>
-    <span class="ident">Advertiser</span>(<span class="ident">ValidatorId</span>),
-    <span class="attribute">#[<span class="ident">display</span>(<span class="string">&quot;{0}&quot;</span>)]</span>
-    <span class="ident">Publisher</span>(<span class="ident">ValidatorId</span>),
-}
-
-<span class="kw">impl</span> <span class="ident">Metric</span> {
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;postgres&quot;</span>)]</span>
-    <span class="attribute">#[<span class="ident">cfg_attr</span>(<span class="ident">docsrs</span>, <span class="ident">doc</span>(<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;postgres&quot;</span>)))]</span>
-    <span class="doccomment">/// Returns the query column name of the [`Metric`].</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Available only when the `postgres` feature is enabled.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">column_name</span>(<span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span> {
-        <span class="kw">match</span> <span class="self">self</span> {
-            <span class="ident">Metric::Count</span> =&gt; <span class="string">&quot;payout_count&quot;</span>,
-            <span class="ident">Metric::Paid</span> =&gt; <span class="string">&quot;payout_amount&quot;</span>,
+<span class="kw">impl </span>Default <span class="kw">for </span>AnalyticsQuery {
+    <span class="kw">fn </span>default() -&gt; <span class="self">Self </span>{
+        <span class="self">Self </span>{
+            limit: default_limit(),
+            event_type: default_event_type(),
+            metric: default_metric(),
+            segment_by: <span class="prelude-val">None</span>,
+            time: Time::default(),
+            campaign_id: <span class="prelude-val">None</span>,
+            ad_unit: <span class="prelude-val">None</span>,
+            ad_slot: <span class="prelude-val">None</span>,
+            ad_slot_type: <span class="prelude-val">None</span>,
+            advertiser: <span class="prelude-val">None</span>,
+            publisher: <span class="prelude-val">None</span>,
+            hostname: <span class="prelude-val">None</span>,
+            country: <span class="prelude-val">None</span>,
+            os_name: <span class="prelude-val">None</span>,
+            chains: Vec::new(),
         }
     }
 }
 
-<span class="kw">impl</span> <span class="ident">Timeframe</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">to_hours</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">i64</span> {
-        <span class="kw">let</span> <span class="ident">hour</span> <span class="op">=</span> <span class="number">1</span>;
-        <span class="kw">let</span> <span class="ident">day</span> <span class="op">=</span> <span class="number">24</span> <span class="op">*</span> <span class="ident">hour</span>;
-        <span class="kw">let</span> <span class="ident">year</span> <span class="op">=</span> <span class="number">365</span> <span class="op">*</span> <span class="ident">day</span>;
-        <span class="kw">match</span> <span class="self">self</span> {
-            <span class="ident">Timeframe::Day</span> =&gt; <span class="ident">day</span>,
-            <span class="ident">Timeframe::Week</span> =&gt; <span class="number">7</span> <span class="op">*</span> <span class="ident">day</span>,
-            <span class="ident">Timeframe::Month</span> =&gt; <span class="ident">year</span> <span class="op">/</span> <span class="number">12</span>,
-            <span class="ident">Timeframe::Year</span> =&gt; <span class="ident">year</span>,
+<span class="attribute">#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Display, Hash, Eq)]</span>
+<span class="attribute">#[serde(untagged, into = <span class="string">&quot;String&quot;</span>, from = <span class="string">&quot;String&quot;</span>)]</span>
+<span class="kw">pub enum </span>OperatingSystem {
+    Linux,
+    <span class="attribute">#[display(<span class="string">&quot;{0}&quot;</span>)]</span>
+    Whitelisted(String),
+    Other,
+}
+
+<span class="attribute">#[derive(Debug, Clone, Serialize, Deserialize, Display, PartialEq, Eq)]</span>
+<span class="attribute">#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]</span>
+<span class="kw">pub enum </span>Timeframe {
+    <span class="doccomment">/// [`Timeframe::Year`] returns analytics grouped by month.
+    </span>Year,
+    <span class="doccomment">/// [`Timeframe::Month`] returns analytics grouped by day.
+    </span>Month,
+    <span class="doccomment">/// [`Timeframe::Week`] returns analytics grouped by hour.
+    /// Same as [`Timeframe::Day`].
+    </span>Week,
+    <span class="doccomment">/// [`Timeframe::Day`] returns analytics grouped by hour.
+    /// Same as [`Timeframe::Week`].
+    </span>Day,
+}
+
+<span class="attribute">#[derive(Debug, Clone, Copy, Serialize, Deserialize, Display)]</span>
+<span class="attribute">#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]</span>
+<span class="kw">pub enum </span>Metric {
+    Count,
+    Paid,
+}
+
+<span class="attribute">#[derive(Debug, Clone, Copy, Serialize, Deserialize, Display)]</span>
+<span class="kw">pub enum </span>AuthenticateAs {
+    <span class="attribute">#[display(<span class="string">&quot;{0}&quot;</span>)]</span>
+    Advertiser(ValidatorId),
+    <span class="attribute">#[display(<span class="string">&quot;{0}&quot;</span>)]</span>
+    Publisher(ValidatorId),
+}
+
+<span class="kw">impl </span>Metric {
+    <span class="attribute">#[cfg(feature = <span class="string">&quot;postgres&quot;</span>)]</span>
+    <span class="attribute">#[cfg_attr(docsrs, doc(cfg(feature = <span class="string">&quot;postgres&quot;</span>)))]</span>
+    <span class="doccomment">/// Returns the query column name of the [`Metric`].
+    ///
+    /// Available only when the `postgres` feature is enabled.
+    </span><span class="kw">pub fn </span>column_name(<span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str {
+        <span class="kw">match </span><span class="self">self </span>{
+            Metric::Count =&gt; <span class="string">&quot;payout_count&quot;</span>,
+            Metric::Paid =&gt; <span class="string">&quot;payout_amount&quot;</span>,
         }
     }
 }
 
-<span class="kw">impl</span> <span class="ident">Default</span> <span class="kw">for</span> <span class="ident">OperatingSystem</span> {
-    <span class="kw">fn</span> <span class="ident">default</span>() -&gt; <span class="self">Self</span> {
-        <span class="ident"><span class="self">Self</span>::Other</span>
-    }
-}
-
-<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">OperatingSystem</span> {
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">operating_system</span>: <span class="ident">String</span>) -&gt; <span class="self">Self</span> {
-        <span class="kw">match</span> <span class="ident">operating_system</span>.<span class="ident">as_str</span>() {
-            <span class="string">&quot;Linux&quot;</span> =&gt; <span class="ident">OperatingSystem::Linux</span>,
-            <span class="string">&quot;Other&quot;</span> =&gt; <span class="ident">OperatingSystem::Other</span>,
-            <span class="kw">_</span> =&gt; <span class="ident">OperatingSystem::Whitelisted</span>(<span class="ident">operating_system</span>),
+<span class="kw">impl </span>Timeframe {
+    <span class="kw">pub fn </span>to_hours(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; i64 {
+        <span class="kw">let </span>hour = <span class="number">1</span>;
+        <span class="kw">let </span>day = <span class="number">24 </span>* hour;
+        <span class="kw">let </span>year = <span class="number">365 </span>* day;
+        <span class="kw">match </span><span class="self">self </span>{
+            Timeframe::Day =&gt; day,
+            Timeframe::Week =&gt; <span class="number">7 </span>* day,
+            Timeframe::Month =&gt; year / <span class="number">12</span>,
+            Timeframe::Year =&gt; year,
         }
     }
 }
 
-<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">OperatingSystem</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">String</span> {
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">os</span>: <span class="ident">OperatingSystem</span>) -&gt; <span class="ident">String</span> {
-        <span class="ident">os</span>.<span class="ident">to_string</span>()
+<span class="kw">impl </span>Default <span class="kw">for </span>OperatingSystem {
+    <span class="kw">fn </span>default() -&gt; <span class="self">Self </span>{
+        <span class="self">Self</span>::Other
     }
 }
 
-<span class="kw">impl</span> <span class="ident">OperatingSystem</span> {
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LINUX_DISTROS</span>: [<span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span>; <span class="number">17</span>] <span class="op">=</span> [
+<span class="kw">impl </span>From&lt;String&gt; <span class="kw">for </span>OperatingSystem {
+    <span class="kw">fn </span>from(operating_system: String) -&gt; <span class="self">Self </span>{
+        <span class="kw">match </span>operating_system.as_str() {
+            <span class="string">&quot;Linux&quot; </span>=&gt; OperatingSystem::Linux,
+            <span class="string">&quot;Other&quot; </span>=&gt; OperatingSystem::Other,
+            <span class="kw">_ </span>=&gt; OperatingSystem::Whitelisted(operating_system),
+        }
+    }
+}
+
+<span class="kw">impl </span>From&lt;OperatingSystem&gt; <span class="kw">for </span>String {
+    <span class="kw">fn </span>from(os: OperatingSystem) -&gt; String {
+        os.to_string()
+    }
+}
+
+<span class="kw">impl </span>OperatingSystem {
+    <span class="kw">pub const </span>LINUX_DISTROS: [<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str; <span class="number">17</span>] = [
         <span class="string">&quot;Arch&quot;</span>,
         <span class="string">&quot;CentOS&quot;</span>,
         <span class="string">&quot;Slackware&quot;</span>,
@@ -617,7 +667,7 @@
         <span class="string">&quot;Ubuntu&quot;</span>,
         <span class="string">&quot;RedHat&quot;</span>,
     ];
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">WHITELISTED</span>: [<span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span>; <span class="number">18</span>] <span class="op">=</span> [
+    <span class="kw">pub const </span>WHITELISTED: [<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str; <span class="number">18</span>] = [
         <span class="string">&quot;Android&quot;</span>,
         <span class="string">&quot;Android-x86&quot;</span>,
         <span class="string">&quot;iOS&quot;</span>,
@@ -638,131 +688,131 @@
         <span class="string">&quot;KAIOS&quot;</span>,
     ];
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">map_os</span>(<span class="ident">os_name</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="ident">OperatingSystem</span> {
-        <span class="kw">if</span> <span class="ident">OperatingSystem::LINUX_DISTROS</span>
-            .<span class="ident">iter</span>()
-            .<span class="ident">any</span>(<span class="op">|</span><span class="ident">distro</span><span class="op">|</span> <span class="ident">os_name</span>.<span class="ident">eq</span>(<span class="kw-2">*</span><span class="ident">distro</span>))
+    <span class="kw">pub fn </span>map_os(os_name: <span class="kw-2">&amp;</span>str) -&gt; OperatingSystem {
+        <span class="kw">if </span>OperatingSystem::LINUX_DISTROS
+            .iter()
+            .any(|distro| os_name.eq(<span class="kw-2">*</span>distro))
         {
-            <span class="ident">OperatingSystem::Linux</span>
-        } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">OperatingSystem::WHITELISTED</span>
-            .<span class="ident">iter</span>()
-            .<span class="ident">any</span>(<span class="op">|</span><span class="ident">whitelisted</span><span class="op">|</span> <span class="ident">os_name</span>.<span class="ident">eq</span>(<span class="kw-2">*</span><span class="ident">whitelisted</span>))
+            OperatingSystem::Linux
+        } <span class="kw">else if </span>OperatingSystem::WHITELISTED
+            .iter()
+            .any(|whitelisted| os_name.eq(<span class="kw-2">*</span>whitelisted))
         {
-            <span class="ident">OperatingSystem::Whitelisted</span>(<span class="ident">os_name</span>.<span class="ident">into</span>())
-        } <span class="kw">else</span> {
-            <span class="ident">OperatingSystem::Other</span>
+            OperatingSystem::Whitelisted(os_name.into())
+        } <span class="kw">else </span>{
+            OperatingSystem::Other
         }
     }
 }
 
-<span class="kw">fn</span> <span class="ident">default_limit</span>() -&gt; <span class="ident">u32</span> {
-    <span class="number">100</span>
+<span class="kw">fn </span>default_limit() -&gt; u32 {
+    <span class="number">100
+</span>}
+
+<span class="kw">fn </span>default_event_type() -&gt; EventType {
+    IMPRESSION
 }
 
-<span class="kw">fn</span> <span class="ident">default_event_type</span>() -&gt; <span class="ident">EventType</span> {
-    <span class="ident">IMPRESSION</span>
+<span class="kw">fn </span>default_metric() -&gt; Metric {
+    Metric::Count
 }
 
-<span class="kw">fn</span> <span class="ident">default_metric</span>() -&gt; <span class="ident">Metric</span> {
-    <span class="ident">Metric::Count</span>
-}
+<span class="attribute">#[cfg(test)]</span>
+<span class="kw">mod </span>test {
+    <span class="kw">use super</span>::<span class="kw-2">*</span>;
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
-<span class="kw">mod</span> <span class="ident">test</span> {
-    <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
+    <span class="attribute">#[cfg(feature = <span class="string">&quot;postgres&quot;</span>)]</span>
+    <span class="kw">use </span><span class="kw">crate</span>::postgres::POSTGRES_POOL;
+    <span class="kw">use </span>once_cell::sync::Lazy;
+    <span class="kw">use </span>serde_json::{from_value, to_value, Value};
+    <span class="kw">use </span>std::collections::HashMap;
 
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;postgres&quot;</span>)]</span>
-    <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::postgres::POSTGRES_POOL</span>;
-    <span class="kw">use</span> <span class="ident">once_cell::sync::Lazy</span>;
-    <span class="kw">use</span> <span class="ident">serde_json</span>::{<span class="ident">from_value</span>, <span class="ident">to_value</span>, <span class="ident">Value</span>};
-    <span class="kw">use</span> <span class="ident">std::collections::HashMap</span>;
-
-    <span class="kw">static</span> <span class="ident">TEST_CASES</span>: <span class="ident">Lazy</span><span class="op">&lt;</span><span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">String</span>, (<span class="ident">OperatingSystem</span>, <span class="ident">Value</span>)<span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Lazy::new</span>(<span class="op">|</span><span class="op">|</span> {
+    <span class="kw">static </span>TEST_CASES: Lazy&lt;HashMap&lt;String, (OperatingSystem, Value)&gt;&gt; = Lazy::new(|| {
         <span class="macro">vec!</span>[
-            <span class="comment">// Whitelisted - Android</span>
-            (
-                <span class="ident">OperatingSystem::WHITELISTED</span>[<span class="number">0</span>].<span class="ident">to_string</span>(),
+            <span class="comment">// Whitelisted - Android
+            </span>(
+                OperatingSystem::WHITELISTED[<span class="number">0</span>].to_string(),
                 (
-                    <span class="ident">OperatingSystem::Whitelisted</span>(<span class="string">&quot;Android&quot;</span>.<span class="ident">into</span>()),
-                    <span class="ident">Value::String</span>(<span class="string">&quot;Android&quot;</span>.<span class="ident">into</span>()),
+                    OperatingSystem::Whitelisted(<span class="string">&quot;Android&quot;</span>.into()),
+                    Value::String(<span class="string">&quot;Android&quot;</span>.into()),
                 ),
             ),
-            <span class="comment">// Linux - Arch</span>
-            (
-                <span class="ident">OperatingSystem::LINUX_DISTROS</span>[<span class="number">0</span>].<span class="ident">to_string</span>(),
-                (<span class="ident">OperatingSystem::Linux</span>, <span class="ident">Value::String</span>(<span class="string">&quot;Linux&quot;</span>.<span class="ident">into</span>())),
+            <span class="comment">// Linux - Arch
+            </span>(
+                OperatingSystem::LINUX_DISTROS[<span class="number">0</span>].to_string(),
+                (OperatingSystem::Linux, Value::String(<span class="string">&quot;Linux&quot;</span>.into())),
             ),
-            <span class="comment">// Other - OS xxxxx</span>
-            (
-                <span class="string">&quot;OS xxxxx&quot;</span>.<span class="ident">into</span>(),
-                (<span class="ident">OperatingSystem::Other</span>, <span class="ident">Value::String</span>(<span class="string">&quot;Other&quot;</span>.<span class="ident">into</span>())),
+            <span class="comment">// Other - OS xxxxx
+            </span>(
+                <span class="string">&quot;OS xxxxx&quot;</span>.into(),
+                (OperatingSystem::Other, Value::String(<span class="string">&quot;Other&quot;</span>.into())),
             ),
         ]
-        .<span class="ident">into_iter</span>()
-        .<span class="ident">collect</span>()
+        .into_iter()
+        .collect()
     });
 
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;postgres&quot;</span>)]</span>
-    <span class="attribute">#[<span class="ident">tokio::test</span>]</span>
-    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">os_to_from_sql</span>() {
-        <span class="kw">let</span> <span class="ident">client</span> <span class="op">=</span> <span class="ident">POSTGRES_POOL</span>.<span class="ident">get</span>().<span class="kw">await</span>.<span class="ident">unwrap</span>();
-        <span class="kw">let</span> <span class="ident">sql_type</span> <span class="op">=</span> <span class="string">&quot;VARCHAR&quot;</span>;
+    <span class="attribute">#[cfg(feature = <span class="string">&quot;postgres&quot;</span>)]</span>
+    <span class="attribute">#[tokio::test]</span>
+    <span class="kw">async fn </span>os_to_from_sql() {
+        <span class="kw">let </span>client = POSTGRES_POOL.get().<span class="kw">await</span>.unwrap();
+        <span class="kw">let </span>sql_type = <span class="string">&quot;VARCHAR&quot;</span>;
 
-        <span class="kw">for</span> (<span class="ident">input</span>, <span class="kw">_</span>) <span class="kw">in</span> <span class="ident">TEST_CASES</span>.<span class="ident">iter</span>() {
-            <span class="kw">let</span> <span class="ident">actual_os</span> <span class="op">=</span> <span class="ident">OperatingSystem::map_os</span>(<span class="ident">input</span>);
+        <span class="kw">for </span>(input, <span class="kw">_</span>) <span class="kw">in </span>TEST_CASES.iter() {
+            <span class="kw">let </span>actual_os = OperatingSystem::map_os(input);
 
-            <span class="comment">// from SQL</span>
-            {
-                <span class="kw">let</span> <span class="ident">row_os</span>: <span class="ident">OperatingSystem</span> <span class="op">=</span> <span class="ident">client</span>
-                    .<span class="ident">query_one</span>(<span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="macro">format!</span>(<span class="string">&quot;SELECT &#39;{}&#39;::{}&quot;</span>, <span class="ident">actual_os</span>, <span class="ident">sql_type</span>), <span class="kw-2">&amp;</span>[])
-                    .<span class="kw">await</span>
-                    .<span class="ident">unwrap</span>()
-                    .<span class="ident">get</span>(<span class="number">0</span>);
+            <span class="comment">// from SQL
+            </span>{
+                <span class="kw">let </span>row_os: OperatingSystem = client
+                    .query_one(<span class="kw-2">&amp;*</span><span class="macro">format!</span>(<span class="string">&quot;SELECT &#39;{}&#39;::{}&quot;</span>, actual_os, sql_type), <span class="kw-2">&amp;</span>[])
+                    .<span class="kw">await
+                    </span>.unwrap()
+                    .get(<span class="number">0</span>);
 
                 <span class="macro">assert_eq!</span>(
-                    <span class="kw-2">&amp;</span><span class="ident">actual_os</span>, <span class="kw-2">&amp;</span><span class="ident">row_os</span>,
+                    <span class="kw-2">&amp;</span>actual_os, <span class="kw-2">&amp;</span>row_os,
                     <span class="string">&quot;expected and actual FromSql differ for {}&quot;</span>,
-                    <span class="ident">input</span>
+                    input
                 );
             }
 
-            <span class="comment">// to SQL</span>
-            {
-                <span class="kw">let</span> <span class="ident">row_os</span>: <span class="ident">OperatingSystem</span> <span class="op">=</span> <span class="ident">client</span>
-                    .<span class="ident">query_one</span>(<span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="macro">format!</span>(<span class="string">&quot;SELECT $1::{}&quot;</span>, <span class="ident">sql_type</span>), <span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">actual_os</span>])
-                    .<span class="kw">await</span>
-                    .<span class="ident">unwrap</span>()
-                    .<span class="ident">get</span>(<span class="number">0</span>);
+            <span class="comment">// to SQL
+            </span>{
+                <span class="kw">let </span>row_os: OperatingSystem = client
+                    .query_one(<span class="kw-2">&amp;*</span><span class="macro">format!</span>(<span class="string">&quot;SELECT $1::{}&quot;</span>, sql_type), <span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span>actual_os])
+                    .<span class="kw">await
+                    </span>.unwrap()
+                    .get(<span class="number">0</span>);
                 <span class="macro">assert_eq!</span>(
-                    <span class="kw-2">&amp;</span><span class="ident">actual_os</span>, <span class="kw-2">&amp;</span><span class="ident">row_os</span>,
+                    <span class="kw-2">&amp;</span>actual_os, <span class="kw-2">&amp;</span>row_os,
                     <span class="string">&quot;expected and actual ToSql differ for {}&quot;</span>,
-                    <span class="ident">input</span>
+                    input
                 );
             }
         }
     }
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">test_operating_system</span>() {
-        <span class="kw">for</span> (<span class="ident">input</span>, (<span class="ident">expect_os</span>, <span class="ident">expect_json</span>)) <span class="kw">in</span> <span class="ident">TEST_CASES</span>.<span class="ident">iter</span>() {
-            <span class="kw">let</span> <span class="ident">actual_os</span> <span class="op">=</span> <span class="ident">OperatingSystem::map_os</span>(<span class="ident">input</span>);
+    <span class="attribute">#[test]</span>
+    <span class="kw">fn </span>test_operating_system() {
+        <span class="kw">for </span>(input, (expect_os, expect_json)) <span class="kw">in </span>TEST_CASES.iter() {
+            <span class="kw">let </span>actual_os = OperatingSystem::map_os(input);
 
             <span class="macro">assert_eq!</span>(
-                <span class="ident">expect_os</span>, <span class="kw-2">&amp;</span><span class="ident">actual_os</span>,
+                expect_os, <span class="kw-2">&amp;</span>actual_os,
                 <span class="string">&quot;expected and actual differ for {}&quot;</span>,
-                <span class="ident">input</span>
+                input
             );
 
-            <span class="kw">let</span> <span class="ident">actual_json</span> <span class="op">=</span> <span class="ident">to_value</span>(<span class="kw-2">&amp;</span><span class="ident">actual_os</span>).<span class="ident">expect</span>(<span class="string">&quot;Should serialize it&quot;</span>);
+            <span class="kw">let </span>actual_json = to_value(<span class="kw-2">&amp;</span>actual_os).expect(<span class="string">&quot;Should serialize it&quot;</span>);
 
-            <span class="macro">assert_eq!</span>(<span class="ident">expect_json</span>, <span class="kw-2">&amp;</span><span class="ident">actual_json</span>);
+            <span class="macro">assert_eq!</span>(expect_json, <span class="kw-2">&amp;</span>actual_json);
 
-            <span class="kw">let</span> <span class="ident">from_json</span>: <span class="ident">OperatingSystem</span> <span class="op">=</span>
-                <span class="ident">from_value</span>(<span class="ident">actual_json</span>).<span class="ident">expect</span>(<span class="string">&quot;Should deserialize it&quot;</span>);
+            <span class="kw">let </span>from_json: OperatingSystem =
+                from_value(actual_json).expect(<span class="string">&quot;Should deserialize it&quot;</span>);
 
-            <span class="macro">assert_eq!</span>(<span class="ident">expect_os</span>, <span class="kw-2">&amp;</span><span class="ident">from_json</span>, <span class="string">&quot;error processing {}&quot;</span>, <span class="ident">input</span>);
+            <span class="macro">assert_eq!</span>(expect_os, <span class="kw-2">&amp;</span>from_json, <span class="string">&quot;error processing {}&quot;</span>, input);
         }
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="primitives" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (20ffea693 2022-08-11)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="primitives" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>

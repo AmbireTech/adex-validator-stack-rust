@@ -139,146 +139,146 @@
 <span id="139">139</span>
 <span id="140">140</span>
 <span id="141">141</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">campaign::Pricing</span>, <span class="ident">sentry::EventType</span>, <span class="ident">Campaign</span>, <span class="ident">UnifiedNum</span>};
+</pre><pre class="rust"><code><span class="kw">use crate</span>::{campaign::Pricing, sentry::EventType, Campaign, UnifiedNum};
 
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">eval</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident">serde_json::Number</span>;
-<span class="kw">use</span> <span class="ident">std::collections::HashMap</span>;
+<span class="kw">pub use </span>eval::<span class="kw-2">*</span>;
+<span class="kw">use </span>serde_json::Number;
+<span class="kw">use </span>std::collections::HashMap;
 
-<span class="attribute">#[<span class="ident">doc</span>(<span class="ident">inline</span>)]</span>
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">input</span>::{<span class="ident">field::GetField</span>, <span class="ident">Input</span>};
+<span class="attribute">#[doc(inline)]</span>
+<span class="kw">pub use </span>input::{field::GetField, Input};
 
-<span class="kw">mod</span> <span class="ident">eval</span>;
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">input</span>;
+<span class="kw">mod </span>eval;
+<span class="kw">pub mod </span>input;
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_pricing_bounds</span>(<span class="ident">campaign</span>: <span class="kw-2">&amp;</span><span class="ident">Campaign</span>, <span class="ident">event_type</span>: <span class="kw-2">&amp;</span><span class="ident">EventType</span>) -&gt; <span class="ident">Pricing</span> {
-    <span class="ident">campaign</span>
-        .<span class="ident">pricing_bounds</span>
-        .<span class="ident">get</span>(<span class="ident">event_type</span>)
-        .<span class="ident">cloned</span>()
-        .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">Pricing</span> {
-            <span class="ident">min</span>: <span class="number">0</span>.<span class="ident">into</span>(),
-            <span class="ident">max</span>: <span class="number">0</span>.<span class="ident">into</span>(),
+<span class="kw">pub fn </span>get_pricing_bounds(campaign: <span class="kw-2">&amp;</span>Campaign, event_type: <span class="kw-2">&amp;</span>EventType) -&gt; Pricing {
+    campaign
+        .pricing_bounds
+        .get(event_type)
+        .cloned()
+        .unwrap_or_else(|| Pricing {
+            min: <span class="number">0</span>.into(),
+            max: <span class="number">0</span>.into(),
         })
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Output</span> {
-    <span class="doccomment">/// Whether to show the ad</span>
-    <span class="doccomment">/// Default: true</span>
-    <span class="kw">pub</span> <span class="ident">show</span>: <span class="ident">bool</span>,
-    <span class="doccomment">/// The boost is a number between 0 and 5 that increases the likelyhood for the ad</span>
-    <span class="doccomment">/// to be chosen if there is random selection applied on the AdView (multiple ad candidates with the same price)</span>
-    <span class="doccomment">/// Default: 1.0</span>
-    <span class="kw">pub</span> <span class="ident">boost</span>: <span class="ident">f64</span>,
-    <span class="doccomment">/// price.{eventType}</span>
-    <span class="doccomment">/// For example: price.IMPRESSION</span>
-    <span class="doccomment">/// The default is the min of the bound of event type:</span>
-    <span class="doccomment">/// Default: pricingBounds.IMPRESSION.min</span>
-    <span class="kw">pub</span> <span class="ident">price</span>: <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">EventType</span>, <span class="ident">UnifiedNum</span><span class="op">&gt;</span>,
+<span class="attribute">#[derive(Debug)]</span>
+<span class="kw">pub struct </span>Output {
+    <span class="doccomment">/// Whether to show the ad
+    /// Default: true
+    </span><span class="kw">pub </span>show: bool,
+    <span class="doccomment">/// The boost is a number between 0 and 5 that increases the likelyhood for the ad
+    /// to be chosen if there is random selection applied on the AdView (multiple ad candidates with the same price)
+    /// Default: 1.0
+    </span><span class="kw">pub </span>boost: f64,
+    <span class="doccomment">/// price.{eventType}
+    /// For example: price.IMPRESSION
+    /// The default is the min of the bound of event type:
+    /// Default: pricingBounds.IMPRESSION.min
+    </span><span class="kw">pub </span>price: HashMap&lt;EventType, UnifiedNum&gt;,
 }
 
-<span class="kw">impl</span> <span class="ident">Output</span> {
-    <span class="kw">fn</span> <span class="ident">try_get</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">key</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Value</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
-        <span class="kw">match</span> <span class="ident">key</span> {
-            <span class="string">&quot;show&quot;</span> =&gt; <span class="prelude-val">Ok</span>(<span class="ident">Value::Bool</span>(<span class="self">self</span>.<span class="ident">show</span>)),
-            <span class="string">&quot;boost&quot;</span> =&gt; {
-                <span class="kw">let</span> <span class="ident">boost</span> <span class="op">=</span> <span class="ident">Number::from_f64</span>(<span class="self">self</span>.<span class="ident">boost</span>).<span class="ident">ok_or</span>(<span class="ident">Error::TypeError</span>)<span class="question-mark">?</span>;
-                <span class="prelude-val">Ok</span>(<span class="ident">Value::Number</span>(<span class="ident">boost</span>))
+<span class="kw">impl </span>Output {
+    <span class="kw">fn </span>try_get(<span class="kw-2">&amp;</span><span class="self">self</span>, key: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Result</span>&lt;Value, Error&gt; {
+        <span class="kw">match </span>key {
+            <span class="string">&quot;show&quot; </span>=&gt; <span class="prelude-val">Ok</span>(Value::Bool(<span class="self">self</span>.show)),
+            <span class="string">&quot;boost&quot; </span>=&gt; {
+                <span class="kw">let </span>boost = Number::from_f64(<span class="self">self</span>.boost).ok_or(Error::TypeError)<span class="question-mark">?</span>;
+                <span class="prelude-val">Ok</span>(Value::Number(boost))
             }
-            <span class="ident">price_key</span> <span class="kw">if</span> <span class="ident">price_key</span>.<span class="ident">starts_with</span>(<span class="string">&quot;price.&quot;</span>) =&gt; {
-                <span class="kw">let</span> <span class="ident">price</span> <span class="op">=</span> <span class="self">self</span>
-                    .<span class="ident">price</span>
-                    .<span class="ident">get</span>(<span class="ident">price_key</span>.<span class="ident">trim_start_matches</span>(<span class="string">&quot;price.&quot;</span>))
-                    .<span class="ident">ok_or</span>(<span class="ident">Error::UnknownVariable</span>)<span class="question-mark">?</span>;
-                <span class="prelude-val">Ok</span>(<span class="ident">Value::UnifiedNum</span>(<span class="kw-2">*</span><span class="ident">price</span>))
+            price_key <span class="kw">if </span>price_key.starts_with(<span class="string">&quot;price.&quot;</span>) =&gt; {
+                <span class="kw">let </span>price = <span class="self">self
+                    </span>.price
+                    .get(price_key.trim_start_matches(<span class="string">&quot;price.&quot;</span>))
+                    .ok_or(Error::UnknownVariable)<span class="question-mark">?</span>;
+                <span class="prelude-val">Ok</span>(Value::UnifiedNum(<span class="kw-2">*</span>price))
             }
-            <span class="kw">_</span> =&gt; <span class="prelude-val">Err</span>(<span class="ident">Error::UnknownVariable</span>),
+            <span class="kw">_ </span>=&gt; <span class="prelude-val">Err</span>(Error::UnknownVariable),
         }
     }
 }
 
-<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">Campaign</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Output</span> {
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">campaign</span>: <span class="kw-2">&amp;</span><span class="ident">Campaign</span>) -&gt; <span class="self">Self</span> {
-        <span class="kw">let</span> <span class="ident">price</span> <span class="op">=</span> <span class="ident">campaign</span>
-            .<span class="ident">pricing_bounds</span>
-            .<span class="ident">iter</span>()
-            .<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">key</span>, <span class="ident">price</span>)<span class="op">|</span> (<span class="kw-2">*</span><span class="ident">key</span>, <span class="ident">price</span>.<span class="ident">min</span>))
-            .<span class="ident">collect</span>();
+<span class="kw">impl </span>From&lt;<span class="kw-2">&amp;</span>Campaign&gt; <span class="kw">for </span>Output {
+    <span class="kw">fn </span>from(campaign: <span class="kw-2">&amp;</span>Campaign) -&gt; <span class="self">Self </span>{
+        <span class="kw">let </span>price = campaign
+            .pricing_bounds
+            .iter()
+            .map(|(key, price)| (<span class="kw-2">*</span>key, price.min))
+            .collect();
 
-        <span class="self">Self</span> {
-            <span class="ident">show</span>: <span class="bool-val">true</span>,
-            <span class="ident">boost</span>: <span class="number">1.0</span>,
-            <span class="ident">price</span>,
+        <span class="self">Self </span>{
+            show: <span class="bool-val">true</span>,
+            boost: <span class="number">1.0</span>,
+            price,
         }
     }
 }
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
-<span class="kw">mod</span> <span class="ident">test</span> {
-    <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::sentry</span>::{<span class="ident">CLICK</span>, <span class="ident">IMPRESSION</span>};
+<span class="attribute">#[cfg(test)]</span>
+<span class="kw">mod </span>test {
+    <span class="kw">use </span><span class="kw">crate</span>::sentry::{CLICK, IMPRESSION};
 
-    <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
+    <span class="kw">use super</span>::<span class="kw-2">*</span>;
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">test_try_get_of_output</span>() {
-        <span class="kw">let</span> <span class="ident">output</span> <span class="op">=</span> <span class="ident">Output</span> {
-            <span class="ident">show</span>: <span class="bool-val">false</span>,
-            <span class="ident">boost</span>: <span class="number">5.5</span>,
-            <span class="ident">price</span>: [(<span class="ident">IMPRESSION</span>, <span class="number">100</span>.<span class="ident">into</span>())].<span class="ident">into_iter</span>().<span class="ident">collect</span>(),
+    <span class="attribute">#[test]</span>
+    <span class="kw">fn </span>test_try_get_of_output() {
+        <span class="kw">let </span>output = Output {
+            show: <span class="bool-val">false</span>,
+            boost: <span class="number">5.5</span>,
+            price: [(IMPRESSION, <span class="number">100</span>.into())].into_iter().collect(),
         };
 
-        <span class="macro">assert_eq!</span>(<span class="prelude-val">Ok</span>(<span class="ident">Value::Bool</span>(<span class="bool-val">false</span>)), <span class="ident">output</span>.<span class="ident">try_get</span>(<span class="string">&quot;show&quot;</span>));
+        <span class="macro">assert_eq!</span>(<span class="prelude-val">Ok</span>(Value::Bool(<span class="bool-val">false</span>)), output.try_get(<span class="string">&quot;show&quot;</span>));
         <span class="macro">assert_eq!</span>(
-            <span class="prelude-val">Ok</span>(<span class="ident">Value::Number</span>(
-                <span class="ident">Number::from_f64</span>(<span class="number">5.5</span>).<span class="ident">expect</span>(<span class="string">&quot;Should make a number&quot;</span>)
+            <span class="prelude-val">Ok</span>(Value::Number(
+                Number::from_f64(<span class="number">5.5</span>).expect(<span class="string">&quot;Should make a number&quot;</span>)
             )),
-            <span class="ident">output</span>.<span class="ident">try_get</span>(<span class="string">&quot;boost&quot;</span>)
+            output.try_get(<span class="string">&quot;boost&quot;</span>)
         );
         <span class="macro">assert_eq!</span>(
-            <span class="prelude-val">Ok</span>(<span class="ident">Value::UnifiedNum</span>(<span class="number">100</span>.<span class="ident">into</span>())),
-            <span class="ident">output</span>.<span class="ident">try_get</span>(<span class="string">&quot;price.IMPRESSION&quot;</span>)
+            <span class="prelude-val">Ok</span>(Value::UnifiedNum(<span class="number">100</span>.into())),
+            output.try_get(<span class="string">&quot;price.IMPRESSION&quot;</span>)
         );
-        <span class="macro">assert_eq!</span>(<span class="prelude-val">Err</span>(<span class="ident">Error::UnknownVariable</span>), <span class="ident">output</span>.<span class="ident">try_get</span>(<span class="string">&quot;price.unknown&quot;</span>));
-        <span class="macro">assert_eq!</span>(<span class="prelude-val">Err</span>(<span class="ident">Error::UnknownVariable</span>), <span class="ident">output</span>.<span class="ident">try_get</span>(<span class="string">&quot;unknown&quot;</span>));
+        <span class="macro">assert_eq!</span>(<span class="prelude-val">Err</span>(Error::UnknownVariable), output.try_get(<span class="string">&quot;price.unknown&quot;</span>));
+        <span class="macro">assert_eq!</span>(<span class="prelude-val">Err</span>(Error::UnknownVariable), output.try_get(<span class="string">&quot;unknown&quot;</span>));
     }
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::float_cmp</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">test_output_from_channel</span>() {
-        <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::campaign::Pricing</span>;
-        <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::test_util::DUMMY_CAMPAIGN</span>;
+    <span class="attribute">#[test]</span>
+    <span class="attribute">#[allow(clippy::float_cmp)]</span>
+    <span class="kw">fn </span>test_output_from_channel() {
+        <span class="kw">use </span><span class="kw">crate</span>::campaign::Pricing;
+        <span class="kw">use </span><span class="kw">crate</span>::test_util::DUMMY_CAMPAIGN;
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">campaign</span> <span class="op">=</span> <span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">clone</span>();
-        <span class="ident">campaign</span>.<span class="ident">pricing_bounds</span> <span class="op">=</span> <span class="macro">vec!</span>[
+        <span class="kw">let </span><span class="kw-2">mut </span>campaign = DUMMY_CAMPAIGN.clone();
+        campaign.pricing_bounds = <span class="macro">vec!</span>[
             (
-                <span class="ident">IMPRESSION</span>,
-                <span class="ident">Pricing</span> {
-                    <span class="ident">min</span>: <span class="number">1_000</span>.<span class="ident">into</span>(),
-                    <span class="ident">max</span>: <span class="number">2_000</span>.<span class="ident">into</span>(),
+                IMPRESSION,
+                Pricing {
+                    min: <span class="number">1_000</span>.into(),
+                    max: <span class="number">2_000</span>.into(),
                 },
             ),
             (
-                <span class="ident">CLICK</span>,
-                <span class="ident">Pricing</span> {
-                    <span class="ident">min</span>: <span class="number">3_000</span>.<span class="ident">into</span>(),
-                    <span class="ident">max</span>: <span class="number">4_000</span>.<span class="ident">into</span>(),
+                CLICK,
+                Pricing {
+                    min: <span class="number">3_000</span>.into(),
+                    max: <span class="number">4_000</span>.into(),
                 },
             ),
         ]
-        .<span class="ident">into_iter</span>()
-        .<span class="ident">collect</span>();
+        .into_iter()
+        .collect();
 
-        <span class="kw">let</span> <span class="ident">output</span> <span class="op">=</span> <span class="ident">Output::from</span>(<span class="kw-2">&amp;</span><span class="ident">campaign</span>);
+        <span class="kw">let </span>output = Output::from(<span class="kw-2">&amp;</span>campaign);
 
-        <span class="macro">assert!</span>(<span class="ident">output</span>.<span class="ident">show</span>);
-        <span class="macro">assert_eq!</span>(<span class="number">1.0</span>, <span class="ident">output</span>.<span class="ident">boost</span>);
+        <span class="macro">assert!</span>(output.show);
+        <span class="macro">assert_eq!</span>(<span class="number">1.0</span>, output.boost);
         <span class="macro">assert_eq!</span>(
-            <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span><span class="ident">UnifiedNum::from</span>(<span class="number">1_000</span>)),
-            <span class="ident">output</span>.<span class="ident">price</span>.<span class="ident">get</span>(<span class="string">&quot;IMPRESSION&quot;</span>)
+            <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>UnifiedNum::from(<span class="number">1_000</span>)),
+            output.price.get(<span class="string">&quot;IMPRESSION&quot;</span>)
         );
-        <span class="macro">assert_eq!</span>(<span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span><span class="ident">UnifiedNum::from</span>(<span class="number">3_000</span>)), <span class="ident">output</span>.<span class="ident">price</span>.<span class="ident">get</span>(<span class="string">&quot;CLICK&quot;</span>));
+        <span class="macro">assert_eq!</span>(<span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>UnifiedNum::from(<span class="number">3_000</span>)), output.price.get(<span class="string">&quot;CLICK&quot;</span>));
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="primitives" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (20ffea693 2022-08-11)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="primitives" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>

@@ -419,426 +419,426 @@
 <span id="419">419</span>
 <span id="420">420</span>
 <span id="421">421</span>
-</pre><pre class="rust"><code><span class="doccomment">//! The AdView Manager</span>
-<span class="kw">use</span> <span class="ident">adex_primitives</span>::{
-    <span class="ident">sentry::IMPRESSION</span>,
-    <span class="ident">supermarket::units_for_slot</span>,
-    <span class="ident">supermarket::units_for_slot::response</span>::{<span class="ident">AdUnit</span>, <span class="ident">Campaign</span>},
-    <span class="ident">targeting</span>::{<span class="self">self</span>, <span class="ident">input</span>},
-    <span class="ident">util::ApiUrl</span>,
-    <span class="ident">Address</span>, <span class="ident">BigNum</span>, <span class="ident">CampaignId</span>, <span class="ident">ToHex</span>, <span class="ident">UnifiedNum</span>, <span class="ident">IPFS</span>,
+</pre><pre class="rust"><code><span class="doccomment">//! The AdView Manager
+</span><span class="kw">use </span>adex_primitives::{
+    sentry::IMPRESSION,
+    supermarket::units_for_slot,
+    supermarket::units_for_slot::response::{AdUnit, Campaign},
+    targeting::{<span class="self">self</span>, input},
+    util::ApiUrl,
+    Address, BigNum, CampaignId, ToHex, UnifiedNum, IPFS,
 };
-<span class="kw">use</span> <span class="ident">async_std</span>::{<span class="ident">sync::RwLock</span>, <span class="ident">task::block_on</span>};
-<span class="kw">use</span> <span class="ident">chrono</span>::{<span class="ident">DateTime</span>, <span class="ident">Duration</span>, <span class="ident">Utc</span>};
-<span class="kw">use</span> <span class="ident">log::error</span>;
-<span class="kw">use</span> <span class="ident">once_cell::sync::Lazy</span>;
-<span class="kw">use</span> <span class="ident">rand::Rng</span>;
-<span class="kw">use</span> <span class="ident">reqwest::StatusCode</span>;
-<span class="kw">use</span> <span class="ident">serde</span>::{<span class="ident">Deserialize</span>, <span class="ident">Serialize</span>};
-<span class="kw">use</span> <span class="ident">std</span>::{
-    <span class="ident">cmp::Ordering</span>,
-    <span class="ident">collections</span>::{<span class="ident">HashSet</span>, <span class="ident">VecDeque</span>},
-    <span class="ident">sync::Arc</span>,
+<span class="kw">use </span>async_std::{sync::RwLock, task::block_on};
+<span class="kw">use </span>chrono::{DateTime, Duration, Utc};
+<span class="kw">use </span>log::error;
+<span class="kw">use </span>once_cell::sync::Lazy;
+<span class="kw">use </span>rand::Rng;
+<span class="kw">use </span>reqwest::StatusCode;
+<span class="kw">use </span>serde::{Deserialize, Serialize};
+<span class="kw">use </span>std::{
+    cmp::Ordering,
+    collections::{HashSet, VecDeque},
+    sync::Arc,
 };
-<span class="kw">use</span> <span class="ident">thiserror::Error</span>;
+<span class="kw">use </span>thiserror::Error;
 
-<span class="kw">use</span> <span class="kw">crate</span>::{
-    <span class="ident">get_unit_html_with_events</span>,
-    <span class="ident">helpers</span>::{<span class="ident">get_unit_html</span>, <span class="ident">is_video</span>, <span class="ident">randomized_sort_pos</span>},
-    <span class="ident">Url</span>, <span class="ident">IMPRESSION_STICKINESS_TIME</span>,
+<span class="kw">use crate</span>::{
+    get_unit_html_with_events,
+    helpers::{get_unit_html, is_video, randomized_sort_pos},
+    Url, IMPRESSION_STICKINESS_TIME,
 };
 
-<span class="doccomment">/// The number of impressions (won auctions) kept in history</span>
-<span class="kw">const</span> <span class="ident">HISTORY_LIMIT</span>: <span class="ident">u32</span> <span class="op">=</span> <span class="number">50</span>;
+<span class="doccomment">/// The number of impressions (won auctions) kept in history
+</span><span class="kw">const </span>HISTORY_LIMIT: u32 = <span class="number">50</span>;
 
-<span class="doccomment">/// Default Market Url that can be used for the [`Options`].</span>
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">DEFAULT_MARKET_URL</span>: <span class="ident">Lazy</span><span class="op">&lt;</span><span class="ident">ApiUrl</span><span class="op">&gt;</span> <span class="op">=</span>
-    <span class="ident">Lazy::new</span>(<span class="op">|</span><span class="op">|</span> <span class="string">&quot;https://market.moonicorn.network&quot;</span>.<span class="ident">parse</span>().<span class="ident">unwrap</span>());
+<span class="doccomment">/// Default Market Url that can be used for the [`Options`].
+</span><span class="kw">pub static </span>DEFAULT_MARKET_URL: Lazy&lt;ApiUrl&gt; =
+    Lazy::new(|| <span class="string">&quot;https://market.moonicorn.network&quot;</span>.parse().unwrap());
 
-<span class="doccomment">/// Default Whitelisted token [`Address`]es that can be used for the [`Options`].</span>
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">DEFAULT_TOKENS</span>: <span class="ident">Lazy</span><span class="op">&lt;</span><span class="ident">HashSet</span><span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Lazy::new</span>(<span class="op">|</span><span class="op">|</span> {
+<span class="doccomment">/// Default Whitelisted token [`Address`]es that can be used for the [`Options`].
+</span><span class="kw">pub static </span>DEFAULT_TOKENS: Lazy&lt;HashSet&lt;Address&gt;&gt; = Lazy::new(|| {
     [
-        <span class="comment">// DAI</span>
-        <span class="string">&quot;0x6B175474E89094C44Da98b954EedeAC495271d0F&quot;</span>
-            .<span class="ident">parse</span>()
-            .<span class="ident">unwrap</span>(),
+        <span class="comment">// DAI
+        </span><span class="string">&quot;0x6B175474E89094C44Da98b954EedeAC495271d0F&quot;
+            </span>.parse()
+            .unwrap(),
     ]
-    .<span class="ident">into_iter</span>()
-    .<span class="ident">collect</span>()
+    .into_iter()
+    .collect()
 });
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Error</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">Error</span> {
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Request to the Market failed: status {status} at url {url}&quot;</span>)]</span>
-    <span class="ident">Market</span> { <span class="ident">status</span>: <span class="ident">StatusCode</span>, <span class="ident">url</span>: <span class="ident">Url</span> },
-    <span class="attribute">#[<span class="ident">error</span>(<span class="ident">transparent</span>)]</span>
-    <span class="ident">Request</span>(<span class="attribute">#[<span class="ident">from</span>]</span> <span class="ident">reqwest::Error</span>),
+<span class="attribute">#[derive(Debug, Error)]</span>
+<span class="kw">pub enum </span>Error {
+    <span class="attribute">#[error(<span class="string">&quot;Request to the Market failed: status {status} at url {url}&quot;</span>)]</span>
+    Market { status: StatusCode, url: Url },
+    <span class="attribute">#[error(transparent)]</span>
+    Request(<span class="attribute">#[from]</span> reqwest::Error),
 }
 
-<span class="doccomment">/// The Ad [`Manager`]&#39;s options for showing ads.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">Clone</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>)]</span>
-<span class="attribute">#[<span class="ident">serde</span>(<span class="ident">rename_all</span> <span class="op">=</span> <span class="string">&quot;camelCase&quot;</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Options</span> {
-    <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">rename</span> <span class="op">=</span> <span class="string">&quot;marketURL&quot;</span>)]</span>
-    <span class="kw">pub</span> <span class="ident">market_url</span>: <span class="ident">ApiUrl</span>,
-    <span class="kw">pub</span> <span class="ident">market_slot</span>: <span class="ident">IPFS</span>,
-    <span class="kw">pub</span> <span class="ident">publisher_addr</span>: <span class="ident">Address</span>,
-    <span class="doccomment">/// All passed tokens must be of the same price and decimals, so that the amounts can be accurately compared</span>
-    <span class="kw">pub</span> <span class="ident">whitelisted_tokens</span>: <span class="ident">HashSet</span><span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span>,
-    <span class="kw">pub</span> <span class="ident">size</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Size</span><span class="op">&gt;</span>,
-    <span class="kw">pub</span> <span class="ident">navigator_language</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// Whether or not to disable Video ads.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// default: `false`</span>
-    <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">default</span>)]</span>
-    <span class="kw">pub</span> <span class="ident">disabled_video</span>: <span class="ident">bool</span>,
-    <span class="doccomment">/// Whether or not to disable Sticky Ads ([`AdUnit`]s).</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// default: `false`</span>
-    <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">default</span>)]</span>
-    <span class="kw">pub</span> <span class="ident">disabled_sticky</span>: <span class="ident">bool</span>,
+<span class="doccomment">/// The Ad [`Manager`]&#39;s options for showing ads.
+</span><span class="attribute">#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]</span>
+<span class="attribute">#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]</span>
+<span class="kw">pub struct </span>Options {
+    <span class="attribute">#[serde(rename = <span class="string">&quot;marketURL&quot;</span>)]</span>
+    <span class="kw">pub </span>market_url: ApiUrl,
+    <span class="kw">pub </span>market_slot: IPFS,
+    <span class="kw">pub </span>publisher_addr: Address,
+    <span class="doccomment">/// All passed tokens must be of the same price and decimals, so that the amounts can be accurately compared
+    </span><span class="kw">pub </span>whitelisted_tokens: HashSet&lt;Address&gt;,
+    <span class="kw">pub </span>size: <span class="prelude-ty">Option</span>&lt;Size&gt;,
+    <span class="kw">pub </span>navigator_language: <span class="prelude-ty">Option</span>&lt;String&gt;,
+    <span class="doccomment">/// Whether or not to disable Video ads.
+    ///
+    /// default: `false`
+    </span><span class="attribute">#[serde(default)]</span>
+    <span class="kw">pub </span>disabled_video: bool,
+    <span class="doccomment">/// Whether or not to disable Sticky Ads ([`AdUnit`]s).
+    ///
+    /// default: `false`
+    </span><span class="attribute">#[serde(default)]</span>
+    <span class="kw">pub </span>disabled_sticky: bool,
 }
 
-<span class="doccomment">/// [`AdSlot`](adex_primitives::AdSlot) size `width x height` in pixels (`px`)</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Size</span> {
-    <span class="kw">pub</span> <span class="ident">width</span>: <span class="ident">u64</span>,
-    <span class="kw">pub</span> <span class="ident">height</span>: <span class="ident">u64</span>,
+<span class="doccomment">/// [`AdSlot`](adex_primitives::AdSlot) size `width x height` in pixels (`px`)
+</span><span class="attribute">#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]</span>
+<span class="kw">pub struct </span>Size {
+    <span class="kw">pub </span>width: u64,
+    <span class="kw">pub </span>height: u64,
 }
 
-<span class="kw">impl</span> <span class="ident">Size</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">width</span>: <span class="ident">u64</span>, <span class="ident">height</span>: <span class="ident">u64</span>) -&gt; <span class="self">Self</span> {
-        <span class="self">Self</span> { <span class="ident">width</span>, <span class="ident">height</span> }
+<span class="kw">impl </span>Size {
+    <span class="kw">pub fn </span>new(width: u64, height: u64) -&gt; <span class="self">Self </span>{
+        <span class="self">Self </span>{ width, height }
     }
 }
 
-<span class="doccomment">/// The next [`AdUnit`] to be shown</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">NextAdUnit</span> {
-    <span class="kw">pub</span> <span class="ident">unit</span>: <span class="ident">AdUnit</span>,
-    <span class="kw">pub</span> <span class="ident">price</span>: <span class="ident">UnifiedNum</span>,
-    <span class="kw">pub</span> <span class="ident">accepted_referrers</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Url</span><span class="op">&gt;</span>,
-    <span class="kw">pub</span> <span class="ident">html</span>: <span class="ident">String</span>,
+<span class="doccomment">/// The next [`AdUnit`] to be shown
+</span><span class="attribute">#[derive(Debug, Clone)]</span>
+<span class="kw">pub struct </span>NextAdUnit {
+    <span class="kw">pub </span>unit: AdUnit,
+    <span class="kw">pub </span>price: UnifiedNum,
+    <span class="kw">pub </span>accepted_referrers: Vec&lt;Url&gt;,
+    <span class="kw">pub </span>html: String,
 }
 
-<span class="doccomment">/// A sticky [`AdUnit`].</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">StickyAdUnit</span> {
-    <span class="kw">pub</span> <span class="ident">unit</span>: <span class="ident">AdUnit</span>,
-    <span class="kw">pub</span> <span class="ident">price</span>: <span class="ident">UnifiedNum</span>,
-    <span class="kw">pub</span> <span class="ident">html</span>: <span class="ident">String</span>,
-    <span class="kw">pub</span> <span class="ident">is_sticky</span>: <span class="ident">bool</span>,
+<span class="doccomment">/// A sticky [`AdUnit`].
+</span><span class="attribute">#[derive(Debug, Clone)]</span>
+<span class="kw">pub struct </span>StickyAdUnit {
+    <span class="kw">pub </span>unit: AdUnit,
+    <span class="kw">pub </span>price: UnifiedNum,
+    <span class="kw">pub </span>html: String,
+    <span class="kw">pub </span>is_sticky: bool,
 }
 
-<span class="doccomment">/// History entry of impressions (won auctions) which the [`Manager`] holds.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">HistoryEntry</span> {
-    <span class="kw">pub</span> <span class="ident">time</span>: <span class="ident">DateTime</span><span class="op">&lt;</span><span class="ident">Utc</span><span class="op">&gt;</span>,
-    <span class="kw">pub</span> <span class="ident">unit_id</span>: <span class="ident">IPFS</span>,
-    <span class="kw">pub</span> <span class="ident">campaign_id</span>: <span class="ident">CampaignId</span>,
-    <span class="kw">pub</span> <span class="ident">slot_id</span>: <span class="ident">IPFS</span>,
+<span class="doccomment">/// History entry of impressions (won auctions) which the [`Manager`] holds.
+</span><span class="attribute">#[derive(Debug, Clone)]</span>
+<span class="kw">pub struct </span>HistoryEntry {
+    <span class="kw">pub </span>time: DateTime&lt;Utc&gt;,
+    <span class="kw">pub </span>unit_id: IPFS,
+    <span class="kw">pub </span>campaign_id: CampaignId,
+    <span class="kw">pub </span>slot_id: IPFS,
 }
 
-<span class="doccomment">/// The AdView Manager</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Manager</span> {
-    <span class="ident">options</span>: <span class="ident">Options</span>,
-    <span class="doccomment">/// Contains the Entries from Old to New</span>
-    <span class="doccomment">/// It always trims to [`HISTORY_LIMIT`], removing the oldest (firstly inserted) elements from the History</span>
-    <span class="ident">history</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">RwLock</span><span class="op">&lt;</span><span class="ident">VecDeque</span><span class="op">&lt;</span><span class="ident">HistoryEntry</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">client</span>: <span class="ident">reqwest::Client</span>,
+<span class="doccomment">/// The AdView Manager
+</span><span class="attribute">#[derive(Debug, Clone)]</span>
+<span class="kw">pub struct </span>Manager {
+    options: Options,
+    <span class="doccomment">/// Contains the Entries from Old to New
+    /// It always trims to [`HISTORY_LIMIT`], removing the oldest (firstly inserted) elements from the History
+    </span>history: Arc&lt;RwLock&lt;VecDeque&lt;HistoryEntry&gt;&gt;&gt;,
+    client: reqwest::Client,
 }
 
-<span class="kw">impl</span> <span class="ident">Manager</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">options</span>: <span class="ident">Options</span>, <span class="ident">history</span>: <span class="ident">VecDeque</span><span class="op">&lt;</span><span class="ident">HistoryEntry</span><span class="op">&gt;</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">client</span> <span class="op">=</span> <span class="ident">reqwest::Client::builder</span>().<span class="ident">build</span>()<span class="question-mark">?</span>;
+<span class="kw">impl </span>Manager {
+    <span class="kw">pub fn </span>new(options: Options, history: VecDeque&lt;HistoryEntry&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, Error&gt; {
+        <span class="kw">let </span>client = reqwest::Client::builder().build()<span class="question-mark">?</span>;
 
-        <span class="prelude-val">Ok</span>(<span class="self">Self</span> {
-            <span class="ident">options</span>,
-            <span class="ident">history</span>: <span class="ident">Arc::new</span>(<span class="ident">RwLock::new</span>(<span class="ident">history</span>)),
-            <span class="ident">client</span>,
+        <span class="prelude-val">Ok</span>(<span class="self">Self </span>{
+            options,
+            history: Arc::new(RwLock::new(history)),
+            client,
         })
     }
 
-    <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">get_targeting_input</span>(
+    <span class="kw">pub async fn </span>get_targeting_input(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="kw-2">mut</span> <span class="ident">input</span>: <span class="ident">input::Input</span>,
-        <span class="ident">campaign_id</span>: <span class="ident">CampaignId</span>,
-    ) -&gt; <span class="ident">input::Input</span> {
-        <span class="kw">let</span> <span class="ident">seconds_since_campaign_impression</span> <span class="op">=</span> <span class="self">self</span>
-            .<span class="ident">history</span>
-            .<span class="ident">read</span>()
-            .<span class="kw">await</span>
-            .<span class="ident">iter</span>()
-            .<span class="ident">rev</span>()
-            .<span class="ident">find_map</span>(<span class="op">|</span><span class="ident">h</span><span class="op">|</span> {
-                <span class="kw">if</span> <span class="ident">h</span>.<span class="ident">campaign_id</span> <span class="op">==</span> <span class="ident">campaign_id</span> {
-                    <span class="kw">let</span> <span class="ident">last_impression</span>: <span class="ident">Duration</span> <span class="op">=</span> <span class="ident">Utc::now</span>() <span class="op">-</span> <span class="ident">h</span>.<span class="ident">time</span>;
+        <span class="kw-2">mut </span>input: input::Input,
+        campaign_id: CampaignId,
+    ) -&gt; input::Input {
+        <span class="kw">let </span>seconds_since_campaign_impression = <span class="self">self
+            </span>.history
+            .read()
+            .<span class="kw">await
+            </span>.iter()
+            .rev()
+            .find_map(|h| {
+                <span class="kw">if </span>h.campaign_id == campaign_id {
+                    <span class="kw">let </span>last_impression: Duration = Utc::now() - h.time;
 
-                    <span class="ident">u64::try_from</span>(<span class="ident">last_impression</span>.<span class="ident">num_seconds</span>()).<span class="ident">ok</span>()
-                } <span class="kw">else</span> {
-                    <span class="prelude-val">None</span>
-                }
+                    u64::try_from(last_impression.num_seconds()).ok()
+                } <span class="kw">else </span>{
+                    <span class="prelude-val">None
+                </span>}
             })
-            .<span class="ident">unwrap_or</span>(<span class="ident">u64::MAX</span>);
+            .unwrap_or(u64::MAX);
 
-        <span class="ident">input</span>.<span class="ident">ad_view</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">input::AdView</span> {
-            <span class="ident">seconds_since_campaign_impression</span>,
-            <span class="ident">has_custom_preferences</span>: <span class="bool-val">false</span>,
-            <span class="ident">navigator_language</span>: <span class="self">self</span>.<span class="ident">options</span>.<span class="ident">navigator_language</span>.<span class="ident">clone</span>().<span class="ident">unwrap_or_default</span>(),
+        input.ad_view = <span class="prelude-val">Some</span>(input::AdView {
+            seconds_since_campaign_impression,
+            has_custom_preferences: <span class="bool-val">false</span>,
+            navigator_language: <span class="self">self</span>.options.navigator_language.clone().unwrap_or_default(),
         });
 
-        <span class="ident">input</span>
+        input
     }
 
-    <span class="doccomment">/// Get a sticky [`AdUnit`] if they are not disabled (see [`Options.disabled_sticky`](Options::disabled_sticky)).</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Takes into account the History Entries, [`IMPRESSION_STICKINESS_TIME`]</span>
-    <span class="doccomment">/// and the provided [`AdSlot`](adex_primitives::AdSlot) [`IPFS`] from [`Options`].</span>
-    <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">get_sticky_ad_unit</span>(
+    <span class="doccomment">/// Get a sticky [`AdUnit`] if they are not disabled (see [`Options.disabled_sticky`](Options::disabled_sticky)).
+    ///
+    /// Takes into account the History Entries, [`IMPRESSION_STICKINESS_TIME`]
+    /// and the provided [`AdSlot`](adex_primitives::AdSlot) [`IPFS`] from [`Options`].
+    </span><span class="kw">pub async fn </span>get_sticky_ad_unit(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">campaigns</span>: <span class="kw-2">&amp;</span>[<span class="ident">Campaign</span>],
-        <span class="ident">hostname</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>,
-    ) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">StickyAdUnit</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">options</span>.<span class="ident">disabled_sticky</span> {
-            <span class="kw">return</span> <span class="prelude-val">None</span>;
+        campaigns: <span class="kw-2">&amp;</span>[Campaign],
+        hostname: <span class="kw-2">&amp;</span>str,
+    ) -&gt; <span class="prelude-ty">Option</span>&lt;StickyAdUnit&gt; {
+        <span class="kw">if </span><span class="self">self</span>.options.disabled_sticky {
+            <span class="kw">return </span><span class="prelude-val">None</span>;
         }
 
-        <span class="kw">let</span> <span class="ident">stickiness_threshold</span> <span class="op">=</span> <span class="ident">Utc::now</span>() <span class="op">-</span> <span class="kw-2">*</span><span class="ident">IMPRESSION_STICKINESS_TIME</span>;
-        <span class="kw">let</span> <span class="ident">sticky_entry</span> <span class="op">=</span> <span class="self">self</span>
-            .<span class="ident">history</span>
-            .<span class="ident">read</span>()
-            .<span class="kw">await</span>
-            .<span class="ident">iter</span>()
-            .<span class="ident">find</span>(<span class="op">|</span><span class="ident">h</span><span class="op">|</span> <span class="ident">h</span>.<span class="ident">time</span> <span class="op">&gt;</span> <span class="ident">stickiness_threshold</span> <span class="op">&amp;&amp;</span> <span class="ident">h</span>.<span class="ident">slot_id</span> <span class="op">==</span> <span class="self">self</span>.<span class="ident">options</span>.<span class="ident">market_slot</span>)
-            .<span class="ident">cloned</span>()<span class="question-mark">?</span>;
+        <span class="kw">let </span>stickiness_threshold = Utc::now() - <span class="kw-2">*</span>IMPRESSION_STICKINESS_TIME;
+        <span class="kw">let </span>sticky_entry = <span class="self">self
+            </span>.history
+            .read()
+            .<span class="kw">await
+            </span>.iter()
+            .find(|h| h.time &gt; stickiness_threshold &amp;&amp; h.slot_id == <span class="self">self</span>.options.market_slot)
+            .cloned()<span class="question-mark">?</span>;
 
-        <span class="kw">let</span> <span class="ident">stick_campaign</span> <span class="op">=</span> <span class="ident">campaigns</span>
-            .<span class="ident">iter</span>()
-            .<span class="ident">find</span>(<span class="op">|</span><span class="ident">c</span><span class="op">|</span> <span class="ident">c</span>.<span class="ident">campaign</span>.<span class="ident">id</span> <span class="op">==</span> <span class="ident">sticky_entry</span>.<span class="ident">campaign_id</span>)<span class="question-mark">?</span>;
+        <span class="kw">let </span>stick_campaign = campaigns
+            .iter()
+            .find(|c| c.campaign.id == sticky_entry.campaign_id)<span class="question-mark">?</span>;
 
-        <span class="kw">let</span> <span class="ident">unit</span> <span class="op">=</span> <span class="ident">stick_campaign</span>
-            .<span class="ident">units_with_price</span>
-            .<span class="ident">iter</span>()
-            .<span class="ident">find_map</span>(<span class="op">|</span><span class="ident">u</span><span class="op">|</span> {
-                <span class="kw">if</span> <span class="ident">u</span>.<span class="ident">unit</span>.<span class="ident">id</span> <span class="op">==</span> <span class="ident">sticky_entry</span>.<span class="ident">unit_id</span> {
-                    <span class="prelude-val">Some</span>(<span class="ident">u</span>.<span class="ident">unit</span>.<span class="ident">clone</span>())
-                } <span class="kw">else</span> {
-                    <span class="prelude-val">None</span>
-                }
+        <span class="kw">let </span>unit = stick_campaign
+            .units_with_price
+            .iter()
+            .find_map(|u| {
+                <span class="kw">if </span>u.unit.id == sticky_entry.unit_id {
+                    <span class="prelude-val">Some</span>(u.unit.clone())
+                } <span class="kw">else </span>{
+                    <span class="prelude-val">None
+                </span>}
             })
-            .<span class="ident">expect</span>(<span class="string">&quot;Something went terribly wrong. Data is corrupted! There should be an AdUnit&quot;</span>);
+            .expect(<span class="string">&quot;Something went terribly wrong. Data is corrupted! There should be an AdUnit&quot;</span>);
 
-        <span class="kw">let</span> <span class="ident">html</span> <span class="op">=</span> <span class="ident">get_unit_html_with_events</span>(
-            <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">options</span>,
-            <span class="kw-2">&amp;</span><span class="ident">unit</span>,
-            <span class="ident">hostname</span>,
-            <span class="ident">stick_campaign</span>.<span class="ident">campaign</span>.<span class="ident">id</span>,
-            <span class="kw-2">&amp;</span><span class="ident">stick_campaign</span>.<span class="ident">campaign</span>.<span class="ident">validators</span>,
+        <span class="kw">let </span>html = get_unit_html_with_events(
+            <span class="kw-2">&amp;</span><span class="self">self</span>.options,
+            <span class="kw-2">&amp;</span>unit,
+            hostname,
+            stick_campaign.campaign.id,
+            <span class="kw-2">&amp;</span>stick_campaign.campaign.validators,
             <span class="bool-val">true</span>,
         );
 
-        <span class="prelude-val">Some</span>(<span class="ident">StickyAdUnit</span> {
-            <span class="ident">unit</span>,
-            <span class="ident">price</span>: <span class="number">0</span>.<span class="ident">into</span>(),
-            <span class="ident">html</span>,
-            <span class="ident">is_sticky</span>: <span class="bool-val">true</span>,
+        <span class="prelude-val">Some</span>(StickyAdUnit {
+            unit,
+            price: <span class="number">0</span>.into(),
+            html,
+            is_sticky: <span class="bool-val">true</span>,
         })
     }
 
-    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">is_campaign_sticky</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">campaign_id</span>: <span class="ident">CampaignId</span>) -&gt; <span class="ident">bool</span> {
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">options</span>.<span class="ident">disabled_sticky</span> {
-            <span class="bool-val">false</span>
-        } <span class="kw">else</span> {
-            <span class="kw">let</span> <span class="ident">stickiness_threshold</span> <span class="op">=</span> <span class="ident">Utc::now</span>() <span class="op">-</span> <span class="kw-2">*</span><span class="ident">IMPRESSION_STICKINESS_TIME</span>;
+    <span class="kw">async fn </span>is_campaign_sticky(<span class="kw-2">&amp;</span><span class="self">self</span>, campaign_id: CampaignId) -&gt; bool {
+        <span class="kw">if </span><span class="self">self</span>.options.disabled_sticky {
+            <span class="bool-val">false
+        </span>} <span class="kw">else </span>{
+            <span class="kw">let </span>stickiness_threshold = Utc::now() - <span class="kw-2">*</span>IMPRESSION_STICKINESS_TIME;
 
-            <span class="self">self</span>.<span class="ident">history</span>
-                .<span class="ident">read</span>()
-                .<span class="kw">await</span>
-                .<span class="ident">iter</span>()
-                .<span class="ident">any</span>(<span class="op">|</span><span class="ident">h</span><span class="op">|</span> <span class="ident">h</span>.<span class="ident">time</span> <span class="op">&gt;</span> <span class="ident">stickiness_threshold</span> <span class="op">&amp;&amp;</span> <span class="ident">h</span>.<span class="ident">campaign_id</span> <span class="op">==</span> <span class="ident">campaign_id</span>)
+            <span class="self">self</span>.history
+                .read()
+                .<span class="kw">await
+                </span>.iter()
+                .any(|h| h.time &gt; stickiness_threshold &amp;&amp; h.campaign_id == campaign_id)
         }
     }
 
-    <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">get_market_demand_resp</span>(
+    <span class="kw">pub async fn </span>get_market_demand_resp(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">units_for_slot::response::Response</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">pub_prefix</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">options</span>.<span class="ident">publisher_addr</span>.<span class="ident">to_hex</span>();
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;units_for_slot::response::Response, Error&gt; {
+        <span class="kw">let </span>pub_prefix = <span class="self">self</span>.options.publisher_addr.to_hex();
 
-        <span class="kw">let</span> <span class="ident">deposit_asset</span> <span class="op">=</span> <span class="self">self</span>
-            .<span class="ident">options</span>
-            .<span class="ident">whitelisted_tokens</span>
-            .<span class="ident">iter</span>()
-            .<span class="ident">map</span>(<span class="op">|</span><span class="ident">token</span><span class="op">|</span> <span class="macro">format!</span>(<span class="string">&quot;depositAsset={}&quot;</span>, <span class="ident">token</span>))
-            .<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span><span class="op">&gt;</span>()
-            .<span class="ident">join</span>(<span class="string">&quot;&amp;&quot;</span>);
+        <span class="kw">let </span>deposit_asset = <span class="self">self
+            </span>.options
+            .whitelisted_tokens
+            .iter()
+            .map(|token| <span class="macro">format!</span>(<span class="string">&quot;depositAsset={}&quot;</span>, token))
+            .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;()
+            .join(<span class="string">&quot;&amp;&quot;</span>);
 
-        <span class="comment">// ApiUrl handles endpoint path (with or without `/`)</span>
-        <span class="kw">let</span> <span class="ident">url</span> <span class="op">=</span> <span class="self">self</span>
-            .<span class="ident">options</span>
-            .<span class="ident">market_url</span>
-            .<span class="ident">join</span>(<span class="kw-2">&amp;</span><span class="macro">format!</span>(
+        <span class="comment">// ApiUrl handles endpoint path (with or without `/`)
+        </span><span class="kw">let </span>url = <span class="self">self
+            </span>.options
+            .market_url
+            .join(<span class="kw-2">&amp;</span><span class="macro">format!</span>(
                 <span class="string">&quot;units-for-slot/{ad_slot}?pubPrefix={pub_prefix}&amp;{deposit_asset}&quot;</span>,
-                <span class="ident">ad_slot</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">options</span>.<span class="ident">market_slot</span>
+                ad_slot = <span class="self">self</span>.options.market_slot
             ))
-            .<span class="ident">expect</span>(<span class="string">&quot;Valid URL endpoint!&quot;</span>);
+            .expect(<span class="string">&quot;Valid URL endpoint!&quot;</span>);
 
-        <span class="kw">let</span> <span class="ident">market_response</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">client</span>.<span class="ident">get</span>(<span class="ident">url</span>.<span class="ident">clone</span>()).<span class="ident">send</span>().<span class="kw">await</span><span class="question-mark">?</span>;
+        <span class="kw">let </span>market_response = <span class="self">self</span>.client.get(url.clone()).send().<span class="kw">await</span><span class="question-mark">?</span>;
 
-        <span class="kw">match</span> <span class="ident">market_response</span>.<span class="ident">status</span>() {
-            <span class="ident">StatusCode::OK</span> =&gt; <span class="prelude-val">Ok</span>(<span class="ident">market_response</span>.<span class="ident">json</span>().<span class="kw">await</span><span class="question-mark">?</span>),
-            <span class="kw">_</span> =&gt; <span class="prelude-val">Err</span>(<span class="ident">Error::Market</span> {
-                <span class="ident">status</span>: <span class="ident">market_response</span>.<span class="ident">status</span>(),
-                <span class="ident">url</span>,
+        <span class="kw">match </span>market_response.status() {
+            StatusCode::OK =&gt; <span class="prelude-val">Ok</span>(market_response.json().<span class="kw">await</span><span class="question-mark">?</span>),
+            <span class="kw">_ </span>=&gt; <span class="prelude-val">Err</span>(Error::Market {
+                status: market_response.status(),
+                url,
             }),
         }
     }
 
-    <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">get_next_ad_unit</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">NextAdUnit</span><span class="op">&gt;</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">units_for_slot</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">get_market_demand_resp</span>().<span class="kw">await</span><span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">m_campaigns</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">units_for_slot</span>.<span class="ident">campaigns</span>;
-        <span class="kw">let</span> <span class="ident">fallback_unit</span> <span class="op">=</span> <span class="ident">units_for_slot</span>.<span class="ident">fallback_unit</span>;
-        <span class="kw">let</span> <span class="ident">targeting_input</span> <span class="op">=</span> <span class="ident">units_for_slot</span>.<span class="ident">targeting_input_base</span>;
+    <span class="kw">pub async fn </span>get_next_ad_unit(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;NextAdUnit&gt;, Error&gt; {
+        <span class="kw">let </span>units_for_slot = <span class="self">self</span>.get_market_demand_resp().<span class="kw">await</span><span class="question-mark">?</span>;
+        <span class="kw">let </span>m_campaigns = <span class="kw-2">&amp;</span>units_for_slot.campaigns;
+        <span class="kw">let </span>fallback_unit = units_for_slot.fallback_unit;
+        <span class="kw">let </span>targeting_input = units_for_slot.targeting_input_base;
 
-        <span class="kw">let</span> <span class="ident">hostname</span> <span class="op">=</span> <span class="ident">targeting_input</span>
-            .<span class="ident">ad_slot</span>
-            .<span class="ident">as_ref</span>()
-            .<span class="ident">map</span>(<span class="op">|</span><span class="ident">ad_slot</span><span class="op">|</span> <span class="ident">ad_slot</span>.<span class="ident">hostname</span>.<span class="ident">clone</span>())
-            .<span class="ident">unwrap_or_default</span>();
+        <span class="kw">let </span>hostname = targeting_input
+            .ad_slot
+            .as_ref()
+            .map(|ad_slot| ad_slot.hostname.clone())
+            .unwrap_or_default();
 
-        <span class="comment">// Stickiness is when we keep showing an ad unit for a slot for some time in order to achieve fair impression value</span>
-        <span class="comment">// see https://github.com/AdExNetwork/adex-adview-manager/issues/65</span>
-        <span class="kw">let</span> <span class="ident">sticky_result</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">get_sticky_ad_unit</span>(<span class="ident">m_campaigns</span>, <span class="kw-2">&amp;</span><span class="ident">hostname</span>).<span class="kw">await</span>;
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">sticky</span>) <span class="op">=</span> <span class="ident">sticky_result</span> {
-            <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">NextAdUnit</span> {
-                <span class="ident">unit</span>: <span class="ident">sticky</span>.<span class="ident">unit</span>,
-                <span class="ident">price</span>: <span class="ident">sticky</span>.<span class="ident">price</span>,
-                <span class="ident">accepted_referrers</span>: <span class="ident">units_for_slot</span>.<span class="ident">accepted_referrers</span>,
-                <span class="ident">html</span>: <span class="ident">sticky</span>.<span class="ident">html</span>,
+        <span class="comment">// Stickiness is when we keep showing an ad unit for a slot for some time in order to achieve fair impression value
+        // see https://github.com/AdExNetwork/adex-adview-manager/issues/65
+        </span><span class="kw">let </span>sticky_result = <span class="self">self</span>.get_sticky_ad_unit(m_campaigns, <span class="kw-2">&amp;</span>hostname).<span class="kw">await</span>;
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(sticky) = sticky_result {
+            <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(NextAdUnit {
+                unit: sticky.unit,
+                price: sticky.price,
+                accepted_referrers: units_for_slot.accepted_referrers,
+                html: sticky.html,
             }));
         }
 
-        <span class="comment">// If two or more units result in the same price, apply random selection between them: this is why we need the seed</span>
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">rng</span> <span class="op">=</span> <span class="ident">rand::thread_rng</span>();
+        <span class="comment">// If two or more units result in the same price, apply random selection between them: this is why we need the seed
+        </span><span class="kw">let </span><span class="kw-2">mut </span>rng = rand::thread_rng();
 
-        <span class="kw">let</span> <span class="ident">random</span>: <span class="ident">f64</span> <span class="op">=</span> <span class="ident">rng</span>.<span class="ident">gen</span>::<span class="op">&lt;</span><span class="ident">f64</span><span class="op">&gt;</span>() <span class="op">*</span> (<span class="number">0x80000000_u64</span> <span class="kw">as</span> <span class="ident">f64</span> <span class="op">-</span> <span class="number">1.0</span>);
-        <span class="kw">let</span> <span class="ident">seed</span> <span class="op">=</span> <span class="ident">BigNum::from</span>(<span class="ident">random</span> <span class="kw">as</span> <span class="ident">u64</span>);
+        <span class="kw">let </span>random: f64 = rng.gen::&lt;f64&gt;() * (<span class="number">0x80000000_u64 </span><span class="kw">as </span>f64 - <span class="number">1.0</span>);
+        <span class="kw">let </span>seed = BigNum::from(random <span class="kw">as </span>u64);
 
-        <span class="comment">// Apply targeting, now with adView.* variables, and sort the resulting ad units</span>
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">units_with_price</span> <span class="op">=</span> <span class="ident">m_campaigns</span>
-            .<span class="ident">iter</span>()
-            .<span class="ident">flat_map</span>(<span class="op">|</span><span class="ident">m_campaign</span><span class="op">|</span> {
-                <span class="comment">// since we are in a Iterator.map(), we can&#39;t use async, so we block</span>
-                <span class="kw">if</span> <span class="ident">block_on</span>(<span class="self">self</span>.<span class="ident">is_campaign_sticky</span>(<span class="ident">m_campaign</span>.<span class="ident">campaign</span>.<span class="ident">id</span>)) {
-                    <span class="kw">return</span> <span class="macro">vec!</span>[];
+        <span class="comment">// Apply targeting, now with adView.* variables, and sort the resulting ad units
+        </span><span class="kw">let </span><span class="kw-2">mut </span>units_with_price = m_campaigns
+            .iter()
+            .flat_map(|m_campaign| {
+                <span class="comment">// since we are in a Iterator.map(), we can&#39;t use async, so we block
+                </span><span class="kw">if </span>block_on(<span class="self">self</span>.is_campaign_sticky(m_campaign.campaign.id)) {
+                    <span class="kw">return </span><span class="macro">vec!</span>[];
                 }
 
-                <span class="kw">let</span> <span class="ident">campaign_id</span> <span class="op">=</span> <span class="ident">m_campaign</span>.<span class="ident">campaign</span>.<span class="ident">id</span>;
+                <span class="kw">let </span>campaign_id = m_campaign.campaign.id;
 
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">unit_input</span> <span class="op">=</span> <span class="ident">targeting_input</span>.<span class="ident">clone</span>().<span class="ident">with_campaign</span>(<span class="ident">m_campaign</span>.<span class="ident">campaign</span>.<span class="ident">clone</span>());
+                <span class="kw">let </span><span class="kw-2">mut </span>unit_input = targeting_input.clone().with_campaign(m_campaign.campaign.clone());
 
-                <span class="ident">m_campaign</span>
-                    .<span class="ident">units_with_price</span>
-                    .<span class="ident">iter</span>()
-                    .<span class="ident">filter</span>(<span class="op">|</span><span class="ident">unit_with_price</span><span class="op">|</span> {
-                        <span class="ident">unit_input</span>.<span class="ident">ad_unit_id</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">unit_with_price</span>.<span class="ident">unit</span>.<span class="ident">id</span>);
+                m_campaign
+                    .units_with_price
+                    .iter()
+                    .filter(|unit_with_price| {
+                        unit_input.ad_unit_id = <span class="prelude-val">Some</span>(unit_with_price.unit.id);
 
-                        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">output</span> <span class="op">=</span> <span class="ident">targeting::Output</span> {
-                            <span class="ident">show</span>: <span class="bool-val">true</span>,
-                            <span class="ident">boost</span>: <span class="number">1.0</span>,
-                            <span class="ident">price</span>: [(<span class="ident">IMPRESSION</span>, <span class="ident">unit_with_price</span>.<span class="ident">price</span>)].<span class="ident">into_iter</span>().<span class="ident">collect</span>(),
+                        <span class="kw">let </span><span class="kw-2">mut </span>output = targeting::Output {
+                            show: <span class="bool-val">true</span>,
+                            boost: <span class="number">1.0</span>,
+                            price: [(IMPRESSION, unit_with_price.price)].into_iter().collect(),
                         };
 
-                        <span class="kw">let</span> <span class="ident">on_type_error</span> <span class="op">=</span> <span class="op">|</span><span class="ident">type_error</span>, <span class="ident">rule</span><span class="op">|</span> <span class="macro">error!</span>(<span class="ident">target</span>: <span class="string">&quot;rule-evaluation&quot;</span>, <span class="string">&quot;Rule evaluation error for {campaign_id:?}, {rule:?} with error: {type_error:?}&quot;</span>);
+                        <span class="kw">let </span>on_type_error = |type_error, rule| <span class="macro">error!</span>(target: <span class="string">&quot;rule-evaluation&quot;</span>, <span class="string">&quot;Rule evaluation error for {campaign_id:?}, {rule:?} with error: {type_error:?}&quot;</span>);
 
-                        <span class="ident">targeting::eval_with_callback</span>(
-                            <span class="kw-2">&amp;</span><span class="ident">m_campaign</span>.<span class="ident">campaign</span>.<span class="ident">targeting_rules</span>,
-                            <span class="kw-2">&amp;</span><span class="ident">unit_input</span>,
-                            <span class="kw-2">&amp;mut</span> <span class="ident">output</span>,
-                            <span class="prelude-val">Some</span>(<span class="ident">on_type_error</span>)
+                        targeting::eval_with_callback(
+                            <span class="kw-2">&amp;</span>m_campaign.campaign.targeting_rules,
+                            <span class="kw-2">&amp;</span>unit_input,
+                            <span class="kw-2">&amp;mut </span>output,
+                            <span class="prelude-val">Some</span>(on_type_error)
                         );
 
-                        <span class="ident">output</span>.<span class="ident">show</span>
+                        output.show
                     })
-                    .<span class="ident">map</span>(<span class="op">|</span><span class="ident">uwp</span><span class="op">|</span> (<span class="ident">uwp</span>.<span class="ident">clone</span>(), <span class="ident">campaign_id</span>))
-                    .<span class="ident">collect</span>()
+                    .map(|uwp| (uwp.clone(), campaign_id))
+                    .collect()
             })
-            .<span class="ident">filter</span>(<span class="op">|</span><span class="ident">x</span><span class="op">|</span> <span class="op">!</span>(<span class="self">self</span>.<span class="ident">options</span>.<span class="ident">disabled_video</span> <span class="op">&amp;&amp;</span> <span class="ident">is_video</span>(<span class="kw-2">&amp;</span><span class="ident">x</span>.<span class="number">0</span>.<span class="ident">unit</span>)))
-            .<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span><span class="op">&gt;</span>();
+            .filter(|x| !(<span class="self">self</span>.options.disabled_video &amp;&amp; is_video(<span class="kw-2">&amp;</span>x.<span class="number">0</span>.unit)))
+            .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
 
-        <span class="ident">units_with_price</span>.<span class="ident">sort_by</span>(<span class="op">|</span><span class="ident">b</span>, <span class="ident">a</span><span class="op">|</span> <span class="kw">match</span> (<span class="kw-2">&amp;</span><span class="ident">a</span>.<span class="number">0</span>.<span class="ident">price</span>).<span class="ident">cmp</span>(<span class="kw-2">&amp;</span><span class="ident">b</span>.<span class="number">0</span>.<span class="ident">price</span>) {
-            <span class="ident">Ordering::Equal</span> =&gt; <span class="ident">randomized_sort_pos</span>(<span class="kw-2">&amp;</span><span class="ident">a</span>.<span class="number">0</span>.<span class="ident">unit</span>, <span class="ident">seed</span>.<span class="ident">clone</span>())
-                .<span class="ident">cmp</span>(<span class="kw-2">&amp;</span><span class="ident">randomized_sort_pos</span>(<span class="kw-2">&amp;</span><span class="ident">b</span>.<span class="number">0</span>.<span class="ident">unit</span>, <span class="ident">seed</span>.<span class="ident">clone</span>())),
-            <span class="ident">ordering</span> =&gt; <span class="ident">ordering</span>,
+        units_with_price.sort_by(|b, a| <span class="kw">match </span>a.<span class="number">0</span>.price.cmp(<span class="kw-2">&amp;</span>b.<span class="number">0</span>.price) {
+            Ordering::Equal =&gt; randomized_sort_pos(<span class="kw-2">&amp;</span>a.<span class="number">0</span>.unit, seed.clone())
+                .cmp(<span class="kw-2">&amp;</span>randomized_sort_pos(<span class="kw-2">&amp;</span>b.<span class="number">0</span>.unit, seed.clone())),
+            ordering =&gt; ordering,
         });
 
-        <span class="comment">// Update history</span>
-        <span class="kw">let</span> <span class="ident">auction_winner</span> <span class="op">=</span> <span class="ident">units_with_price</span>.<span class="ident">get</span>(<span class="number">0</span>);
+        <span class="comment">// Update history
+        </span><span class="kw">let </span>auction_winner = units_with_price.get(<span class="number">0</span>);
 
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>((<span class="ident">unit_with_price</span>, <span class="ident">campaign_id</span>)) <span class="op">=</span> <span class="ident">auction_winner</span> {
-            <span class="kw">let</span> <span class="ident">history</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">history</span>.<span class="ident">read</span>().<span class="kw">await</span>.<span class="ident">clone</span>();
+        <span class="kw">if let </span><span class="prelude-val">Some</span>((unit_with_price, campaign_id)) = auction_winner {
+            <span class="kw">let </span>history = <span class="self">self</span>.history.read().<span class="kw">await</span>.clone();
 
-            <span class="kw">let</span> <span class="ident">new_entry</span> <span class="op">=</span> <span class="ident">HistoryEntry</span> {
-                <span class="ident">time</span>: <span class="ident">Utc::now</span>(),
-                <span class="ident">unit_id</span>: <span class="ident">unit_with_price</span>.<span class="ident">unit</span>.<span class="ident">id</span>,
-                <span class="ident">campaign_id</span>: <span class="kw-2">*</span><span class="ident">campaign_id</span>,
-                <span class="ident">slot_id</span>: <span class="self">self</span>.<span class="ident">options</span>.<span class="ident">market_slot</span>,
+            <span class="kw">let </span>new_entry = HistoryEntry {
+                time: Utc::now(),
+                unit_id: unit_with_price.unit.id,
+                campaign_id: <span class="kw-2">*</span>campaign_id,
+                slot_id: <span class="self">self</span>.options.market_slot,
             };
 
-            <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">history</span>.<span class="ident">write</span>().<span class="kw">await</span> <span class="op">=</span> <span class="ident">history</span>
-                .<span class="ident">into_iter</span>()
-                .<span class="ident">chain</span>(<span class="ident">std::iter::once</span>(<span class="ident">new_entry</span>))
-                <span class="comment">// Reverse the iterator since we want to remove the oldest history entries</span>
-                .<span class="ident">rev</span>()
-                .<span class="ident">take</span>(<span class="ident">HISTORY_LIMIT</span> <span class="kw">as</span> <span class="ident">usize</span>)
-                .<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">VecDeque</span><span class="op">&lt;</span><span class="ident">HistoryEntry</span><span class="op">&gt;</span><span class="op">&gt;</span>()
-                <span class="comment">// Keeps the same order, as the one we&#39;ve started with! Old =&gt; New</span>
-                .<span class="ident">into_iter</span>()
-                .<span class="ident">rev</span>()
-                .<span class="ident">collect</span>();
+            <span class="kw-2">*</span><span class="self">self</span>.history.write().<span class="kw">await </span>= history
+                .into_iter()
+                .chain(std::iter::once(new_entry))
+                <span class="comment">// Reverse the iterator since we want to remove the oldest history entries
+                </span>.rev()
+                .take(HISTORY_LIMIT <span class="kw">as </span>usize)
+                .collect::&lt;VecDeque&lt;HistoryEntry&gt;&gt;()
+                <span class="comment">// Keeps the same order, as the one we&#39;ve started with! Old =&gt; New
+                </span>.into_iter()
+                .rev()
+                .collect();
         }
 
-        <span class="comment">// Return the results, with a fallback unit if there is one</span>
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>((<span class="ident">unit_with_price</span>, <span class="ident">campaign_id</span>)) <span class="op">=</span> <span class="ident">auction_winner</span> {
-            <span class="kw">let</span> <span class="ident">validators</span> <span class="op">=</span> <span class="ident">m_campaigns</span>
-                .<span class="ident">iter</span>()
-                .<span class="ident">find_map</span>(<span class="op">|</span><span class="ident">m_campaign</span><span class="op">|</span> {
-                    <span class="kw">if</span> <span class="kw-2">&amp;</span><span class="ident">m_campaign</span>.<span class="ident">campaign</span>.<span class="ident">id</span> <span class="op">==</span> <span class="ident">campaign_id</span> {
-                        <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span><span class="ident">m_campaign</span>.<span class="ident">campaign</span>.<span class="ident">validators</span>)
-                    } <span class="kw">else</span> {
-                        <span class="prelude-val">None</span>
-                    }
+        <span class="comment">// Return the results, with a fallback unit if there is one
+        </span><span class="kw">if let </span><span class="prelude-val">Some</span>((unit_with_price, campaign_id)) = auction_winner {
+            <span class="kw">let </span>validators = m_campaigns
+                .iter()
+                .find_map(|m_campaign| {
+                    <span class="kw">if </span><span class="kw-2">&amp;</span>m_campaign.campaign.id == campaign_id {
+                        <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>m_campaign.campaign.validators)
+                    } <span class="kw">else </span>{
+                        <span class="prelude-val">None
+                    </span>}
                 })
-                <span class="comment">// TODO: Check what should happen here if we don&#39;t find the Validator</span>
-                .<span class="ident">unwrap</span>();
+                <span class="comment">// TODO: Check what should happen here if we don&#39;t find the Validator
+                </span>.unwrap();
 
-            <span class="kw">let</span> <span class="ident">html</span> <span class="op">=</span> <span class="ident">get_unit_html_with_events</span>(
-                <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">options</span>,
-                <span class="kw-2">&amp;</span><span class="ident">unit_with_price</span>.<span class="ident">unit</span>,
-                <span class="kw-2">&amp;</span><span class="ident">hostname</span>,
-                <span class="kw-2">*</span><span class="ident">campaign_id</span>,
-                <span class="ident">validators</span>,
+            <span class="kw">let </span>html = get_unit_html_with_events(
+                <span class="kw-2">&amp;</span><span class="self">self</span>.options,
+                <span class="kw-2">&amp;</span>unit_with_price.unit,
+                <span class="kw-2">&amp;</span>hostname,
+                <span class="kw-2">*</span>campaign_id,
+                validators,
                 <span class="bool-val">false</span>,
             );
 
-            <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">NextAdUnit</span> {
-                <span class="ident">unit</span>: <span class="ident">unit_with_price</span>.<span class="ident">unit</span>.<span class="ident">clone</span>(),
-                <span class="ident">price</span>: <span class="ident">unit_with_price</span>.<span class="ident">price</span>,
-                <span class="ident">accepted_referrers</span>: <span class="ident">units_for_slot</span>.<span class="ident">accepted_referrers</span>,
-                <span class="ident">html</span>,
+            <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(NextAdUnit {
+                unit: unit_with_price.unit.clone(),
+                price: unit_with_price.price,
+                accepted_referrers: units_for_slot.accepted_referrers,
+                html,
             }))
-        } <span class="kw">else</span> <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">fallback_unit</span>) <span class="op">=</span> <span class="ident">fallback_unit</span> {
-            <span class="kw">let</span> <span class="ident">html</span> <span class="op">=</span> <span class="ident">get_unit_html</span>(<span class="self">self</span>.<span class="ident">options</span>.<span class="ident">size</span>, <span class="kw-2">&amp;</span><span class="ident">fallback_unit</span>, <span class="kw-2">&amp;</span><span class="ident">hostname</span>, <span class="string">&quot;&quot;</span>, <span class="string">&quot;&quot;</span>);
-            <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">NextAdUnit</span> {
-                <span class="ident">unit</span>: <span class="ident">fallback_unit</span>,
-                <span class="ident">price</span>: <span class="number">0</span>.<span class="ident">into</span>(),
-                <span class="ident">accepted_referrers</span>: <span class="ident">units_for_slot</span>.<span class="ident">accepted_referrers</span>,
-                <span class="ident">html</span>,
+        } <span class="kw">else if let </span><span class="prelude-val">Some</span>(fallback_unit) = fallback_unit {
+            <span class="kw">let </span>html = get_unit_html(<span class="self">self</span>.options.size, <span class="kw-2">&amp;</span>fallback_unit, <span class="kw-2">&amp;</span>hostname, <span class="string">&quot;&quot;</span>, <span class="string">&quot;&quot;</span>);
+            <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(NextAdUnit {
+                unit: fallback_unit,
+                price: <span class="number">0</span>.into(),
+                accepted_referrers: units_for_slot.accepted_referrers,
+                html,
             }))
-        } <span class="kw">else</span> {
+        } <span class="kw">else </span>{
             <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>)
         }
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="adview_manager" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (20ffea693 2022-08-11)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="adview_manager" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>

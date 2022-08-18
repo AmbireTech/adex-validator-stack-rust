@@ -802,809 +802,809 @@
 <span id="802">802</span>
 <span id="803">803</span>
 <span id="804">804</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">std</span>::{<span class="ident">fs</span>, <span class="ident">str::FromStr</span>};
+</pre><pre class="rust"><code><span class="kw">use </span>std::{fs, str::FromStr};
 
-<span class="kw">use</span> <span class="kw">crate</span>::{
-    <span class="ident">prelude</span>::<span class="kw-2">*</span>,
-    <span class="ident">primitives</span>::{<span class="ident">Deposit</span>, <span class="ident">Session</span>},
+<span class="kw">use crate</span>::{
+    prelude::<span class="kw-2">*</span>,
+    primitives::{Deposit, Session},
 };
-<span class="kw">use</span> <span class="ident">async_trait::async_trait</span>;
-<span class="kw">use</span> <span class="ident">chrono::Utc</span>;
-<span class="kw">use</span> <span class="ident">ethsign</span>::{<span class="ident">KeyFile</span>, <span class="ident">Signature</span>};
-<span class="kw">use</span> <span class="ident">primitives</span>::{<span class="ident">Address</span>, <span class="ident">BigNum</span>, <span class="ident">Chain</span>, <span class="ident">ChainId</span>, <span class="ident">ChainOf</span>, <span class="ident">Channel</span>, <span class="ident">Config</span>, <span class="ident">ValidatorId</span>};
+<span class="kw">use </span>async_trait::async_trait;
+<span class="kw">use </span>chrono::Utc;
+<span class="kw">use </span>ethsign::{KeyFile, Signature};
+<span class="kw">use </span>primitives::{Address, BigNum, Chain, ChainId, ChainOf, Channel, Config, ValidatorId};
 
-<span class="kw">use</span> <span class="kw">super</span>::{
-    <span class="ident">error</span>::{<span class="ident">Error</span>, <span class="ident">EwtSigningError</span>, <span class="ident">KeystoreError</span>, <span class="ident">VerifyError</span>},
-    <span class="ident">ewt</span>::{<span class="self">self</span>, <span class="ident">Payload</span>},
-    <span class="ident">to_ethereum_signed</span>, <span class="ident">Electrum</span>, <span class="ident">LockedWallet</span>, <span class="ident">UnlockedWallet</span>, <span class="ident">WalletState</span>, <span class="ident">IDENTITY_ABI</span>,
-    <span class="ident">OUTPACE_ABI</span>,
+<span class="kw">use super</span>::{
+    error::{Error, EwtSigningError, KeystoreError, VerifyError},
+    ewt::{<span class="self">self</span>, Payload},
+    to_ethereum_signed, Electrum, LockedWallet, UnlockedWallet, WalletState, IDENTITY_ABI,
+    OUTPACE_ABI,
 };
-<span class="kw">use</span> <span class="ident">web3</span>::{
-    <span class="ident">contract</span>::{<span class="ident">Contract</span>, <span class="ident">Options</span> <span class="kw">as</span> <span class="ident">ContractOptions</span>},
-    <span class="ident">ethabi::Token</span>,
-    <span class="ident">transports::Http</span>,
-    <span class="ident">types</span>::{<span class="ident">H160</span>, <span class="ident">U256</span>},
-    <span class="ident">Web3</span>,
+<span class="kw">use </span>web3::{
+    contract::{Contract, Options <span class="kw">as </span>ContractOptions},
+    ethabi::Token,
+    transports::Http,
+    types::{H160, U256},
+    Web3,
 };
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Options</span> {
-    <span class="kw">pub</span> <span class="ident">keystore_file</span>: <span class="ident">String</span>,
-    <span class="kw">pub</span> <span class="ident">keystore_pwd</span>: <span class="ident">String</span>,
+<span class="attribute">#[derive(Debug, Clone)]</span>
+<span class="kw">pub struct </span>Options {
+    <span class="kw">pub </span>keystore_file: String,
+    <span class="kw">pub </span>keystore_pwd: String,
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
-<span class="doccomment">/// Ethereum client implementation for the [`crate::Adapter`].</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Ethereum</span><span class="op">&lt;</span><span class="ident">S</span> <span class="op">=</span> <span class="ident">LockedWallet</span><span class="op">&gt;</span> {
-    <span class="ident">address</span>: <span class="ident">ValidatorId</span>,
-    <span class="ident">config</span>: <span class="ident">Config</span>,
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">state</span>: <span class="ident">S</span>,
+<span class="attribute">#[derive(Debug, Clone)]</span>
+<span class="doccomment">/// Ethereum client implementation for the [`crate::Adapter`].
+</span><span class="kw">pub struct </span>Ethereum&lt;S = LockedWallet&gt; {
+    address: ValidatorId,
+    config: Config,
+    <span class="kw">pub</span>(<span class="kw">crate</span>) state: S,
 }
 
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">trait</span> <span class="ident">ChainTransport</span> {
-    <span class="kw">fn</span> <span class="ident">init_web3</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">web3::Result</span><span class="op">&lt;</span><span class="ident">Web3</span><span class="op">&lt;</span><span class="ident">Http</span><span class="op">&gt;</span><span class="op">&gt;</span>;
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">trait </span>ChainTransport {
+    <span class="kw">fn </span>init_web3(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; web3::Result&lt;Web3&lt;Http&gt;&gt;;
 }
 
-<span class="kw">impl</span> <span class="ident">ChainTransport</span> <span class="kw">for</span> <span class="ident">Chain</span> {
-    <span class="kw">fn</span> <span class="ident">init_web3</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">web3::Result</span><span class="op">&lt;</span><span class="ident">Web3</span><span class="op">&lt;</span><span class="ident">Http</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">transport</span> <span class="op">=</span> <span class="ident">Http::new</span>(<span class="self">self</span>.<span class="ident">rpc</span>.<span class="ident">as_str</span>())<span class="question-mark">?</span>;
+<span class="kw">impl </span>ChainTransport <span class="kw">for </span>Chain {
+    <span class="kw">fn </span>init_web3(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; web3::Result&lt;Web3&lt;Http&gt;&gt; {
+        <span class="kw">let </span>transport = Http::new(<span class="self">self</span>.rpc.as_str())<span class="question-mark">?</span>;
 
-        <span class="prelude-val">Ok</span>(<span class="ident">Web3::new</span>(<span class="ident">transport</span>))
+        <span class="prelude-val">Ok</span>(Web3::new(transport))
     }
 }
 
-<span class="kw">impl</span> <span class="ident">Ethereum</span><span class="op">&lt;</span><span class="ident">LockedWallet</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>(<span class="ident">opts</span>: <span class="ident">Options</span>, <span class="ident">config</span>: <span class="kw-2">&amp;</span><span class="ident">Config</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">keystore_contents</span> <span class="op">=</span>
-            <span class="ident">fs::read_to_string</span>(<span class="kw-2">&amp;</span><span class="ident">opts</span>.<span class="ident">keystore_file</span>).<span class="ident">map_err</span>(<span class="ident">KeystoreError::ReadingFile</span>)<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">keystore_json</span>: <span class="ident">KeyFile</span> <span class="op">=</span>
-            <span class="ident">serde_json::from_str</span>(<span class="kw-2">&amp;</span><span class="ident">keystore_contents</span>).<span class="ident">map_err</span>(<span class="ident">KeystoreError::Deserialization</span>)<span class="question-mark">?</span>;
+<span class="kw">impl </span>Ethereum&lt;LockedWallet&gt; {
+    <span class="kw">pub fn </span>init(opts: Options, config: <span class="kw-2">&amp;</span>Config) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, Error&gt; {
+        <span class="kw">let </span>keystore_contents =
+            fs::read_to_string(<span class="kw-2">&amp;</span>opts.keystore_file).map_err(KeystoreError::ReadingFile)<span class="question-mark">?</span>;
+        <span class="kw">let </span>keystore_json: KeyFile =
+            serde_json::from_str(<span class="kw-2">&amp;</span>keystore_contents).map_err(KeystoreError::Deserialization)<span class="question-mark">?</span>;
 
-        <span class="kw">let</span> <span class="ident">address_bytes</span> <span class="op">=</span> <span class="ident">keystore_json</span>
-            .<span class="ident">address</span>
-            .<span class="ident">clone</span>()
-            .<span class="ident">ok_or</span>(<span class="ident">KeystoreError::AddressMissing</span>)<span class="question-mark">?</span>;
+        <span class="kw">let </span>address_bytes = keystore_json
+            .address
+            .clone()
+            .ok_or(KeystoreError::AddressMissing)<span class="question-mark">?</span>;
 
-        <span class="kw">let</span> <span class="ident">address</span> <span class="op">=</span> <span class="ident">Address::from_slice</span>(<span class="kw-2">&amp;</span><span class="ident">address_bytes</span>.<span class="number">0</span>).<span class="ident">ok_or</span>(<span class="ident">KeystoreError::AddressLength</span>)<span class="question-mark">?</span>;
+        <span class="kw">let </span>address = Address::from_slice(<span class="kw-2">&amp;</span>address_bytes.<span class="number">0</span>).ok_or(KeystoreError::AddressLength)<span class="question-mark">?</span>;
 
-        <span class="prelude-val">Ok</span>(<span class="self">Self</span> {
-            <span class="ident">address</span>: <span class="ident">ValidatorId::from</span>(<span class="ident">address</span>),
-            <span class="ident">config</span>: <span class="ident">config</span>.<span class="ident">to_owned</span>(),
-            <span class="ident">state</span>: <span class="ident">LockedWallet::KeyStore</span> {
-                <span class="ident">keystore</span>: <span class="ident">keystore_json</span>,
-                <span class="ident">password</span>: <span class="ident">opts</span>.<span class="ident">keystore_pwd</span>.<span class="ident">into</span>(),
+        <span class="prelude-val">Ok</span>(<span class="self">Self </span>{
+            address: ValidatorId::from(address),
+            config: config.to_owned(),
+            state: LockedWallet::KeyStore {
+                keystore: keystore_json,
+                password: opts.keystore_pwd.into(),
             },
         })
     }
 }
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">S</span>: <span class="ident">WalletState</span><span class="op">&gt;</span> <span class="ident">Ethereum</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// Checks if the signer of the `hash` &amp; `signature` has privileges,</span>
-    <span class="doccomment">/// by using the Identity contract and the passed identity [`Address`]</span>
-    <span class="doccomment">/// See &lt;https://eips.ethereum.org/EIPS/eip-1271&gt;</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// **Note:** Signature should be `01` suffixed for Eth Sign for this call.</span>
-    <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">has_privileges</span>(
+<span class="kw">impl</span>&lt;S: WalletState&gt; Ethereum&lt;S&gt; {
+    <span class="doccomment">/// Checks if the signer of the `hash` &amp; `signature` has privileges,
+    /// by using the Identity contract and the passed identity [`Address`]
+    /// See &lt;https://eips.ethereum.org/EIPS/eip-1271&gt;
+    ///
+    /// **Note:** Signature should be `01` suffixed for Eth Sign for this call.
+    </span><span class="kw">pub async fn </span>has_privileges(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">chain</span>: <span class="kw-2">&amp;</span><span class="ident">Chain</span>,
-        <span class="ident">identity</span>: <span class="ident">Address</span>,
-        <span class="ident">hash</span>: [<span class="ident">u8</span>; <span class="number">32</span>],
-        <span class="ident">signature_with_mode</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>],
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">bool</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
-        <span class="comment">// 0x1626ba7e is in little endian</span>
-        <span class="kw">let</span> <span class="ident">magic_value</span>: <span class="ident">u32</span> <span class="op">=</span> <span class="number">2126128662</span>;
-        <span class="comment">// u32::MAX = 4294967295</span>
-        <span class="kw">let</span> <span class="ident">_no_access_value</span>: <span class="ident">u32</span> <span class="op">=</span> <span class="number">0xffffffff</span>;
+        chain: <span class="kw-2">&amp;</span>Chain,
+        identity: Address,
+        hash: [u8; <span class="number">32</span>],
+        signature_with_mode: <span class="kw-2">&amp;</span>[u8],
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;bool, Error&gt; {
+        <span class="comment">// 0x1626ba7e is in little endian
+        </span><span class="kw">let </span>magic_value: u32 = <span class="number">2126128662</span>;
+        <span class="comment">// u32::MAX = 4294967295
+        </span><span class="kw">let </span>_no_access_value: u32 = <span class="number">0xffffffff</span>;
 
-        <span class="kw">let</span> <span class="ident">identity_contract</span> <span class="op">=</span> <span class="ident">Contract::from_json</span>(
-            <span class="ident">chain</span>.<span class="ident">init_web3</span>()<span class="question-mark">?</span>.<span class="ident">eth</span>(),
-            <span class="ident">H160</span>(<span class="ident">identity</span>.<span class="ident">to_bytes</span>()),
-            <span class="kw-2">&amp;</span><span class="ident">IDENTITY_ABI</span>,
+        <span class="kw">let </span>identity_contract = Contract::from_json(
+            chain.init_web3()<span class="question-mark">?</span>.eth(),
+            H160(identity.to_bytes()),
+            <span class="kw-2">&amp;</span>IDENTITY_ABI,
         )
-        .<span class="ident">map_err</span>(<span class="ident">Error::ContractInitialization</span>)<span class="question-mark">?</span>;
+        .map_err(Error::ContractInitialization)<span class="question-mark">?</span>;
 
-        <span class="comment">// we receive `bytes4` from the contract</span>
-        <span class="kw">let</span> <span class="ident">status</span>: [<span class="ident">u8</span>; <span class="number">4</span>] <span class="op">=</span> <span class="ident">identity_contract</span>
-            .<span class="ident">query</span>(
+        <span class="comment">// we receive `bytes4` from the contract
+        </span><span class="kw">let </span>status: [u8; <span class="number">4</span>] = identity_contract
+            .query(
                 <span class="string">&quot;isValidSignature&quot;</span>,
                 (
-                    <span class="comment">// bytes32</span>
-                    <span class="ident">Token::FixedBytes</span>(<span class="ident">hash</span>.<span class="ident">to_vec</span>()),
-                    <span class="comment">// bytes</span>
-                    <span class="ident">Token::Bytes</span>(<span class="ident">signature_with_mode</span>.<span class="ident">to_vec</span>()),
+                    <span class="comment">// bytes32
+                    </span>Token::FixedBytes(hash.to_vec()),
+                    <span class="comment">// bytes
+                    </span>Token::Bytes(signature_with_mode.to_vec()),
                 ),
                 <span class="prelude-val">None</span>,
-                <span class="ident">ContractOptions::default</span>(),
+                ContractOptions::default(),
                 <span class="prelude-val">None</span>,
             )
-            .<span class="kw">await</span>
-            .<span class="ident">map_err</span>(<span class="ident">Error::ContractQuerying</span>)<span class="question-mark">?</span>;
+            .<span class="kw">await
+            </span>.map_err(Error::ContractQuerying)<span class="question-mark">?</span>;
 
-        <span class="comment">// turn this into `u32` (EVM is in little endian)</span>
-        <span class="kw">let</span> <span class="ident">actual_value</span> <span class="op">=</span> <span class="ident">u32::from_le_bytes</span>(<span class="ident">status</span>);
+        <span class="comment">// turn this into `u32` (EVM is in little endian)
+        </span><span class="kw">let </span>actual_value = u32::from_le_bytes(status);
 
-        <span class="comment">// if it is the magical value then the address has privileges.</span>
-        <span class="prelude-val">Ok</span>(<span class="ident">actual_value</span> <span class="op">==</span> <span class="ident">magic_value</span>)
+        <span class="comment">// if it is the magical value then the address has privileges.
+        </span><span class="prelude-val">Ok</span>(actual_value == magic_value)
     }
 }
 
-<span class="kw">impl</span> <span class="ident">Unlockable</span> <span class="kw">for</span> <span class="ident">Ethereum</span><span class="op">&lt;</span><span class="ident">LockedWallet</span><span class="op">&gt;</span> {
-    <span class="kw">type</span> <span class="ident">Unlocked</span> <span class="op">=</span> <span class="ident">Ethereum</span><span class="op">&lt;</span><span class="ident">UnlockedWallet</span><span class="op">&gt;</span>;
+<span class="kw">impl </span>Unlockable <span class="kw">for </span>Ethereum&lt;LockedWallet&gt; {
+    <span class="kw">type </span>Unlocked = Ethereum&lt;UnlockedWallet&gt;;
 
-    <span class="kw">fn</span> <span class="ident">unlock</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Ethereum</span><span class="op">&lt;</span><span class="ident">UnlockedWallet</span><span class="op">&gt;</span>, <span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::Unlocked</span> <span class="kw">as</span> <span class="ident">Locked</span><span class="op">&gt;</span><span class="ident">::Error</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">unlocked_wallet</span> <span class="op">=</span> <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">state</span> {
-            <span class="ident">LockedWallet::KeyStore</span> { <span class="ident">keystore</span>, <span class="ident">password</span> } =&gt; {
-                <span class="kw">let</span> <span class="ident">wallet</span> <span class="op">=</span> <span class="ident">keystore</span>.<span class="ident">to_secret_key</span>(<span class="ident">password</span>)<span class="question-mark">?</span>;
+    <span class="kw">fn </span>unlock(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;Ethereum&lt;UnlockedWallet&gt;, &lt;<span class="self">Self</span>::Unlocked <span class="kw">as </span>Locked&gt;::Error&gt; {
+        <span class="kw">let </span>unlocked_wallet = <span class="kw">match </span><span class="kw-2">&amp;</span><span class="self">self</span>.state {
+            LockedWallet::KeyStore { keystore, password } =&gt; {
+                <span class="kw">let </span>wallet = keystore.to_secret_key(password)<span class="question-mark">?</span>;
 
-                <span class="ident">UnlockedWallet</span> { <span class="ident">wallet</span> }
+                UnlockedWallet { wallet }
             }
-            <span class="ident">LockedWallet::PrivateKey</span>(<span class="ident">_priv_key</span>) =&gt; <span class="macro">todo!</span>(),
+            LockedWallet::PrivateKey(_priv_key) =&gt; <span class="macro">todo!</span>(),
         };
 
-        <span class="prelude-val">Ok</span>(<span class="ident">Ethereum</span> {
-            <span class="ident">address</span>: <span class="self">self</span>.<span class="ident">address</span>,
-            <span class="ident">config</span>: <span class="self">self</span>.<span class="ident">config</span>.<span class="ident">clone</span>(),
-            <span class="ident">state</span>: <span class="ident">unlocked_wallet</span>,
+        <span class="prelude-val">Ok</span>(Ethereum {
+            address: <span class="self">self</span>.address,
+            config: <span class="self">self</span>.config.clone(),
+            state: unlocked_wallet,
         })
     }
 }
 
-<span class="attribute">#[<span class="ident">async_trait</span>]</span>
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">S</span>: <span class="ident">WalletState</span><span class="op">&gt;</span> <span class="ident">Locked</span> <span class="kw">for</span> <span class="ident">Ethereum</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span> {
-    <span class="kw">type</span> <span class="ident">Error</span> <span class="op">=</span> <span class="ident">Error</span>;
+<span class="attribute">#[async_trait]</span>
+<span class="kw">impl</span>&lt;S: WalletState&gt; Locked <span class="kw">for </span>Ethereum&lt;S&gt; {
+    <span class="kw">type </span>Error = Error;
 
-    <span class="kw">fn</span> <span class="ident">whoami</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">ValidatorId</span> {
-        <span class="self">self</span>.<span class="ident">address</span>
+    <span class="kw">fn </span>whoami(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; ValidatorId {
+        <span class="self">self</span>.address
     }
 
-    <span class="kw">fn</span> <span class="ident">verify</span>(
+    <span class="kw">fn </span>verify(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">signer</span>: <span class="ident">ValidatorId</span>,
-        <span class="ident">state_root</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>,
-        <span class="ident">signature</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>,
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">bool</span>, <span class="ident"><span class="self">Self</span>::Error</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="op">!</span><span class="ident">signature</span>.<span class="ident">starts_with</span>(<span class="string">&quot;0x&quot;</span>) {
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">VerifyError::SignatureNotPrefixed</span>.<span class="ident">into</span>());
+        signer: ValidatorId,
+        state_root: <span class="kw-2">&amp;</span>str,
+        signature: <span class="kw-2">&amp;</span>str,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;bool, <span class="self">Self</span>::Error&gt; {
+        <span class="kw">if </span>!signature.starts_with(<span class="string">&quot;0x&quot;</span>) {
+            <span class="kw">return </span><span class="prelude-val">Err</span>(VerifyError::SignatureNotPrefixed.into());
         }
-        <span class="kw">let</span> <span class="ident">decoded_signature</span> <span class="op">=</span>
-            <span class="ident">hex::decode</span>(<span class="kw-2">&amp;</span><span class="ident">signature</span>[<span class="number">2</span>..]).<span class="ident">map_err</span>(<span class="ident">VerifyError::SignatureDecoding</span>)<span class="question-mark">?</span>;
+        <span class="kw">let </span>decoded_signature =
+            hex::decode(<span class="kw-2">&amp;</span>signature[<span class="number">2</span>..]).map_err(VerifyError::SignatureDecoding)<span class="question-mark">?</span>;
 
-        <span class="kw">let</span> <span class="ident">signature</span> <span class="op">=</span>
-            <span class="ident">Signature::from_electrum</span>(<span class="kw-2">&amp;</span><span class="ident">decoded_signature</span>).<span class="ident">ok_or</span>(<span class="ident">VerifyError::SignatureInvalid</span>)<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">state_root</span> <span class="op">=</span> <span class="ident">hex::decode</span>(<span class="ident">state_root</span>).<span class="ident">map_err</span>(<span class="ident">VerifyError::StateRootDecoding</span>)<span class="question-mark">?</span>;
+        <span class="kw">let </span>signature =
+            Signature::from_electrum(<span class="kw-2">&amp;</span>decoded_signature).ok_or(VerifyError::SignatureInvalid)<span class="question-mark">?</span>;
+        <span class="kw">let </span>state_root = hex::decode(state_root).map_err(VerifyError::StateRootDecoding)<span class="question-mark">?</span>;
 
-        <span class="kw">let</span> <span class="ident">message</span> <span class="op">=</span> <span class="ident">to_ethereum_signed</span>(<span class="kw-2">&amp;</span><span class="ident">state_root</span>);
+        <span class="kw">let </span>message = to_ethereum_signed(<span class="kw-2">&amp;</span>state_root);
 
-        <span class="comment">// recover the public key using the signature and the eth sign message</span>
-        <span class="kw">let</span> <span class="ident">public_key</span> <span class="op">=</span> <span class="ident">signature</span>
-            .<span class="ident">recover</span>(<span class="kw-2">&amp;</span><span class="ident">message</span>)
-            .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">ec_err</span><span class="op">|</span> <span class="ident">VerifyError::PublicKeyRecovery</span>(<span class="ident">ec_err</span>.<span class="ident">to_string</span>()))<span class="question-mark">?</span>;
+        <span class="comment">// recover the public key using the signature and the eth sign message
+        </span><span class="kw">let </span>public_key = signature
+            .recover(<span class="kw-2">&amp;</span>message)
+            .map_err(|ec_err| VerifyError::PublicKeyRecovery(ec_err.to_string()))<span class="question-mark">?</span>;
 
-        <span class="prelude-val">Ok</span>(<span class="ident">public_key</span>.<span class="ident">address</span>() <span class="op">==</span> <span class="ident">signer</span>.<span class="ident">as_bytes</span>())
+        <span class="prelude-val">Ok</span>(public_key.address() == signer.as_bytes())
     }
 
-    <span class="doccomment">/// Creates a `Session` from a provided Token by calling the Contract.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// This methods validates that the [`Payload`]&#39;s [`Chain`] is whitelisted in the configuration.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Does **not** cache the (`Token`, `Session`) pair.</span>
-    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">session_from_token</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">token</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Session</span>, <span class="ident"><span class="self">Self</span>::Error</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> (<span class="ident">verified_token</span>, <span class="ident">verified</span>) <span class="op">=</span> <span class="ident">ewt::Token::verify</span>(<span class="ident">token</span>).<span class="ident">map_err</span>(<span class="ident">Error::VerifyMessage</span>)<span class="question-mark">?</span>;
+    <span class="doccomment">/// Creates a `Session` from a provided Token by calling the Contract.
+    ///
+    /// This methods validates that the [`Payload`]&#39;s [`Chain`] is whitelisted in the configuration.
+    ///
+    /// Does **not** cache the (`Token`, `Session`) pair.
+    </span><span class="kw">async fn </span>session_from_token(<span class="kw-2">&amp;</span><span class="self">self</span>, token: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Result</span>&lt;Session, <span class="self">Self</span>::Error&gt; {
+        <span class="kw">let </span>(verified_token, verified) = ewt::Token::verify(token).map_err(Error::VerifyMessage)<span class="question-mark">?</span>;
 
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">whoami</span>() <span class="op">!</span><span class="op">=</span> <span class="ident">verified</span>.<span class="ident">payload</span>.<span class="ident">id</span> {
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error::AuthenticationTokenNotIntendedForUs</span> {
-                <span class="ident">payload</span>: <span class="ident">verified</span>.<span class="ident">payload</span>,
-                <span class="ident">whoami</span>: <span class="self">self</span>.<span class="ident">whoami</span>(),
+        <span class="kw">if </span><span class="self">self</span>.whoami() != verified.payload.id {
+            <span class="kw">return </span><span class="prelude-val">Err</span>(Error::AuthenticationTokenNotIntendedForUs {
+                payload: verified.payload,
+                whoami: <span class="self">self</span>.whoami(),
             });
         }
 
-        <span class="comment">// Check if Payload chain is whitelisted</span>
-        <span class="kw">let</span> <span class="ident">whitelisted_chain</span> <span class="op">=</span> <span class="self">self</span>
-            .<span class="ident">config</span>
-            .<span class="ident">find_chain</span>(<span class="ident">verified</span>.<span class="ident">payload</span>.<span class="ident">chain_id</span>)
-            .<span class="ident">ok_or</span>(<span class="ident">Error::ChainNotWhitelisted</span>(<span class="ident">verified</span>.<span class="ident">payload</span>.<span class="ident">chain_id</span>))<span class="question-mark">?</span>
-            .<span class="ident">chain</span>
-            .<span class="ident">clone</span>();
+        <span class="comment">// Check if Payload chain is whitelisted
+        </span><span class="kw">let </span>whitelisted_chain = <span class="self">self
+            </span>.config
+            .find_chain(verified.payload.chain_id)
+            .ok_or(Error::ChainNotWhitelisted(verified.payload.chain_id))<span class="question-mark">?
+            </span>.chain
+            .clone();
 
-        <span class="kw">let</span> <span class="ident">sess</span> <span class="op">=</span> <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="ident">verified</span>.<span class="ident">payload</span>.<span class="ident">identity</span> {
-            <span class="prelude-val">Some</span>(<span class="ident">identity</span>) =&gt; {
-                <span class="comment">// the Hash for has_privileges should **not** be an Ethereum Signed Message hash</span>
+        <span class="kw">let </span>sess = <span class="kw">match </span><span class="kw-2">&amp;</span>verified.payload.identity {
+            <span class="prelude-val">Some</span>(identity) =&gt; {
+                <span class="comment">// the Hash for has_privileges should **not** be an Ethereum Signed Message hash
 
-                <span class="kw">if</span> <span class="self">self</span>
-                    .<span class="ident">has_privileges</span>(
-                        <span class="kw-2">&amp;</span><span class="ident">whitelisted_chain</span>,
-                        <span class="kw-2">*</span><span class="ident">identity</span>,
-                        <span class="ident">verified_token</span>.<span class="ident">message_hash</span>,
-                        <span class="kw-2">&amp;</span><span class="ident">verified_token</span>.<span class="ident">signature</span>,
+                </span><span class="kw">if </span><span class="self">self
+                    </span>.has_privileges(
+                        <span class="kw-2">&amp;</span>whitelisted_chain,
+                        <span class="kw-2">*</span>identity,
+                        verified_token.message_hash,
+                        <span class="kw-2">&amp;</span>verified_token.signature,
                     )
-                    .<span class="kw">await</span><span class="question-mark">?</span>
-                {
-                    <span class="ident">Session</span> {
-                        <span class="ident">era</span>: <span class="ident">verified</span>.<span class="ident">payload</span>.<span class="ident">era</span>,
-                        <span class="ident">uid</span>: <span class="ident">identity</span>.<span class="ident">to_owned</span>(),
-                        <span class="ident">chain</span>: <span class="ident">whitelisted_chain</span>,
+                    .<span class="kw">await</span><span class="question-mark">?
+                </span>{
+                    Session {
+                        era: verified.payload.era,
+                        uid: identity.to_owned(),
+                        chain: whitelisted_chain,
                     }
-                } <span class="kw">else</span> {
-                    <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error::InsufficientAuthorizationPrivilege</span>);
+                } <span class="kw">else </span>{
+                    <span class="kw">return </span><span class="prelude-val">Err</span>(Error::InsufficientAuthorizationPrivilege);
                 }
             }
-            <span class="prelude-val">None</span> =&gt; <span class="ident">Session</span> {
-                <span class="ident">era</span>: <span class="ident">verified</span>.<span class="ident">payload</span>.<span class="ident">era</span>,
-                <span class="ident">uid</span>: <span class="ident">verified</span>.<span class="ident">from</span>,
-                <span class="ident">chain</span>: <span class="ident">whitelisted_chain</span>,
+            <span class="prelude-val">None </span>=&gt; Session {
+                era: verified.payload.era,
+                uid: verified.from,
+                chain: whitelisted_chain,
             },
         };
 
-        <span class="prelude-val">Ok</span>(<span class="ident">sess</span>)
+        <span class="prelude-val">Ok</span>(sess)
     }
 
-    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">get_deposit</span>(
+    <span class="kw">async fn </span>get_deposit(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">channel_context</span>: <span class="kw-2">&amp;</span><span class="ident">ChainOf</span><span class="op">&lt;</span><span class="ident">Channel</span><span class="op">&gt;</span>,
-        <span class="ident">depositor_address</span>: <span class="ident">Address</span>,
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Deposit</span>, <span class="ident"><span class="self">Self</span>::Error</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">channel</span> <span class="op">=</span> <span class="ident">channel_context</span>.<span class="ident">context</span>;
-        <span class="kw">let</span> <span class="ident">chain</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">channel_context</span>.<span class="ident">chain</span>;
+        channel_context: <span class="kw-2">&amp;</span>ChainOf&lt;Channel&gt;,
+        depositor_address: Address,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;Deposit, <span class="self">Self</span>::Error&gt; {
+        <span class="kw">let </span>channel = channel_context.context;
+        <span class="kw">let </span>chain = <span class="kw-2">&amp;</span>channel_context.chain;
 
-        <span class="kw">let</span> <span class="ident">web3</span> <span class="op">=</span> <span class="ident">chain</span>.<span class="ident">init_web3</span>()<span class="question-mark">?</span>;
+        <span class="kw">let </span>web3 = chain.init_web3()<span class="question-mark">?</span>;
 
-        <span class="kw">let</span> <span class="ident">outpace_contract</span> <span class="op">=</span> <span class="ident">Contract::from_json</span>(
-            <span class="ident">web3</span>.<span class="ident">eth</span>(),
-            <span class="ident">H160</span>(<span class="ident">channel_context</span>.<span class="ident">chain</span>.<span class="ident">outpace</span>.<span class="ident">to_bytes</span>()),
-            <span class="kw-2">&amp;</span><span class="ident">OUTPACE_ABI</span>,
+        <span class="kw">let </span>outpace_contract = Contract::from_json(
+            web3.eth(),
+            H160(channel_context.chain.outpace.to_bytes()),
+            <span class="kw-2">&amp;</span>OUTPACE_ABI,
         )
-        .<span class="ident">map_err</span>(<span class="ident">Error::ContractInitialization</span>)<span class="question-mark">?</span>;
+        .map_err(Error::ContractInitialization)<span class="question-mark">?</span>;
 
-        <span class="kw">let</span> <span class="ident">on_outpace</span>: <span class="ident">U256</span> <span class="op">=</span> <span class="ident">outpace_contract</span>
-            .<span class="ident">query</span>(
+        <span class="kw">let </span>on_outpace: U256 = outpace_contract
+            .query(
                 <span class="string">&quot;deposits&quot;</span>,
                 (
-                    <span class="ident">Token::FixedBytes</span>(<span class="ident">channel</span>.<span class="ident">id</span>().<span class="ident">as_bytes</span>().<span class="ident">to_vec</span>()),
-                    <span class="ident">Token::Address</span>(<span class="ident">H160</span>(<span class="ident">depositor_address</span>.<span class="ident">to_bytes</span>())),
+                    Token::FixedBytes(channel.id().as_bytes().to_vec()),
+                    Token::Address(H160(depositor_address.to_bytes())),
                 ),
                 <span class="prelude-val">None</span>,
-                <span class="ident">ContractOptions::default</span>(),
+                ContractOptions::default(),
                 <span class="prelude-val">None</span>,
             )
-            .<span class="kw">await</span>
-            .<span class="ident">map_err</span>(<span class="ident">Error::ContractQuerying</span>)<span class="question-mark">?</span>;
+            .<span class="kw">await
+            </span>.map_err(Error::ContractQuerying)<span class="question-mark">?</span>;
 
-        <span class="kw">let</span> <span class="ident">on_outpace</span> <span class="op">=</span> <span class="ident">BigNum::from_str</span>(<span class="kw-2">&amp;</span><span class="ident">on_outpace</span>.<span class="ident">to_string</span>()).<span class="ident">map_err</span>(<span class="ident">Error::BigNumParsing</span>)<span class="question-mark">?</span>;
+        <span class="kw">let </span>on_outpace = BigNum::from_str(<span class="kw-2">&amp;</span>on_outpace.to_string()).map_err(Error::BigNumParsing)<span class="question-mark">?</span>;
 
-        <span class="kw">let</span> <span class="ident">deposit</span> <span class="op">=</span> <span class="ident">Deposit</span> { <span class="ident">total</span>: <span class="ident">on_outpace</span> };
+        <span class="kw">let </span>deposit = Deposit { total: on_outpace };
 
-        <span class="prelude-val">Ok</span>(<span class="ident">deposit</span>)
+        <span class="prelude-val">Ok</span>(deposit)
     }
 }
 
-<span class="attribute">#[<span class="ident">async_trait</span>]</span>
-<span class="kw">impl</span> <span class="ident">Unlocked</span> <span class="kw">for</span> <span class="ident">Ethereum</span><span class="op">&lt;</span><span class="ident">UnlockedWallet</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">sign</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">state_root</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">String</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">state_root</span> <span class="op">=</span> <span class="ident">hex::decode</span>(<span class="ident">state_root</span>).<span class="ident">map_err</span>(<span class="ident">VerifyError::StateRootDecoding</span>)<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">message</span> <span class="op">=</span> <span class="ident">to_ethereum_signed</span>(<span class="kw-2">&amp;</span><span class="ident">state_root</span>);
+<span class="attribute">#[async_trait]</span>
+<span class="kw">impl </span>Unlocked <span class="kw">for </span>Ethereum&lt;UnlockedWallet&gt; {
+    <span class="kw">fn </span>sign(<span class="kw-2">&amp;</span><span class="self">self</span>, state_root: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Result</span>&lt;String, Error&gt; {
+        <span class="kw">let </span>state_root = hex::decode(state_root).map_err(VerifyError::StateRootDecoding)<span class="question-mark">?</span>;
+        <span class="kw">let </span>message = to_ethereum_signed(<span class="kw-2">&amp;</span>state_root);
 
-        <span class="kw">let</span> <span class="ident">wallet_sign</span> <span class="op">=</span> <span class="self">self</span>
-            .<span class="ident">state</span>
-            .<span class="ident">wallet</span>
-            .<span class="ident">sign</span>(<span class="kw-2">&amp;</span><span class="ident">message</span>)
-            <span class="comment">// TODO: This is not entirely true, we do not sign an Ethereum Web Token but Outpace state_root</span>
-            .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">err</span><span class="op">|</span> <span class="ident">EwtSigningError::SigningMessage</span>(<span class="ident">err</span>.<span class="ident">to_string</span>()))<span class="question-mark">?</span>;
+        <span class="kw">let </span>wallet_sign = <span class="self">self
+            </span>.state
+            .wallet
+            .sign(<span class="kw-2">&amp;</span>message)
+            <span class="comment">// TODO: This is not entirely true, we do not sign an Ethereum Web Token but Outpace state_root
+            </span>.map_err(|err| EwtSigningError::SigningMessage(err.to_string()))<span class="question-mark">?</span>;
 
-        <span class="prelude-val">Ok</span>(<span class="macro">format!</span>(<span class="string">&quot;0x{}&quot;</span>, <span class="ident">hex::encode</span>(<span class="ident">wallet_sign</span>.<span class="ident">to_electrum</span>())))
+        <span class="prelude-val">Ok</span>(<span class="macro">format!</span>(<span class="string">&quot;0x{}&quot;</span>, hex::encode(wallet_sign.to_electrum())))
     }
 
-    <span class="kw">fn</span> <span class="ident">get_auth</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">for_chain</span>: <span class="ident">ChainId</span>, <span class="ident">intended_for</span>: <span class="ident">ValidatorId</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">String</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">era</span> <span class="op">=</span> <span class="ident">Utc::now</span>().<span class="ident">timestamp_millis</span>() <span class="kw">as</span> <span class="ident">f64</span> <span class="op">/</span> <span class="number">60000.0</span>;
-        <span class="kw">let</span> <span class="ident">payload</span> <span class="op">=</span> <span class="ident">Payload</span> {
-            <span class="ident">id</span>: <span class="ident">intended_for</span>,
-            <span class="ident">era</span>: <span class="ident">era</span>.<span class="ident">floor</span>() <span class="kw">as</span> <span class="ident">i64</span>,
-            <span class="ident">identity</span>: <span class="prelude-val">None</span>,
-            <span class="ident">address</span>: <span class="self">self</span>.<span class="ident">whoami</span>().<span class="ident">to_address</span>(),
-            <span class="ident">chain_id</span>: <span class="ident">for_chain</span>,
+    <span class="kw">fn </span>get_auth(<span class="kw-2">&amp;</span><span class="self">self</span>, for_chain: ChainId, intended_for: ValidatorId) -&gt; <span class="prelude-ty">Result</span>&lt;String, Error&gt; {
+        <span class="kw">let </span>era = Utc::now().timestamp_millis() <span class="kw">as </span>f64 / <span class="number">60000.0</span>;
+        <span class="kw">let </span>payload = Payload {
+            id: intended_for,
+            era: era.floor() <span class="kw">as </span>i64,
+            identity: <span class="prelude-val">None</span>,
+            address: <span class="self">self</span>.whoami().to_address(),
+            chain_id: for_chain,
         };
 
-        <span class="kw">let</span> <span class="ident">token</span> <span class="op">=</span> <span class="ident">ewt::Token::sign</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">state</span>.<span class="ident">wallet</span>, <span class="ident">payload</span>).<span class="ident">map_err</span>(<span class="ident">Error::SignMessage</span>)<span class="question-mark">?</span>;
+        <span class="kw">let </span>token = ewt::Token::sign(<span class="kw-2">&amp;</span><span class="self">self</span>.state.wallet, payload).map_err(Error::SignMessage)<span class="question-mark">?</span>;
 
-        <span class="prelude-val">Ok</span>(<span class="ident">token</span>.<span class="ident">to_string</span>())
+        <span class="prelude-val">Ok</span>(token.to_string())
     }
 }
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
-<span class="kw">mod</span> <span class="ident">test</span> {
-    <span class="kw">use</span> <span class="kw">super</span>::{<span class="ident">ewt::ETH_SIGN_SUFFIX</span>, <span class="ident">Ethereum</span>};
-    <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::ethereum</span>::{
-        <span class="ident">client::ChainTransport</span>,
-        <span class="ident">ewt</span>::{<span class="self">self</span>, <span class="ident">Payload</span>},
-        <span class="ident">test_util</span>::<span class="kw-2">*</span>,
-        <span class="ident">to_ethereum_signed</span>, <span class="ident">Electrum</span>,
+<span class="attribute">#[cfg(test)]</span>
+<span class="kw">mod </span>test {
+    <span class="kw">use super</span>::{ewt::ETH_SIGN_SUFFIX, Ethereum};
+    <span class="kw">use </span><span class="kw">crate</span>::ethereum::{
+        client::ChainTransport,
+        ewt::{<span class="self">self</span>, Payload},
+        test_util::<span class="kw-2">*</span>,
+        to_ethereum_signed, Electrum,
     };
 
-    <span class="kw">use</span> <span class="kw">crate</span>::{
-        <span class="ident">prelude</span>::<span class="kw-2">*</span>,
-        <span class="ident">primitives</span>::{<span class="ident">Deposit</span>, <span class="ident">Session</span>},
+    <span class="kw">use crate</span>::{
+        prelude::<span class="kw-2">*</span>,
+        primitives::{Deposit, Session},
     };
-    <span class="kw">use</span> <span class="ident">chrono::Utc</span>;
+    <span class="kw">use </span>chrono::Utc;
 
-    <span class="kw">use</span> <span class="ident">primitives</span>::{
-        <span class="ident">channel::Nonce</span>,
-        <span class="ident">config::GANACHE_CONFIG</span>,
-        <span class="ident">test_util</span>::{
-            <span class="ident">ADDRESS_3</span>, <span class="ident">ADDRESS_4</span>, <span class="ident">ADDRESS_5</span>, <span class="ident">ADVERTISER</span>, <span class="ident">CREATOR</span>, <span class="ident">DUMMY_CAMPAIGN</span>, <span class="ident">FOLLOWER</span>,
-            <span class="ident">GUARDIAN</span>, <span class="ident">GUARDIAN_2</span>, <span class="ident">IDS</span>, <span class="ident">LEADER</span>, <span class="ident">LEADER_2</span>,
+    <span class="kw">use </span>primitives::{
+        channel::Nonce,
+        config::GANACHE_CONFIG,
+        test_util::{
+            ADDRESS_3, ADDRESS_4, ADDRESS_5, ADVERTISER, CREATOR, DUMMY_CAMPAIGN, FOLLOWER,
+            GUARDIAN, GUARDIAN_2, IDS, LEADER, LEADER_2,
         },
-        <span class="ident">BigNum</span>, <span class="ident">ChainOf</span>, <span class="ident">Channel</span>, <span class="ident">ToHex</span>, <span class="ident">ValidatorId</span>,
+        BigNum, ChainOf, Channel, ToHex, ValidatorId,
     };
-    <span class="kw">use</span> <span class="ident">web3</span>::{
-        <span class="ident">contract::Options</span> <span class="kw">as</span> <span class="ident">ContractOptions</span>, <span class="ident">ethabi::Token</span>, <span class="ident">signing::keccak256</span>, <span class="ident">types::H160</span>,
+    <span class="kw">use </span>web3::{
+        contract::Options <span class="kw">as </span>ContractOptions, ethabi::Token, signing::keccak256, types::H160,
     };
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">should_init_and_unlock_ethereum_adapter</span>() {
-        <span class="kw">let</span> <span class="ident">_eth_adapter</span> <span class="op">=</span> <span class="ident">Ethereum::init</span>(<span class="ident">KEYSTORE_IDENTITY</span>.<span class="number">1</span>.<span class="ident">clone</span>(), <span class="kw-2">&amp;</span><span class="ident">GANACHE_CONFIG</span>)
-            .<span class="ident">expect</span>(<span class="string">&quot;Should init&quot;</span>)
-            .<span class="ident">unlock</span>()
-            .<span class="ident">expect</span>(<span class="string">&quot;should unlock eth adapter&quot;</span>);
+    <span class="attribute">#[test]</span>
+    <span class="kw">fn </span>should_init_and_unlock_ethereum_adapter() {
+        <span class="kw">let </span>_eth_adapter = Ethereum::init(KEYSTORE_IDENTITY.<span class="number">1</span>.clone(), <span class="kw-2">&amp;</span>GANACHE_CONFIG)
+            .expect(<span class="string">&quot;Should init&quot;</span>)
+            .unlock()
+            .expect(<span class="string">&quot;should unlock eth adapter&quot;</span>);
     }
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">should_get_whoami_sign_and_verify_messages</span>() {
-        <span class="comment">// whoami</span>
-        <span class="kw">let</span> <span class="ident">eth_adapter</span> <span class="op">=</span> <span class="ident">Ethereum::init</span>(<span class="ident">KEYSTORE_IDENTITY</span>.<span class="number">1</span>.<span class="ident">clone</span>(), <span class="kw-2">&amp;</span><span class="ident">GANACHE_CONFIG</span>)
-            .<span class="ident">expect</span>(<span class="string">&quot;Should init&quot;</span>)
-            .<span class="ident">unlock</span>()
-            .<span class="ident">expect</span>(<span class="string">&quot;should unlock eth adapter&quot;</span>);
-        <span class="kw">let</span> <span class="ident">whoami</span> <span class="op">=</span> <span class="ident">eth_adapter</span>.<span class="ident">whoami</span>();
+    <span class="attribute">#[test]</span>
+    <span class="kw">fn </span>should_get_whoami_sign_and_verify_messages() {
+        <span class="comment">// whoami
+        </span><span class="kw">let </span>eth_adapter = Ethereum::init(KEYSTORE_IDENTITY.<span class="number">1</span>.clone(), <span class="kw-2">&amp;</span>GANACHE_CONFIG)
+            .expect(<span class="string">&quot;Should init&quot;</span>)
+            .unlock()
+            .expect(<span class="string">&quot;should unlock eth adapter&quot;</span>);
+        <span class="kw">let </span>whoami = eth_adapter.whoami();
         <span class="macro">assert_eq!</span>(
-            <span class="ident">whoami</span>.<span class="ident">to_string</span>(),
+            whoami.to_string(),
             <span class="string">&quot;0x2bDeAFAE53940669DaA6F519373f686c1f3d3393&quot;</span>,
-            <span class="string">&quot;failed to get correct whoami&quot;</span>
-        );
+            <span class="string">&quot;failed to get correct whoami&quot;
+        </span>);
 
-        <span class="comment">// Sign</span>
-        <span class="kw">let</span> <span class="ident">expected_response</span> <span class="op">=</span>
+        <span class="comment">// Sign
+        </span><span class="kw">let </span>expected_response =
             <span class="string">&quot;0x625fd46f82c4cfd135ea6a8534e85dbf50beb157046dce59d2e97aacdf4e38381d1513c0e6f002b2f05c05458038b187754ff38cc0658dfc9ba854cccfb6e13e1b&quot;</span>;
-        <span class="kw">let</span> <span class="ident">message</span> <span class="op">=</span> <span class="string">&quot;2bdeafae53940669daa6f519373f686c&quot;</span>;
-        <span class="kw">let</span> <span class="ident">signature</span> <span class="op">=</span> <span class="ident">eth_adapter</span>.<span class="ident">sign</span>(<span class="ident">message</span>).<span class="ident">expect</span>(<span class="string">&quot;failed to sign message&quot;</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">expected_response</span>, <span class="ident">signature</span>, <span class="string">&quot;invalid signature&quot;</span>);
+        <span class="kw">let </span>message = <span class="string">&quot;2bdeafae53940669daa6f519373f686c&quot;</span>;
+        <span class="kw">let </span>signature = eth_adapter.sign(message).expect(<span class="string">&quot;failed to sign message&quot;</span>);
+        <span class="macro">assert_eq!</span>(expected_response, signature, <span class="string">&quot;invalid signature&quot;</span>);
 
-        <span class="comment">// Verify</span>
-        <span class="kw">let</span> <span class="ident">signature</span> <span class="op">=</span>
+        <span class="comment">// Verify
+        </span><span class="kw">let </span>signature =
             <span class="string">&quot;0x9e07f12958ce7c5eb1362eb9461e4745dd9d74a42b921391393caea700bfbd6e1ad876a7d8f9202ef1fe6110dbfe87840c5676ca5c4fda9f3330694a1ac2a1fc1b&quot;</span>;
-        <span class="kw">let</span> <span class="ident">verify</span> <span class="op">=</span> <span class="ident">eth_adapter</span>
-            .<span class="ident">verify</span>(
-                <span class="ident">ValidatorId::try_from</span>(<span class="string">&quot;2892f6C41E0718eeeDd49D98D648C789668cA67d&quot;</span>)
-                    .<span class="ident">expect</span>(<span class="string">&quot;Failed to parse id&quot;</span>),
+        <span class="kw">let </span>verify = eth_adapter
+            .verify(
+                ValidatorId::try_from(<span class="string">&quot;2892f6C41E0718eeeDd49D98D648C789668cA67d&quot;</span>)
+                    .expect(<span class="string">&quot;Failed to parse id&quot;</span>),
                 <span class="string">&quot;8bc45d8eb27f4c98cab35d17b0baecc2a263d6831ef0800f4c190cbfac6d20a3&quot;</span>,
-                <span class="ident">signature</span>,
+                signature,
             )
-            .<span class="ident">expect</span>(<span class="string">&quot;Failed to verify signatures&quot;</span>);
+            .expect(<span class="string">&quot;Failed to verify signatures&quot;</span>);
 
-        <span class="kw">let</span> <span class="ident">signature2</span> <span class="op">=</span> <span class="string">&quot;0x9fa5852041b9818021323aff8260624fd6998c52c95d9ad5036e0db6f2bf2b2d48a188ec1d638581ff56b0a2ecceca6d3880fc65030558bd8f68b154e7ebf80f1b&quot;</span>;
-        <span class="kw">let</span> <span class="ident">message2</span> <span class="op">=</span> <span class="string">&quot;1648231285e69677531ffe70719f67a07f3d4393b8425a5a1c84b0c72434c77b&quot;</span>;
+        <span class="kw">let </span>signature2 = <span class="string">&quot;0x9fa5852041b9818021323aff8260624fd6998c52c95d9ad5036e0db6f2bf2b2d48a188ec1d638581ff56b0a2ecceca6d3880fc65030558bd8f68b154e7ebf80f1b&quot;</span>;
+        <span class="kw">let </span>message2 = <span class="string">&quot;1648231285e69677531ffe70719f67a07f3d4393b8425a5a1c84b0c72434c77b&quot;</span>;
 
-        <span class="kw">let</span> <span class="ident">signer2</span> <span class="op">=</span> <span class="string">&quot;0xce07CbB7e054514D590a0262C93070D838bFBA2e&quot;</span>
-            .<span class="ident">parse</span>()
-            .<span class="ident">expect</span>(<span class="string">&quot;Valid ValidatorId&quot;</span>);
-        <span class="kw">let</span> <span class="ident">verify2</span> <span class="op">=</span> <span class="ident">eth_adapter</span>
-            .<span class="ident">verify</span>(<span class="ident">signer2</span>, <span class="ident">message2</span>, <span class="ident">signature2</span>)
-            .<span class="ident">expect</span>(<span class="string">&quot;Failed to verify signatures&quot;</span>);
+        <span class="kw">let </span>signer2 = <span class="string">&quot;0xce07CbB7e054514D590a0262C93070D838bFBA2e&quot;
+            </span>.parse()
+            .expect(<span class="string">&quot;Valid ValidatorId&quot;</span>);
+        <span class="kw">let </span>verify2 = eth_adapter
+            .verify(signer2, message2, signature2)
+            .expect(<span class="string">&quot;Failed to verify signatures&quot;</span>);
 
-        <span class="macro">assert!</span>(<span class="ident">verify</span>, <span class="string">&quot;invalid signature 1 verification&quot;</span>);
-        <span class="macro">assert!</span>(<span class="ident">verify2</span>, <span class="string">&quot;invalid signature 2 verification&quot;</span>);
+        <span class="macro">assert!</span>(verify, <span class="string">&quot;invalid signature 1 verification&quot;</span>);
+        <span class="macro">assert!</span>(verify2, <span class="string">&quot;invalid signature 2 verification&quot;</span>);
     }
 
-    <span class="doccomment">/// Validated using `lib/protocol-eth/js/Bundle.js`</span>
-    <span class="attribute">#[<span class="ident">tokio::test</span>]</span>
-    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">test_has_privileges_with_raw_data</span>() {
-        <span class="kw">let</span> <span class="ident">user</span> <span class="op">=</span> <span class="kw-2">*</span><span class="ident">ADDRESS_4</span>;
-        <span class="comment">// the web3 from Adapter is used to deploy the Identity contract</span>
-        <span class="kw">let</span> <span class="ident">user_adapter</span> <span class="op">=</span> <span class="ident">Ethereum::init</span>(<span class="ident">KEYSTORES</span>[<span class="kw-2">&amp;</span><span class="ident">user</span>].<span class="ident">clone</span>(), <span class="kw-2">&amp;</span><span class="ident">GANACHE_CONFIG</span>)
-            .<span class="ident">expect</span>(<span class="string">&quot;should init ethereum adapter&quot;</span>)
-            .<span class="ident">unlock</span>()
-            .<span class="ident">expect</span>(<span class="string">&quot;should unlock eth adapter&quot;</span>);
+    <span class="doccomment">/// Validated using `lib/protocol-eth/js/Bundle.js`
+    </span><span class="attribute">#[tokio::test]</span>
+    <span class="kw">async fn </span>test_has_privileges_with_raw_data() {
+        <span class="kw">let </span>user = <span class="kw-2">*</span>ADDRESS_4;
+        <span class="comment">// the web3 from Adapter is used to deploy the Identity contract
+        </span><span class="kw">let </span>user_adapter = Ethereum::init(KEYSTORES[<span class="kw-2">&amp;</span>user].clone(), <span class="kw-2">&amp;</span>GANACHE_CONFIG)
+            .expect(<span class="string">&quot;should init ethereum adapter&quot;</span>)
+            .unlock()
+            .expect(<span class="string">&quot;should unlock eth adapter&quot;</span>);
 
-        <span class="kw">let</span> <span class="ident">ganache_chain</span> <span class="op">=</span> <span class="ident">GANACHE_1337</span>.<span class="ident">clone</span>();
-        <span class="kw">let</span> <span class="ident">web3</span> <span class="op">=</span> <span class="ident">ganache_chain</span>
-            .<span class="ident">init_web3</span>()
-            .<span class="ident">expect</span>(<span class="string">&quot;Should init the Web3 client&quot;</span>);
+        <span class="kw">let </span>ganache_chain = GANACHE_1337.clone();
+        <span class="kw">let </span>web3 = ganache_chain
+            .init_web3()
+            .expect(<span class="string">&quot;Should init the Web3 client&quot;</span>);
 
-        <span class="kw">let</span> <span class="ident">evil</span> <span class="op">=</span> <span class="kw-2">*</span><span class="ident">ADDRESS_5</span>;
-        <span class="kw">let</span> <span class="ident">identify_as</span> <span class="op">=</span> <span class="kw-2">*</span><span class="ident">ADDRESS_3</span>;
+        <span class="kw">let </span>evil = <span class="kw-2">*</span>ADDRESS_5;
+        <span class="kw">let </span>identify_as = <span class="kw-2">*</span>ADDRESS_3;
 
-        <span class="kw">let</span> <span class="ident">msg_hash_actual</span> <span class="op">=</span> <span class="ident">keccak256</span>(<span class="kw-2">&amp;</span><span class="ident">hex::decode</span>(<span class="string">&quot;21851b&quot;</span>).<span class="ident">unwrap</span>());
+        <span class="kw">let </span>msg_hash_actual = keccak256(<span class="kw-2">&amp;</span>hex::decode(<span class="string">&quot;21851b&quot;</span>).unwrap());
 
-        <span class="kw">let</span> <span class="ident">msg_hash</span> <span class="op">=</span> <span class="string">&quot;978d98785935b5526480e9ca00d01b063a6c56f51afbc4ad27b28daecb14258d&quot;</span>;
-        <span class="kw">let</span> <span class="ident">msg_hash_decoded</span> <span class="op">=</span> <span class="ident">hex::decode</span>(<span class="ident">msg_hash</span>).<span class="ident">unwrap</span>();
-        <span class="macro">assert_eq!</span>(<span class="ident">msg_hash_decoded</span>.<span class="ident">len</span>(), <span class="number">32</span>);
-        <span class="macro">assert_eq!</span>(<span class="kw-2">&amp;</span><span class="ident">hex::encode</span>(<span class="ident">msg_hash_actual</span>), <span class="ident">msg_hash</span>);
-        <span class="macro">assert_eq!</span>(<span class="kw-2">&amp;</span><span class="ident">msg_hash_decoded</span>, <span class="kw-2">&amp;</span><span class="ident">msg_hash_actual</span>);
+        <span class="kw">let </span>msg_hash = <span class="string">&quot;978d98785935b5526480e9ca00d01b063a6c56f51afbc4ad27b28daecb14258d&quot;</span>;
+        <span class="kw">let </span>msg_hash_decoded = hex::decode(msg_hash).unwrap();
+        <span class="macro">assert_eq!</span>(msg_hash_decoded.len(), <span class="number">32</span>);
+        <span class="macro">assert_eq!</span>(<span class="kw-2">&amp;</span>hex::encode(msg_hash_actual), msg_hash);
+        <span class="macro">assert_eq!</span>(<span class="kw-2">&amp;</span>msg_hash_decoded, <span class="kw-2">&amp;</span>msg_hash_actual);
 
-        <span class="kw">let</span> (<span class="ident">identity_address</span>, <span class="ident">_contract</span>) <span class="op">=</span> <span class="ident">deploy_identity_contract</span>(<span class="kw-2">&amp;</span><span class="ident">web3</span>, <span class="ident">identify_as</span>, <span class="kw-2">&amp;</span>[<span class="ident">user</span>])
-            .<span class="kw">await</span>
-            .<span class="ident">expect</span>(<span class="string">&quot;Should deploy identity&quot;</span>);
+        <span class="kw">let </span>(identity_address, _contract) = deploy_identity_contract(<span class="kw-2">&amp;</span>web3, identify_as, <span class="kw-2">&amp;</span>[user])
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;Should deploy identity&quot;</span>);
 
-        <span class="comment">// User should have privileges!</span>
-        {
-            <span class="kw">let</span> <span class="ident">user_sig</span> <span class="op">=</span> <span class="string">&quot;0x41fb9082f8d369256ed7f46afff32efe1511128b92d0be3b2457f012e389320f348700a58395d8f55836cf5d95db431b1061d30b11114d21bd0c5d9dcd4791e71b01&quot;</span>;
+        <span class="comment">// User should have privileges!
+        </span>{
+            <span class="kw">let </span>user_sig = <span class="string">&quot;0x41fb9082f8d369256ed7f46afff32efe1511128b92d0be3b2457f012e389320f348700a58395d8f55836cf5d95db431b1061d30b11114d21bd0c5d9dcd4791e71b01&quot;</span>;
 
-            <span class="kw">let</span> <span class="ident">signature_actual</span> <span class="op">=</span> {
-                <span class="kw">let</span> <span class="ident">ethers_sign_message</span> <span class="op">=</span> <span class="ident">to_ethereum_signed</span>(<span class="kw-2">&amp;</span><span class="ident">msg_hash_actual</span>);
+            <span class="kw">let </span>signature_actual = {
+                <span class="kw">let </span>ethers_sign_message = to_ethereum_signed(<span class="kw-2">&amp;</span>msg_hash_actual);
 
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">signature</span> <span class="op">=</span> <span class="ident">user_adapter</span>
-                    .<span class="ident">state</span>
-                    .<span class="ident">wallet</span>
-                    .<span class="ident">sign</span>(<span class="kw-2">&amp;</span><span class="ident">ethers_sign_message</span>)
-                    .<span class="ident">expect</span>(<span class="string">&quot;Should sign message&quot;</span>)
-                    .<span class="ident">to_electrum</span>()
-                    .<span class="ident">to_vec</span>();
+                <span class="kw">let </span><span class="kw-2">mut </span>signature = user_adapter
+                    .state
+                    .wallet
+                    .sign(<span class="kw-2">&amp;</span>ethers_sign_message)
+                    .expect(<span class="string">&quot;Should sign message&quot;</span>)
+                    .to_electrum()
+                    .to_vec();
 
-                <span class="ident">signature</span>.<span class="ident">extend</span>(<span class="ident">ETH_SIGN_SUFFIX</span>.<span class="ident">as_slice</span>());
-                <span class="ident">signature</span>
+                signature.extend(ETH_SIGN_SUFFIX.as_slice());
+                signature
             };
 
-            <span class="macro">assert_eq!</span>(<span class="ident">user_sig</span>, <span class="ident">signature_actual</span>.<span class="ident">to_hex_prefixed</span>());
+            <span class="macro">assert_eq!</span>(user_sig, signature_actual.to_hex_prefixed());
 
-            <span class="kw">let</span> <span class="ident">has_privileges</span> <span class="op">=</span> <span class="ident">user_adapter</span>
-                .<span class="ident">has_privileges</span>(
-                    <span class="kw-2">&amp;</span><span class="ident">ganache_chain</span>,
-                    <span class="ident">identity_address</span>,
-                    <span class="ident">msg_hash_actual</span>,
-                    <span class="kw-2">&amp;</span><span class="ident">signature_actual</span>,
+            <span class="kw">let </span>has_privileges = user_adapter
+                .has_privileges(
+                    <span class="kw-2">&amp;</span>ganache_chain,
+                    identity_address,
+                    msg_hash_actual,
+                    <span class="kw-2">&amp;</span>signature_actual,
                 )
-                .<span class="kw">await</span>
-                .<span class="ident">expect</span>(<span class="string">&quot;Should get privileges&quot;</span>);
+                .<span class="kw">await
+                </span>.expect(<span class="string">&quot;Should get privileges&quot;</span>);
 
-            <span class="macro">assert!</span>(<span class="ident">has_privileges</span>, <span class="string">&quot;User should have privileges!&quot;</span>)
+            <span class="macro">assert!</span>(has_privileges, <span class="string">&quot;User should have privileges!&quot;</span>)
         }
 
-        <span class="comment">// Evil should **not** have privileges!</span>
-        {
-            <span class="kw">let</span> <span class="ident">evil_sig</span> <span class="op">=</span> <span class="string">&quot;0x78b1d955c38baa3d98e11c5ed379191880d9f85acde31a1b7da1436825f688ec1b0a12bc749701a0135643dfb7f84a65697afa8065f886edb259f500651e415b1b01&quot;</span>;
+        <span class="comment">// Evil should **not** have privileges!
+        </span>{
+            <span class="kw">let </span>evil_sig = <span class="string">&quot;0x78b1d955c38baa3d98e11c5ed379191880d9f85acde31a1b7da1436825f688ec1b0a12bc749701a0135643dfb7f84a65697afa8065f886edb259f500651e415b1b01&quot;</span>;
 
-            <span class="kw">let</span> <span class="ident">evil_adapter</span> <span class="op">=</span> <span class="ident">Ethereum::init</span>(<span class="ident">KEYSTORES</span>[<span class="kw-2">&amp;</span><span class="ident">evil</span>].<span class="ident">clone</span>(), <span class="kw-2">&amp;</span><span class="ident">GANACHE_CONFIG</span>)
-                .<span class="ident">expect</span>(<span class="string">&quot;should init ethereum adapter&quot;</span>)
-                .<span class="ident">unlock</span>()
-                .<span class="ident">expect</span>(<span class="string">&quot;should unlock eth adapter&quot;</span>);
+            <span class="kw">let </span>evil_adapter = Ethereum::init(KEYSTORES[<span class="kw-2">&amp;</span>evil].clone(), <span class="kw-2">&amp;</span>GANACHE_CONFIG)
+                .expect(<span class="string">&quot;should init ethereum adapter&quot;</span>)
+                .unlock()
+                .expect(<span class="string">&quot;should unlock eth adapter&quot;</span>);
 
-            <span class="kw">let</span> <span class="ident">signature_actual</span> <span class="op">=</span> {
-                <span class="kw">let</span> <span class="ident">ethers_sign_message</span> <span class="op">=</span> <span class="ident">to_ethereum_signed</span>(<span class="kw-2">&amp;</span><span class="ident">msg_hash_actual</span>);
+            <span class="kw">let </span>signature_actual = {
+                <span class="kw">let </span>ethers_sign_message = to_ethereum_signed(<span class="kw-2">&amp;</span>msg_hash_actual);
 
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">signature</span> <span class="op">=</span> <span class="ident">evil_adapter</span>
-                    .<span class="ident">state</span>
-                    .<span class="ident">wallet</span>
-                    .<span class="ident">sign</span>(<span class="kw-2">&amp;</span><span class="ident">ethers_sign_message</span>)
-                    .<span class="ident">expect</span>(<span class="string">&quot;Should sign message&quot;</span>)
-                    .<span class="ident">to_electrum</span>()
-                    .<span class="ident">to_vec</span>();
+                <span class="kw">let </span><span class="kw-2">mut </span>signature = evil_adapter
+                    .state
+                    .wallet
+                    .sign(<span class="kw-2">&amp;</span>ethers_sign_message)
+                    .expect(<span class="string">&quot;Should sign message&quot;</span>)
+                    .to_electrum()
+                    .to_vec();
 
-                <span class="ident">signature</span>.<span class="ident">extend</span>(<span class="ident">ETH_SIGN_SUFFIX</span>.<span class="ident">as_slice</span>());
-                <span class="ident">signature</span>
+                signature.extend(ETH_SIGN_SUFFIX.as_slice());
+                signature
             };
 
-            <span class="macro">assert_eq!</span>(<span class="ident">evil_sig</span>, <span class="ident">signature_actual</span>.<span class="ident">to_hex_prefixed</span>());
+            <span class="macro">assert_eq!</span>(evil_sig, signature_actual.to_hex_prefixed());
 
-            <span class="kw">let</span> <span class="ident">has_privileges</span> <span class="op">=</span> <span class="ident">evil_adapter</span>
-                .<span class="ident">has_privileges</span>(
-                    <span class="kw-2">&amp;</span><span class="ident">ganache_chain</span>,
-                    <span class="ident">identity_address</span>,
-                    <span class="ident">msg_hash_actual</span>,
-                    <span class="kw-2">&amp;</span><span class="ident">signature_actual</span>,
+            <span class="kw">let </span>has_privileges = evil_adapter
+                .has_privileges(
+                    <span class="kw-2">&amp;</span>ganache_chain,
+                    identity_address,
+                    msg_hash_actual,
+                    <span class="kw-2">&amp;</span>signature_actual,
                 )
-                .<span class="kw">await</span>
-                .<span class="ident">expect</span>(<span class="string">&quot;Should get privileges&quot;</span>);
+                .<span class="kw">await
+                </span>.expect(<span class="string">&quot;Should get privileges&quot;</span>);
 
-            <span class="macro">assert!</span>(<span class="op">!</span><span class="ident">has_privileges</span>, <span class="string">&quot;Evil should not have privileges!&quot;</span>)
+            <span class="macro">assert!</span>(!has_privileges, <span class="string">&quot;Evil should not have privileges!&quot;</span>)
         }
     }
 
-    <span class="attribute">#[<span class="ident">tokio::test</span>]</span>
-    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">test_has_privileges_with_payload</span>() {
-        <span class="kw">let</span> <span class="ident">adapter</span> <span class="op">=</span> <span class="ident">Ethereum::init</span>(<span class="ident">KEYSTORES</span>[<span class="kw-2">&amp;</span><span class="ident">LEADER</span>].<span class="ident">clone</span>(), <span class="kw-2">&amp;</span><span class="ident">GANACHE_CONFIG</span>)
-            .<span class="ident">expect</span>(<span class="string">&quot;should init ethereum adapter&quot;</span>)
-            .<span class="ident">unlock</span>()
-            .<span class="ident">expect</span>(<span class="string">&quot;should unlock eth adapter&quot;</span>);
+    <span class="attribute">#[tokio::test]</span>
+    <span class="kw">async fn </span>test_has_privileges_with_payload() {
+        <span class="kw">let </span>adapter = Ethereum::init(KEYSTORES[<span class="kw-2">&amp;</span>LEADER].clone(), <span class="kw-2">&amp;</span>GANACHE_CONFIG)
+            .expect(<span class="string">&quot;should init ethereum adapter&quot;</span>)
+            .unlock()
+            .expect(<span class="string">&quot;should unlock eth adapter&quot;</span>);
 
-        <span class="kw">let</span> <span class="ident">whoami</span> <span class="op">=</span> <span class="ident">adapter</span>.<span class="ident">whoami</span>().<span class="ident">to_address</span>();
+        <span class="kw">let </span>whoami = adapter.whoami().to_address();
         <span class="macro">assert_eq!</span>(
-            <span class="kw-2">*</span><span class="ident">LEADER</span>, <span class="ident">whoami</span>,
-            <span class="string">&quot;Ethereum address should be authenticated with keystore file as LEADER!&quot;</span>
-        );
+            <span class="kw-2">*</span>LEADER, whoami,
+            <span class="string">&quot;Ethereum address should be authenticated with keystore file as LEADER!&quot;
+        </span>);
 
-        <span class="kw">let</span> <span class="ident">ganache_chain</span> <span class="op">=</span> <span class="ident">GANACHE_1337</span>.<span class="ident">clone</span>();
-        <span class="kw">let</span> <span class="ident">web3</span> <span class="op">=</span> <span class="ident">ganache_chain</span>
-            .<span class="ident">init_web3</span>()
-            .<span class="ident">expect</span>(<span class="string">&quot;Should init the Web3 client&quot;</span>);
+        <span class="kw">let </span>ganache_chain = GANACHE_1337.clone();
+        <span class="kw">let </span>web3 = ganache_chain
+            .init_web3()
+            .expect(<span class="string">&quot;Should init the Web3 client&quot;</span>);
 
-        <span class="kw">let</span> (<span class="ident">identity_address</span>, <span class="ident">contract</span>) <span class="op">=</span> <span class="ident">deploy_identity_contract</span>(<span class="kw-2">&amp;</span><span class="ident">web3</span>, <span class="kw-2">*</span><span class="ident">CREATOR</span>, <span class="kw-2">&amp;</span>[<span class="ident">whoami</span>])
-            .<span class="kw">await</span>
-            .<span class="ident">expect</span>(<span class="string">&quot;Should deploy identity&quot;</span>);
+        <span class="kw">let </span>(identity_address, contract) = deploy_identity_contract(<span class="kw-2">&amp;</span>web3, <span class="kw-2">*</span>CREATOR, <span class="kw-2">&amp;</span>[whoami])
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;Should deploy identity&quot;</span>);
 
-        <span class="kw">let</span> <span class="ident">set_privileges</span>: [<span class="ident">u8</span>; <span class="number">32</span>] <span class="op">=</span> <span class="ident">contract</span>
-            .<span class="ident">query</span>(
+        <span class="kw">let </span>set_privileges: [u8; <span class="number">32</span>] = contract
+            .query(
                 <span class="string">&quot;privileges&quot;</span>,
-                <span class="ident">Token::Address</span>(<span class="ident">H160</span>(<span class="ident">whoami</span>.<span class="ident">to_bytes</span>())),
+                Token::Address(H160(whoami.to_bytes())),
                 <span class="prelude-val">None</span>,
-                <span class="ident">ContractOptions::default</span>(),
+                ContractOptions::default(),
                 <span class="prelude-val">None</span>,
             )
-            .<span class="kw">await</span>
-            .<span class="ident">expect</span>(<span class="string">&quot;should query contract privileges&quot;</span>);
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;should query contract privileges&quot;</span>);
 
-        <span class="kw">let</span> <span class="ident">expected_privileges</span> <span class="op">=</span> {
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">bytes32</span> <span class="op">=</span> [<span class="number">0_u8</span>; <span class="number">32</span>];
-            <span class="ident">bytes32</span>[<span class="number">31</span>] <span class="op">=</span> <span class="number">1</span>;
-            <span class="ident">bytes32</span>
+        <span class="kw">let </span>expected_privileges = {
+            <span class="kw">let </span><span class="kw-2">mut </span>bytes32 = [<span class="number">0_u8</span>; <span class="number">32</span>];
+            bytes32[<span class="number">31</span>] = <span class="number">1</span>;
+            bytes32
         };
         <span class="macro">assert_eq!</span>(
-            <span class="ident">expected_privileges</span>, <span class="ident">set_privileges</span>,
-            <span class="string">&quot;The Privilege set through constructor should be `1`&quot;</span>
-        );
+            expected_privileges, set_privileges,
+            <span class="string">&quot;The Privilege set through constructor should be `1`&quot;
+        </span>);
 
-        <span class="kw">let</span> <span class="ident">era</span> <span class="op">=</span> <span class="ident">Utc::now</span>().<span class="ident">timestamp_millis</span>() <span class="kw">as</span> <span class="ident">f64</span> <span class="op">/</span> <span class="number">60000.0</span>;
-        <span class="kw">let</span> <span class="ident">payload</span> <span class="op">=</span> <span class="ident">Payload</span> {
-            <span class="ident">id</span>: <span class="ident">adapter</span>.<span class="ident">whoami</span>(),
-            <span class="ident">era</span>: <span class="ident">era</span>.<span class="ident">floor</span>() <span class="kw">as</span> <span class="ident">i64</span>,
-            <span class="ident">address</span>: <span class="ident">adapter</span>.<span class="ident">whoami</span>().<span class="ident">to_address</span>(),
-            <span class="ident">identity</span>: <span class="prelude-val">Some</span>(<span class="ident">identity_address</span>),
-            <span class="ident">chain_id</span>: <span class="ident">ganache_chain</span>.<span class="ident">chain_id</span>,
+        <span class="kw">let </span>era = Utc::now().timestamp_millis() <span class="kw">as </span>f64 / <span class="number">60000.0</span>;
+        <span class="kw">let </span>payload = Payload {
+            id: adapter.whoami(),
+            era: era.floor() <span class="kw">as </span>i64,
+            address: adapter.whoami().to_address(),
+            identity: <span class="prelude-val">Some</span>(identity_address),
+            chain_id: ganache_chain.chain_id,
         };
 
-        <span class="kw">let</span> <span class="ident">auth_token</span> <span class="op">=</span> <span class="ident">ewt::Token::sign</span>(<span class="kw-2">&amp;</span><span class="ident">adapter</span>.<span class="ident">state</span>.<span class="ident">wallet</span>, <span class="ident">payload</span>)
-            .<span class="ident">expect</span>(<span class="string">&quot;Should sign successfully the Payload&quot;</span>);
+        <span class="kw">let </span>auth_token = ewt::Token::sign(<span class="kw-2">&amp;</span>adapter.state.wallet, payload)
+            .expect(<span class="string">&quot;Should sign successfully the Payload&quot;</span>);
 
-        <span class="kw">let</span> <span class="ident">has_privileges</span> <span class="op">=</span> <span class="ident">adapter</span>
-            .<span class="ident">has_privileges</span>(
-                <span class="kw-2">&amp;</span><span class="ident">ganache_chain</span>,
-                <span class="ident">identity_address</span>,
-                <span class="ident">auth_token</span>.<span class="ident">message_hash</span>,
-                <span class="kw-2">&amp;</span><span class="ident">auth_token</span>.<span class="ident">signature</span>,
+        <span class="kw">let </span>has_privileges = adapter
+            .has_privileges(
+                <span class="kw-2">&amp;</span>ganache_chain,
+                identity_address,
+                auth_token.message_hash,
+                <span class="kw-2">&amp;</span>auth_token.signature,
             )
-            .<span class="kw">await</span>
-            .<span class="ident">expect</span>(<span class="string">&quot;Should get privileges&quot;</span>);
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;Should get privileges&quot;</span>);
 
-        <span class="macro">assert!</span>(<span class="ident">has_privileges</span>);
+        <span class="macro">assert!</span>(has_privileges);
     }
 
-    <span class="attribute">#[<span class="ident">tokio::test</span>]</span>
-    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">test_session_from_token</span>() {
-        <span class="kw">let</span> <span class="ident">adapter</span> <span class="op">=</span> <span class="ident">Ethereum::init</span>(<span class="ident">KEYSTORES</span>[<span class="kw-2">&amp;</span><span class="ident">LEADER</span>].<span class="ident">clone</span>(), <span class="kw-2">&amp;</span><span class="ident">GANACHE_CONFIG</span>)
-            .<span class="ident">expect</span>(<span class="string">&quot;should init Leader ethereum adapter&quot;</span>)
-            .<span class="ident">unlock</span>()
-            .<span class="ident">expect</span>(<span class="string">&quot;should unlock eth adapter&quot;</span>);
+    <span class="attribute">#[tokio::test]</span>
+    <span class="kw">async fn </span>test_session_from_token() {
+        <span class="kw">let </span>adapter = Ethereum::init(KEYSTORES[<span class="kw-2">&amp;</span>LEADER].clone(), <span class="kw-2">&amp;</span>GANACHE_CONFIG)
+            .expect(<span class="string">&quot;should init Leader ethereum adapter&quot;</span>)
+            .unlock()
+            .expect(<span class="string">&quot;should unlock eth adapter&quot;</span>);
 
-        <span class="kw">let</span> <span class="ident">ganache_chain</span> <span class="op">=</span> <span class="ident">GANACHE_1337</span>.<span class="ident">clone</span>();
-        <span class="kw">let</span> <span class="ident">web3</span> <span class="op">=</span> <span class="ident">ganache_chain</span>
-            .<span class="ident">init_web3</span>()
-            .<span class="ident">expect</span>(<span class="string">&quot;Should init the Web3 client&quot;</span>);
+        <span class="kw">let </span>ganache_chain = GANACHE_1337.clone();
+        <span class="kw">let </span>web3 = ganache_chain
+            .init_web3()
+            .expect(<span class="string">&quot;Should init the Web3 client&quot;</span>);
 
-        <span class="kw">let</span> (<span class="ident">identity_address</span>, <span class="ident">_contract</span>) <span class="op">=</span>
-            <span class="ident">deploy_identity_contract</span>(<span class="kw-2">&amp;</span><span class="ident">web3</span>, <span class="kw-2">*</span><span class="ident">CREATOR</span>, <span class="kw-2">&amp;</span>[<span class="kw-2">*</span><span class="ident">ADVERTISER</span>])
-                .<span class="kw">await</span>
-                .<span class="ident">expect</span>(<span class="string">&quot;Should deploy identity&quot;</span>);
+        <span class="kw">let </span>(identity_address, _contract) =
+            deploy_identity_contract(<span class="kw-2">&amp;</span>web3, <span class="kw-2">*</span>CREATOR, <span class="kw-2">&amp;</span>[<span class="kw-2">*</span>ADVERTISER])
+                .<span class="kw">await
+                </span>.expect(<span class="string">&quot;Should deploy identity&quot;</span>);
 
-        <span class="kw">let</span> <span class="ident">signer_adapter</span> <span class="op">=</span> <span class="ident">Ethereum::init</span>(<span class="ident">KEYSTORES</span>[<span class="kw-2">&amp;</span><span class="ident">ADVERTISER</span>].<span class="ident">clone</span>(), <span class="kw-2">&amp;</span><span class="ident">GANACHE_CONFIG</span>)
-            .<span class="ident">expect</span>(<span class="string">&quot;should init Advertiser ethereum adapter&quot;</span>)
-            .<span class="ident">unlock</span>()
-            .<span class="ident">expect</span>(<span class="string">&quot;Should unlock eth adapter&quot;</span>);
+        <span class="kw">let </span>signer_adapter = Ethereum::init(KEYSTORES[<span class="kw-2">&amp;</span>ADVERTISER].clone(), <span class="kw-2">&amp;</span>GANACHE_CONFIG)
+            .expect(<span class="string">&quot;should init Advertiser ethereum adapter&quot;</span>)
+            .unlock()
+            .expect(<span class="string">&quot;Should unlock eth adapter&quot;</span>);
 
-        <span class="macro">assert_eq!</span>(<span class="ident">signer_adapter</span>.<span class="ident">whoami</span>(), <span class="ident">ValidatorId::from</span>(<span class="kw-2">*</span><span class="ident">ADVERTISER</span>));
+        <span class="macro">assert_eq!</span>(signer_adapter.whoami(), ValidatorId::from(<span class="kw-2">*</span>ADVERTISER));
 
-        <span class="kw">let</span> <span class="ident">era</span> <span class="op">=</span> <span class="ident">Utc::now</span>().<span class="ident">timestamp_millis</span>() <span class="kw">as</span> <span class="ident">f64</span> <span class="op">/</span> <span class="number">60000.0</span>;
-        <span class="kw">let</span> <span class="ident">payload</span> <span class="op">=</span> <span class="ident">Payload</span> {
-            <span class="comment">// the intended ValidatorId for whom the payload is.</span>
-            <span class="ident">id</span>: <span class="ident">adapter</span>.<span class="ident">whoami</span>(),
-            <span class="ident">era</span>: <span class="ident">era</span>.<span class="ident">floor</span>() <span class="kw">as</span> <span class="ident">i64</span>,
-            <span class="comment">// the identity as which we&#39;d like to authenticate</span>
-            <span class="ident">identity</span>: <span class="prelude-val">Some</span>(<span class="ident">identity_address</span>),
-            <span class="comment">// The singer address</span>
-            <span class="ident">address</span>: <span class="ident">signer_adapter</span>.<span class="ident">whoami</span>().<span class="ident">to_address</span>(),
-            <span class="comment">// the chain we need to make the token for</span>
-            <span class="ident">chain_id</span>: <span class="ident">ganache_chain</span>.<span class="ident">chain_id</span>,
+        <span class="kw">let </span>era = Utc::now().timestamp_millis() <span class="kw">as </span>f64 / <span class="number">60000.0</span>;
+        <span class="kw">let </span>payload = Payload {
+            <span class="comment">// the intended ValidatorId for whom the payload is.
+            </span>id: adapter.whoami(),
+            era: era.floor() <span class="kw">as </span>i64,
+            <span class="comment">// the identity as which we&#39;d like to authenticate
+            </span>identity: <span class="prelude-val">Some</span>(identity_address),
+            <span class="comment">// The singer address
+            </span>address: signer_adapter.whoami().to_address(),
+            <span class="comment">// the chain we need to make the token for
+            </span>chain_id: ganache_chain.chain_id,
         };
 
-        <span class="kw">let</span> <span class="ident">token</span> <span class="op">=</span> <span class="ident">ewt::Token::sign</span>(<span class="kw-2">&amp;</span><span class="ident">signer_adapter</span>.<span class="ident">state</span>.<span class="ident">wallet</span>, <span class="ident">payload</span>)
-            .<span class="ident">expect</span>(<span class="string">&quot;Should sign successfully the Payload&quot;</span>);
+        <span class="kw">let </span>token = ewt::Token::sign(<span class="kw-2">&amp;</span>signer_adapter.state.wallet, payload)
+            .expect(<span class="string">&quot;Should sign successfully the Payload&quot;</span>);
 
-        <span class="comment">// double check that we have privileges for _Who Am I_</span>
-        <span class="macro">assert!</span>(<span class="ident">adapter</span>
-            .<span class="ident">has_privileges</span>(
-                <span class="kw-2">&amp;</span><span class="ident">ganache_chain</span>,
-                <span class="ident">identity_address</span>,
-                <span class="ident">token</span>.<span class="ident">message_hash</span>,
-                <span class="kw-2">&amp;</span><span class="ident">token</span>.<span class="ident">signature</span>
+        <span class="comment">// double check that we have privileges for _Who Am I_
+        </span><span class="macro">assert!</span>(adapter
+            .has_privileges(
+                <span class="kw-2">&amp;</span>ganache_chain,
+                identity_address,
+                token.message_hash,
+                <span class="kw-2">&amp;</span>token.signature
             )
-            .<span class="kw">await</span>
-            .<span class="ident">expect</span>(<span class="string">&quot;Ok&quot;</span>));
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;Ok&quot;</span>));
 
-        <span class="kw">let</span> <span class="ident">session</span>: <span class="ident">Session</span> <span class="op">=</span> <span class="ident">adapter</span>.<span class="ident">session_from_token</span>(<span class="ident">token</span>.<span class="ident">as_str</span>()).<span class="kw">await</span>.<span class="ident">unwrap</span>();
-        <span class="macro">assert_eq!</span>(<span class="ident">session</span>.<span class="ident">uid</span>, <span class="ident">identity_address</span>);
+        <span class="kw">let </span>session: Session = adapter.session_from_token(token.as_str()).<span class="kw">await</span>.unwrap();
+        <span class="macro">assert_eq!</span>(session.uid, identity_address);
     }
 
-    <span class="attribute">#[<span class="ident">tokio::test</span>]</span>
-    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">multi_chain_deposit_from_config</span>() -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">std::error::Error</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">config</span> <span class="op">=</span> <span class="ident">GANACHE_CONFIG</span>.<span class="ident">clone</span>();
+    <span class="attribute">#[tokio::test]</span>
+    <span class="kw">async fn </span>multi_chain_deposit_from_config() -&gt; <span class="prelude-ty">Result</span>&lt;(), Box&lt;<span class="kw">dyn </span>std::error::Error&gt;&gt; {
+        <span class="kw">let </span>config = GANACHE_CONFIG.clone();
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">channel_1</span> <span class="op">=</span> <span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">channel</span>;
-        <span class="kw">let</span> <span class="ident">channel_1_token</span> <span class="op">=</span> <span class="ident">GANACHE_INFO_1</span>.<span class="ident">tokens</span>[<span class="string">&quot;Mocked TOKEN 1&quot;</span>].<span class="ident">clone</span>();
-        <span class="ident">channel_1</span>.<span class="ident">token</span> <span class="op">=</span> <span class="ident">channel_1_token</span>.<span class="ident">address</span>;
+        <span class="kw">let </span><span class="kw-2">mut </span>channel_1 = DUMMY_CAMPAIGN.channel;
+        <span class="kw">let </span>channel_1_token = GANACHE_INFO_1.tokens[<span class="string">&quot;Mocked TOKEN 1&quot;</span>].clone();
+        channel_1.token = channel_1_token.address;
 
-        <span class="kw">let</span> <span class="ident">chain_of</span> <span class="op">=</span> <span class="ident">ChainOf::new</span>(<span class="ident">GANACHE_1</span>.<span class="ident">clone</span>(), <span class="ident">channel_1_token</span>);
+        <span class="kw">let </span>chain_of = ChainOf::new(GANACHE_1.clone(), channel_1_token);
 
-        <span class="kw">let</span> <span class="ident">web3_1</span> <span class="op">=</span> <span class="ident">chain_of</span>
-            .<span class="ident">chain</span>
-            .<span class="ident">init_web3</span>()
-            .<span class="ident">expect</span>(<span class="string">&quot;Should init web3 for Chain #1&quot;</span>);
+        <span class="kw">let </span>web3_1 = chain_of
+            .chain
+            .init_web3()
+            .expect(<span class="string">&quot;Should init web3 for Chain #1&quot;</span>);
 
-        <span class="kw">let</span> <span class="ident">leader_adapter</span> <span class="op">=</span> <span class="ident">Ethereum::init</span>(<span class="ident">KEYSTORES</span>[<span class="kw-2">&amp;</span><span class="ident">LEADER</span>].<span class="ident">clone</span>(), <span class="kw-2">&amp;</span><span class="ident">config</span>)
-            .<span class="ident">expect</span>(<span class="string">&quot;should init ethereum adapter&quot;</span>)
-            .<span class="ident">unlock</span>()
-            .<span class="ident">expect</span>(<span class="string">&quot;should unlock eth adapter&quot;</span>);
+        <span class="kw">let </span>leader_adapter = Ethereum::init(KEYSTORES[<span class="kw-2">&amp;</span>LEADER].clone(), <span class="kw-2">&amp;</span>config)
+            .expect(<span class="string">&quot;should init ethereum adapter&quot;</span>)
+            .unlock()
+            .expect(<span class="string">&quot;should unlock eth adapter&quot;</span>);
 
-        <span class="kw">let</span> <span class="ident">advertiser</span> <span class="op">=</span> <span class="kw-2">*</span><span class="ident">ADVERTISER</span>;
+        <span class="kw">let </span>advertiser = <span class="kw-2">*</span>ADVERTISER;
 
-        <span class="kw">let</span> <span class="ident">_actual_deposit</span> <span class="op">=</span> <span class="ident">leader_adapter</span>
-            .<span class="ident">get_deposit</span>(<span class="kw-2">&amp;</span><span class="ident">chain_of</span>.<span class="ident">clone</span>().<span class="ident">with</span>(<span class="ident">channel_1</span>), <span class="ident">advertiser</span>)
-            .<span class="kw">await</span>
-            .<span class="ident">expect</span>(<span class="string">&quot;Should get deposit for Channel in Chain 1&quot;</span>);
+        <span class="kw">let </span>_actual_deposit = leader_adapter
+            .get_deposit(<span class="kw-2">&amp;</span>chain_of.clone().with(channel_1), advertiser)
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;Should get deposit for Channel in Chain 1&quot;</span>);
 
-        <span class="kw">let</span> <span class="ident">token</span> <span class="op">=</span> <span class="ident">Erc20Token::new</span>(<span class="kw-2">&amp;</span><span class="ident">web3_1</span>, <span class="ident">chain_of</span>.<span class="ident">token</span>.<span class="ident">clone</span>());
-        <span class="kw">let</span> <span class="ident">outpace</span> <span class="op">=</span> <span class="ident">Outpace::new</span>(<span class="kw-2">&amp;</span><span class="ident">web3_1</span>, <span class="ident">chain_of</span>.<span class="ident">chain</span>.<span class="ident">outpace</span>);
+        <span class="kw">let </span>token = Erc20Token::new(<span class="kw-2">&amp;</span>web3_1, chain_of.token.clone());
+        <span class="kw">let </span>outpace = Outpace::new(<span class="kw-2">&amp;</span>web3_1, chain_of.chain.outpace);
 
-        <span class="comment">// OUTPACE deposit Chain #1</span>
-        <span class="comment">// 10 tokens</span>
-        {
-            <span class="kw">let</span> <span class="ident">ten</span> <span class="op">=</span> <span class="ident">BigNum::with_precision</span>(<span class="number">10</span>, <span class="ident">chain_of</span>.<span class="ident">token</span>.<span class="ident">precision</span>.<span class="ident">into</span>());
-            <span class="ident">token</span>
-                .<span class="ident">set_balance</span>(<span class="ident">LEADER</span>.<span class="ident">to_bytes</span>(), <span class="ident">advertiser</span>.<span class="ident">to_bytes</span>(), <span class="kw-2">&amp;</span><span class="ident">ten</span>)
-                .<span class="kw">await</span>
-                .<span class="ident">expect</span>(<span class="string">&quot;Failed to set balance&quot;</span>);
+        <span class="comment">// OUTPACE deposit Chain #1
+        // 10 tokens
+        </span>{
+            <span class="kw">let </span>ten = BigNum::with_precision(<span class="number">10</span>, chain_of.token.precision.into());
+            token
+                .set_balance(LEADER.to_bytes(), advertiser.to_bytes(), <span class="kw-2">&amp;</span>ten)
+                .<span class="kw">await
+                </span>.expect(<span class="string">&quot;Failed to set balance&quot;</span>);
 
-            <span class="ident">outpace</span>
-                .<span class="ident">deposit</span>(<span class="kw-2">&amp;</span><span class="ident">channel_1</span>, <span class="ident">advertiser</span>.<span class="ident">to_bytes</span>(), <span class="kw-2">&amp;</span><span class="ident">ten</span>)
-                .<span class="kw">await</span>
-                .<span class="ident">expect</span>(<span class="string">&quot;Should deposit funds&quot;</span>);
+            outpace
+                .deposit(<span class="kw-2">&amp;</span>channel_1, advertiser.to_bytes(), <span class="kw-2">&amp;</span>ten)
+                .<span class="kw">await
+                </span>.expect(<span class="string">&quot;Should deposit funds&quot;</span>);
 
-            <span class="kw">let</span> <span class="ident">regular_deposit</span> <span class="op">=</span> <span class="ident">leader_adapter</span>
-                .<span class="ident">get_deposit</span>(<span class="kw-2">&amp;</span><span class="ident">chain_of</span>.<span class="ident">clone</span>().<span class="ident">with</span>(<span class="ident">channel_1</span>), <span class="ident">advertiser</span>)
-                .<span class="kw">await</span>
-                .<span class="ident">expect</span>(<span class="string">&quot;should get deposit&quot;</span>);
+            <span class="kw">let </span>regular_deposit = leader_adapter
+                .get_deposit(<span class="kw-2">&amp;</span>chain_of.clone().with(channel_1), advertiser)
+                .<span class="kw">await
+                </span>.expect(<span class="string">&quot;should get deposit&quot;</span>);
 
-            <span class="macro">assert_eq!</span>(<span class="ident">Deposit</span> { <span class="ident">total</span>: <span class="ident">ten</span>.<span class="ident">clone</span>() }, <span class="ident">regular_deposit</span>);
+            <span class="macro">assert_eq!</span>(Deposit { total: ten.clone() }, regular_deposit);
         }
 
         <span class="prelude-val">Ok</span>(())
     }
 
-    <span class="attribute">#[<span class="ident">tokio::test</span>]</span>
-    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">multi_chain_deposit_from_deployed_contracts</span>() -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">std::error::Error</span><span class="op">&gt;</span><span class="op">&gt;</span>
+    <span class="attribute">#[tokio::test]</span>
+    <span class="kw">async fn </span>multi_chain_deposit_from_deployed_contracts() -&gt; <span class="prelude-ty">Result</span>&lt;(), Box&lt;<span class="kw">dyn </span>std::error::Error&gt;&gt;
     {
-        <span class="kw">let</span> <span class="ident">chain_of_1337</span> <span class="op">=</span> <span class="ident">ChainOf::new</span>(
-            <span class="ident">GANACHE_1337</span>.<span class="ident">clone</span>(),
-            <span class="ident">GANACHE_INFO_1337</span>.<span class="ident">tokens</span>[<span class="string">&quot;Mocked TOKEN 1337&quot;</span>].<span class="ident">clone</span>(),
+        <span class="kw">let </span>chain_of_1337 = ChainOf::new(
+            GANACHE_1337.clone(),
+            GANACHE_INFO_1337.tokens[<span class="string">&quot;Mocked TOKEN 1337&quot;</span>].clone(),
         );
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">config</span> <span class="op">=</span> <span class="ident">GANACHE_CONFIG</span>.<span class="ident">clone</span>();
+        <span class="kw">let </span><span class="kw-2">mut </span>config = GANACHE_CONFIG.clone();
 
-        <span class="kw">let</span> <span class="ident">channel_chain_1</span> <span class="op">=</span> {
-            <span class="kw">let</span> <span class="ident">web3</span> <span class="op">=</span> <span class="ident">GANACHE_1</span>.<span class="ident">init_web3</span>().<span class="ident">expect</span>(<span class="string">&quot;Init web3&quot;</span>);
+        <span class="kw">let </span>channel_chain_1 = {
+            <span class="kw">let </span>web3 = GANACHE_1.init_web3().expect(<span class="string">&quot;Init web3&quot;</span>);
 
-            <span class="comment">// deploy contracts</span>
-            <span class="kw">let</span> <span class="ident">token</span> <span class="op">=</span> <span class="ident">Erc20Token::deploy</span>(<span class="kw-2">&amp;</span><span class="ident">web3</span>, <span class="number">1_000</span>)
-                .<span class="kw">await</span>
-                .<span class="ident">expect</span>(<span class="string">&quot;Correct parameters are passed to the Token constructor.&quot;</span>);
+            <span class="comment">// deploy contracts
+            </span><span class="kw">let </span>token = Erc20Token::deploy(<span class="kw-2">&amp;</span>web3, <span class="number">1_000</span>)
+                .<span class="kw">await
+                </span>.expect(<span class="string">&quot;Correct parameters are passed to the Token constructor.&quot;</span>);
 
-            <span class="kw">let</span> <span class="ident">outpace</span> <span class="op">=</span> <span class="ident">Outpace::deploy</span>(<span class="kw-2">&amp;</span><span class="ident">web3</span>)
-                .<span class="kw">await</span>
-                .<span class="ident">expect</span>(<span class="string">&quot;Correct parameters are passed to the OUTPACE constructor.&quot;</span>);
+            <span class="kw">let </span>outpace = Outpace::deploy(<span class="kw-2">&amp;</span>web3)
+                .<span class="kw">await
+                </span>.expect(<span class="string">&quot;Correct parameters are passed to the OUTPACE constructor.&quot;</span>);
 
-            <span class="comment">// Add new &quot;Deployed TOKEN&quot;</span>
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ganache_1</span> <span class="op">=</span> <span class="ident">config</span>
-                .<span class="ident">chains</span>
-                .<span class="ident">get_mut</span>(<span class="string">&quot;Ganache #1&quot;</span>)
-                .<span class="ident">expect</span>(<span class="string">&quot;Should have Ganache #1 already in config&quot;</span>);
+            <span class="comment">// Add new &quot;Deployed TOKEN&quot;
+            </span><span class="kw">let </span><span class="kw-2">mut </span>ganache_1 = config
+                .chains
+                .get_mut(<span class="string">&quot;Ganache #1&quot;</span>)
+                .expect(<span class="string">&quot;Should have Ganache #1 already in config&quot;</span>);
 
             <span class="macro">assert!</span>(
-                <span class="op">!</span><span class="ident">ganache_1</span>
-                    .<span class="ident">tokens</span>
-                    .<span class="ident">values</span>()
-                    .<span class="ident">any</span>(<span class="op">|</span><span class="ident">existing_token</span><span class="op">|</span> { <span class="ident">existing_token</span>.<span class="ident">address</span> <span class="op">==</span> <span class="ident">token</span>.<span class="ident">info</span>.<span class="ident">address</span> }),
-                <span class="string">&quot;The deployed token address should not have existed previously in the config!&quot;</span>
-            );
+                !ganache_1
+                    .tokens
+                    .values()
+                    .any(|existing_token| { existing_token.address == token.info.address }),
+                <span class="string">&quot;The deployed token address should not have existed previously in the config!&quot;
+            </span>);
 
-            <span class="comment">// Insert the new token in the config</span>
-            <span class="macro">assert!</span>(
-                <span class="ident">ganache_1</span>
-                    .<span class="ident">tokens</span>
-                    .<span class="ident">insert</span>(<span class="string">&quot;Deployed TOKEN&quot;</span>.<span class="ident">into</span>(), <span class="ident">token</span>.<span class="ident">info</span>.<span class="ident">clone</span>())
-                    .<span class="ident">is_none</span>(),
-                <span class="string">&quot;Should not have previous value for the Deployed TOKEN&quot;</span>
-            );
+            <span class="comment">// Insert the new token in the config
+            </span><span class="macro">assert!</span>(
+                ganache_1
+                    .tokens
+                    .insert(<span class="string">&quot;Deployed TOKEN&quot;</span>.into(), token.info.clone())
+                    .is_none(),
+                <span class="string">&quot;Should not have previous value for the Deployed TOKEN&quot;
+            </span>);
 
-            <span class="comment">// Replace Outpace &amp; Sweeper addresses with the ones just deployed.</span>
-            <span class="ident">ganache_1</span>.<span class="ident">chain</span>.<span class="ident">outpace</span> <span class="op">=</span> <span class="ident">outpace</span>.<span class="ident">address</span>;
+            <span class="comment">// Replace Outpace &amp; Sweeper addresses with the ones just deployed.
+            </span>ganache_1.chain.outpace = outpace.address;
 
-            <span class="kw">let</span> <span class="ident">chain_of_1</span> <span class="op">=</span> <span class="ident">ChainOf::new</span>(<span class="ident">ganache_1</span>.<span class="ident">chain</span>.<span class="ident">clone</span>(), <span class="ident">token</span>.<span class="ident">info</span>.<span class="ident">clone</span>());
+            <span class="kw">let </span>chain_of_1 = ChainOf::new(ganache_1.chain.clone(), token.info.clone());
 
-            <span class="ident">chain_of_1</span>.<span class="ident">clone</span>().<span class="ident">with</span>(<span class="ident">Channel</span> {
-                <span class="ident">leader</span>: <span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="ident">LEADER</span>],
-                <span class="ident">follower</span>: <span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="ident">FOLLOWER</span>],
-                <span class="ident">guardian</span>: <span class="kw-2">*</span><span class="ident">GUARDIAN</span>,
-                <span class="ident">token</span>: <span class="ident">chain_of_1</span>.<span class="ident">token</span>.<span class="ident">address</span>,
-                <span class="ident">nonce</span>: <span class="ident">Nonce::from</span>(<span class="number">1_u32</span>),
+            chain_of_1.clone().with(Channel {
+                leader: IDS[<span class="kw-2">&amp;</span>LEADER],
+                follower: IDS[<span class="kw-2">&amp;</span>FOLLOWER],
+                guardian: <span class="kw-2">*</span>GUARDIAN,
+                token: chain_of_1.token.address,
+                nonce: Nonce::from(<span class="number">1_u32</span>),
             })
         };
 
-        <span class="kw">let</span> <span class="ident">channel_chain_1337</span> <span class="op">=</span> <span class="ident">chain_of_1337</span>.<span class="ident">clone</span>().<span class="ident">with</span>(<span class="ident">Channel</span> {
-            <span class="ident">leader</span>: <span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="ident">LEADER_2</span>],
-            <span class="ident">follower</span>: <span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="ident">FOLLOWER</span>],
-            <span class="ident">guardian</span>: <span class="kw-2">*</span><span class="ident">GUARDIAN_2</span>,
-            <span class="ident">token</span>: <span class="ident">chain_of_1337</span>.<span class="ident">token</span>.<span class="ident">address</span>,
-            <span class="ident">nonce</span>: <span class="ident">Nonce::from</span>(<span class="number">1337_u32</span>),
+        <span class="kw">let </span>channel_chain_1337 = chain_of_1337.clone().with(Channel {
+            leader: IDS[<span class="kw-2">&amp;</span>LEADER_2],
+            follower: IDS[<span class="kw-2">&amp;</span>FOLLOWER],
+            guardian: <span class="kw-2">*</span>GUARDIAN_2,
+            token: chain_of_1337.token.address,
+            nonce: Nonce::from(<span class="number">1337_u32</span>),
         });
 
-        <span class="kw">let</span> <span class="ident">eth_adapter</span> <span class="op">=</span> <span class="ident">Ethereum::init</span>(<span class="ident">KEYSTORES</span>[<span class="kw-2">&amp;</span><span class="ident">FOLLOWER</span>].<span class="ident">clone</span>(), <span class="kw-2">&amp;</span><span class="ident">config</span>)
-            .<span class="ident">expect</span>(<span class="string">&quot;should init ethereum adapter&quot;</span>)
-            .<span class="ident">unlock</span>()
-            .<span class="ident">expect</span>(<span class="string">&quot;should unlock eth adapter&quot;</span>);
+        <span class="kw">let </span>eth_adapter = Ethereum::init(KEYSTORES[<span class="kw-2">&amp;</span>FOLLOWER].clone(), <span class="kw-2">&amp;</span>config)
+            .expect(<span class="string">&quot;should init ethereum adapter&quot;</span>)
+            .unlock()
+            .expect(<span class="string">&quot;should unlock eth adapter&quot;</span>);
 
-        <span class="kw">let</span> <span class="ident">spender</span> <span class="op">=</span> <span class="kw-2">*</span><span class="ident">ADVERTISER</span>;
+        <span class="kw">let </span>spender = <span class="kw-2">*</span>ADVERTISER;
 
-        <span class="comment">// No Regular deposits</span>
-        <span class="comment">// Chain #1</span>
-        {
-            <span class="kw">let</span> <span class="ident">no_deposits</span> <span class="op">=</span> <span class="ident">eth_adapter</span>
-                .<span class="ident">get_deposit</span>(<span class="kw-2">&amp;</span><span class="ident">channel_chain_1</span>, <span class="ident">spender</span>)
-                .<span class="kw">await</span>
-                .<span class="ident">expect</span>(<span class="string">&quot;should get deposit&quot;</span>);
+        <span class="comment">// No Regular deposits
+        // Chain #1
+        </span>{
+            <span class="kw">let </span>no_deposits = eth_adapter
+                .get_deposit(<span class="kw-2">&amp;</span>channel_chain_1, spender)
+                .<span class="kw">await
+                </span>.expect(<span class="string">&quot;should get deposit&quot;</span>);
 
             <span class="macro">assert_eq!</span>(
-                <span class="ident">Deposit</span> {
-                    <span class="ident">total</span>: <span class="ident">BigNum::from</span>(<span class="number">0</span>),
+                Deposit {
+                    total: BigNum::from(<span class="number">0</span>),
                 },
-                <span class="ident">no_deposits</span>
+                no_deposits
             );
         }
 
-        <span class="comment">// No Regular deposits</span>
-        <span class="comment">// Chain #1337</span>
-        {
-            <span class="kw">let</span> <span class="ident">no_deposits</span> <span class="op">=</span> <span class="ident">eth_adapter</span>
-                .<span class="ident">get_deposit</span>(<span class="kw-2">&amp;</span><span class="ident">channel_chain_1337</span>, <span class="ident">spender</span>)
-                .<span class="kw">await</span>
-                .<span class="ident">expect</span>(<span class="string">&quot;should get deposit&quot;</span>);
+        <span class="comment">// No Regular deposits
+        // Chain #1337
+        </span>{
+            <span class="kw">let </span>no_deposits = eth_adapter
+                .get_deposit(<span class="kw-2">&amp;</span>channel_chain_1337, spender)
+                .<span class="kw">await
+                </span>.expect(<span class="string">&quot;should get deposit&quot;</span>);
 
             <span class="macro">assert_eq!</span>(
-                <span class="ident">Deposit</span> {
-                    <span class="ident">total</span>: <span class="ident">BigNum::from</span>(<span class="number">0</span>),
+                Deposit {
+                    total: BigNum::from(<span class="number">0</span>),
                 },
-                <span class="ident">no_deposits</span>
+                no_deposits
             );
         }
 
-        <span class="comment">// OUTPACE deposit</span>
-        <span class="comment">// {</span>
-        <span class="comment">//     mock_set_balance(&amp;token.2, LEADER.to_bytes(), spender.to_bytes(), &amp;one_token)</span>
-        <span class="comment">//         .await</span>
-        <span class="comment">//         .expect(&quot;Failed to set balance&quot;);</span>
+        <span class="comment">// OUTPACE deposit
+        // {
+        //     mock_set_balance(&amp;token.2, LEADER.to_bytes(), spender.to_bytes(), &amp;one_token)
+        //         .await
+        //         .expect(&quot;Failed to set balance&quot;);
 
-        <span class="comment">//     outpace_deposit(&amp;outpace.1, &amp;channel, spender.to_bytes(), &amp;one_token)</span>
-        <span class="comment">//         .await</span>
-        <span class="comment">//         .expect(&quot;Should deposit funds&quot;);</span>
+        //     outpace_deposit(&amp;outpace.1, &amp;channel, spender.to_bytes(), &amp;one_token)
+        //         .await
+        //         .expect(&quot;Should deposit funds&quot;);
 
-        <span class="comment">//     let regular_deposit = eth_adapter</span>
-        <span class="comment">//         .get_deposit(&amp;channel_context, spender)</span>
-        <span class="comment">//         .await</span>
-        <span class="comment">//         .expect(&quot;should get deposit&quot;);</span>
+        //     let regular_deposit = eth_adapter
+        //         .get_deposit(&amp;channel_context, spender)
+        //         .await
+        //         .expect(&quot;should get deposit&quot;);
 
-        <span class="comment">//     assert_eq!(</span>
-        <span class="comment">//         Deposit {</span>
-        <span class="comment">//             total: one_token.clone(),</span>
-        <span class="comment">//         },</span>
-        <span class="comment">//         regular_deposit</span>
-        <span class="comment">//     );</span>
-        <span class="comment">// }</span>
+        //     assert_eq!(
+        //         Deposit {
+        //             total: one_token.clone(),
+        //         },
+        //         regular_deposit
+        //     );
+        // }
 
-        <span class="prelude-val">Ok</span>(())
+        </span><span class="prelude-val">Ok</span>(())
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="adapter" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (20ffea693 2022-08-11)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="adapter" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>

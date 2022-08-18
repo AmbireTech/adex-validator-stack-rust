@@ -189,196 +189,196 @@
 <span id="189">189</span>
 <span id="190">190</span>
 <span id="191">191</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">std::marker::PhantomData</span>;
+</pre><pre class="rust"><code><span class="kw">use </span>std::marker::PhantomData;
 
-<span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">Address</span>, <span class="ident">UnifiedMap</span>, <span class="ident">UnifiedNum</span>};
-<span class="kw">use</span> <span class="ident">serde</span>::{<span class="ident">de::DeserializeOwned</span>, <span class="ident">Deserialize</span>, <span class="ident">Serialize</span>};
-<span class="kw">use</span> <span class="ident">thiserror::Error</span>;
+<span class="kw">use crate</span>::{Address, UnifiedMap, UnifiedNum};
+<span class="kw">use </span>serde::{de::DeserializeOwned, Deserialize, Serialize};
+<span class="kw">use </span>thiserror::Error;
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Serialize</span>, <span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>, <span class="ident">Default</span>)]</span>
-<span class="attribute">#[<span class="ident">serde</span>(<span class="ident">rename_all</span> <span class="op">=</span> <span class="string">&quot;camelCase&quot;</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Balances</span><span class="op">&lt;</span><span class="ident">S</span>: <span class="ident">BalancesState</span> <span class="op">=</span> <span class="ident">CheckedState</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span> <span class="ident">earners</span>: <span class="ident">UnifiedMap</span>,
-    <span class="kw">pub</span> <span class="ident">spenders</span>: <span class="ident">UnifiedMap</span>,
-    <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">skip</span>)]</span>
-    <span class="ident">state</span>: <span class="ident">PhantomData</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span>,
+<span class="attribute">#[derive(Serialize, Debug, Clone, PartialEq, Eq, Default)]</span>
+<span class="attribute">#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]</span>
+<span class="kw">pub struct </span>Balances&lt;S: BalancesState = CheckedState&gt; {
+    <span class="kw">pub </span>earners: UnifiedMap,
+    <span class="kw">pub </span>spenders: UnifiedMap,
+    <span class="attribute">#[serde(skip)]</span>
+    state: PhantomData&lt;S&gt;,
 }
 
-<span class="kw">impl</span> <span class="ident">Balances</span><span class="op">&lt;</span><span class="ident">UncheckedState</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">check</span>(<span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Balances</span><span class="op">&lt;</span><span class="ident">CheckedState</span><span class="op">&gt;</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">earned</span> <span class="op">=</span> <span class="self">self</span>
-            .<span class="ident">earners</span>
-            .<span class="ident">values</span>()
-            .<span class="ident">sum</span>::<span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">UnifiedNum</span><span class="op">&gt;</span><span class="op">&gt;</span>()
-            .<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">Error::Overflow</span>(<span class="string">&quot;earners overflow&quot;</span>.<span class="ident">to_string</span>()))<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">spent</span> <span class="op">=</span> <span class="self">self</span>
-            .<span class="ident">spenders</span>
-            .<span class="ident">values</span>()
-            .<span class="ident">sum</span>::<span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">UnifiedNum</span><span class="op">&gt;</span><span class="op">&gt;</span>()
-            .<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">Error::Overflow</span>(<span class="string">&quot;spenders overflow&quot;</span>.<span class="ident">to_string</span>()))<span class="question-mark">?</span>;
+<span class="kw">impl </span>Balances&lt;UncheckedState&gt; {
+    <span class="kw">pub fn </span>check(<span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;Balances&lt;CheckedState&gt;, Error&gt; {
+        <span class="kw">let </span>earned = <span class="self">self
+            </span>.earners
+            .values()
+            .sum::&lt;<span class="prelude-ty">Option</span>&lt;UnifiedNum&gt;&gt;()
+            .ok_or_else(|| Error::Overflow(<span class="string">&quot;earners overflow&quot;</span>.to_string()))<span class="question-mark">?</span>;
+        <span class="kw">let </span>spent = <span class="self">self
+            </span>.spenders
+            .values()
+            .sum::&lt;<span class="prelude-ty">Option</span>&lt;UnifiedNum&gt;&gt;()
+            .ok_or_else(|| Error::Overflow(<span class="string">&quot;spenders overflow&quot;</span>.to_string()))<span class="question-mark">?</span>;
 
-        <span class="kw">if</span> <span class="ident">earned</span> <span class="op">!</span><span class="op">=</span> <span class="ident">spent</span> {
-            <span class="prelude-val">Err</span>(<span class="ident">Error::PayoutMismatch</span> { <span class="ident">spent</span>, <span class="ident">earned</span> })
-        } <span class="kw">else</span> {
-            <span class="prelude-val">Ok</span>(<span class="ident">Balances</span> {
-                <span class="ident">earners</span>: <span class="self">self</span>.<span class="ident">earners</span>,
-                <span class="ident">spenders</span>: <span class="self">self</span>.<span class="ident">spenders</span>,
-                <span class="ident">state</span>: <span class="ident">PhantomData</span>::<span class="op">&lt;</span><span class="ident">CheckedState</span><span class="op">&gt;</span><span class="ident">::default</span>(),
+        <span class="kw">if </span>earned != spent {
+            <span class="prelude-val">Err</span>(Error::PayoutMismatch { spent, earned })
+        } <span class="kw">else </span>{
+            <span class="prelude-val">Ok</span>(Balances {
+                earners: <span class="self">self</span>.earners,
+                spenders: <span class="self">self</span>.spenders,
+                state: PhantomData::&lt;CheckedState&gt;::default(),
             })
         }
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">S</span>: <span class="ident">BalancesState</span><span class="op">&gt;</span> <span class="ident">Balances</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>() -&gt; <span class="ident">Balances</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span> {
-        <span class="ident">Balances</span> {
-            <span class="ident">earners</span>: <span class="ident">Default::default</span>(),
-            <span class="ident">spenders</span>: <span class="ident">Default::default</span>(),
-            <span class="ident">state</span>: <span class="ident">Default::default</span>(),
+<span class="kw">impl</span>&lt;S: BalancesState&gt; Balances&lt;S&gt; {
+    <span class="kw">pub fn </span>new() -&gt; Balances&lt;S&gt; {
+        Balances {
+            earners: Default::default(),
+            spenders: Default::default(),
+            state: Default::default(),
         }
     }
 
-    <span class="doccomment">/// Adds the spender to the Balances with `0` if he does not exist</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">add_spender</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">spender</span>: <span class="ident">Address</span>) {
-        <span class="self">self</span>.<span class="ident">spenders</span>
-            .<span class="ident">entry</span>(<span class="ident">spender</span>)
-            .<span class="ident">or_insert_with</span>(<span class="ident">UnifiedNum::default</span>);
+    <span class="doccomment">/// Adds the spender to the Balances with `0` if he does not exist
+    </span><span class="kw">pub fn </span>add_spender(<span class="kw-2">&amp;mut </span><span class="self">self</span>, spender: Address) {
+        <span class="self">self</span>.spenders
+            .entry(spender)
+            .or_insert_with(UnifiedNum::default);
     }
 
-    <span class="doccomment">/// Adds the earner to the Balances with `0` if he does not exist</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">add_earner</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">earner</span>: <span class="ident">Address</span>) {
-        <span class="self">self</span>.<span class="ident">earners</span>
-            .<span class="ident">entry</span>(<span class="ident">earner</span>)
-            .<span class="ident">or_insert_with</span>(<span class="ident">UnifiedNum::default</span>);
+    <span class="doccomment">/// Adds the earner to the Balances with `0` if he does not exist
+    </span><span class="kw">pub fn </span>add_earner(<span class="kw-2">&amp;mut </span><span class="self">self</span>, earner: Address) {
+        <span class="self">self</span>.earners
+            .entry(earner)
+            .or_insert_with(UnifiedNum::default);
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">into_unchecked</span>(<span class="self">self</span>) -&gt; <span class="ident">Balances</span><span class="op">&lt;</span><span class="ident">UncheckedState</span><span class="op">&gt;</span> {
-        <span class="ident">Balances</span> {
-            <span class="ident">earners</span>: <span class="self">self</span>.<span class="ident">earners</span>,
-            <span class="ident">spenders</span>: <span class="self">self</span>.<span class="ident">spenders</span>,
-            <span class="ident">state</span>: <span class="ident">PhantomData::default</span>(),
+    <span class="kw">pub fn </span>into_unchecked(<span class="self">self</span>) -&gt; Balances&lt;UncheckedState&gt; {
+        Balances {
+            earners: <span class="self">self</span>.earners,
+            spenders: <span class="self">self</span>.spenders,
+            state: PhantomData::default(),
         }
     }
 
-    <span class="doccomment">/// Returns a tuple of the sum of `(earners, spenders)`</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">sum</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span>(<span class="ident">UnifiedNum</span>, <span class="ident">UnifiedNum</span>)<span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">spenders</span>
-            .<span class="ident">values</span>()
-            .<span class="ident">sum</span>::<span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">UnifiedNum</span><span class="op">&gt;</span><span class="op">&gt;</span>()
-            .<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">spenders</span><span class="op">|</span> {
-                <span class="kw">let</span> <span class="ident">earners</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">earners</span>.<span class="ident">values</span>().<span class="ident">sum</span>::<span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">UnifiedNum</span><span class="op">&gt;</span><span class="op">&gt;</span>()<span class="question-mark">?</span>;
+    <span class="doccomment">/// Returns a tuple of the sum of `(earners, spenders)`
+    </span><span class="kw">pub fn </span>sum(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;(UnifiedNum, UnifiedNum)&gt; {
+        <span class="self">self</span>.spenders
+            .values()
+            .sum::&lt;<span class="prelude-ty">Option</span>&lt;UnifiedNum&gt;&gt;()
+            .and_then(|spenders| {
+                <span class="kw">let </span>earners = <span class="self">self</span>.earners.values().sum::&lt;<span class="prelude-ty">Option</span>&lt;UnifiedNum&gt;&gt;()<span class="question-mark">?</span>;
 
-                <span class="prelude-val">Some</span>((<span class="ident">earners</span>, <span class="ident">spenders</span>))
+                <span class="prelude-val">Some</span>((earners, spenders))
             })
     }
 }
 
-<span class="kw">impl</span> <span class="ident">Balances</span><span class="op">&lt;</span><span class="ident">CheckedState</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">spend</span>(
-        <span class="kw-2">&amp;mut</span> <span class="self">self</span>,
-        <span class="ident">spender</span>: <span class="ident">Address</span>,
-        <span class="ident">earner</span>: <span class="ident">Address</span>,
-        <span class="ident">amount</span>: <span class="ident">UnifiedNum</span>,
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">OverflowError</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">spent</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">spenders</span>.<span class="ident">entry</span>(<span class="ident">spender</span>).<span class="ident">or_default</span>();
-        <span class="kw-2">*</span><span class="ident">spent</span> <span class="op">=</span> <span class="ident">spent</span>
-            .<span class="ident">checked_add</span>(<span class="kw-2">&amp;</span><span class="ident">amount</span>)
-            .<span class="ident">ok_or</span>(<span class="ident">OverflowError::Spender</span>(<span class="ident">spender</span>))<span class="question-mark">?</span>;
+<span class="kw">impl </span>Balances&lt;CheckedState&gt; {
+    <span class="kw">pub fn </span>spend(
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+        spender: Address,
+        earner: Address,
+        amount: UnifiedNum,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;(), OverflowError&gt; {
+        <span class="kw">let </span>spent = <span class="self">self</span>.spenders.entry(spender).or_default();
+        <span class="kw-2">*</span>spent = spent
+            .checked_add(<span class="kw-2">&amp;</span>amount)
+            .ok_or(OverflowError::Spender(spender))<span class="question-mark">?</span>;
 
-        <span class="kw">let</span> <span class="ident">earned</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">earners</span>.<span class="ident">entry</span>(<span class="ident">earner</span>).<span class="ident">or_default</span>();
-        <span class="kw-2">*</span><span class="ident">earned</span> <span class="op">=</span> <span class="ident">earned</span>
-            .<span class="ident">checked_add</span>(<span class="kw-2">&amp;</span><span class="ident">amount</span>)
-            .<span class="ident">ok_or</span>(<span class="ident">OverflowError::Earner</span>(<span class="ident">earner</span>))<span class="question-mark">?</span>;
+        <span class="kw">let </span>earned = <span class="self">self</span>.earners.entry(earner).or_default();
+        <span class="kw-2">*</span>earned = earned
+            .checked_add(<span class="kw-2">&amp;</span>amount)
+            .ok_or(OverflowError::Earner(earner))<span class="question-mark">?</span>;
 
         <span class="prelude-val">Ok</span>(())
     }
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Error</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">OverflowError</span> {
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Spender {0} amount overflowed&quot;</span>)]</span>
-    <span class="ident">Spender</span>(<span class="ident">Address</span>),
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Earner {0} amount overflowed&quot;</span>)]</span>
-    <span class="ident">Earner</span>(<span class="ident">Address</span>),
+<span class="attribute">#[derive(Debug, Error)]</span>
+<span class="kw">pub enum </span>OverflowError {
+    <span class="attribute">#[error(<span class="string">&quot;Spender {0} amount overflowed&quot;</span>)]</span>
+    Spender(Address),
+    <span class="attribute">#[error(<span class="string">&quot;Earner {0} amount overflowed&quot;</span>)]</span>
+    Earner(Address),
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Error</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">Error</span> {
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Overflow of computation {0}&quot;</span>)]</span>
-    <span class="ident">Overflow</span>(<span class="ident">String</span>),
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Payout mismatch between spent ({spent}) and earned ({earned})&quot;</span>)]</span>
-    <span class="ident">PayoutMismatch</span> {
-        <span class="ident">spent</span>: <span class="ident">UnifiedNum</span>,
-        <span class="ident">earned</span>: <span class="ident">UnifiedNum</span>,
+<span class="attribute">#[derive(Debug, Error)]</span>
+<span class="kw">pub enum </span>Error {
+    <span class="attribute">#[error(<span class="string">&quot;Overflow of computation {0}&quot;</span>)]</span>
+    Overflow(String),
+    <span class="attribute">#[error(<span class="string">&quot;Payout mismatch between spent ({spent}) and earned ({earned})&quot;</span>)]</span>
+    PayoutMismatch {
+        spent: UnifiedNum,
+        earned: UnifiedNum,
     },
 }
 
-<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">BalancesState</span>: <span class="ident">std::fmt::Debug</span> <span class="op">+</span> <span class="ident">Eq</span> <span class="op">+</span> <span class="ident">Clone</span> <span class="op">+</span> <span class="ident">Serialize</span> <span class="op">+</span> <span class="ident">DeserializeOwned</span> {
-    <span class="kw">fn</span> <span class="ident">from_unchecked</span>(<span class="ident">balances</span>: <span class="ident">Balances</span><span class="op">&lt;</span><span class="ident">UncheckedState</span><span class="op">&gt;</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Balances</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>, <span class="ident">Error</span><span class="op">&gt;</span>;
+<span class="kw">pub trait </span>BalancesState: std::fmt::Debug + Eq + Clone + Serialize + DeserializeOwned {
+    <span class="kw">fn </span>from_unchecked(balances: Balances&lt;UncheckedState&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;Balances&lt;<span class="self">Self</span>&gt;, Error&gt;;
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>, <span class="ident">Default</span>, <span class="ident">Serialize</span>, <span class="ident">Deserialize</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">CheckedState</span>;
-<span class="kw">impl</span> <span class="ident">BalancesState</span> <span class="kw">for</span> <span class="ident">CheckedState</span> {
-    <span class="kw">fn</span> <span class="ident">from_unchecked</span>(<span class="ident">balances</span>: <span class="ident">Balances</span><span class="op">&lt;</span><span class="ident">UncheckedState</span><span class="op">&gt;</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Balances</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
-        <span class="ident">balances</span>.<span class="ident">check</span>()
+<span class="attribute">#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]</span>
+<span class="kw">pub struct </span>CheckedState;
+<span class="kw">impl </span>BalancesState <span class="kw">for </span>CheckedState {
+    <span class="kw">fn </span>from_unchecked(balances: Balances&lt;UncheckedState&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;Balances&lt;<span class="self">Self</span>&gt;, Error&gt; {
+        balances.check()
     }
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>, <span class="ident">Default</span>, <span class="ident">Serialize</span>, <span class="ident">Deserialize</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">UncheckedState</span>;
-<span class="kw">impl</span> <span class="ident">BalancesState</span> <span class="kw">for</span> <span class="ident">UncheckedState</span> {
-    <span class="kw">fn</span> <span class="ident">from_unchecked</span>(<span class="ident">balances</span>: <span class="ident">Balances</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Balances</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
-        <span class="prelude-val">Ok</span>(<span class="ident">balances</span>)
+<span class="attribute">#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]</span>
+<span class="kw">pub struct </span>UncheckedState;
+<span class="kw">impl </span>BalancesState <span class="kw">for </span>UncheckedState {
+    <span class="kw">fn </span>from_unchecked(balances: Balances&lt;<span class="self">Self</span>&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;Balances&lt;<span class="self">Self</span>&gt;, Error&gt; {
+        <span class="prelude-val">Ok</span>(balances)
     }
 }
 
-<span class="kw">impl</span> <span class="ident">TryFrom</span><span class="op">&lt;</span><span class="ident">Balances</span><span class="op">&lt;</span><span class="ident">UncheckedState</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Balances</span><span class="op">&lt;</span><span class="ident">CheckedState</span><span class="op">&gt;</span> {
-    <span class="kw">type</span> <span class="ident">Error</span> <span class="op">=</span> <span class="ident">Error</span>;
+<span class="kw">impl </span>TryFrom&lt;Balances&lt;UncheckedState&gt;&gt; <span class="kw">for </span>Balances&lt;CheckedState&gt; {
+    <span class="kw">type </span>Error = Error;
 
-    <span class="kw">fn</span> <span class="ident">try_from</span>(<span class="ident">value</span>: <span class="ident">Balances</span><span class="op">&lt;</span><span class="ident">UncheckedState</span><span class="op">&gt;</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident"><span class="self">Self</span>::Error</span><span class="op">&gt;</span> {
-        <span class="ident">value</span>.<span class="ident">check</span>()
+    <span class="kw">fn </span>try_from(value: Balances&lt;UncheckedState&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, <span class="self">Self</span>::Error&gt; {
+        value.check()
     }
 }
 
-<span class="doccomment">/// This modules implements the needed non-generic structs that help with Deserialization of the `Balances&lt;S&gt;`</span>
-<span class="kw">mod</span> <span class="ident">de</span> {
-    <span class="kw">use</span> <span class="ident">serde::Deserializer</span>;
+<span class="doccomment">/// This modules implements the needed non-generic structs that help with Deserialization of the `Balances&lt;S&gt;`
+</span><span class="kw">mod </span>de {
+    <span class="kw">use </span>serde::Deserializer;
 
-    <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
+    <span class="kw">use super</span>::<span class="kw-2">*</span>;
 
-    <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Deserialize</span>, <span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>)]</span>
-    <span class="kw">struct</span> <span class="ident">DeserializeBalances</span> {
-        <span class="kw">pub</span> <span class="ident">earners</span>: <span class="ident">UnifiedMap</span>,
-        <span class="kw">pub</span> <span class="ident">spenders</span>: <span class="ident">UnifiedMap</span>,
+    <span class="attribute">#[derive(Deserialize, Debug, Clone, PartialEq, Eq)]</span>
+    <span class="kw">struct </span>DeserializeBalances {
+        <span class="kw">pub </span>earners: UnifiedMap,
+        <span class="kw">pub </span>spenders: UnifiedMap,
     }
 
-    <span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;de</span>, <span class="ident">S</span>: <span class="ident">BalancesState</span><span class="op">&gt;</span> <span class="ident">Deserialize</span><span class="op">&lt;</span><span class="lifetime">&#39;de</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Balances</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span> {
-        <span class="kw">fn</span> <span class="ident">deserialize</span><span class="op">&lt;</span><span class="ident">D</span><span class="op">&gt;</span>(<span class="ident">deserializer</span>: <span class="ident">D</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">D::Error</span><span class="op">&gt;</span>
-        <span class="kw">where</span>
-            <span class="ident">D</span>: <span class="ident">Deserializer</span><span class="op">&lt;</span><span class="lifetime">&#39;de</span><span class="op">&gt;</span>,
+    <span class="kw">impl</span>&lt;<span class="lifetime">&#39;de</span>, S: BalancesState&gt; Deserialize&lt;<span class="lifetime">&#39;de</span>&gt; <span class="kw">for </span>Balances&lt;S&gt; {
+        <span class="kw">fn </span>deserialize&lt;D&gt;(deserializer: D) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, D::Error&gt;
+        <span class="kw">where
+            </span>D: Deserializer&lt;<span class="lifetime">&#39;de</span>&gt;,
         {
-            <span class="kw">let</span> <span class="ident">deser_balances</span> <span class="op">=</span> <span class="ident">DeserializeBalances::deserialize</span>(<span class="ident">deserializer</span>)<span class="question-mark">?</span>;
+            <span class="kw">let </span>deser_balances = DeserializeBalances::deserialize(deserializer)<span class="question-mark">?</span>;
 
-            <span class="kw">let</span> <span class="ident">unchecked_balances</span> <span class="op">=</span> <span class="ident">Balances</span> {
-                <span class="ident">earners</span>: <span class="ident">deser_balances</span>.<span class="ident">earners</span>,
-                <span class="ident">spenders</span>: <span class="ident">deser_balances</span>.<span class="ident">spenders</span>,
-                <span class="ident">state</span>: <span class="ident">PhantomData</span>::<span class="op">&lt;</span><span class="ident">UncheckedState</span><span class="op">&gt;</span><span class="ident">::default</span>(),
+            <span class="kw">let </span>unchecked_balances = Balances {
+                earners: deser_balances.earners,
+                spenders: deser_balances.spenders,
+                state: PhantomData::&lt;UncheckedState&gt;::default(),
             };
 
-            <span class="ident">S::from_unchecked</span>(<span class="ident">unchecked_balances</span>).<span class="ident">map_err</span>(<span class="ident">serde::de::Error::custom</span>)
+            S::from_unchecked(unchecked_balances).map_err(serde::de::Error::custom)
         }
     }
 
-    <span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">DeserializeBalances</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Balances</span><span class="op">&lt;</span><span class="ident">UncheckedState</span><span class="op">&gt;</span> {
-        <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">value</span>: <span class="ident">DeserializeBalances</span>) -&gt; <span class="self">Self</span> {
-            <span class="self">Self</span> {
-                <span class="ident">earners</span>: <span class="ident">value</span>.<span class="ident">earners</span>,
-                <span class="ident">spenders</span>: <span class="ident">value</span>.<span class="ident">spenders</span>,
-                <span class="ident">state</span>: <span class="ident">PhantomData</span>::<span class="op">&lt;</span><span class="ident">UncheckedState</span><span class="op">&gt;</span><span class="ident">::default</span>(),
+    <span class="kw">impl </span>From&lt;DeserializeBalances&gt; <span class="kw">for </span>Balances&lt;UncheckedState&gt; {
+        <span class="kw">fn </span>from(value: DeserializeBalances) -&gt; <span class="self">Self </span>{
+            <span class="self">Self </span>{
+                earners: value.earners,
+                spenders: value.spenders,
+                state: PhantomData::&lt;UncheckedState&gt;::default(),
             }
         }
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="primitives" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (20ffea693 2022-08-11)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="primitives" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>

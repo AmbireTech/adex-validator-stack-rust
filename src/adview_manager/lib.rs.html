@@ -34,41 +34,41 @@
 <span id="34">34</span>
 <span id="35">35</span>
 <span id="36">36</span>
-</pre><pre class="rust"><code><span class="attribute">#![<span class="ident">deny</span>(<span class="ident">rust_2018_idioms</span>)]</span>
-<span class="attribute">#![<span class="ident">deny</span>(<span class="ident">clippy::all</span>)]</span>
-<span class="attribute">#![<span class="ident">deny</span>(<span class="ident">rustdoc::broken_intra_doc_links</span>)]</span>
-<span class="attribute">#![<span class="ident">cfg_attr</span>(<span class="ident">docsrs</span>, <span class="ident">feature</span>(<span class="ident">doc_cfg</span>))]</span>
+</pre><pre class="rust"><code><span class="attribute">#![deny(rust_2018_idioms)]</span>
+<span class="attribute">#![deny(clippy::all)]</span>
+<span class="attribute">#![deny(rustdoc::broken_intra_doc_links)]</span>
+<span class="attribute">#![cfg_attr(docsrs, feature(doc_cfg))]</span>
 
-<span class="kw">use</span> <span class="ident">chrono::Duration</span>;
-<span class="kw">use</span> <span class="ident">once_cell::sync::Lazy</span>;
+<span class="kw">use </span>chrono::Duration;
+<span class="kw">use </span>once_cell::sync::Lazy;
 
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">url::Url</span>;
+<span class="kw">pub use </span>url::Url;
 
-<span class="attribute">#[<span class="ident">doc</span>(<span class="ident">inline</span>)]</span>
-<span class="kw">pub</span> <span class="kw">use</span> <span class="self">self</span>::{
-    <span class="ident">helpers::get_unit_html_with_events</span>,
-    <span class="ident">manager</span>::{<span class="ident">Manager</span>, <span class="ident">Options</span>},
+<span class="attribute">#[doc(inline)]</span>
+<span class="kw">pub use </span><span class="self">self</span>::{
+    helpers::get_unit_html_with_events,
+    manager::{Manager, Options},
 };
 
-<span class="doccomment">/// The waiting time before sending out an impression event - **8 seconds** (used as milliseconds in JS).</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Sets the timeout in JS with [setTimeout](https://developer.mozilla.org/en-US/docs/Web/API/setTimeout) function</span>
-<span class="doccomment">/// for sending events when showing the Ads.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Related:</span>
-<span class="doccomment">/// - &lt;https://github.com/AdExNetwork/adex-adview-manager/issues/17&gt;</span>
-<span class="doccomment">/// - &lt;https://github.com/AdExNetwork/adex-adview-manager/issues/35&gt;</span>
-<span class="doccomment">/// - &lt;https://github.com/AdExNetwork/adex-adview-manager/issues/46&gt;</span>
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">WAIT_FOR_IMPRESSION</span>: <span class="ident">Lazy</span><span class="op">&lt;</span><span class="ident">Duration</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Lazy::new</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">Duration::seconds</span>(<span class="number">8</span>));
+<span class="doccomment">/// The waiting time before sending out an impression event - **8 seconds** (used as milliseconds in JS).
+///
+/// Sets the timeout in JS with [setTimeout](https://developer.mozilla.org/en-US/docs/Web/API/setTimeout) function
+/// for sending events when showing the Ads.
+///
+/// Related:
+/// - &lt;https://github.com/AdExNetwork/adex-adview-manager/issues/17&gt;
+/// - &lt;https://github.com/AdExNetwork/adex-adview-manager/issues/35&gt;
+/// - &lt;https://github.com/AdExNetwork/adex-adview-manager/issues/46&gt;
+</span><span class="kw">pub static </span>WAIT_FOR_IMPRESSION: Lazy&lt;Duration&gt; = Lazy::new(|| Duration::seconds(<span class="number">8</span>));
 
-<span class="doccomment">/// Impression &quot;stickiness&quot; time - **4 minutes**</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// **4 minutes** allows ~4 campaigns to rotate, considering a default frequency cap of 15 minutes</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// See &lt;https://github.com/AdExNetwork/adex-adview-manager/issues/65&gt;.</span>
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">IMPRESSION_STICKINESS_TIME</span>: <span class="ident">Lazy</span><span class="op">&lt;</span><span class="ident">Duration</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Lazy::new</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">Duration::minutes</span>(<span class="number">4</span>));
+<span class="doccomment">/// Impression &quot;stickiness&quot; time - **4 minutes**
+///
+/// **4 minutes** allows ~4 campaigns to rotate, considering a default frequency cap of 15 minutes
+///
+/// See &lt;https://github.com/AdExNetwork/adex-adview-manager/issues/65&gt;.
+</span><span class="kw">pub static </span>IMPRESSION_STICKINESS_TIME: Lazy&lt;Duration&gt; = Lazy::new(|| Duration::minutes(<span class="number">4</span>));
 
-<span class="kw">mod</span> <span class="ident">helpers</span>;
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">manager</span>;
+<span class="kw">mod </span>helpers;
+<span class="kw">pub mod </span>manager;
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="adview_manager" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (20ffea693 2022-08-11)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="adview_manager" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>

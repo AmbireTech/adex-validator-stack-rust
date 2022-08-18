@@ -94,101 +94,101 @@
 <span id="94">94</span>
 <span id="95">95</span>
 <span id="96">96</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">channel::channel_tick</span>, <span class="ident">SentryApi</span>};
-<span class="kw">use</span> <span class="ident">adapter</span>::{<span class="ident">prelude</span>::<span class="kw-2">*</span>, <span class="ident">Adapter</span>};
-<span class="kw">use</span> <span class="ident">primitives::Config</span>;
-<span class="kw">use</span> <span class="ident">slog</span>::{<span class="ident">error</span>, <span class="ident">info</span>, <span class="ident">Logger</span>};
-<span class="kw">use</span> <span class="ident">std::error::Error</span>;
+</pre><pre class="rust"><code><span class="kw">use crate</span>::{channel::channel_tick, SentryApi};
+<span class="kw">use </span>adapter::{prelude::<span class="kw-2">*</span>, Adapter};
+<span class="kw">use </span>primitives::Config;
+<span class="kw">use </span>slog::{error, info, Logger};
+<span class="kw">use </span>std::error::Error;
 
-<span class="kw">use</span> <span class="ident">futures</span>::{
-    <span class="ident">future</span>::{<span class="ident">join</span>, <span class="ident">join_all</span>},
-    <span class="ident">TryFutureExt</span>,
+<span class="kw">use </span>futures::{
+    future::{join, join_all},
+    TryFutureExt,
 };
-<span class="kw">use</span> <span class="ident">tokio</span>::{<span class="ident">runtime::Runtime</span>, <span class="ident">time::sleep</span>};
+<span class="kw">use </span>tokio::{runtime::Runtime, time::sleep};
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Worker</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">Unlocked</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// SentryApi with set `whoami` validator</span>
-    <span class="doccomment">/// Requires an unlocked adapter to create [`SentryApi`], use `Worker::init_unlock()`.</span>
-    <span class="kw">pub</span> <span class="ident">sentry</span>: <span class="ident">SentryApi</span><span class="op">&lt;</span><span class="ident">C</span>, ()<span class="op">&gt;</span>,
-    <span class="kw">pub</span> <span class="ident">config</span>: <span class="ident">Config</span>,
-    <span class="doccomment">/// The unlocked Adapter</span>
-    <span class="kw">pub</span> <span class="ident">adapter</span>: <span class="ident">Adapter</span><span class="op">&lt;</span><span class="ident">C</span>, <span class="ident">UnlockedState</span><span class="op">&gt;</span>,
-    <span class="kw">pub</span> <span class="ident">logger</span>: <span class="ident">Logger</span>,
+<span class="attribute">#[derive(Debug, Clone)]</span>
+<span class="kw">pub struct </span>Worker&lt;C: Unlocked&gt; {
+    <span class="doccomment">/// SentryApi with set `whoami` validator
+    /// Requires an unlocked adapter to create [`SentryApi`], use `Worker::init_unlock()`.
+    </span><span class="kw">pub </span>sentry: SentryApi&lt;C, ()&gt;,
+    <span class="kw">pub </span>config: Config,
+    <span class="doccomment">/// The unlocked Adapter
+    </span><span class="kw">pub </span>adapter: Adapter&lt;C, UnlockedState&gt;,
+    <span class="kw">pub </span>logger: Logger,
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">Unlocked</span> <span class="op">+</span> <span class="lifetime">&#39;static</span><span class="op">&gt;</span> <span class="ident">Worker</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// Requires an unlocked [`Adapter`]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">from_sentry</span>(<span class="ident">sentry</span>: <span class="ident">SentryApi</span><span class="op">&lt;</span><span class="ident">C</span>, ()<span class="op">&gt;</span>) -&gt; <span class="self">Self</span> {
-        <span class="self">Self</span> {
-            <span class="ident">config</span>: <span class="ident">sentry</span>.<span class="ident">config</span>.<span class="ident">clone</span>(),
-            <span class="ident">adapter</span>: <span class="ident">sentry</span>.<span class="ident">adapter</span>.<span class="ident">clone</span>(),
-            <span class="ident">logger</span>: <span class="ident">sentry</span>.<span class="ident">logger</span>.<span class="ident">clone</span>(),
-            <span class="ident">sentry</span>,
+<span class="kw">impl</span>&lt;C: Unlocked + <span class="lifetime">&#39;static</span>&gt; Worker&lt;C&gt; {
+    <span class="doccomment">/// Requires an unlocked [`Adapter`]
+    </span><span class="kw">pub fn </span>from_sentry(sentry: SentryApi&lt;C, ()&gt;) -&gt; <span class="self">Self </span>{
+        <span class="self">Self </span>{
+            config: sentry.config.clone(),
+            adapter: sentry.adapter.clone(),
+            logger: sentry.logger.clone(),
+            sentry,
         }
     }
 
-    <span class="doccomment">/// Runs the validator in a single tick or it runs infinitely.</span>
-    <span class="doccomment">/// Uses [`tokio::runtime::Runtime`]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">run</span>(<span class="self">self</span>, <span class="ident">is_single_tick</span>: <span class="ident">bool</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Error</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="comment">// Create the runtime</span>
-        <span class="kw">let</span> <span class="ident">rt</span> <span class="op">=</span> <span class="ident">Runtime::new</span>()<span class="question-mark">?</span>;
+    <span class="doccomment">/// Runs the validator in a single tick or it runs infinitely.
+    /// Uses [`tokio::runtime::Runtime`]
+    </span><span class="kw">pub fn </span>run(<span class="self">self</span>, is_single_tick: bool) -&gt; <span class="prelude-ty">Result</span>&lt;(), Box&lt;<span class="kw">dyn </span>Error&gt;&gt; {
+        <span class="comment">// Create the runtime
+        </span><span class="kw">let </span>rt = Runtime::new()<span class="question-mark">?</span>;
 
-        <span class="kw">if</span> <span class="ident">is_single_tick</span> {
-            <span class="ident">rt</span>.<span class="ident">block_on</span>(<span class="self">self</span>.<span class="ident">all_channels_tick</span>());
-        } <span class="kw">else</span> {
-            <span class="ident">rt</span>.<span class="ident">block_on</span>(<span class="self">self</span>.<span class="ident">infinite</span>());
+        <span class="kw">if </span>is_single_tick {
+            rt.block_on(<span class="self">self</span>.all_channels_tick());
+        } <span class="kw">else </span>{
+            rt.block_on(<span class="self">self</span>.infinite());
         }
 
         <span class="prelude-val">Ok</span>(())
     }
 
-    <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">infinite</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="kw">loop</span> {
-            <span class="kw">let</span> <span class="ident">wait_time_future</span> <span class="op">=</span> <span class="ident">sleep</span>(<span class="self">self</span>.<span class="ident">config</span>.<span class="ident">wait_time</span>);
+    <span class="kw">pub async fn </span>infinite(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="kw">loop </span>{
+            <span class="kw">let </span>wait_time_future = sleep(<span class="self">self</span>.config.wait_time);
 
-            <span class="kw">let</span> <span class="ident">_result</span> <span class="op">=</span> <span class="ident">join</span>(<span class="self">self</span>.<span class="ident">all_channels_tick</span>(), <span class="ident">wait_time_future</span>).<span class="kw">await</span>;
+            <span class="kw">let </span>_result = join(<span class="self">self</span>.all_channels_tick(), wait_time_future).<span class="kw">await</span>;
         }
     }
 
-    <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">all_channels_tick</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="kw">let</span> <span class="ident">logger</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">logger</span>;
+    <span class="kw">pub async fn </span>all_channels_tick(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="kw">let </span>logger = <span class="kw-2">&amp;</span><span class="self">self</span>.logger;
 
-        <span class="kw">let</span> (<span class="ident">channels_context</span>, <span class="ident">validators</span>) <span class="op">=</span> <span class="kw">match</span> <span class="self">self</span>.<span class="ident">sentry</span>.<span class="ident">collect_channels</span>().<span class="kw">await</span> {
-            <span class="prelude-val">Ok</span>(<span class="ident">res</span>) =&gt; <span class="ident">res</span>,
-            <span class="prelude-val">Err</span>(<span class="ident">err</span>) =&gt; {
-                <span class="macro">error!</span>(<span class="ident">logger</span>, <span class="string">&quot;Error collecting all channels for tick&quot;</span>; <span class="string">&quot;collect_channels&quot;</span> =&gt; <span class="question-mark">?</span><span class="ident">err</span>, <span class="string">&quot;main&quot;</span> =&gt; <span class="string">&quot;all_channels_tick&quot;</span>);
+        <span class="kw">let </span>(channels_context, validators) = <span class="kw">match </span><span class="self">self</span>.sentry.collect_channels().<span class="kw">await </span>{
+            <span class="prelude-val">Ok</span>(res) =&gt; res,
+            <span class="prelude-val">Err</span>(err) =&gt; {
+                <span class="macro">error!</span>(logger, <span class="string">&quot;Error collecting all channels for tick&quot;</span>; <span class="string">&quot;collect_channels&quot; </span>=&gt; <span class="question-mark">?</span>err, <span class="string">&quot;main&quot; </span>=&gt; <span class="string">&quot;all_channels_tick&quot;</span>);
                 <span class="kw">return</span>;
             }
         };
-        <span class="kw">let</span> <span class="ident">channels_size</span> <span class="op">=</span> <span class="ident">channels_context</span>.<span class="ident">len</span>();
+        <span class="kw">let </span>channels_size = channels_context.len();
 
-        <span class="kw">let</span> <span class="ident">sentry_with_propagate</span> <span class="op">=</span> <span class="kw">match</span> <span class="self">self</span>.<span class="ident">sentry</span>.<span class="ident">clone</span>().<span class="ident">with_propagate</span>(<span class="ident">validators</span>) {
-            <span class="prelude-val">Ok</span>(<span class="ident">sentry</span>) =&gt; <span class="ident">sentry</span>,
-            <span class="prelude-val">Err</span>(<span class="ident">err</span>) =&gt; {
-                <span class="macro">error!</span>(<span class="ident">logger</span>, <span class="string">&quot;Failed to set propagation validators: {err}&quot;</span>; <span class="string">&quot;err&quot;</span> =&gt; <span class="question-mark">?</span><span class="ident">err</span>, <span class="string">&quot;main&quot;</span> =&gt; <span class="string">&quot;all_channels_tick&quot;</span>);
+        <span class="kw">let </span>sentry_with_propagate = <span class="kw">match </span><span class="self">self</span>.sentry.clone().with_propagate(validators) {
+            <span class="prelude-val">Ok</span>(sentry) =&gt; sentry,
+            <span class="prelude-val">Err</span>(err) =&gt; {
+                <span class="macro">error!</span>(logger, <span class="string">&quot;Failed to set propagation validators: {err}&quot;</span>; <span class="string">&quot;err&quot; </span>=&gt; <span class="question-mark">?</span>err, <span class="string">&quot;main&quot; </span>=&gt; <span class="string">&quot;all_channels_tick&quot;</span>);
                 <span class="kw">return</span>;
             }
         };
 
-        <span class="kw">let</span> <span class="ident">tick_results</span> <span class="op">=</span> <span class="ident">join_all</span>(<span class="ident">channels_context</span>.<span class="ident">into_iter</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">channel_context</span><span class="op">|</span> {
-            <span class="kw">let</span> <span class="ident">channel</span> <span class="op">=</span> <span class="ident">channel_context</span>.<span class="ident">context</span>;
+        <span class="kw">let </span>tick_results = join_all(channels_context.into_iter().map(|channel_context| {
+            <span class="kw">let </span>channel = channel_context.context;
 
-            <span class="ident">channel_tick</span>(<span class="kw-2">&amp;</span><span class="ident">sentry_with_propagate</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">config</span>, <span class="ident">channel_context</span>)
-                .<span class="ident">map_err</span>(<span class="kw">move</span> <span class="op">|</span><span class="ident">err</span><span class="op">|</span> (<span class="ident">channel</span>, <span class="ident">err</span>))
+            channel_tick(<span class="kw-2">&amp;</span>sentry_with_propagate, <span class="kw-2">&amp;</span><span class="self">self</span>.config, channel_context)
+                .map_err(<span class="kw">move </span>|err| (channel, err))
         }))
         .<span class="kw">await</span>;
 
-        <span class="kw">for</span> (<span class="ident">channel</span>, <span class="ident">channel_err</span>) <span class="kw">in</span> <span class="ident">tick_results</span>.<span class="ident">into_iter</span>().<span class="ident">filter_map</span>(<span class="ident">Result::err</span>) {
-            <span class="macro">error!</span>(<span class="ident">logger</span>, <span class="string">&quot;Error processing Channel&quot;</span>; <span class="string">&quot;channel&quot;</span> =&gt; <span class="question-mark">?</span><span class="ident">channel</span>, <span class="string">&quot;error&quot;</span> =&gt; <span class="question-mark">?</span><span class="ident">channel_err</span>, <span class="string">&quot;main&quot;</span> =&gt; <span class="string">&quot;all_channels_tick&quot;</span>);
+        <span class="kw">for </span>(channel, channel_err) <span class="kw">in </span>tick_results.into_iter().filter_map(Result::err) {
+            <span class="macro">error!</span>(logger, <span class="string">&quot;Error processing Channel&quot;</span>; <span class="string">&quot;channel&quot; </span>=&gt; <span class="question-mark">?</span>channel, <span class="string">&quot;error&quot; </span>=&gt; <span class="question-mark">?</span>channel_err, <span class="string">&quot;main&quot; </span>=&gt; <span class="string">&quot;all_channels_tick&quot;</span>);
         }
 
-        <span class="macro">info!</span>(<span class="ident">logger</span>, <span class="string">&quot;Processed {} channels&quot;</span>, <span class="ident">channels_size</span>);
+        <span class="macro">info!</span>(logger, <span class="string">&quot;Processed {} channels&quot;</span>, channels_size);
 
-        <span class="kw">if</span> <span class="ident">channels_size</span> <span class="op">&gt;</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">config</span>.<span class="ident">max_channels</span> <span class="kw">as</span> <span class="ident">usize</span> {
-            <span class="macro">error!</span>(<span class="ident">logger</span>, <span class="string">&quot;WARNING: channel limit cfg.MAX_CHANNELS={} reached&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">config</span>.<span class="ident">max_channels</span>; <span class="string">&quot;main&quot;</span> =&gt; <span class="string">&quot;all_channels_tick&quot;</span>);
+        <span class="kw">if </span>channels_size &gt;= <span class="self">self</span>.config.max_channels <span class="kw">as </span>usize {
+            <span class="macro">error!</span>(logger, <span class="string">&quot;WARNING: channel limit cfg.MAX_CHANNELS={} reached&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.config.max_channels; <span class="string">&quot;main&quot; </span>=&gt; <span class="string">&quot;all_channels_tick&quot;</span>);
         }
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="validator_worker" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (20ffea693 2022-08-11)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="validator_worker" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>

@@ -195,202 +195,202 @@
 <span id="195">195</span>
 <span id="196">196</span>
 <span id="197">197</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">std::sync::Arc</span>;
+</pre><pre class="rust"><code><span class="kw">use </span>std::sync::Arc;
 
-<span class="kw">use</span> <span class="ident">adex_primitives</span>::{
-    <span class="ident">sentry::IMPRESSION</span>,
-    <span class="ident">supermarket::units_for_slot</span>,
-    <span class="ident">targeting</span>::{<span class="ident">input::Global</span>, <span class="ident">Input</span>},
-    <span class="ident">test_util</span>::{<span class="ident">DUMMY_CAMPAIGN</span>, <span class="ident">DUMMY_IPFS</span>},
-    <span class="ident">ToHex</span>,
+<span class="kw">use </span>adex_primitives::{
+    sentry::IMPRESSION,
+    supermarket::units_for_slot,
+    targeting::{input::Global, Input},
+    test_util::{DUMMY_CAMPAIGN, DUMMY_IPFS},
+    ToHex,
 };
-<span class="kw">use</span> <span class="ident">adview_manager</span>::{
-    <span class="ident">get_unit_html_with_events</span>, <span class="ident">manager::Size</span>, <span class="ident">manager::DEFAULT_TOKENS</span>, <span class="ident">Manager</span>, <span class="ident">Options</span>,
+<span class="kw">use </span>adview_manager::{
+    get_unit_html_with_events, manager::Size, manager::DEFAULT_TOKENS, Manager, Options,
 };
-<span class="kw">use</span> <span class="ident">axum</span>::{<span class="ident">response::Html</span>, <span class="ident">Extension</span>};
-<span class="kw">use</span> <span class="ident">chrono::Utc</span>;
-<span class="kw">use</span> <span class="ident">log::debug</span>;
-<span class="kw">use</span> <span class="ident">wiremock</span>::{
-    <span class="ident">matchers</span>::{<span class="ident">method</span>, <span class="ident">path</span>, <span class="ident">query_param</span>},
-    <span class="ident">Mock</span>, <span class="ident">MockServer</span>, <span class="ident">ResponseTemplate</span>,
+<span class="kw">use </span>axum::{response::Html, Extension};
+<span class="kw">use </span>chrono::Utc;
+<span class="kw">use </span>log::debug;
+<span class="kw">use </span>wiremock::{
+    matchers::{method, path, query_param},
+    Mock, MockServer, ResponseTemplate,
 };
 
-<span class="kw">use</span> <span class="ident">tera::Context</span>;
+<span class="kw">use </span>tera::Context;
 
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::app::State</span>;
+<span class="kw">use </span><span class="kw">crate</span>::app::State;
 
-<span class="doccomment">/// `GET /`</span>
-<span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">get_index</span>(<span class="ident">Extension</span>(<span class="ident">state</span>): <span class="ident">Extension</span><span class="op">&lt;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">State</span><span class="op">&gt;</span><span class="op">&gt;</span>) -&gt; <span class="ident">Html</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">html</span> <span class="op">=</span> <span class="ident">state</span>
-        .<span class="ident">tera</span>
-        .<span class="ident">render</span>(<span class="string">&quot;index.html&quot;</span>, <span class="kw-2">&amp;</span><span class="ident">Default::default</span>())
-        .<span class="ident">expect</span>(<span class="string">&quot;Should render&quot;</span>);
+<span class="doccomment">/// `GET /`
+</span><span class="kw">pub async fn </span>get_index(Extension(state): Extension&lt;Arc&lt;State&gt;&gt;) -&gt; Html&lt;String&gt; {
+    <span class="kw">let </span>html = state
+        .tera
+        .render(<span class="string">&quot;index.html&quot;</span>, <span class="kw-2">&amp;</span>Default::default())
+        .expect(<span class="string">&quot;Should render&quot;</span>);
 
-    <span class="ident">Html</span>(<span class="ident">html</span>)
+    Html(html)
 }
 
-<span class="doccomment">/// `GET /preview/ad`</span>
-<span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">get_preview_ad</span>(<span class="ident">Extension</span>(<span class="ident">state</span>): <span class="ident">Extension</span><span class="op">&lt;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">State</span><span class="op">&gt;</span><span class="op">&gt;</span>) -&gt; <span class="ident">Html</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span> {
-    <span class="comment">// For mocking the `get_market_demand_resp` call</span>
-    <span class="kw">let</span> <span class="ident">mock_server</span> <span class="op">=</span> <span class="ident">MockServer::start</span>().<span class="kw">await</span>;
+<span class="doccomment">/// `GET /preview/ad`
+</span><span class="kw">pub async fn </span>get_preview_ad(Extension(state): Extension&lt;Arc&lt;State&gt;&gt;) -&gt; Html&lt;String&gt; {
+    <span class="comment">// For mocking the `get_market_demand_resp` call
+    </span><span class="kw">let </span>mock_server = MockServer::start().<span class="kw">await</span>;
 
-    <span class="kw">let</span> <span class="ident">market_url</span> <span class="op">=</span> <span class="ident">mock_server</span>.<span class="ident">uri</span>().<span class="ident">parse</span>().<span class="ident">unwrap</span>();
-    <span class="kw">let</span> <span class="ident">whitelisted_tokens</span> <span class="op">=</span> <span class="ident">DEFAULT_TOKENS</span>.<span class="ident">clone</span>();
-    <span class="kw">let</span> <span class="ident">disabled_video</span> <span class="op">=</span> <span class="bool-val">false</span>;
-    <span class="kw">let</span> <span class="ident">publisher_addr</span> <span class="op">=</span> <span class="string">&quot;0x0000000000000000626f62627973686d75726461&quot;</span>
-        .<span class="ident">parse</span>()
-        .<span class="ident">unwrap</span>();
+    <span class="kw">let </span>market_url = mock_server.uri().parse().unwrap();
+    <span class="kw">let </span>whitelisted_tokens = DEFAULT_TOKENS.clone();
+    <span class="kw">let </span>disabled_video = <span class="bool-val">false</span>;
+    <span class="kw">let </span>publisher_addr = <span class="string">&quot;0x0000000000000000626f62627973686d75726461&quot;
+        </span>.parse()
+        .unwrap();
 
-    <span class="kw">let</span> <span class="ident">options</span> <span class="op">=</span> <span class="ident">Options</span> {
-        <span class="ident">market_url</span>,
-        <span class="ident">market_slot</span>: <span class="ident">DUMMY_IPFS</span>[<span class="number">0</span>],
-        <span class="ident">publisher_addr</span>,
-        <span class="comment">// All passed tokens must be of the same price and decimals, so that the amounts can be accurately compared</span>
-        <span class="ident">whitelisted_tokens</span>,
-        <span class="ident">size</span>: <span class="prelude-val">Some</span>(<span class="ident">Size::new</span>(<span class="number">300</span>, <span class="number">100</span>)),
-        <span class="comment">// TODO: Check this value</span>
-        <span class="ident">navigator_language</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;bg&quot;</span>.<span class="ident">into</span>()),
-        <span class="doccomment">/// Defaulted</span>
-        <span class="ident">disabled_video</span>,
-        <span class="ident">disabled_sticky</span>: <span class="bool-val">false</span>,
+    <span class="kw">let </span>options = Options {
+        market_url,
+        market_slot: DUMMY_IPFS[<span class="number">0</span>],
+        publisher_addr,
+        <span class="comment">// All passed tokens must be of the same price and decimals, so that the amounts can be accurately compared
+        </span>whitelisted_tokens,
+        size: <span class="prelude-val">Some</span>(Size::new(<span class="number">300</span>, <span class="number">100</span>)),
+        <span class="comment">// TODO: Check this value
+        </span>navigator_language: <span class="prelude-val">Some</span>(<span class="string">&quot;bg&quot;</span>.into()),
+        <span class="doccomment">/// Defaulted
+        </span>disabled_video,
+        disabled_sticky: <span class="bool-val">false</span>,
     };
 
-    <span class="kw">let</span> <span class="ident">manager</span> <span class="op">=</span>
-        <span class="ident">Manager::new</span>(<span class="ident">options</span>.<span class="ident">clone</span>(), <span class="ident">Default::default</span>()).<span class="ident">expect</span>(<span class="string">&quot;Failed to create AdView Manager&quot;</span>);
-    <span class="kw">let</span> <span class="ident">pub_prefix</span> <span class="op">=</span> <span class="ident">publisher_addr</span>.<span class="ident">to_hex</span>();
+    <span class="kw">let </span>manager =
+        Manager::new(options.clone(), Default::default()).expect(<span class="string">&quot;Failed to create AdView Manager&quot;</span>);
+    <span class="kw">let </span>pub_prefix = publisher_addr.to_hex();
 
-    <span class="kw">let</span> <span class="ident">units_for_slot_resp</span> <span class="op">=</span> <span class="ident">units_for_slot::response::Response</span> {
-        <span class="ident">targeting_input_base</span>: <span class="ident">Input</span> {
-            <span class="ident">ad_view</span>: <span class="prelude-val">None</span>,
-            <span class="ident">global</span>: <span class="ident">Global</span> {
-                <span class="ident">ad_slot_id</span>: <span class="ident">options</span>.<span class="ident">market_slot</span>,
-                <span class="ident">ad_slot_type</span>: <span class="string">&quot;&quot;</span>.<span class="ident">into</span>(),
-                <span class="ident">publisher_id</span>: <span class="ident">publisher_addr</span>,
-                <span class="ident">country</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;Bulgaria&quot;</span>.<span class="ident">into</span>()),
-                <span class="ident">event_type</span>: <span class="ident">IMPRESSION</span>,
-                <span class="ident">seconds_since_epoch</span>: <span class="ident">Utc::now</span>(),
-                <span class="ident">user_agent_os</span>: <span class="prelude-val">None</span>,
-                <span class="ident">user_agent_browser_family</span>: <span class="prelude-val">None</span>,
+    <span class="kw">let </span>units_for_slot_resp = units_for_slot::response::Response {
+        targeting_input_base: Input {
+            ad_view: <span class="prelude-val">None</span>,
+            global: Global {
+                ad_slot_id: options.market_slot,
+                ad_slot_type: <span class="string">&quot;&quot;</span>.into(),
+                publisher_id: publisher_addr,
+                country: <span class="prelude-val">Some</span>(<span class="string">&quot;Bulgaria&quot;</span>.into()),
+                event_type: IMPRESSION,
+                seconds_since_epoch: Utc::now(),
+                user_agent_os: <span class="prelude-val">None</span>,
+                user_agent_browser_family: <span class="prelude-val">None</span>,
             },
-            <span class="ident">campaign</span>: <span class="prelude-val">None</span>,
-            <span class="ident">balances</span>: <span class="prelude-val">None</span>,
-            <span class="ident">ad_unit_id</span>: <span class="prelude-val">None</span>,
-            <span class="ident">ad_slot</span>: <span class="prelude-val">None</span>,
+            campaign: <span class="prelude-val">None</span>,
+            balances: <span class="prelude-val">None</span>,
+            ad_unit_id: <span class="prelude-val">None</span>,
+            ad_slot: <span class="prelude-val">None</span>,
         },
-        <span class="ident">accepted_referrers</span>: <span class="macro">vec!</span>[],
-        <span class="ident">fallback_unit</span>: <span class="prelude-val">None</span>,
-        <span class="ident">campaigns</span>: <span class="macro">vec!</span>[],
+        accepted_referrers: <span class="macro">vec!</span>[],
+        fallback_unit: <span class="prelude-val">None</span>,
+        campaigns: <span class="macro">vec!</span>[],
     };
 
-    <span class="comment">// Mock the `get_market_demand_resp` call</span>
-    <span class="kw">let</span> <span class="ident">mock_call</span> <span class="op">=</span> <span class="ident">Mock::given</span>(<span class="ident">method</span>(<span class="string">&quot;GET&quot;</span>))
-        <span class="comment">// &amp;depositAsset={}&amp;depositAsset={}</span>
-        .<span class="ident">and</span>(<span class="ident">path</span>(<span class="macro">format!</span>(<span class="string">&quot;units-for-slot/{}&quot;</span>, <span class="ident">options</span>.<span class="ident">market_slot</span>)))
-        <span class="comment">// pubPrefix=HEX&amp;depositAsset=0xASSET1&amp;depositAsset=0xASSET2</span>
-        .<span class="ident">and</span>(<span class="ident">query_param</span>(<span class="string">&quot;pubPrefix&quot;</span>, <span class="ident">pub_prefix</span>))
-        .<span class="ident">and</span>(<span class="ident">query_param</span>(
+    <span class="comment">// Mock the `get_market_demand_resp` call
+    </span><span class="kw">let </span>mock_call = Mock::given(method(<span class="string">&quot;GET&quot;</span>))
+        <span class="comment">// &amp;depositAsset={}&amp;depositAsset={}
+        </span>.and(path(<span class="macro">format!</span>(<span class="string">&quot;units-for-slot/{}&quot;</span>, options.market_slot)))
+        <span class="comment">// pubPrefix=HEX&amp;depositAsset=0xASSET1&amp;depositAsset=0xASSET2
+        </span>.and(query_param(<span class="string">&quot;pubPrefix&quot;</span>, pub_prefix))
+        .and(query_param(
             <span class="string">&quot;depositAsset&quot;</span>,
             <span class="string">&quot;0x6B175474E89094C44Da98b954EedeAC495271d0F&quot;</span>,
         ))
-        <span class="comment">// .and(query_param(&quot;depositAsset[]&quot;, &quot;0x6B175474E89094C44Da98b954EedeAC495271d03&quot;))</span>
-        .<span class="ident">respond_with</span>(<span class="ident">ResponseTemplate::new</span>(<span class="number">200</span>).<span class="ident">set_body_json</span>(<span class="ident">units_for_slot_resp</span>))
-        .<span class="ident">expect</span>(<span class="number">1</span>)
-        .<span class="ident">named</span>(<span class="string">&quot;get_market_demand_resp&quot;</span>);
+        <span class="comment">// .and(query_param(&quot;depositAsset[]&quot;, &quot;0x6B175474E89094C44Da98b954EedeAC495271d03&quot;))
+        </span>.respond_with(ResponseTemplate::new(<span class="number">200</span>).set_body_json(units_for_slot_resp))
+        .expect(<span class="number">1</span>)
+        .named(<span class="string">&quot;get_market_demand_resp&quot;</span>);
 
-    <span class="comment">// Mounting the mock on the mock server - it&#39;s now effective!</span>
-    <span class="ident">mock_call</span>.<span class="ident">mount</span>(<span class="kw-2">&amp;</span><span class="ident">mock_server</span>).<span class="kw">await</span>;
+    <span class="comment">// Mounting the mock on the mock server - it&#39;s now effective!
+    </span>mock_call.mount(<span class="kw-2">&amp;</span>mock_server).<span class="kw">await</span>;
 
-    <span class="kw">let</span> <span class="ident">demand_resp</span> <span class="op">=</span> <span class="ident">manager</span>
-        .<span class="ident">get_market_demand_resp</span>()
-        .<span class="kw">await</span>
-        .<span class="ident">expect</span>(<span class="string">&quot;Should return Mocked response&quot;</span>);
+    <span class="kw">let </span>demand_resp = manager
+        .get_market_demand_resp()
+        .<span class="kw">await
+        </span>.expect(<span class="string">&quot;Should return Mocked response&quot;</span>);
 
     <span class="macro">debug!</span>(<span class="string">&quot;Mocked response: {demand_resp:?}&quot;</span>);
 
-    <span class="kw">let</span> <span class="ident">supermarket_ad_unit</span> <span class="op">=</span> <span class="ident">adex_primitives::supermarket::units_for_slot::response::AdUnit</span> {
-        <span class="doccomment">/// Same as `ipfs`</span>
-        <span class="ident">id</span>: <span class="ident">DUMMY_IPFS</span>[<span class="number">1</span>],
-        <span class="ident">media_url</span>: <span class="string">&quot;ipfs://QmcUVX7fvoLMM93uN2bD3wGTH8MXSxeL8hojYfL2Lhp7mR&quot;</span>.<span class="ident">to_string</span>(),
-        <span class="ident">media_mime</span>: <span class="string">&quot;image/jpeg&quot;</span>.<span class="ident">to_string</span>(),
-        <span class="ident">target_url</span>: <span class="string">&quot;https://www.adex.network/?stremio-test-banner-1&quot;</span>.<span class="ident">to_string</span>(),
+    <span class="kw">let </span>supermarket_ad_unit = adex_primitives::supermarket::units_for_slot::response::AdUnit {
+        <span class="doccomment">/// Same as `ipfs`
+        </span>id: DUMMY_IPFS[<span class="number">1</span>],
+        media_url: <span class="string">&quot;ipfs://QmcUVX7fvoLMM93uN2bD3wGTH8MXSxeL8hojYfL2Lhp7mR&quot;</span>.to_string(),
+        media_mime: <span class="string">&quot;image/jpeg&quot;</span>.to_string(),
+        target_url: <span class="string">&quot;https://www.adex.network/?stremio-test-banner-1&quot;</span>.to_string(),
     };
 
-    <span class="kw">let</span> <span class="ident">code</span> <span class="op">=</span> <span class="ident">get_unit_html_with_events</span>(
-        <span class="kw-2">&amp;</span><span class="ident">options</span>,
-        <span class="kw-2">&amp;</span><span class="ident">supermarket_ad_unit</span>,
+    <span class="kw">let </span>code = get_unit_html_with_events(
+        <span class="kw-2">&amp;</span>options,
+        <span class="kw-2">&amp;</span>supermarket_ad_unit,
         <span class="string">&quot;localhost&quot;</span>,
-        <span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">id</span>,
-        <span class="kw-2">&amp;</span><span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">validators</span>,
+        DUMMY_CAMPAIGN.id,
+        <span class="kw-2">&amp;</span>DUMMY_CAMPAIGN.validators,
         <span class="bool-val">false</span>,
     );
 
-    <span class="kw">let</span> <span class="ident">html</span> <span class="op">=</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">context</span> <span class="op">=</span> <span class="ident">Context::new</span>();
-        <span class="ident">context</span>.<span class="ident">insert</span>(<span class="string">&quot;ad_code&quot;</span>, <span class="kw-2">&amp;</span><span class="ident">code</span>);
+    <span class="kw">let </span>html = {
+        <span class="kw">let </span><span class="kw-2">mut </span>context = Context::new();
+        context.insert(<span class="string">&quot;ad_code&quot;</span>, <span class="kw-2">&amp;</span>code);
 
-        <span class="ident">state</span>
-            .<span class="ident">tera</span>
-            .<span class="ident">render</span>(<span class="string">&quot;ad.html&quot;</span>, <span class="kw-2">&amp;</span><span class="ident">context</span>)
-            .<span class="ident">expect</span>(<span class="string">&quot;Should render&quot;</span>)
+        state
+            .tera
+            .render(<span class="string">&quot;ad.html&quot;</span>, <span class="kw-2">&amp;</span>context)
+            .expect(<span class="string">&quot;Should render&quot;</span>)
     };
 
-    <span class="ident">Html</span>(<span class="ident">html</span>)
+    Html(html)
 }
 
-<span class="doccomment">/// `GET /preview/video`</span>
-<span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">get_preview_video</span>(<span class="ident">Extension</span>(<span class="ident">state</span>): <span class="ident">Extension</span><span class="op">&lt;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">State</span><span class="op">&gt;</span><span class="op">&gt;</span>) -&gt; <span class="ident">Html</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">whitelisted_tokens</span> <span class="op">=</span> <span class="ident">DEFAULT_TOKENS</span>.<span class="ident">clone</span>();
-    <span class="kw">let</span> <span class="ident">disabled_video</span> <span class="op">=</span> <span class="bool-val">false</span>;
-    <span class="kw">let</span> <span class="ident">publisher_addr</span> <span class="op">=</span> <span class="string">&quot;0x0000000000000000626f62627973686d75726461&quot;</span>
-        .<span class="ident">parse</span>()
-        .<span class="ident">unwrap</span>();
+<span class="doccomment">/// `GET /preview/video`
+</span><span class="kw">pub async fn </span>get_preview_video(Extension(state): Extension&lt;Arc&lt;State&gt;&gt;) -&gt; Html&lt;String&gt; {
+    <span class="kw">let </span>whitelisted_tokens = DEFAULT_TOKENS.clone();
+    <span class="kw">let </span>disabled_video = <span class="bool-val">false</span>;
+    <span class="kw">let </span>publisher_addr = <span class="string">&quot;0x0000000000000000626f62627973686d75726461&quot;
+        </span>.parse()
+        .unwrap();
 
-    <span class="kw">let</span> <span class="ident">options</span> <span class="op">=</span> <span class="ident">Options</span> {
-        <span class="ident">market_url</span>: <span class="string">&quot;http://placeholder.com&quot;</span>.<span class="ident">parse</span>().<span class="ident">unwrap</span>(),
-        <span class="ident">market_slot</span>: <span class="ident">DUMMY_IPFS</span>[<span class="number">0</span>],
-        <span class="ident">publisher_addr</span>,
-        <span class="comment">// All passed tokens must be of the same price and decimals, so that the amounts can be accurately compared</span>
-        <span class="ident">whitelisted_tokens</span>,
-        <span class="ident">size</span>: <span class="prelude-val">Some</span>(<span class="ident">Size::new</span>(<span class="number">728</span>, <span class="number">90</span>)),
-        <span class="comment">// TODO: Check this value</span>
-        <span class="ident">navigator_language</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;bg&quot;</span>.<span class="ident">into</span>()),
-        <span class="doccomment">/// Defaulted</span>
-        <span class="ident">disabled_video</span>,
-        <span class="ident">disabled_sticky</span>: <span class="bool-val">false</span>,
+    <span class="kw">let </span>options = Options {
+        market_url: <span class="string">&quot;http://placeholder.com&quot;</span>.parse().unwrap(),
+        market_slot: DUMMY_IPFS[<span class="number">0</span>],
+        publisher_addr,
+        <span class="comment">// All passed tokens must be of the same price and decimals, so that the amounts can be accurately compared
+        </span>whitelisted_tokens,
+        size: <span class="prelude-val">Some</span>(Size::new(<span class="number">728</span>, <span class="number">90</span>)),
+        <span class="comment">// TODO: Check this value
+        </span>navigator_language: <span class="prelude-val">Some</span>(<span class="string">&quot;bg&quot;</span>.into()),
+        <span class="doccomment">/// Defaulted
+        </span>disabled_video,
+        disabled_sticky: <span class="bool-val">false</span>,
     };
 
-    <span class="comment">// legacy_728x90</span>
-    <span class="kw">let</span> <span class="ident">video_ad_unit</span> <span class="op">=</span> <span class="ident">adex_primitives::supermarket::units_for_slot::response::AdUnit</span> {
-        <span class="doccomment">/// Same as `ipfs`</span>
-        <span class="ident">id</span>: <span class="string">&quot;QmShJ6tsJ7LHLiYGX4EAmPyCPWJuCnvm6AKjweQPnw9qfh&quot;</span>
-            .<span class="ident">parse</span>()
-            .<span class="ident">expect</span>(<span class="string">&quot;Valid IPFS&quot;</span>),
-        <span class="ident">media_url</span>: <span class="string">&quot;ipfs://Qmevmms1AZgYXS27A9ghSjHn4DSaHMfgYcD2SoGW14RYGy&quot;</span>.<span class="ident">to_string</span>(),
-        <span class="ident">media_mime</span>: <span class="string">&quot;video/mp4&quot;</span>.<span class="ident">to_string</span>(),
-        <span class="ident">target_url</span>: <span class="string">&quot;https://www.stremio.com/downloads&quot;</span>.<span class="ident">to_string</span>(),
+    <span class="comment">// legacy_728x90
+    </span><span class="kw">let </span>video_ad_unit = adex_primitives::supermarket::units_for_slot::response::AdUnit {
+        <span class="doccomment">/// Same as `ipfs`
+        </span>id: <span class="string">&quot;QmShJ6tsJ7LHLiYGX4EAmPyCPWJuCnvm6AKjweQPnw9qfh&quot;
+            </span>.parse()
+            .expect(<span class="string">&quot;Valid IPFS&quot;</span>),
+        media_url: <span class="string">&quot;ipfs://Qmevmms1AZgYXS27A9ghSjHn4DSaHMfgYcD2SoGW14RYGy&quot;</span>.to_string(),
+        media_mime: <span class="string">&quot;video/mp4&quot;</span>.to_string(),
+        target_url: <span class="string">&quot;https://www.stremio.com/downloads&quot;</span>.to_string(),
     };
 
-    <span class="kw">let</span> <span class="ident">video_html</span> <span class="op">=</span> <span class="ident">get_unit_html_with_events</span>(
-        <span class="kw-2">&amp;</span><span class="ident">options</span>,
-        <span class="kw-2">&amp;</span><span class="ident">video_ad_unit</span>,
+    <span class="kw">let </span>video_html = get_unit_html_with_events(
+        <span class="kw-2">&amp;</span>options,
+        <span class="kw-2">&amp;</span>video_ad_unit,
         <span class="string">&quot;localhost&quot;</span>,
-        <span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">id</span>,
-        <span class="kw-2">&amp;</span><span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">validators</span>,
+        DUMMY_CAMPAIGN.id,
+        <span class="kw-2">&amp;</span>DUMMY_CAMPAIGN.validators,
         <span class="bool-val">false</span>,
     );
 
-    <span class="comment">// let video_html = get_unit_html_with_events(&amp;options, );</span>
-    <span class="kw">let</span> <span class="ident">html</span> <span class="op">=</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">context</span> <span class="op">=</span> <span class="ident">Context::new</span>();
-        <span class="ident">context</span>.<span class="ident">insert</span>(<span class="string">&quot;ad_code&quot;</span>, <span class="kw-2">&amp;</span><span class="ident">video_html</span>);
+    <span class="comment">// let video_html = get_unit_html_with_events(&amp;options, );
+    </span><span class="kw">let </span>html = {
+        <span class="kw">let </span><span class="kw-2">mut </span>context = Context::new();
+        context.insert(<span class="string">&quot;ad_code&quot;</span>, <span class="kw-2">&amp;</span>video_html);
 
-        <span class="ident">state</span>
-            .<span class="ident">tera</span>
-            .<span class="ident">render</span>(<span class="string">&quot;ad.html&quot;</span>, <span class="kw-2">&amp;</span><span class="ident">context</span>)
-            .<span class="ident">expect</span>(<span class="string">&quot;Should render&quot;</span>)
+        state
+            .tera
+            .render(<span class="string">&quot;ad.html&quot;</span>, <span class="kw-2">&amp;</span>context)
+            .expect(<span class="string">&quot;Should render&quot;</span>)
     };
 
-    <span class="ident">Html</span>(<span class="ident">html</span>)
+    Html(html)
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="adview_serve" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (20ffea693 2022-08-11)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="adview_serve" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>

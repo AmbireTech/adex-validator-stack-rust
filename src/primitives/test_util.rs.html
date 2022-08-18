@@ -500,507 +500,507 @@
 <span id="500">500</span>
 <span id="501">501</span>
 <span id="502">502</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">std</span>::{<span class="ident">collections::HashMap</span>, <span class="ident">ops::Deref</span>};
+</pre><pre class="rust"><code><span class="kw">use </span>std::{collections::HashMap, ops::Deref};
 
-<span class="kw">use</span> <span class="ident">chrono</span>::{<span class="ident">TimeZone</span>, <span class="ident">Utc</span>};
-<span class="kw">use</span> <span class="ident">once_cell::sync::Lazy</span>;
+<span class="kw">use </span>chrono::{TimeZone, Utc};
+<span class="kw">use </span>once_cell::sync::Lazy;
 
-<span class="kw">use</span> <span class="kw">crate</span>::{
-    <span class="ident">campaign</span>::{<span class="ident">Active</span>, <span class="ident">Pricing</span>, <span class="ident">Validators</span>},
-    <span class="ident">channel::Nonce</span>,
-    <span class="ident">config::GANACHE_CONFIG</span>,
-    <span class="ident">sentry</span>::{<span class="ident">CLICK</span>, <span class="ident">IMPRESSION</span>},
-    <span class="ident">targeting::Rules</span>,
-    <span class="ident">unified_num::FromWhole</span>,
-    <span class="ident">AdUnit</span>, <span class="ident">Address</span>, <span class="ident">Campaign</span>, <span class="ident">ChainOf</span>, <span class="ident">Channel</span>, <span class="ident">EventSubmission</span>, <span class="ident">UnifiedNum</span>, <span class="ident">ValidatorDesc</span>,
-    <span class="ident">ValidatorId</span>, <span class="ident">IPFS</span>,
+<span class="kw">use crate</span>::{
+    campaign::{Active, Pricing, Validators},
+    channel::Nonce,
+    config::GANACHE_CONFIG,
+    sentry::{CLICK, IMPRESSION},
+    targeting::Rules,
+    unified_num::FromWhole,
+    AdUnit, Address, Campaign, ChainOf, Channel, EventSubmission, UnifiedNum, ValidatorDesc,
+    ValidatorId, IPFS,
 };
 
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">logger::discard_logger</span>;
+<span class="kw">pub use </span>logger::discard_logger;
 
-<span class="doccomment">/// [`ValidatorId`]s used for testing.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// They are the same as the ones in Ganache and we know their keystore passphrases.</span>
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">IDS</span>: <span class="ident">Lazy</span><span class="op">&lt;</span><span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">Address</span>, <span class="ident">ValidatorId</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Lazy::new</span>(<span class="op">|</span><span class="op">|</span> {
+<span class="doccomment">/// [`ValidatorId`]s used for testing.
+///
+/// They are the same as the ones in Ganache and we know their keystore passphrases.
+</span><span class="kw">pub static </span>IDS: Lazy&lt;HashMap&lt;Address, ValidatorId&gt;&gt; = Lazy::new(|| {
     <span class="macro">vec!</span>[
-        (<span class="kw-2">*</span><span class="ident">LEADER</span>, <span class="ident">LEADER</span>.<span class="ident">deref</span>().<span class="ident">into</span>()),
-        (<span class="kw-2">*</span><span class="ident">FOLLOWER</span>, <span class="ident">FOLLOWER</span>.<span class="ident">deref</span>().<span class="ident">into</span>()),
-        (<span class="kw-2">*</span><span class="ident">GUARDIAN</span>, <span class="ident">GUARDIAN</span>.<span class="ident">deref</span>().<span class="ident">into</span>()),
-        (<span class="kw-2">*</span><span class="ident">CREATOR</span>, <span class="ident">CREATOR</span>.<span class="ident">deref</span>().<span class="ident">into</span>()),
-        (<span class="kw-2">*</span><span class="ident">ADVERTISER</span>, <span class="ident">ADVERTISER</span>.<span class="ident">deref</span>().<span class="ident">into</span>()),
-        (<span class="kw-2">*</span><span class="ident">PUBLISHER</span>, <span class="ident">PUBLISHER</span>.<span class="ident">deref</span>().<span class="ident">into</span>()),
-        (<span class="kw-2">*</span><span class="ident">GUARDIAN_2</span>, <span class="ident">GUARDIAN_2</span>.<span class="ident">deref</span>().<span class="ident">into</span>()),
-        (<span class="kw-2">*</span><span class="ident">PUBLISHER_2</span>, <span class="ident">PUBLISHER_2</span>.<span class="ident">deref</span>().<span class="ident">into</span>()),
-        (<span class="kw-2">*</span><span class="ident">ADVERTISER_2</span>, <span class="ident">ADVERTISER_2</span>.<span class="ident">deref</span>().<span class="ident">into</span>()),
-        (<span class="kw-2">*</span><span class="ident">LEADER_2</span>, <span class="ident">LEADER_2</span>.<span class="ident">deref</span>().<span class="ident">into</span>()),
+        (<span class="kw-2">*</span>LEADER, LEADER.deref().into()),
+        (<span class="kw-2">*</span>FOLLOWER, FOLLOWER.deref().into()),
+        (<span class="kw-2">*</span>GUARDIAN, GUARDIAN.deref().into()),
+        (<span class="kw-2">*</span>CREATOR, CREATOR.deref().into()),
+        (<span class="kw-2">*</span>ADVERTISER, ADVERTISER.deref().into()),
+        (<span class="kw-2">*</span>PUBLISHER, PUBLISHER.deref().into()),
+        (<span class="kw-2">*</span>GUARDIAN_2, GUARDIAN_2.deref().into()),
+        (<span class="kw-2">*</span>PUBLISHER_2, PUBLISHER_2.deref().into()),
+        (<span class="kw-2">*</span>ADVERTISER_2, ADVERTISER_2.deref().into()),
+        (<span class="kw-2">*</span>LEADER_2, LEADER_2.deref().into()),
     ]
-    .<span class="ident">into_iter</span>()
-    .<span class="ident">collect</span>()
+    .into_iter()
+    .collect()
 });
 
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">LEADER</span>: <span class="ident">Lazy</span><span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Lazy::new</span>(<span class="op">|</span><span class="op">|</span> <span class="kw-2">*</span><span class="ident">ADDRESS_0</span>);
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">FOLLOWER</span>: <span class="ident">Lazy</span><span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Lazy::new</span>(<span class="op">|</span><span class="op">|</span> <span class="kw-2">*</span><span class="ident">ADDRESS_1</span>);
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">GUARDIAN</span>: <span class="ident">Lazy</span><span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Lazy::new</span>(<span class="op">|</span><span class="op">|</span> <span class="kw-2">*</span><span class="ident">ADDRESS_2</span>);
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">CREATOR</span>: <span class="ident">Lazy</span><span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Lazy::new</span>(<span class="op">|</span><span class="op">|</span> <span class="kw-2">*</span><span class="ident">ADDRESS_3</span>);
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">ADVERTISER</span>: <span class="ident">Lazy</span><span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Lazy::new</span>(<span class="op">|</span><span class="op">|</span> <span class="kw-2">*</span><span class="ident">ADDRESS_4</span>);
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">PUBLISHER</span>: <span class="ident">Lazy</span><span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Lazy::new</span>(<span class="op">|</span><span class="op">|</span> <span class="kw-2">*</span><span class="ident">ADDRESS_5</span>);
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">GUARDIAN_2</span>: <span class="ident">Lazy</span><span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Lazy::new</span>(<span class="op">|</span><span class="op">|</span> <span class="kw-2">*</span><span class="ident">ADDRESS_6</span>);
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">PUBLISHER_2</span>: <span class="ident">Lazy</span><span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Lazy::new</span>(<span class="op">|</span><span class="op">|</span> <span class="kw-2">*</span><span class="ident">ADDRESS_7</span>);
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">ADVERTISER_2</span>: <span class="ident">Lazy</span><span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Lazy::new</span>(<span class="op">|</span><span class="op">|</span> <span class="kw-2">*</span><span class="ident">ADDRESS_8</span>);
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">LEADER_2</span>: <span class="ident">Lazy</span><span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Lazy::new</span>(<span class="op">|</span><span class="op">|</span> <span class="kw-2">*</span><span class="ident">ADDRESS_9</span>);
+<span class="kw">pub static </span>LEADER: Lazy&lt;Address&gt; = Lazy::new(|| <span class="kw-2">*</span>ADDRESS_0);
+<span class="kw">pub static </span>FOLLOWER: Lazy&lt;Address&gt; = Lazy::new(|| <span class="kw-2">*</span>ADDRESS_1);
+<span class="kw">pub static </span>GUARDIAN: Lazy&lt;Address&gt; = Lazy::new(|| <span class="kw-2">*</span>ADDRESS_2);
+<span class="kw">pub static </span>CREATOR: Lazy&lt;Address&gt; = Lazy::new(|| <span class="kw-2">*</span>ADDRESS_3);
+<span class="kw">pub static </span>ADVERTISER: Lazy&lt;Address&gt; = Lazy::new(|| <span class="kw-2">*</span>ADDRESS_4);
+<span class="kw">pub static </span>PUBLISHER: Lazy&lt;Address&gt; = Lazy::new(|| <span class="kw-2">*</span>ADDRESS_5);
+<span class="kw">pub static </span>GUARDIAN_2: Lazy&lt;Address&gt; = Lazy::new(|| <span class="kw-2">*</span>ADDRESS_6);
+<span class="kw">pub static </span>PUBLISHER_2: Lazy&lt;Address&gt; = Lazy::new(|| <span class="kw-2">*</span>ADDRESS_7);
+<span class="kw">pub static </span>ADVERTISER_2: Lazy&lt;Address&gt; = Lazy::new(|| <span class="kw-2">*</span>ADDRESS_8);
+<span class="kw">pub static </span>LEADER_2: Lazy&lt;Address&gt; = Lazy::new(|| <span class="kw-2">*</span>ADDRESS_9);
 
-<span class="doccomment">/// passphrase: ganache0</span>
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">ADDRESS_0</span>: <span class="ident">Lazy</span><span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Lazy::new</span>(<span class="op">|</span><span class="op">|</span> {
-    <span class="string">b&quot;0x80690751969B234697e9059e04ed72195c3507fa&quot;</span>
-        .<span class="ident">try_into</span>()
-        .<span class="ident">unwrap</span>()
+<span class="doccomment">/// passphrase: ganache0
+</span><span class="kw">pub static </span>ADDRESS_0: Lazy&lt;Address&gt; = Lazy::new(|| {
+    <span class="string">b&quot;0x80690751969B234697e9059e04ed72195c3507fa&quot;
+        </span>.try_into()
+        .unwrap()
 });
 
-<span class="doccomment">/// passphrase: ganache1</span>
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">ADDRESS_1</span>: <span class="ident">Lazy</span><span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Lazy::new</span>(<span class="op">|</span><span class="op">|</span> {
-    <span class="string">b&quot;0xf3f583AEC5f7C030722Fe992A5688557e1B86ef7&quot;</span>
-        .<span class="ident">try_into</span>()
-        .<span class="ident">unwrap</span>()
+<span class="doccomment">/// passphrase: ganache1
+</span><span class="kw">pub static </span>ADDRESS_1: Lazy&lt;Address&gt; = Lazy::new(|| {
+    <span class="string">b&quot;0xf3f583AEC5f7C030722Fe992A5688557e1B86ef7&quot;
+        </span>.try_into()
+        .unwrap()
 });
 
-<span class="doccomment">/// passphrase: ganache2</span>
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">ADDRESS_2</span>: <span class="ident">Lazy</span><span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Lazy::new</span>(<span class="op">|</span><span class="op">|</span> {
-    <span class="string">b&quot;0xe061E1EB461EaBE512759aa18A201B20Fe90631D&quot;</span>
-        .<span class="ident">try_into</span>()
-        .<span class="ident">unwrap</span>()
+<span class="doccomment">/// passphrase: ganache2
+</span><span class="kw">pub static </span>ADDRESS_2: Lazy&lt;Address&gt; = Lazy::new(|| {
+    <span class="string">b&quot;0xe061E1EB461EaBE512759aa18A201B20Fe90631D&quot;
+        </span>.try_into()
+        .unwrap()
 });
 
-<span class="doccomment">/// passphrase: ganache3</span>
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">ADDRESS_3</span>: <span class="ident">Lazy</span><span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Lazy::new</span>(<span class="op">|</span><span class="op">|</span> {
-    <span class="string">b&quot;0xaCBaDA2d5830d1875ae3D2de207A1363B316Df2F&quot;</span>
-        .<span class="ident">try_into</span>()
-        .<span class="ident">unwrap</span>()
+<span class="doccomment">/// passphrase: ganache3
+</span><span class="kw">pub static </span>ADDRESS_3: Lazy&lt;Address&gt; = Lazy::new(|| {
+    <span class="string">b&quot;0xaCBaDA2d5830d1875ae3D2de207A1363B316Df2F&quot;
+        </span>.try_into()
+        .unwrap()
 });
 
-<span class="doccomment">/// passphrase: ganache4</span>
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">ADDRESS_4</span>: <span class="ident">Lazy</span><span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Lazy::new</span>(<span class="op">|</span><span class="op">|</span> {
-    <span class="string">b&quot;0xDd589B43793934EF6Ad266067A0d1D4896b0dff0&quot;</span>
-        .<span class="ident">try_into</span>()
-        .<span class="ident">unwrap</span>()
+<span class="doccomment">/// passphrase: ganache4
+</span><span class="kw">pub static </span>ADDRESS_4: Lazy&lt;Address&gt; = Lazy::new(|| {
+    <span class="string">b&quot;0xDd589B43793934EF6Ad266067A0d1D4896b0dff0&quot;
+        </span>.try_into()
+        .unwrap()
 });
 
-<span class="doccomment">/// passphrase: ganache5</span>
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">ADDRESS_5</span>: <span class="ident">Lazy</span><span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Lazy::new</span>(<span class="op">|</span><span class="op">|</span> {
-    <span class="string">b&quot;0xE882ebF439207a70dDcCb39E13CA8506c9F45fD9&quot;</span>
-        .<span class="ident">try_into</span>()
-        .<span class="ident">unwrap</span>()
+<span class="doccomment">/// passphrase: ganache5
+</span><span class="kw">pub static </span>ADDRESS_5: Lazy&lt;Address&gt; = Lazy::new(|| {
+    <span class="string">b&quot;0xE882ebF439207a70dDcCb39E13CA8506c9F45fD9&quot;
+        </span>.try_into()
+        .unwrap()
 });
 
-<span class="doccomment">/// passphrase: ganache6</span>
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">ADDRESS_6</span>: <span class="ident">Lazy</span><span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Lazy::new</span>(<span class="op">|</span><span class="op">|</span> {
-    <span class="string">b&quot;0x79D358a3194d737880B3eFD94ADccD246af9F535&quot;</span>
-        .<span class="ident">try_into</span>()
-        .<span class="ident">unwrap</span>()
+<span class="doccomment">/// passphrase: ganache6
+</span><span class="kw">pub static </span>ADDRESS_6: Lazy&lt;Address&gt; = Lazy::new(|| {
+    <span class="string">b&quot;0x79D358a3194d737880B3eFD94ADccD246af9F535&quot;
+        </span>.try_into()
+        .unwrap()
 });
 
-<span class="doccomment">/// passphrase: ganache7</span>
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">ADDRESS_7</span>: <span class="ident">Lazy</span><span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Lazy::new</span>(<span class="op">|</span><span class="op">|</span> {
-    <span class="string">b&quot;0x0e880972A4b216906F05D67EeaaF55d16B5EE4F1&quot;</span>
-        .<span class="ident">try_into</span>()
-        .<span class="ident">unwrap</span>()
+<span class="doccomment">/// passphrase: ganache7
+</span><span class="kw">pub static </span>ADDRESS_7: Lazy&lt;Address&gt; = Lazy::new(|| {
+    <span class="string">b&quot;0x0e880972A4b216906F05D67EeaaF55d16B5EE4F1&quot;
+        </span>.try_into()
+        .unwrap()
 });
 
-<span class="doccomment">/// passphrase: ganache8</span>
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">ADDRESS_8</span>: <span class="ident">Lazy</span><span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Lazy::new</span>(<span class="op">|</span><span class="op">|</span> {
-    <span class="string">b&quot;0x541b401362Ea1D489D322579552B099e801F3632&quot;</span>
-        .<span class="ident">try_into</span>()
-        .<span class="ident">unwrap</span>()
+<span class="doccomment">/// passphrase: ganache8
+</span><span class="kw">pub static </span>ADDRESS_8: Lazy&lt;Address&gt; = Lazy::new(|| {
+    <span class="string">b&quot;0x541b401362Ea1D489D322579552B099e801F3632&quot;
+        </span>.try_into()
+        .unwrap()
 });
 
-<span class="doccomment">/// passphrase: ganache9</span>
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">ADDRESS_9</span>: <span class="ident">Lazy</span><span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Lazy::new</span>(<span class="op">|</span><span class="op">|</span> {
-    <span class="string">b&quot;0x6B83e7D6B72c098d48968441e0d05658dc17Adb9&quot;</span>
-        .<span class="ident">try_into</span>()
-        .<span class="ident">unwrap</span>()
+<span class="doccomment">/// passphrase: ganache9
+</span><span class="kw">pub static </span>ADDRESS_9: Lazy&lt;Address&gt; = Lazy::new(|| {
+    <span class="string">b&quot;0x6B83e7D6B72c098d48968441e0d05658dc17Adb9&quot;
+        </span>.try_into()
+        .unwrap()
 });
 
-<span class="comment">// Dummy adapter auth tokens</span>
-<span class="comment">// authorization tokens</span>
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">DUMMY_AUTH</span>: <span class="ident">Lazy</span><span class="op">&lt;</span><span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">Address</span>, <span class="ident">String</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Lazy::new</span>(<span class="op">|</span><span class="op">|</span> {
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">auth</span> <span class="op">=</span> <span class="ident">HashMap::new</span>();
+<span class="comment">// Dummy adapter auth tokens
+// authorization tokens
+</span><span class="kw">pub static </span>DUMMY_AUTH: Lazy&lt;HashMap&lt;Address, String&gt;&gt; = Lazy::new(|| {
+    <span class="kw">let </span><span class="kw-2">mut </span>auth = HashMap::new();
 
-    <span class="ident">auth</span>.<span class="ident">insert</span>(<span class="kw-2">*</span><span class="ident">LEADER</span>, <span class="string">&quot;AUTH_awesomeLeader&quot;</span>.<span class="ident">into</span>());
-    <span class="ident">auth</span>.<span class="ident">insert</span>(<span class="kw-2">*</span><span class="ident">FOLLOWER</span>, <span class="string">&quot;AUTH_awesomeFollower&quot;</span>.<span class="ident">into</span>());
-    <span class="ident">auth</span>.<span class="ident">insert</span>(<span class="kw-2">*</span><span class="ident">GUARDIAN</span>, <span class="string">&quot;AUTH_awesomeGuardian&quot;</span>.<span class="ident">into</span>());
-    <span class="ident">auth</span>.<span class="ident">insert</span>(<span class="kw-2">*</span><span class="ident">CREATOR</span>, <span class="string">&quot;AUTH_awesomeCreator&quot;</span>.<span class="ident">into</span>());
-    <span class="ident">auth</span>.<span class="ident">insert</span>(<span class="kw-2">*</span><span class="ident">ADVERTISER</span>, <span class="string">&quot;AUTH_awesomeAdvertiser&quot;</span>.<span class="ident">into</span>());
-    <span class="ident">auth</span>.<span class="ident">insert</span>(<span class="kw-2">*</span><span class="ident">PUBLISHER</span>, <span class="string">&quot;AUTH_awesomePublisher&quot;</span>.<span class="ident">into</span>());
-    <span class="ident">auth</span>.<span class="ident">insert</span>(<span class="kw-2">*</span><span class="ident">GUARDIAN_2</span>, <span class="string">&quot;AUTH_awesomeGuardian2&quot;</span>.<span class="ident">into</span>());
-    <span class="ident">auth</span>.<span class="ident">insert</span>(<span class="kw-2">*</span><span class="ident">PUBLISHER_2</span>, <span class="string">&quot;AUTH_awesomePublisher2&quot;</span>.<span class="ident">into</span>());
-    <span class="ident">auth</span>.<span class="ident">insert</span>(<span class="kw-2">*</span><span class="ident">ADVERTISER_2</span>, <span class="string">&quot;AUTH_awesomeAdvertiser2&quot;</span>.<span class="ident">into</span>());
-    <span class="ident">auth</span>.<span class="ident">insert</span>(<span class="kw-2">*</span><span class="ident">LEADER_2</span>, <span class="string">&quot;AUTH_awesomeLeader2&quot;</span>.<span class="ident">into</span>());
+    auth.insert(<span class="kw-2">*</span>LEADER, <span class="string">&quot;AUTH_awesomeLeader&quot;</span>.into());
+    auth.insert(<span class="kw-2">*</span>FOLLOWER, <span class="string">&quot;AUTH_awesomeFollower&quot;</span>.into());
+    auth.insert(<span class="kw-2">*</span>GUARDIAN, <span class="string">&quot;AUTH_awesomeGuardian&quot;</span>.into());
+    auth.insert(<span class="kw-2">*</span>CREATOR, <span class="string">&quot;AUTH_awesomeCreator&quot;</span>.into());
+    auth.insert(<span class="kw-2">*</span>ADVERTISER, <span class="string">&quot;AUTH_awesomeAdvertiser&quot;</span>.into());
+    auth.insert(<span class="kw-2">*</span>PUBLISHER, <span class="string">&quot;AUTH_awesomePublisher&quot;</span>.into());
+    auth.insert(<span class="kw-2">*</span>GUARDIAN_2, <span class="string">&quot;AUTH_awesomeGuardian2&quot;</span>.into());
+    auth.insert(<span class="kw-2">*</span>PUBLISHER_2, <span class="string">&quot;AUTH_awesomePublisher2&quot;</span>.into());
+    auth.insert(<span class="kw-2">*</span>ADVERTISER_2, <span class="string">&quot;AUTH_awesomeAdvertiser2&quot;</span>.into());
+    auth.insert(<span class="kw-2">*</span>LEADER_2, <span class="string">&quot;AUTH_awesomeLeader2&quot;</span>.into());
 
-    <span class="ident">auth</span>
+    auth
 });
 
-<span class="kw">mod</span> <span class="ident">logger</span> {
+<span class="kw">mod </span>logger {
 
-    <span class="kw">use</span> <span class="ident">slog</span>::{<span class="ident">o</span>, <span class="ident">Discard</span>, <span class="ident">Drain</span>, <span class="ident">Logger</span>};
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">discard_logger</span>() -&gt; <span class="ident">Logger</span> {
-        <span class="kw">let</span> <span class="ident">drain</span> <span class="op">=</span> <span class="ident">Discard</span>.<span class="ident">fuse</span>();
+    <span class="kw">use </span>slog::{o, Discard, Drain, Logger};
+    <span class="kw">pub fn </span>discard_logger() -&gt; Logger {
+        <span class="kw">let </span>drain = Discard.fuse();
 
-        <span class="ident">Logger::root</span>(<span class="ident">drain</span>, <span class="macro">o!</span>())
+        Logger::root(drain, <span class="macro">o!</span>())
     }
 }
 
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">DUMMY_VALIDATOR_LEADER</span>: <span class="ident">Lazy</span><span class="op">&lt;</span><span class="ident">ValidatorDesc</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Lazy::new</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">ValidatorDesc</span> {
-    <span class="ident">id</span>: <span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="ident">LEADER</span>],
-    <span class="ident">url</span>: <span class="string">&quot;http://localhost:8005&quot;</span>.<span class="ident">to_string</span>(),
-    <span class="ident">fee</span>: <span class="ident">UnifiedNum::from_whole</span>(<span class="number">0.03</span>),
-    <span class="ident">fee_addr</span>: <span class="prelude-val">None</span>,
+<span class="kw">pub static </span>DUMMY_VALIDATOR_LEADER: Lazy&lt;ValidatorDesc&gt; = Lazy::new(|| ValidatorDesc {
+    id: IDS[<span class="kw-2">&amp;</span>LEADER],
+    url: <span class="string">&quot;http://localhost:8005&quot;</span>.to_string(),
+    fee: UnifiedNum::from_whole(<span class="number">0.03</span>),
+    fee_addr: <span class="prelude-val">None</span>,
 });
 
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">DUMMY_VALIDATOR_FOLLOWER</span>: <span class="ident">Lazy</span><span class="op">&lt;</span><span class="ident">ValidatorDesc</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Lazy::new</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">ValidatorDesc</span> {
-    <span class="ident">id</span>: <span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="ident">FOLLOWER</span>],
-    <span class="ident">url</span>: <span class="string">&quot;http://localhost:8006&quot;</span>.<span class="ident">to_string</span>(),
-    <span class="ident">fee</span>: <span class="ident">UnifiedNum::from_whole</span>(<span class="number">0.02</span>),
-    <span class="ident">fee_addr</span>: <span class="prelude-val">None</span>,
+<span class="kw">pub static </span>DUMMY_VALIDATOR_FOLLOWER: Lazy&lt;ValidatorDesc&gt; = Lazy::new(|| ValidatorDesc {
+    id: IDS[<span class="kw-2">&amp;</span>FOLLOWER],
+    url: <span class="string">&quot;http://localhost:8006&quot;</span>.to_string(),
+    fee: UnifiedNum::from_whole(<span class="number">0.02</span>),
+    fee_addr: <span class="prelude-val">None</span>,
 });
 
-<span class="doccomment">/// Dummy Campaign uses Ganache #1337 with the mocked token</span>
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">DUMMY_CAMPAIGN</span>: <span class="ident">Lazy</span><span class="op">&lt;</span><span class="ident">Campaign</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Lazy::new</span>(<span class="op">|</span><span class="op">|</span> {
-    <span class="kw">let</span> <span class="ident">token_info</span> <span class="op">=</span> <span class="ident">GANACHE_CONFIG</span>
-        .<span class="ident">chains</span>
-        .<span class="ident">get</span>(<span class="string">&quot;Ganache #1337&quot;</span>)
-        .<span class="ident">unwrap</span>()
-        .<span class="ident">tokens</span>
-        .<span class="ident">get</span>(<span class="string">&quot;Mocked TOKEN 1337&quot;</span>)
-        .<span class="ident">unwrap</span>();
+<span class="doccomment">/// Dummy Campaign uses Ganache #1337 with the mocked token
+</span><span class="kw">pub static </span>DUMMY_CAMPAIGN: Lazy&lt;Campaign&gt; = Lazy::new(|| {
+    <span class="kw">let </span>token_info = GANACHE_CONFIG
+        .chains
+        .get(<span class="string">&quot;Ganache #1337&quot;</span>)
+        .unwrap()
+        .tokens
+        .get(<span class="string">&quot;Mocked TOKEN 1337&quot;</span>)
+        .unwrap();
 
-    <span class="ident">Campaign</span> {
-        <span class="ident">id</span>: <span class="string">&quot;0x936da01f9abd4d9d80c702af85c822a8&quot;</span>
-            .<span class="ident">parse</span>()
-            .<span class="ident">expect</span>(<span class="string">&quot;Should parse&quot;</span>),
-        <span class="ident">channel</span>: <span class="ident">Channel</span> {
-            <span class="ident">leader</span>: <span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="ident">LEADER</span>],
-            <span class="ident">follower</span>: <span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="ident">FOLLOWER</span>],
-            <span class="ident">guardian</span>: <span class="kw-2">*</span><span class="ident">GUARDIAN</span>,
-            <span class="ident">token</span>: <span class="ident">token_info</span>.<span class="ident">address</span>,
-            <span class="ident">nonce</span>: <span class="ident">Nonce::from</span>(<span class="number">987_654_321_u32</span>),
+    Campaign {
+        id: <span class="string">&quot;0x936da01f9abd4d9d80c702af85c822a8&quot;
+            </span>.parse()
+            .expect(<span class="string">&quot;Should parse&quot;</span>),
+        channel: Channel {
+            leader: IDS[<span class="kw-2">&amp;</span>LEADER],
+            follower: IDS[<span class="kw-2">&amp;</span>FOLLOWER],
+            guardian: <span class="kw-2">*</span>GUARDIAN,
+            token: token_info.address,
+            nonce: Nonce::from(<span class="number">987_654_321_u32</span>),
         },
-        <span class="ident">creator</span>: <span class="kw-2">*</span><span class="ident">CREATOR</span>,
-        <span class="comment">// 1000.00000000</span>
-        <span class="ident">budget</span>: <span class="ident">UnifiedNum::from_whole</span>(<span class="number">1_000</span>),
-        <span class="ident">validators</span>: <span class="ident">Validators::new</span>((
-            <span class="ident">DUMMY_VALIDATOR_LEADER</span>.<span class="ident">clone</span>(),
-            <span class="ident">DUMMY_VALIDATOR_FOLLOWER</span>.<span class="ident">clone</span>(),
+        creator: <span class="kw-2">*</span>CREATOR,
+        <span class="comment">// 1000.00000000
+        </span>budget: UnifiedNum::from_whole(<span class="number">1_000</span>),
+        validators: Validators::new((
+            DUMMY_VALIDATOR_LEADER.clone(),
+            DUMMY_VALIDATOR_FOLLOWER.clone(),
         )),
-        <span class="ident">title</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;Dummy Campaign&quot;</span>.<span class="ident">to_string</span>()),
-        <span class="ident">pricing_bounds</span>: <span class="macro">vec!</span>[
+        title: <span class="prelude-val">Some</span>(<span class="string">&quot;Dummy Campaign&quot;</span>.to_string()),
+        pricing_bounds: <span class="macro">vec!</span>[
             (
-                <span class="ident">IMPRESSION</span>,
-                <span class="ident">Pricing</span> {
-                    <span class="ident">min</span>: <span class="number">1</span>.<span class="ident">into</span>(),
-                    <span class="ident">max</span>: <span class="number">10</span>.<span class="ident">into</span>(),
+                IMPRESSION,
+                Pricing {
+                    min: <span class="number">1</span>.into(),
+                    max: <span class="number">10</span>.into(),
                 },
             ),
             (
-                <span class="ident">CLICK</span>,
-                <span class="ident">Pricing</span> {
-                    <span class="ident">min</span>: <span class="number">0</span>.<span class="ident">into</span>(),
-                    <span class="ident">max</span>: <span class="number">0</span>.<span class="ident">into</span>(),
+                CLICK,
+                Pricing {
+                    min: <span class="number">0</span>.into(),
+                    max: <span class="number">0</span>.into(),
                 },
             ),
         ]
-        .<span class="ident">into_iter</span>()
-        .<span class="ident">collect</span>(),
-        <span class="ident">event_submission</span>: <span class="prelude-val">Some</span>(<span class="ident">EventSubmission</span> { <span class="ident">allow</span>: <span class="macro">vec!</span>[] }),
-        <span class="ident">ad_units</span>: <span class="macro">vec!</span>[],
-        <span class="ident">targeting_rules</span>: <span class="ident">Rules::new</span>(),
-        <span class="ident">created</span>: <span class="ident">Utc</span>.<span class="ident">ymd</span>(<span class="number">2021</span>, <span class="number">2</span>, <span class="number">1</span>).<span class="ident">and_hms</span>(<span class="number">7</span>, <span class="number">0</span>, <span class="number">0</span>),
-        <span class="ident">active</span>: <span class="ident">Active</span> {
-            <span class="ident">to</span>: <span class="ident">Utc</span>.<span class="ident">ymd</span>(<span class="number">2099</span>, <span class="number">1</span>, <span class="number">30</span>).<span class="ident">and_hms</span>(<span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>),
-            <span class="ident">from</span>: <span class="prelude-val">None</span>,
+        .into_iter()
+        .collect(),
+        event_submission: <span class="prelude-val">Some</span>(EventSubmission { allow: <span class="macro">vec!</span>[] }),
+        ad_units: <span class="macro">vec!</span>[],
+        targeting_rules: Rules::new(),
+        created: Utc.ymd(<span class="number">2021</span>, <span class="number">2</span>, <span class="number">1</span>).and_hms(<span class="number">7</span>, <span class="number">0</span>, <span class="number">0</span>),
+        active: Active {
+            to: Utc.ymd(<span class="number">2099</span>, <span class="number">1</span>, <span class="number">30</span>).and_hms(<span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>),
+            from: <span class="prelude-val">None</span>,
         },
     }
 });
 
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">DUMMY_AD_UNITS</span>: <span class="ident">Lazy</span><span class="op">&lt;</span>[<span class="ident">AdUnit</span>; <span class="number">4</span>]<span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Lazy::new</span>(<span class="op">|</span><span class="op">|</span> {
+<span class="kw">pub static </span>DUMMY_AD_UNITS: Lazy&lt;[AdUnit; <span class="number">4</span>]&gt; = Lazy::new(|| {
     [
-        <span class="ident">AdUnit</span> {
-            <span class="ident">ipfs</span>: <span class="ident">IPFS::try_from</span>(<span class="string">&quot;Qmasg8FrbuSQpjFu3kRnZF9beg8rEBFrqgi1uXDRwCbX5f&quot;</span>)
-                .<span class="ident">expect</span>(<span class="string">&quot;should convert&quot;</span>),
-            <span class="ident">media_url</span>: <span class="string">&quot;ipfs://QmcUVX7fvoLMM93uN2bD3wGTH8MXSxeL8hojYfL2Lhp7mR&quot;</span>.<span class="ident">to_string</span>(),
-            <span class="ident">media_mime</span>: <span class="string">&quot;image/jpeg&quot;</span>.<span class="ident">to_string</span>(),
-            <span class="ident">target_url</span>: <span class="string">&quot;https://www.adex.network/?stremio-test-banner-1&quot;</span>.<span class="ident">to_string</span>(),
-            <span class="ident">archived</span>: <span class="bool-val">false</span>,
-            <span class="ident">description</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;Dummy AdUnit description 1&quot;</span>.<span class="ident">to_string</span>()),
-            <span class="ident">ad_type</span>: <span class="string">&quot;legacy_250x250&quot;</span>.<span class="ident">to_string</span>(),
-            <span class="doccomment">/// Timestamp: 1 564 383 600</span>
-            <span class="ident">created</span>: <span class="ident">Utc</span>.<span class="ident">ymd</span>(<span class="number">2019</span>, <span class="number">7</span>, <span class="number">29</span>).<span class="ident">and_hms</span>(<span class="number">9</span>, <span class="number">0</span>, <span class="number">0</span>),
-            <span class="ident">min_targeting_score</span>: <span class="prelude-val">None</span>,
-            <span class="ident">modified</span>: <span class="prelude-val">None</span>,
-            <span class="ident">owner</span>: <span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="ident">PUBLISHER</span>],
-            <span class="ident">title</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;Dummy AdUnit 1&quot;</span>.<span class="ident">to_string</span>()),
+        AdUnit {
+            ipfs: IPFS::try_from(<span class="string">&quot;Qmasg8FrbuSQpjFu3kRnZF9beg8rEBFrqgi1uXDRwCbX5f&quot;</span>)
+                .expect(<span class="string">&quot;should convert&quot;</span>),
+            media_url: <span class="string">&quot;ipfs://QmcUVX7fvoLMM93uN2bD3wGTH8MXSxeL8hojYfL2Lhp7mR&quot;</span>.to_string(),
+            media_mime: <span class="string">&quot;image/jpeg&quot;</span>.to_string(),
+            target_url: <span class="string">&quot;https://www.adex.network/?stremio-test-banner-1&quot;</span>.to_string(),
+            archived: <span class="bool-val">false</span>,
+            description: <span class="prelude-val">Some</span>(<span class="string">&quot;Dummy AdUnit description 1&quot;</span>.to_string()),
+            ad_type: <span class="string">&quot;legacy_250x250&quot;</span>.to_string(),
+            <span class="doccomment">/// Timestamp: 1 564 383 600
+            </span>created: Utc.ymd(<span class="number">2019</span>, <span class="number">7</span>, <span class="number">29</span>).and_hms(<span class="number">9</span>, <span class="number">0</span>, <span class="number">0</span>),
+            min_targeting_score: <span class="prelude-val">None</span>,
+            modified: <span class="prelude-val">None</span>,
+            owner: IDS[<span class="kw-2">&amp;</span>PUBLISHER],
+            title: <span class="prelude-val">Some</span>(<span class="string">&quot;Dummy AdUnit 1&quot;</span>.to_string()),
         },
-        <span class="ident">AdUnit</span> {
-            <span class="ident">ipfs</span>: <span class="ident">IPFS::try_from</span>(<span class="string">&quot;QmVhRDGXoM3Fg3HZD5xwMuxtb9ZErwC8wHt8CjsfxaiUbZ&quot;</span>)
-                .<span class="ident">expect</span>(<span class="string">&quot;should convert&quot;</span>),
-            <span class="ident">media_url</span>: <span class="string">&quot;ipfs://QmQB7uz7Gxfy7wqAnrnBcZFaVJLos8J9gn8mRcHQU6dAi1&quot;</span>.<span class="ident">to_string</span>(),
-            <span class="ident">media_mime</span>: <span class="string">&quot;image/jpeg&quot;</span>.<span class="ident">to_string</span>(),
-            <span class="ident">target_url</span>: <span class="string">&quot;https://www.adex.network/?adex-campaign=true&amp;pub=stremio&quot;</span>.<span class="ident">to_string</span>(),
-            <span class="ident">archived</span>: <span class="bool-val">false</span>,
-            <span class="ident">description</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;Dummy AdUnit description 2&quot;</span>.<span class="ident">to_string</span>()),
-            <span class="ident">ad_type</span>: <span class="string">&quot;legacy_250x250&quot;</span>.<span class="ident">to_string</span>(),
-            <span class="doccomment">/// Timestamp: 1 564 383 600</span>
-            <span class="ident">created</span>: <span class="ident">Utc</span>.<span class="ident">ymd</span>(<span class="number">2019</span>, <span class="number">7</span>, <span class="number">29</span>).<span class="ident">and_hms</span>(<span class="number">9</span>, <span class="number">0</span>, <span class="number">0</span>),
-            <span class="ident">min_targeting_score</span>: <span class="prelude-val">None</span>,
-            <span class="ident">modified</span>: <span class="prelude-val">None</span>,
-            <span class="ident">owner</span>: <span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="ident">PUBLISHER</span>],
-            <span class="ident">title</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;Dummy AdUnit 2&quot;</span>.<span class="ident">to_string</span>()),
+        AdUnit {
+            ipfs: IPFS::try_from(<span class="string">&quot;QmVhRDGXoM3Fg3HZD5xwMuxtb9ZErwC8wHt8CjsfxaiUbZ&quot;</span>)
+                .expect(<span class="string">&quot;should convert&quot;</span>),
+            media_url: <span class="string">&quot;ipfs://QmQB7uz7Gxfy7wqAnrnBcZFaVJLos8J9gn8mRcHQU6dAi1&quot;</span>.to_string(),
+            media_mime: <span class="string">&quot;image/jpeg&quot;</span>.to_string(),
+            target_url: <span class="string">&quot;https://www.adex.network/?adex-campaign=true&amp;pub=stremio&quot;</span>.to_string(),
+            archived: <span class="bool-val">false</span>,
+            description: <span class="prelude-val">Some</span>(<span class="string">&quot;Dummy AdUnit description 2&quot;</span>.to_string()),
+            ad_type: <span class="string">&quot;legacy_250x250&quot;</span>.to_string(),
+            <span class="doccomment">/// Timestamp: 1 564 383 600
+            </span>created: Utc.ymd(<span class="number">2019</span>, <span class="number">7</span>, <span class="number">29</span>).and_hms(<span class="number">9</span>, <span class="number">0</span>, <span class="number">0</span>),
+            min_targeting_score: <span class="prelude-val">None</span>,
+            modified: <span class="prelude-val">None</span>,
+            owner: IDS[<span class="kw-2">&amp;</span>PUBLISHER],
+            title: <span class="prelude-val">Some</span>(<span class="string">&quot;Dummy AdUnit 2&quot;</span>.to_string()),
         },
-        <span class="ident">AdUnit</span> {
-            <span class="ident">ipfs</span>: <span class="ident">IPFS::try_from</span>(<span class="string">&quot;QmYwcpMjmqJfo9ot1jGe9rfXsszFV1WbEA59QS7dEVHfJi&quot;</span>)
-                .<span class="ident">expect</span>(<span class="string">&quot;should convert&quot;</span>),
-            <span class="ident">media_url</span>: <span class="string">&quot;ipfs://QmQB7uz7Gxfy7wqAnrnBcZFaVJLos8J9gn8mRcHQU6dAi1&quot;</span>.<span class="ident">to_string</span>(),
-            <span class="ident">media_mime</span>: <span class="string">&quot;image/jpeg&quot;</span>.<span class="ident">to_string</span>(),
-            <span class="ident">target_url</span>: <span class="string">&quot;https://www.adex.network/?adex-campaign=true&quot;</span>.<span class="ident">to_string</span>(),
-            <span class="ident">archived</span>: <span class="bool-val">false</span>,
-            <span class="ident">description</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;Dummy AdUnit description 3&quot;</span>.<span class="ident">to_string</span>()),
-            <span class="ident">ad_type</span>: <span class="string">&quot;legacy_250x250&quot;</span>.<span class="ident">to_string</span>(),
-            <span class="doccomment">/// Timestamp: 1 564 383 600</span>
-            <span class="ident">created</span>: <span class="ident">Utc</span>.<span class="ident">ymd</span>(<span class="number">2019</span>, <span class="number">7</span>, <span class="number">29</span>).<span class="ident">and_hms</span>(<span class="number">9</span>, <span class="number">0</span>, <span class="number">0</span>),
-            <span class="ident">min_targeting_score</span>: <span class="prelude-val">None</span>,
-            <span class="ident">modified</span>: <span class="prelude-val">None</span>,
-            <span class="ident">owner</span>: <span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="ident">PUBLISHER</span>],
-            <span class="ident">title</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;Dummy AdUnit 3&quot;</span>.<span class="ident">to_string</span>()),
+        AdUnit {
+            ipfs: IPFS::try_from(<span class="string">&quot;QmYwcpMjmqJfo9ot1jGe9rfXsszFV1WbEA59QS7dEVHfJi&quot;</span>)
+                .expect(<span class="string">&quot;should convert&quot;</span>),
+            media_url: <span class="string">&quot;ipfs://QmQB7uz7Gxfy7wqAnrnBcZFaVJLos8J9gn8mRcHQU6dAi1&quot;</span>.to_string(),
+            media_mime: <span class="string">&quot;image/jpeg&quot;</span>.to_string(),
+            target_url: <span class="string">&quot;https://www.adex.network/?adex-campaign=true&quot;</span>.to_string(),
+            archived: <span class="bool-val">false</span>,
+            description: <span class="prelude-val">Some</span>(<span class="string">&quot;Dummy AdUnit description 3&quot;</span>.to_string()),
+            ad_type: <span class="string">&quot;legacy_250x250&quot;</span>.to_string(),
+            <span class="doccomment">/// Timestamp: 1 564 383 600
+            </span>created: Utc.ymd(<span class="number">2019</span>, <span class="number">7</span>, <span class="number">29</span>).and_hms(<span class="number">9</span>, <span class="number">0</span>, <span class="number">0</span>),
+            min_targeting_score: <span class="prelude-val">None</span>,
+            modified: <span class="prelude-val">None</span>,
+            owner: IDS[<span class="kw-2">&amp;</span>PUBLISHER],
+            title: <span class="prelude-val">Some</span>(<span class="string">&quot;Dummy AdUnit 3&quot;</span>.to_string()),
         },
-        <span class="ident">AdUnit</span> {
-            <span class="ident">ipfs</span>: <span class="ident">IPFS::try_from</span>(<span class="string">&quot;QmTAF3FsFDS7Ru8WChoD9ofiHTH8gAQfR4mYSnwxqTDpJH&quot;</span>)
-                .<span class="ident">expect</span>(<span class="string">&quot;should convert&quot;</span>),
-            <span class="ident">media_url</span>: <span class="string">&quot;ipfs://QmQAcfBJpDDuH99A4p3pFtUmQwamS8UYStP5HxHC7bgYXY&quot;</span>.<span class="ident">to_string</span>(),
-            <span class="ident">media_mime</span>: <span class="string">&quot;image/jpeg&quot;</span>.<span class="ident">to_string</span>(),
-            <span class="ident">target_url</span>: <span class="string">&quot;https://adex.network&quot;</span>.<span class="ident">to_string</span>(),
-            <span class="ident">archived</span>: <span class="bool-val">false</span>,
-            <span class="ident">description</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;Dummy AdUnit description 4&quot;</span>.<span class="ident">to_string</span>()),
-            <span class="ident">ad_type</span>: <span class="string">&quot;legacy_250x250&quot;</span>.<span class="ident">to_string</span>(),
-            <span class="doccomment">/// Timestamp: 1 564 383 600</span>
-            <span class="ident">created</span>: <span class="ident">Utc</span>.<span class="ident">ymd</span>(<span class="number">2019</span>, <span class="number">7</span>, <span class="number">29</span>).<span class="ident">and_hms</span>(<span class="number">9</span>, <span class="number">0</span>, <span class="number">0</span>),
-            <span class="ident">min_targeting_score</span>: <span class="prelude-val">None</span>,
-            <span class="ident">modified</span>: <span class="prelude-val">None</span>,
-            <span class="ident">owner</span>: <span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="ident">PUBLISHER</span>],
-            <span class="ident">title</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;Dummy AdUnit 4&quot;</span>.<span class="ident">to_string</span>()),
+        AdUnit {
+            ipfs: IPFS::try_from(<span class="string">&quot;QmTAF3FsFDS7Ru8WChoD9ofiHTH8gAQfR4mYSnwxqTDpJH&quot;</span>)
+                .expect(<span class="string">&quot;should convert&quot;</span>),
+            media_url: <span class="string">&quot;ipfs://QmQAcfBJpDDuH99A4p3pFtUmQwamS8UYStP5HxHC7bgYXY&quot;</span>.to_string(),
+            media_mime: <span class="string">&quot;image/jpeg&quot;</span>.to_string(),
+            target_url: <span class="string">&quot;https://adex.network&quot;</span>.to_string(),
+            archived: <span class="bool-val">false</span>,
+            description: <span class="prelude-val">Some</span>(<span class="string">&quot;Dummy AdUnit description 4&quot;</span>.to_string()),
+            ad_type: <span class="string">&quot;legacy_250x250&quot;</span>.to_string(),
+            <span class="doccomment">/// Timestamp: 1 564 383 600
+            </span>created: Utc.ymd(<span class="number">2019</span>, <span class="number">7</span>, <span class="number">29</span>).and_hms(<span class="number">9</span>, <span class="number">0</span>, <span class="number">0</span>),
+            min_targeting_score: <span class="prelude-val">None</span>,
+            modified: <span class="prelude-val">None</span>,
+            owner: IDS[<span class="kw-2">&amp;</span>PUBLISHER],
+            title: <span class="prelude-val">Some</span>(<span class="string">&quot;Dummy AdUnit 4&quot;</span>.to_string()),
         },
     ]
 });
 
-<span class="comment">// CID V0</span>
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">DUMMY_IPFS</span>: <span class="ident">Lazy</span><span class="op">&lt;</span>[<span class="ident">IPFS</span>; <span class="number">5</span>]<span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Lazy::new</span>(<span class="op">|</span><span class="op">|</span> {
+<span class="comment">// CID V0
+</span><span class="kw">pub static </span>DUMMY_IPFS: Lazy&lt;[IPFS; <span class="number">5</span>]&gt; = Lazy::new(|| {
     [
-        <span class="ident">IPFS::try_from</span>(<span class="string">&quot;QmcUVX7fvoLMM93uN2bD3wGTH8MXSxeL8hojYfL2Lhp7mR&quot;</span>).<span class="ident">expect</span>(<span class="string">&quot;Valid IPFS V0&quot;</span>),
-        <span class="ident">IPFS::try_from</span>(<span class="string">&quot;Qmasg8FrbuSQpjFu3kRnZF9beg8rEBFrqgi1uXDRwCbX5f&quot;</span>).<span class="ident">expect</span>(<span class="string">&quot;Valid IPFS V0&quot;</span>),
-        <span class="ident">IPFS::try_from</span>(<span class="string">&quot;QmQnu8zrHsuVvnTJsEgDHYA8c1MmRL7YLiMD8uzDUJKcNq&quot;</span>).<span class="ident">expect</span>(<span class="string">&quot;Valid IPFS V0&quot;</span>),
-        <span class="ident">IPFS::try_from</span>(<span class="string">&quot;QmYYBULc9QDEaDr8HAXvVWHDmFfL2GvyumYRr1g4ERBC96&quot;</span>).<span class="ident">expect</span>(<span class="string">&quot;Valid IPFS V0&quot;</span>),
-        <span class="comment">// V1 of the V0 ipfs: `QmcUVX7fvoLMM93uN2bD3wGTH8MXSxeL8hojYfL2Lhp7mR`</span>
-        <span class="ident">IPFS::try_from</span>(<span class="string">&quot;bafybeif2h3mynaf3ylgdbs6arf6mczqycargt5cqm3rmel3wpjarlswway&quot;</span>)
-            .<span class="ident">expect</span>(<span class="string">&quot;Valid IPFS V1&quot;</span>),
+        IPFS::try_from(<span class="string">&quot;QmcUVX7fvoLMM93uN2bD3wGTH8MXSxeL8hojYfL2Lhp7mR&quot;</span>).expect(<span class="string">&quot;Valid IPFS V0&quot;</span>),
+        IPFS::try_from(<span class="string">&quot;Qmasg8FrbuSQpjFu3kRnZF9beg8rEBFrqgi1uXDRwCbX5f&quot;</span>).expect(<span class="string">&quot;Valid IPFS V0&quot;</span>),
+        IPFS::try_from(<span class="string">&quot;QmQnu8zrHsuVvnTJsEgDHYA8c1MmRL7YLiMD8uzDUJKcNq&quot;</span>).expect(<span class="string">&quot;Valid IPFS V0&quot;</span>),
+        IPFS::try_from(<span class="string">&quot;QmYYBULc9QDEaDr8HAXvVWHDmFfL2GvyumYRr1g4ERBC96&quot;</span>).expect(<span class="string">&quot;Valid IPFS V0&quot;</span>),
+        <span class="comment">// V1 of the V0 ipfs: `QmcUVX7fvoLMM93uN2bD3wGTH8MXSxeL8hojYfL2Lhp7mR`
+        </span>IPFS::try_from(<span class="string">&quot;bafybeif2h3mynaf3ylgdbs6arf6mczqycargt5cqm3rmel3wpjarlswway&quot;</span>)
+            .expect(<span class="string">&quot;Valid IPFS V1&quot;</span>),
     ]
 });
 
-<span class="doccomment">/// List of test campaigns with keys `Campaign {Chain id} #{Number campaign}`</span>
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">CAMPAIGNS</span>: <span class="ident">Lazy</span><span class="op">&lt;</span>[<span class="ident">ChainOf</span><span class="op">&lt;</span><span class="ident">Campaign</span><span class="op">&gt;</span>; <span class="number">3</span>]<span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Lazy::new</span>(<span class="op">|</span><span class="op">|</span> {
-    <span class="kw">let</span> <span class="ident">campaign_1337_1</span> <span class="op">=</span> {
-        <span class="kw">let</span> <span class="ident">ganache_chain_info</span> <span class="op">=</span> <span class="ident">GANACHE_CONFIG</span>.<span class="ident">chains</span>[<span class="string">&quot;Ganache #1337&quot;</span>].<span class="ident">clone</span>();
-        <span class="kw">let</span> <span class="ident">token_info</span> <span class="op">=</span> <span class="ident">ganache_chain_info</span>.<span class="ident">tokens</span>[<span class="string">&quot;Mocked TOKEN 1337&quot;</span>].<span class="ident">clone</span>();
+<span class="doccomment">/// List of test campaigns with keys `Campaign {Chain id} #{Number campaign}`
+</span><span class="kw">pub static </span>CAMPAIGNS: Lazy&lt;[ChainOf&lt;Campaign&gt;; <span class="number">3</span>]&gt; = Lazy::new(|| {
+    <span class="kw">let </span>campaign_1337_1 = {
+        <span class="kw">let </span>ganache_chain_info = GANACHE_CONFIG.chains[<span class="string">&quot;Ganache #1337&quot;</span>].clone();
+        <span class="kw">let </span>token_info = ganache_chain_info.tokens[<span class="string">&quot;Mocked TOKEN 1337&quot;</span>].clone();
 
-        <span class="kw">let</span> <span class="ident">channel</span> <span class="op">=</span> <span class="ident">Channel</span> {
-            <span class="ident">leader</span>: <span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="ident">LEADER</span>],
-            <span class="ident">follower</span>: <span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="ident">FOLLOWER</span>],
-            <span class="ident">guardian</span>: <span class="kw-2">*</span><span class="ident">GUARDIAN</span>,
-            <span class="ident">token</span>: <span class="ident">token_info</span>.<span class="ident">address</span>,
-            <span class="ident">nonce</span>: <span class="number">0_u64</span>.<span class="ident">into</span>(),
+        <span class="kw">let </span>channel = Channel {
+            leader: IDS[<span class="kw-2">&amp;</span>LEADER],
+            follower: IDS[<span class="kw-2">&amp;</span>FOLLOWER],
+            guardian: <span class="kw-2">*</span>GUARDIAN,
+            token: token_info.address,
+            nonce: <span class="number">0_u64</span>.into(),
         };
 
-        <span class="kw">let</span> <span class="ident">leader_desc</span> <span class="op">=</span> <span class="ident">ValidatorDesc</span> {
-            <span class="ident">fee</span>: <span class="ident">UnifiedNum::from_whole</span>(<span class="number">0.5</span>),
-            ..<span class="ident">DUMMY_VALIDATOR_LEADER</span>.<span class="ident">clone</span>()
+        <span class="kw">let </span>leader_desc = ValidatorDesc {
+            fee: UnifiedNum::from_whole(<span class="number">0.5</span>),
+            ..DUMMY_VALIDATOR_LEADER.clone()
         };
 
-        <span class="kw">let</span> <span class="ident">follower_desc</span> <span class="op">=</span> <span class="ident">ValidatorDesc</span> {
-            <span class="ident">fee</span>: <span class="ident">UnifiedNum::from_whole</span>(<span class="number">0.4</span>),
-            ..<span class="ident">DUMMY_VALIDATOR_FOLLOWER</span>.<span class="ident">clone</span>()
+        <span class="kw">let </span>follower_desc = ValidatorDesc {
+            fee: UnifiedNum::from_whole(<span class="number">0.4</span>),
+            ..DUMMY_VALIDATOR_FOLLOWER.clone()
         };
 
-        <span class="kw">let</span> <span class="ident">validators</span> <span class="op">=</span> <span class="ident">Validators::new</span>((<span class="ident">leader_desc</span>, <span class="ident">follower_desc</span>));
+        <span class="kw">let </span>validators = Validators::new((leader_desc, follower_desc));
 
-        <span class="ident">ChainOf::new</span>(<span class="ident">ganache_chain_info</span>.<span class="ident">chain</span>, <span class="ident">token_info</span>).<span class="ident">with_campaign</span>(<span class="ident">Campaign</span> {
-            <span class="ident">id</span>: <span class="string">&quot;0x936da01f9abd4d9d80c702af85c822a8&quot;</span>
-                .<span class="ident">parse</span>()
-                .<span class="ident">expect</span>(<span class="string">&quot;Should parse&quot;</span>),
-            <span class="ident">channel</span>,
-            <span class="ident">creator</span>: <span class="kw-2">*</span><span class="ident">ADVERTISER</span>,
-            <span class="comment">// 100 000</span>
-            <span class="ident">budget</span>: <span class="ident">UnifiedNum::from_whole</span>(<span class="number">100_000</span>),
-            <span class="ident">validators</span>,
-            <span class="ident">title</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;Dummy Campaign&quot;</span>.<span class="ident">to_string</span>()),
-            <span class="ident">pricing_bounds</span>: <span class="macro">vec!</span>[
+        ChainOf::new(ganache_chain_info.chain, token_info).with_campaign(Campaign {
+            id: <span class="string">&quot;0x936da01f9abd4d9d80c702af85c822a8&quot;
+                </span>.parse()
+                .expect(<span class="string">&quot;Should parse&quot;</span>),
+            channel,
+            creator: <span class="kw-2">*</span>ADVERTISER,
+            <span class="comment">// 100 000
+            </span>budget: UnifiedNum::from_whole(<span class="number">100_000</span>),
+            validators,
+            title: <span class="prelude-val">Some</span>(<span class="string">&quot;Dummy Campaign&quot;</span>.to_string()),
+            pricing_bounds: <span class="macro">vec!</span>[
                 (
-                    <span class="ident">IMPRESSION</span>,
-                    <span class="ident">Pricing</span> {
-                        <span class="ident">min</span>: <span class="ident">UnifiedNum::from_whole</span>(<span class="number">0.0004</span>),
-                        <span class="ident">max</span>: <span class="ident">UnifiedNum::from_whole</span>(<span class="number">0.0005</span>),
+                    IMPRESSION,
+                    Pricing {
+                        min: UnifiedNum::from_whole(<span class="number">0.0004</span>),
+                        max: UnifiedNum::from_whole(<span class="number">0.0005</span>),
                     },
                 ),
                 (
-                    <span class="ident">CLICK</span>,
-                    <span class="ident">Pricing</span> {
-                        <span class="ident">min</span>: <span class="ident">UnifiedNum::from_whole</span>(<span class="number">0.0006</span>),
-                        <span class="ident">max</span>: <span class="ident">UnifiedNum::from_whole</span>(<span class="number">0.001</span>),
+                    CLICK,
+                    Pricing {
+                        min: UnifiedNum::from_whole(<span class="number">0.0006</span>),
+                        max: UnifiedNum::from_whole(<span class="number">0.001</span>),
                     },
                 ),
             ]
-            .<span class="ident">into_iter</span>()
-            .<span class="ident">collect</span>(),
-            <span class="ident">event_submission</span>: <span class="prelude-val">Some</span>(<span class="ident">EventSubmission</span> { <span class="ident">allow</span>: <span class="macro">vec!</span>[] }),
-            <span class="ident">ad_units</span>: <span class="macro">vec!</span>[<span class="ident">DUMMY_AD_UNITS</span>[<span class="number">0</span>].<span class="ident">clone</span>(), <span class="ident">DUMMY_AD_UNITS</span>[<span class="number">1</span>].<span class="ident">clone</span>()],
-            <span class="ident">targeting_rules</span>: <span class="ident">Rules::new</span>(),
-            <span class="ident">created</span>: <span class="ident">Utc</span>.<span class="ident">ymd</span>(<span class="number">2021</span>, <span class="number">2</span>, <span class="number">1</span>).<span class="ident">and_hms</span>(<span class="number">7</span>, <span class="number">0</span>, <span class="number">0</span>),
-            <span class="ident">active</span>: <span class="ident">Active</span> {
-                <span class="ident">from</span>: <span class="prelude-val">Some</span>(<span class="ident">Utc</span>.<span class="ident">ymd</span>(<span class="number">2022</span>, <span class="number">6</span>, <span class="number">27</span>).<span class="ident">and_hms</span>(<span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>)),
-                <span class="ident">to</span>: <span class="ident">Utc</span>.<span class="ident">ymd</span>(<span class="number">2099</span>, <span class="number">1</span>, <span class="number">30</span>).<span class="ident">and_hms</span>(<span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>),
+            .into_iter()
+            .collect(),
+            event_submission: <span class="prelude-val">Some</span>(EventSubmission { allow: <span class="macro">vec!</span>[] }),
+            ad_units: <span class="macro">vec!</span>[DUMMY_AD_UNITS[<span class="number">0</span>].clone(), DUMMY_AD_UNITS[<span class="number">1</span>].clone()],
+            targeting_rules: Rules::new(),
+            created: Utc.ymd(<span class="number">2021</span>, <span class="number">2</span>, <span class="number">1</span>).and_hms(<span class="number">7</span>, <span class="number">0</span>, <span class="number">0</span>),
+            active: Active {
+                from: <span class="prelude-val">Some</span>(Utc.ymd(<span class="number">2022</span>, <span class="number">6</span>, <span class="number">27</span>).and_hms(<span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>)),
+                to: Utc.ymd(<span class="number">2099</span>, <span class="number">1</span>, <span class="number">30</span>).and_hms(<span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>),
             },
         })
     };
 
-    <span class="kw">let</span> <span class="ident">campaign_1337_2</span> <span class="op">=</span> {
-        <span class="kw">let</span> <span class="ident">ganache_chain_info</span> <span class="op">=</span> <span class="ident">GANACHE_CONFIG</span>.<span class="ident">chains</span>[<span class="string">&quot;Ganache #1337&quot;</span>].<span class="ident">clone</span>();
-        <span class="kw">let</span> <span class="ident">token_info</span> <span class="op">=</span> <span class="ident">ganache_chain_info</span>.<span class="ident">tokens</span>[<span class="string">&quot;Mocked TOKEN 1337&quot;</span>].<span class="ident">clone</span>();
+    <span class="kw">let </span>campaign_1337_2 = {
+        <span class="kw">let </span>ganache_chain_info = GANACHE_CONFIG.chains[<span class="string">&quot;Ganache #1337&quot;</span>].clone();
+        <span class="kw">let </span>token_info = ganache_chain_info.tokens[<span class="string">&quot;Mocked TOKEN 1337&quot;</span>].clone();
 
-        <span class="kw">let</span> <span class="ident">channel</span> <span class="op">=</span> <span class="ident">Channel</span> {
-            <span class="ident">leader</span>: <span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="ident">FOLLOWER</span>],
-            <span class="ident">follower</span>: <span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="ident">LEADER</span>],
-            <span class="ident">guardian</span>: <span class="kw-2">*</span><span class="ident">GUARDIAN_2</span>,
-            <span class="ident">token</span>: <span class="ident">token_info</span>.<span class="ident">address</span>,
-            <span class="ident">nonce</span>: <span class="number">0_u64</span>.<span class="ident">into</span>(),
+        <span class="kw">let </span>channel = Channel {
+            leader: IDS[<span class="kw-2">&amp;</span>FOLLOWER],
+            follower: IDS[<span class="kw-2">&amp;</span>LEADER],
+            guardian: <span class="kw-2">*</span>GUARDIAN_2,
+            token: token_info.address,
+            nonce: <span class="number">0_u64</span>.into(),
         };
 
-        <span class="kw">let</span> <span class="ident">leader_desc</span> <span class="op">=</span> <span class="ident">ValidatorDesc</span> {
-            <span class="ident">fee</span>: <span class="ident">UnifiedNum::from_whole</span>(<span class="number">0.1</span>),
-            ..<span class="ident">DUMMY_VALIDATOR_FOLLOWER</span>.<span class="ident">clone</span>()
+        <span class="kw">let </span>leader_desc = ValidatorDesc {
+            fee: UnifiedNum::from_whole(<span class="number">0.1</span>),
+            ..DUMMY_VALIDATOR_FOLLOWER.clone()
         };
 
-        <span class="kw">let</span> <span class="ident">follower_desc</span> <span class="op">=</span> <span class="ident">ValidatorDesc</span> {
-            <span class="ident">fee</span>: <span class="ident">UnifiedNum::from_whole</span>(<span class="number">0.05</span>),
-            ..<span class="ident">DUMMY_VALIDATOR_LEADER</span>.<span class="ident">clone</span>()
+        <span class="kw">let </span>follower_desc = ValidatorDesc {
+            fee: UnifiedNum::from_whole(<span class="number">0.05</span>),
+            ..DUMMY_VALIDATOR_LEADER.clone()
         };
-        <span class="kw">let</span> <span class="ident">validators</span> <span class="op">=</span> <span class="ident">Validators::new</span>((<span class="ident">leader_desc</span>, <span class="ident">follower_desc</span>));
+        <span class="kw">let </span>validators = Validators::new((leader_desc, follower_desc));
 
-        <span class="ident">ChainOf::new</span>(<span class="ident">ganache_chain_info</span>.<span class="ident">chain</span>, <span class="ident">token_info</span>).<span class="ident">with_campaign</span>(<span class="ident">Campaign</span> {
-            <span class="ident">id</span>: <span class="string">&quot;0x127b98248f4e4b73af409d10f62daeaa&quot;</span>
-                .<span class="ident">parse</span>()
-                .<span class="ident">expect</span>(<span class="string">&quot;Should parse&quot;</span>),
-            <span class="ident">channel</span>,
-            <span class="ident">creator</span>: <span class="kw-2">*</span><span class="ident">ADVERTISER</span>,
-            <span class="comment">// 200 000</span>
-            <span class="ident">budget</span>: <span class="ident">UnifiedNum::from_whole</span>(<span class="number">200_000.0</span>),
-            <span class="ident">validators</span>,
-            <span class="ident">title</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;Dummy Campaign 2 in Chain #1337&quot;</span>.<span class="ident">to_string</span>()),
-            <span class="ident">pricing_bounds</span>: <span class="macro">vec!</span>[
+        ChainOf::new(ganache_chain_info.chain, token_info).with_campaign(Campaign {
+            id: <span class="string">&quot;0x127b98248f4e4b73af409d10f62daeaa&quot;
+                </span>.parse()
+                .expect(<span class="string">&quot;Should parse&quot;</span>),
+            channel,
+            creator: <span class="kw-2">*</span>ADVERTISER,
+            <span class="comment">// 200 000
+            </span>budget: UnifiedNum::from_whole(<span class="number">200_000.0</span>),
+            validators,
+            title: <span class="prelude-val">Some</span>(<span class="string">&quot;Dummy Campaign 2 in Chain #1337&quot;</span>.to_string()),
+            pricing_bounds: <span class="macro">vec!</span>[
                 (
-                    <span class="ident">IMPRESSION</span>,
-                    <span class="ident">Pricing</span> {
-                        <span class="ident">min</span>: <span class="ident">UnifiedNum::from_whole</span>(<span class="number">0.0004</span>),
-                        <span class="ident">max</span>: <span class="ident">UnifiedNum::from_whole</span>(<span class="number">0.0005</span>),
+                    IMPRESSION,
+                    Pricing {
+                        min: UnifiedNum::from_whole(<span class="number">0.0004</span>),
+                        max: UnifiedNum::from_whole(<span class="number">0.0005</span>),
                     },
                 ),
                 (
-                    <span class="ident">CLICK</span>,
-                    <span class="ident">Pricing</span> {
-                        <span class="ident">min</span>: <span class="ident">UnifiedNum::from_whole</span>(<span class="number">0.0006</span>),
-                        <span class="ident">max</span>: <span class="ident">UnifiedNum::from_whole</span>(<span class="number">0.001</span>),
+                    CLICK,
+                    Pricing {
+                        min: UnifiedNum::from_whole(<span class="number">0.0006</span>),
+                        max: UnifiedNum::from_whole(<span class="number">0.001</span>),
                     },
                 ),
             ]
-            .<span class="ident">into_iter</span>()
-            .<span class="ident">collect</span>(),
-            <span class="ident">event_submission</span>: <span class="prelude-val">Some</span>(<span class="ident">EventSubmission</span> { <span class="ident">allow</span>: <span class="macro">vec!</span>[] }),
-            <span class="ident">ad_units</span>: <span class="macro">vec!</span>[<span class="ident">DUMMY_AD_UNITS</span>[<span class="number">0</span>].<span class="ident">clone</span>(), <span class="ident">DUMMY_AD_UNITS</span>[<span class="number">1</span>].<span class="ident">clone</span>()],
-            <span class="ident">targeting_rules</span>: <span class="ident">Rules::new</span>(),
-            <span class="ident">created</span>: <span class="ident">Utc</span>.<span class="ident">ymd</span>(<span class="number">2021</span>, <span class="number">2</span>, <span class="number">1</span>).<span class="ident">and_hms</span>(<span class="number">7</span>, <span class="number">0</span>, <span class="number">0</span>),
-            <span class="ident">active</span>: <span class="ident">Active</span> {
-                <span class="ident">from</span>: <span class="prelude-val">None</span>,
-                <span class="ident">to</span>: <span class="ident">Utc</span>.<span class="ident">ymd</span>(<span class="number">2099</span>, <span class="number">1</span>, <span class="number">30</span>).<span class="ident">and_hms</span>(<span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>),
+            .into_iter()
+            .collect(),
+            event_submission: <span class="prelude-val">Some</span>(EventSubmission { allow: <span class="macro">vec!</span>[] }),
+            ad_units: <span class="macro">vec!</span>[DUMMY_AD_UNITS[<span class="number">0</span>].clone(), DUMMY_AD_UNITS[<span class="number">1</span>].clone()],
+            targeting_rules: Rules::new(),
+            created: Utc.ymd(<span class="number">2021</span>, <span class="number">2</span>, <span class="number">1</span>).and_hms(<span class="number">7</span>, <span class="number">0</span>, <span class="number">0</span>),
+            active: Active {
+                from: <span class="prelude-val">None</span>,
+                to: Utc.ymd(<span class="number">2099</span>, <span class="number">1</span>, <span class="number">30</span>).and_hms(<span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>),
             },
         })
     };
 
-    <span class="kw">let</span> <span class="ident">campaign_1_1</span> <span class="op">=</span> {
-        <span class="kw">let</span> <span class="ident">ganache_chain_info</span> <span class="op">=</span> <span class="ident">GANACHE_CONFIG</span>.<span class="ident">chains</span>[<span class="string">&quot;Ganache #1&quot;</span>].<span class="ident">clone</span>();
-        <span class="kw">let</span> <span class="ident">token_info</span> <span class="op">=</span> <span class="ident">ganache_chain_info</span>.<span class="ident">tokens</span>[<span class="string">&quot;Mocked TOKEN 1&quot;</span>].<span class="ident">clone</span>();
+    <span class="kw">let </span>campaign_1_1 = {
+        <span class="kw">let </span>ganache_chain_info = GANACHE_CONFIG.chains[<span class="string">&quot;Ganache #1&quot;</span>].clone();
+        <span class="kw">let </span>token_info = ganache_chain_info.tokens[<span class="string">&quot;Mocked TOKEN 1&quot;</span>].clone();
 
-        <span class="kw">let</span> <span class="ident">channel</span> <span class="op">=</span> <span class="ident">Channel</span> {
-            <span class="ident">leader</span>: <span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="ident">LEADER</span>],
-            <span class="ident">follower</span>: <span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="ident">FOLLOWER</span>],
-            <span class="ident">guardian</span>: <span class="kw-2">*</span><span class="ident">GUARDIAN_2</span>,
-            <span class="ident">token</span>: <span class="ident">token_info</span>.<span class="ident">address</span>,
-            <span class="ident">nonce</span>: <span class="number">1_u64</span>.<span class="ident">into</span>(),
+        <span class="kw">let </span>channel = Channel {
+            leader: IDS[<span class="kw-2">&amp;</span>LEADER],
+            follower: IDS[<span class="kw-2">&amp;</span>FOLLOWER],
+            guardian: <span class="kw-2">*</span>GUARDIAN_2,
+            token: token_info.address,
+            nonce: <span class="number">1_u64</span>.into(),
         };
 
-        <span class="kw">let</span> <span class="ident">leader_desc</span> <span class="op">=</span> <span class="ident">ValidatorDesc</span> {
-            <span class="ident">fee</span>: <span class="ident">UnifiedNum::from_whole</span>(<span class="number">0.02</span>),
-            ..<span class="ident">DUMMY_VALIDATOR_LEADER</span>.<span class="ident">clone</span>()
+        <span class="kw">let </span>leader_desc = ValidatorDesc {
+            fee: UnifiedNum::from_whole(<span class="number">0.02</span>),
+            ..DUMMY_VALIDATOR_LEADER.clone()
         };
 
-        <span class="kw">let</span> <span class="ident">follower_desc</span> <span class="op">=</span> <span class="ident">ValidatorDesc</span> {
-            <span class="ident">fee</span>: <span class="ident">UnifiedNum::from_whole</span>(<span class="number">0.0175</span>),
-            ..<span class="ident">DUMMY_VALIDATOR_FOLLOWER</span>.<span class="ident">clone</span>()
+        <span class="kw">let </span>follower_desc = ValidatorDesc {
+            fee: UnifiedNum::from_whole(<span class="number">0.0175</span>),
+            ..DUMMY_VALIDATOR_FOLLOWER.clone()
         };
 
-        <span class="kw">let</span> <span class="ident">validators</span> <span class="op">=</span> <span class="ident">Validators::new</span>((<span class="ident">leader_desc</span>, <span class="ident">follower_desc</span>));
+        <span class="kw">let </span>validators = Validators::new((leader_desc, follower_desc));
 
-        <span class="ident">ChainOf::new</span>(<span class="ident">ganache_chain_info</span>.<span class="ident">chain</span>, <span class="ident">token_info</span>).<span class="ident">with_campaign</span>(<span class="ident">Campaign</span> {
-            <span class="ident">id</span>: <span class="string">&quot;0xa78f3492481b41a688488a7aa1ff17df&quot;</span>
-                .<span class="ident">parse</span>()
-                .<span class="ident">expect</span>(<span class="string">&quot;Should parse&quot;</span>),
-            <span class="ident">channel</span>,
-            <span class="ident">creator</span>: <span class="kw-2">*</span><span class="ident">ADVERTISER_2</span>,
-            <span class="comment">// 20 000</span>
-            <span class="ident">budget</span>: <span class="ident">UnifiedNum::from_whole</span>(<span class="number">20_000</span>),
-            <span class="ident">validators</span>,
-            <span class="ident">title</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;Dummy Campaign 3 in Chain #1&quot;</span>.<span class="ident">to_string</span>()),
-            <span class="ident">pricing_bounds</span>: <span class="macro">vec!</span>[
+        ChainOf::new(ganache_chain_info.chain, token_info).with_campaign(Campaign {
+            id: <span class="string">&quot;0xa78f3492481b41a688488a7aa1ff17df&quot;
+                </span>.parse()
+                .expect(<span class="string">&quot;Should parse&quot;</span>),
+            channel,
+            creator: <span class="kw-2">*</span>ADVERTISER_2,
+            <span class="comment">// 20 000
+            </span>budget: UnifiedNum::from_whole(<span class="number">20_000</span>),
+            validators,
+            title: <span class="prelude-val">Some</span>(<span class="string">&quot;Dummy Campaign 3 in Chain #1&quot;</span>.to_string()),
+            pricing_bounds: <span class="macro">vec!</span>[
                 (
-                    <span class="ident">IMPRESSION</span>,
-                    <span class="ident">Pricing</span> {
-                        <span class="comment">// 0.01500000</span>
-                        <span class="comment">// Per 1000 = 15.00000000</span>
-                        <span class="ident">min</span>: <span class="ident">UnifiedNum::from_whole</span>(<span class="number">0.015</span>),
-                        <span class="comment">// 0.0250000</span>
-                        <span class="comment">// Per 1000 = 25.00000000</span>
-                        <span class="ident">max</span>: <span class="ident">UnifiedNum::from_whole</span>(<span class="number">0.025</span>),
+                    IMPRESSION,
+                    Pricing {
+                        <span class="comment">// 0.01500000
+                        // Per 1000 = 15.00000000
+                        </span>min: UnifiedNum::from_whole(<span class="number">0.015</span>),
+                        <span class="comment">// 0.0250000
+                        // Per 1000 = 25.00000000
+                        </span>max: UnifiedNum::from_whole(<span class="number">0.025</span>),
                     },
                 ),
                 (
-                    <span class="ident">CLICK</span>,
-                    <span class="ident">Pricing</span> {
-                        <span class="comment">// 0.03500000</span>
-                        <span class="comment">// Per 1000 = 35.00000000</span>
-                        <span class="ident">min</span>: <span class="ident">UnifiedNum::from_whole</span>(<span class="number">0.035</span>),
-                        <span class="comment">// 0.06500000</span>
-                        <span class="comment">// Per 1000 = 65.00000000</span>
-                        <span class="ident">max</span>: <span class="ident">UnifiedNum::from_whole</span>(<span class="number">0.065</span>),
+                    CLICK,
+                    Pricing {
+                        <span class="comment">// 0.03500000
+                        // Per 1000 = 35.00000000
+                        </span>min: UnifiedNum::from_whole(<span class="number">0.035</span>),
+                        <span class="comment">// 0.06500000
+                        // Per 1000 = 65.00000000
+                        </span>max: UnifiedNum::from_whole(<span class="number">0.065</span>),
                     },
                 ),
             ]
-            .<span class="ident">into_iter</span>()
-            .<span class="ident">collect</span>(),
-            <span class="ident">event_submission</span>: <span class="prelude-val">Some</span>(<span class="ident">EventSubmission</span> { <span class="ident">allow</span>: <span class="macro">vec!</span>[] }),
-            <span class="ident">ad_units</span>: <span class="macro">vec!</span>[<span class="ident">DUMMY_AD_UNITS</span>[<span class="number">2</span>].<span class="ident">clone</span>(), <span class="ident">DUMMY_AD_UNITS</span>[<span class="number">3</span>].<span class="ident">clone</span>()],
-            <span class="ident">targeting_rules</span>: <span class="ident">Rules::new</span>(),
-            <span class="ident">created</span>: <span class="ident">Utc</span>.<span class="ident">ymd</span>(<span class="number">2021</span>, <span class="number">2</span>, <span class="number">1</span>).<span class="ident">and_hms</span>(<span class="number">7</span>, <span class="number">0</span>, <span class="number">0</span>),
-            <span class="ident">active</span>: <span class="ident">Active</span> {
-                <span class="ident">from</span>: <span class="prelude-val">None</span>,
-                <span class="ident">to</span>: <span class="ident">Utc</span>.<span class="ident">ymd</span>(<span class="number">2099</span>, <span class="number">1</span>, <span class="number">30</span>).<span class="ident">and_hms</span>(<span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>),
+            .into_iter()
+            .collect(),
+            event_submission: <span class="prelude-val">Some</span>(EventSubmission { allow: <span class="macro">vec!</span>[] }),
+            ad_units: <span class="macro">vec!</span>[DUMMY_AD_UNITS[<span class="number">2</span>].clone(), DUMMY_AD_UNITS[<span class="number">3</span>].clone()],
+            targeting_rules: Rules::new(),
+            created: Utc.ymd(<span class="number">2021</span>, <span class="number">2</span>, <span class="number">1</span>).and_hms(<span class="number">7</span>, <span class="number">0</span>, <span class="number">0</span>),
+            active: Active {
+                from: <span class="prelude-val">None</span>,
+                to: Utc.ymd(<span class="number">2099</span>, <span class="number">1</span>, <span class="number">30</span>).and_hms(<span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>),
             },
         })
     };
 
-    [<span class="ident">campaign_1337_1</span>, <span class="ident">campaign_1337_2</span>, <span class="ident">campaign_1_1</span>]
+    [campaign_1337_1, campaign_1337_2, campaign_1_1]
 });
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="primitives" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (20ffea693 2022-08-11)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="primitives" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>

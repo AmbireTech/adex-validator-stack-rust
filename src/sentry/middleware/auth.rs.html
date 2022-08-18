@@ -257,264 +257,518 @@
 <span id="257">257</span>
 <span id="258">258</span>
 <span id="259">259</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">std::error</span>;
+<span id="260">260</span>
+<span id="261">261</span>
+<span id="262">262</span>
+<span id="263">263</span>
+<span id="264">264</span>
+<span id="265">265</span>
+<span id="266">266</span>
+<span id="267">267</span>
+<span id="268">268</span>
+<span id="269">269</span>
+<span id="270">270</span>
+<span id="271">271</span>
+<span id="272">272</span>
+<span id="273">273</span>
+<span id="274">274</span>
+<span id="275">275</span>
+<span id="276">276</span>
+<span id="277">277</span>
+<span id="278">278</span>
+<span id="279">279</span>
+<span id="280">280</span>
+<span id="281">281</span>
+<span id="282">282</span>
+<span id="283">283</span>
+<span id="284">284</span>
+<span id="285">285</span>
+<span id="286">286</span>
+<span id="287">287</span>
+<span id="288">288</span>
+<span id="289">289</span>
+<span id="290">290</span>
+<span id="291">291</span>
+<span id="292">292</span>
+<span id="293">293</span>
+<span id="294">294</span>
+<span id="295">295</span>
+<span id="296">296</span>
+<span id="297">297</span>
+<span id="298">298</span>
+<span id="299">299</span>
+<span id="300">300</span>
+<span id="301">301</span>
+<span id="302">302</span>
+<span id="303">303</span>
+<span id="304">304</span>
+<span id="305">305</span>
+<span id="306">306</span>
+<span id="307">307</span>
+<span id="308">308</span>
+<span id="309">309</span>
+<span id="310">310</span>
+<span id="311">311</span>
+<span id="312">312</span>
+<span id="313">313</span>
+<span id="314">314</span>
+<span id="315">315</span>
+<span id="316">316</span>
+<span id="317">317</span>
+<span id="318">318</span>
+<span id="319">319</span>
+<span id="320">320</span>
+<span id="321">321</span>
+<span id="322">322</span>
+<span id="323">323</span>
+<span id="324">324</span>
+<span id="325">325</span>
+<span id="326">326</span>
+<span id="327">327</span>
+<span id="328">328</span>
+<span id="329">329</span>
+<span id="330">330</span>
+<span id="331">331</span>
+<span id="332">332</span>
+<span id="333">333</span>
+<span id="334">334</span>
+<span id="335">335</span>
+<span id="336">336</span>
+<span id="337">337</span>
+<span id="338">338</span>
+<span id="339">339</span>
+<span id="340">340</span>
+<span id="341">341</span>
+<span id="342">342</span>
+<span id="343">343</span>
+<span id="344">344</span>
+<span id="345">345</span>
+<span id="346">346</span>
+<span id="347">347</span>
+<span id="348">348</span>
+<span id="349">349</span>
+<span id="350">350</span>
+<span id="351">351</span>
+<span id="352">352</span>
+<span id="353">353</span>
+<span id="354">354</span>
+<span id="355">355</span>
+<span id="356">356</span>
+<span id="357">357</span>
+<span id="358">358</span>
+<span id="359">359</span>
+<span id="360">360</span>
+<span id="361">361</span>
+<span id="362">362</span>
+<span id="363">363</span>
+<span id="364">364</span>
+<span id="365">365</span>
+<span id="366">366</span>
+<span id="367">367</span>
+<span id="368">368</span>
+<span id="369">369</span>
+<span id="370">370</span>
+<span id="371">371</span>
+<span id="372">372</span>
+<span id="373">373</span>
+<span id="374">374</span>
+<span id="375">375</span>
+<span id="376">376</span>
+<span id="377">377</span>
+<span id="378">378</span>
+<span id="379">379</span>
+<span id="380">380</span>
+<span id="381">381</span>
+<span id="382">382</span>
+<span id="383">383</span>
+<span id="384">384</span>
+<span id="385">385</span>
+<span id="386">386</span>
+</pre><pre class="rust"><code><span class="kw">use </span>std::sync::Arc;
 
-<span class="kw">use</span> <span class="ident">async_trait::async_trait</span>;
-<span class="kw">use</span> <span class="ident">hyper::header</span>::{<span class="ident">AUTHORIZATION</span>, <span class="ident">REFERER</span>};
-<span class="kw">use</span> <span class="ident">hyper</span>::{<span class="ident">Body</span>, <span class="ident">Request</span>};
-<span class="kw">use</span> <span class="ident">redis::aio::MultiplexedConnection</span>;
+<span class="kw">use </span>axum::{
+    http::{
+        header::{AUTHORIZATION, REFERER},
+        Request,
+    },
+    middleware::Next,
+};
 
-<span class="kw">use</span> <span class="ident">adapter</span>::{<span class="ident">prelude</span>::<span class="kw-2">*</span>, <span class="ident">primitives::Session</span> <span class="kw">as</span> <span class="ident">AdapterSession</span>, <span class="ident">Adapter</span>};
-<span class="kw">use</span> <span class="ident">primitives::ValidatorId</span>;
+<span class="kw">use </span>adapter::{prelude::<span class="kw-2">*</span>, primitives::Session <span class="kw">as </span>AdapterSession};
+<span class="kw">use </span>primitives::{analytics::AuthenticateAs, ValidatorId};
 
-<span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">middleware::Middleware</span>, <span class="ident">response::ResponseError</span>, <span class="ident">Application</span>, <span class="ident">Auth</span>, <span class="ident">Session</span>};
+<span class="kw">use crate</span>::{response::ResponseError, Application, Auth, Session};
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Authenticate</span>;
+<span class="kw">pub async fn </span>is_admin&lt;C: Locked + <span class="lifetime">&#39;static</span>, B&gt;(
+    request: axum::http::Request&lt;B&gt;,
+    next: Next&lt;B&gt;,
+) -&gt; <span class="prelude-ty">Result</span>&lt;axum::response::Response, ResponseError&gt; {
+    <span class="kw">let </span>auth = request
+        .extensions()
+        .get::&lt;Auth&gt;()
+        .ok_or(ResponseError::Unauthorized)<span class="question-mark">?</span>;
 
-<span class="attribute">#[<span class="ident">async_trait</span>]</span>
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">Locked</span> <span class="op">+</span> <span class="lifetime">&#39;static</span><span class="op">&gt;</span> <span class="ident">Middleware</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Authenticate</span> {
-    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">call</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>(
-        <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">request</span>: <span class="ident">Request</span><span class="op">&lt;</span><span class="ident">Body</span><span class="op">&gt;</span>,
-        <span class="ident">application</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">Application</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span>,
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Request</span><span class="op">&lt;</span><span class="ident">Body</span><span class="op">&gt;</span>, <span class="ident">ResponseError</span><span class="op">&gt;</span> {
-        <span class="ident">for_request</span>(<span class="ident">request</span>, <span class="kw-2">&amp;</span><span class="ident">application</span>.<span class="ident">adapter</span>, <span class="kw-2">&amp;</span><span class="ident">application</span>.<span class="ident">redis</span>.<span class="ident">clone</span>())
-            .<span class="kw">await</span>
-            .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">error</span><span class="op">|</span> {
-                <span class="macro">slog::error!</span>(<span class="kw-2">&amp;</span><span class="ident">application</span>.<span class="ident">logger</span>, <span class="string">&quot;{}&quot;</span>, <span class="kw-2">&amp;</span><span class="ident">error</span>; <span class="string">&quot;module&quot;</span> =&gt; <span class="string">&quot;middleware-auth&quot;</span>);
+    <span class="kw">let </span>config = <span class="kw-2">&amp;</span>request
+        .extensions()
+        .get::&lt;Arc&lt;Application&lt;C&gt;&gt;&gt;()
+        .expect(<span class="string">&quot;Application should always be present&quot;</span>)
+        .config;
 
-                <span class="ident">ResponseError::Unauthorized</span>
-            })
+    <span class="kw">if </span>!config.admins.contains(auth.uid.as_address()) {
+        <span class="kw">return </span><span class="prelude-val">Err</span>(ResponseError::Unauthorized);
+    }
+    <span class="prelude-val">Ok</span>(next.run(request).<span class="kw">await</span>)
+}
+
+<span class="kw">pub async fn </span>authentication_required&lt;C: Locked + <span class="lifetime">&#39;static</span>, B&gt;(
+    request: axum::http::Request&lt;B&gt;,
+    next: Next&lt;B&gt;,
+) -&gt; <span class="prelude-ty">Result</span>&lt;axum::response::Response, ResponseError&gt; {
+    <span class="kw">if </span>request.extensions().get::&lt;Auth&gt;().is_some() {
+        <span class="prelude-val">Ok</span>(next.run(request).<span class="kw">await</span>)
+    } <span class="kw">else </span>{
+        <span class="prelude-val">Err</span>(ResponseError::Unauthorized)
     }
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">AuthRequired</span>;
+<span class="doccomment">/// Creates a [`Session`] and additionally [`Auth`] if a Bearer token was provided.
+///
+/// Check `Authorization` header for `Bearer` scheme with `Adapter::session_from_token`.
+/// If the `Adapter` fails to create an `AdapterSession`, `ResponseError::BadRequest` will be returned.
+</span><span class="kw">pub async fn </span>authenticate&lt;C: Locked + <span class="lifetime">&#39;static</span>, B&gt;(
+    <span class="kw-2">mut </span>request: axum::http::Request&lt;B&gt;,
+    next: Next&lt;B&gt;,
+) -&gt; <span class="prelude-ty">Result</span>&lt;axum::response::Response, ResponseError&gt; {
+    <span class="kw">let </span>(adapter, redis) = {
+        <span class="kw">let </span>app = request
+            .extensions()
+            .get::&lt;Arc&lt;Application&lt;C&gt;&gt;&gt;()
+            .expect(<span class="string">&quot;Application should always be present&quot;</span>);
 
-<span class="attribute">#[<span class="ident">async_trait</span>]</span>
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">Locked</span> <span class="op">+</span> <span class="lifetime">&#39;static</span><span class="op">&gt;</span> <span class="ident">Middleware</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">AuthRequired</span> {
-    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">call</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>(
-        <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">request</span>: <span class="ident">Request</span><span class="op">&lt;</span><span class="ident">Body</span><span class="op">&gt;</span>,
-        <span class="ident">_application</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">Application</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span>,
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Request</span><span class="op">&lt;</span><span class="ident">Body</span><span class="op">&gt;</span>, <span class="ident">ResponseError</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="ident">request</span>.<span class="ident">extensions</span>().<span class="ident">get</span>::<span class="op">&lt;</span><span class="ident">Auth</span><span class="op">&gt;</span>().<span class="ident">is_some</span>() {
-            <span class="prelude-val">Ok</span>(<span class="ident">request</span>)
-        } <span class="kw">else</span> {
-            <span class="prelude-val">Err</span>(<span class="ident">ResponseError::Unauthorized</span>)
-        }
-    }
-}
-
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">IsAdmin</span>;
-
-<span class="attribute">#[<span class="ident">async_trait</span>]</span>
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">Locked</span> <span class="op">+</span> <span class="lifetime">&#39;static</span><span class="op">&gt;</span> <span class="ident">Middleware</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">IsAdmin</span> {
-    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">call</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>(
-        <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">request</span>: <span class="ident">Request</span><span class="op">&lt;</span><span class="ident">Body</span><span class="op">&gt;</span>,
-        <span class="ident">application</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">Application</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span>,
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Request</span><span class="op">&lt;</span><span class="ident">Body</span><span class="op">&gt;</span>, <span class="ident">ResponseError</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">auth</span> <span class="op">=</span> <span class="ident">request</span>
-            .<span class="ident">extensions</span>()
-            .<span class="ident">get</span>::<span class="op">&lt;</span><span class="ident">Auth</span><span class="op">&gt;</span>()
-            .<span class="ident">expect</span>(<span class="string">&quot;request should have session&quot;</span>)
-            .<span class="ident">to_owned</span>();
-
-        <span class="kw">if</span> <span class="op">!</span><span class="ident">application</span>.<span class="ident">config</span>.<span class="ident">admins</span>.<span class="ident">contains</span>(<span class="ident">auth</span>.<span class="ident">uid</span>.<span class="ident">as_address</span>()) {
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">ResponseError::Unauthorized</span>);
-        }
-        <span class="prelude-val">Ok</span>(<span class="ident">request</span>)
-    }
-}
-
-<span class="doccomment">/// Check `Authorization` header for `Bearer` scheme with `Adapter::session_from_token`.</span>
-<span class="doccomment">/// If the `Adapter` fails to create an `AdapterSession`, `ResponseError::BadRequest` will be returned.</span>
-<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">for_request</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">Locked</span><span class="op">&gt;</span>(
-    <span class="kw-2">mut</span> <span class="ident">req</span>: <span class="ident">Request</span><span class="op">&lt;</span><span class="ident">Body</span><span class="op">&gt;</span>,
-    <span class="ident">adapter</span>: <span class="kw-2">&amp;</span><span class="ident">Adapter</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span>,
-    <span class="ident">redis</span>: <span class="kw-2">&amp;</span><span class="ident">MultiplexedConnection</span>,
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Request</span><span class="op">&lt;</span><span class="ident">Body</span><span class="op">&gt;</span>, <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">error::Error</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">referrer</span> <span class="op">=</span> <span class="ident">req</span>
-        .<span class="ident">headers</span>()
-        .<span class="ident">get</span>(<span class="ident">REFERER</span>)
-        .<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">hv</span><span class="op">|</span> <span class="ident">hv</span>.<span class="ident">to_str</span>().<span class="ident">ok</span>().<span class="ident">map</span>(<span class="ident">ToString::to_string</span>));
-
-    <span class="kw">let</span> <span class="ident">session</span> <span class="op">=</span> <span class="ident">Session</span> {
-        <span class="ident">ip</span>: <span class="ident">get_request_ip</span>(<span class="kw-2">&amp;</span><span class="ident">req</span>),
-        <span class="ident">country</span>: <span class="prelude-val">None</span>,
-        <span class="ident">referrer_header</span>: <span class="ident">referrer</span>,
-        <span class="ident">os</span>: <span class="prelude-val">None</span>,
+        (app.adapter.clone(), app.redis.clone())
     };
-    <span class="ident">req</span>.<span class="ident">extensions_mut</span>().<span class="ident">insert</span>(<span class="ident">session</span>);
 
-    <span class="kw">let</span> <span class="ident">authorization</span> <span class="op">=</span> <span class="ident">req</span>.<span class="ident">headers</span>().<span class="ident">get</span>(<span class="ident">AUTHORIZATION</span>);
+    <span class="kw">let </span>referrer = request
+        .headers()
+        .get(REFERER)
+        .and_then(|hv| hv.to_str().ok().map(ToString::to_string));
 
-    <span class="kw">let</span> <span class="ident">prefix</span> <span class="op">=</span> <span class="string">&quot;Bearer &quot;</span>;
+    <span class="kw">let </span>session = Session {
+        ip: get_request_ip(<span class="kw-2">&amp;</span>request),
+        country: <span class="prelude-val">None</span>,
+        referrer_header: referrer,
+        os: <span class="prelude-val">None</span>,
+    };
+    request.extensions_mut().insert(session);
 
-    <span class="kw">let</span> <span class="ident">token</span> <span class="op">=</span> <span class="ident">authorization</span>
-        .<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">hv</span><span class="op">|</span> {
-            <span class="ident">hv</span>.<span class="ident">to_str</span>()
-                .<span class="ident">map</span>(<span class="op">|</span><span class="ident">token_str</span><span class="op">|</span> <span class="ident">token_str</span>.<span class="ident">strip_prefix</span>(<span class="ident">prefix</span>))
-                .<span class="ident">transpose</span>()
+    <span class="kw">let </span>authorization = request.headers().get(AUTHORIZATION);
+
+    <span class="kw">let </span>prefix = <span class="string">&quot;Bearer &quot;</span>;
+
+    <span class="kw">let </span>token = authorization
+        .and_then(|hv| {
+            hv.to_str()
+                .map(|token_str| token_str.strip_prefix(prefix))
+                .transpose()
         })
-        .<span class="ident">transpose</span>()<span class="question-mark">?</span>;
+        .transpose()<span class="question-mark">?</span>;
 
-    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">token</span>) <span class="op">=</span> <span class="ident">token</span> {
-        <span class="kw">let</span> <span class="ident">adapter_session</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">redis::cmd</span>(<span class="string">&quot;GET&quot;</span>)
-            .<span class="ident">arg</span>(<span class="ident">token</span>)
-            .<span class="ident">query_async</span>::<span class="op">&lt;</span><span class="kw">_</span>, <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span><span class="op">&gt;</span>(<span class="kw-2">&amp;mut</span> <span class="ident">redis</span>.<span class="ident">clone</span>())
-            .<span class="kw">await</span><span class="question-mark">?</span>
-            .<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">session_str</span><span class="op">|</span> <span class="ident">serde_json::from_str</span>::<span class="op">&lt;</span><span class="ident">AdapterSession</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="ident">session_str</span>).<span class="ident">ok</span>())
+    <span class="kw">if let </span><span class="prelude-val">Some</span>(token) = token {
+        <span class="kw">let </span>adapter_session = <span class="kw">match </span>redis::cmd(<span class="string">&quot;GET&quot;</span>)
+            .arg(token)
+            .query_async::&lt;<span class="kw">_</span>, <span class="prelude-ty">Option</span>&lt;String&gt;&gt;(<span class="kw-2">&amp;mut </span>redis.clone())
+            .<span class="kw">await</span><span class="question-mark">?
+            </span>.and_then(|session_str| serde_json::from_str::&lt;AdapterSession&gt;(<span class="kw-2">&amp;</span>session_str).ok())
         {
-            <span class="prelude-val">Some</span>(<span class="ident">adapter_session</span>) =&gt; <span class="ident">adapter_session</span>,
-            <span class="prelude-val">None</span> =&gt; {
-                <span class="comment">// If there was a problem with the Session or the Token, this will error</span>
-                <span class="comment">// and a BadRequest response will be returned</span>
-                <span class="kw">let</span> <span class="ident">adapter_session</span> <span class="op">=</span> <span class="ident">adapter</span>.<span class="ident">session_from_token</span>(<span class="ident">token</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+            <span class="prelude-val">Some</span>(adapter_session) =&gt; adapter_session,
+            <span class="prelude-val">None </span>=&gt; {
+                <span class="comment">// If there was a problem with the Session or the Token, this will error
+                // and a BadRequest response will be returned
+                </span><span class="kw">let </span>adapter_session = adapter.session_from_token(token).<span class="kw">await</span><span class="question-mark">?</span>;
 
-                <span class="comment">// save the Adapter Session to Redis for the next request</span>
-                <span class="comment">// if serde errors on deserialization this will override the value inside</span>
-                <span class="ident">redis::cmd</span>(<span class="string">&quot;SET&quot;</span>)
-                    .<span class="ident">arg</span>(<span class="ident">token</span>)
-                    .<span class="ident">arg</span>(<span class="ident">serde_json::to_string</span>(<span class="kw-2">&amp;</span><span class="ident">adapter_session</span>)<span class="question-mark">?</span>)
-                    .<span class="ident">query_async</span>(<span class="kw-2">&amp;mut</span> <span class="ident">redis</span>.<span class="ident">clone</span>())
+                <span class="comment">// save the Adapter Session to Redis for the next request
+                // if serde errors on deserialization this will override the value inside
+                </span>redis::cmd(<span class="string">&quot;SET&quot;</span>)
+                    .arg(token)
+                    .arg(serde_json::to_string(<span class="kw-2">&amp;</span>adapter_session)<span class="question-mark">?</span>)
+                    .query_async(<span class="kw-2">&amp;mut </span>redis.clone())
                     .<span class="kw">await</span><span class="question-mark">?</span>;
 
-                <span class="ident">adapter_session</span>
+                adapter_session
             }
         };
 
-        <span class="kw">let</span> <span class="ident">auth</span> <span class="op">=</span> <span class="ident">Auth</span> {
-            <span class="ident">era</span>: <span class="ident">adapter_session</span>.<span class="ident">era</span>,
-            <span class="ident">uid</span>: <span class="ident">ValidatorId::from</span>(<span class="ident">adapter_session</span>.<span class="ident">uid</span>),
-            <span class="ident">chain</span>: <span class="ident">adapter_session</span>.<span class="ident">chain</span>,
+        <span class="kw">let </span>auth = Auth {
+            era: adapter_session.era,
+            uid: ValidatorId::from(adapter_session.uid),
+            chain: adapter_session.chain,
         };
 
-        <span class="ident">req</span>.<span class="ident">extensions_mut</span>().<span class="ident">insert</span>(<span class="ident">auth</span>);
+        request.extensions_mut().insert(auth);
     }
 
-    <span class="prelude-val">Ok</span>(<span class="ident">req</span>)
+    <span class="prelude-val">Ok</span>(next.run(request).<span class="kw">await</span>)
 }
 
-<span class="kw">fn</span> <span class="ident">get_request_ip</span>(<span class="ident">req</span>: <span class="kw-2">&amp;</span><span class="ident">Request</span><span class="op">&lt;</span><span class="ident">Body</span><span class="op">&gt;</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span> {
-    <span class="ident">req</span>.<span class="ident">headers</span>()
-        .<span class="ident">get</span>(<span class="string">&quot;true-client-ip&quot;</span>)
-        .<span class="ident">or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">req</span>.<span class="ident">headers</span>().<span class="ident">get</span>(<span class="string">&quot;x-forwarded-for&quot;</span>))
-        .<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">hv</span><span class="op">|</span> <span class="ident">hv</span>.<span class="ident">to_str</span>().<span class="ident">map</span>(<span class="ident">ToString::to_string</span>).<span class="ident">ok</span>())
-        .<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">token</span><span class="op">|</span> <span class="ident">token</span>.<span class="ident">split</span>(<span class="string">&#39;,&#39;</span>).<span class="ident">next</span>().<span class="ident">map</span>(<span class="ident">ToString::to_string</span>))
+<span class="kw">pub async fn </span>authenticate_as_advertiser&lt;B&gt;(
+    <span class="kw-2">mut </span>request: axum::http::Request&lt;B&gt;,
+    next: Next&lt;B&gt;,
+) -&gt; <span class="prelude-ty">Result</span>&lt;axum::response::Response, ResponseError&gt; {
+    <span class="kw">let </span>auth_uid = request
+        .extensions()
+        .get::&lt;Auth&gt;()
+        .ok_or(ResponseError::Unauthorized)<span class="question-mark">?
+        </span>.uid;
+
+    <span class="kw">let </span>previous = request
+        .extensions_mut()
+        .insert(AuthenticateAs::Advertiser(auth_uid));
+
+    <span class="macro">assert!</span>(
+        previous.is_none(),
+        <span class="string">&quot;Should not contain previous value of AuthenticateAs&quot;
+    </span>);
+
+    <span class="prelude-val">Ok</span>(next.run(request).<span class="kw">await</span>)
 }
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
-<span class="kw">mod</span> <span class="ident">test</span> {
-    <span class="kw">use</span> <span class="ident">adapter</span>::{
-        <span class="ident">dummy</span>::{<span class="ident">Dummy</span>, <span class="ident">HeaderToken</span>, <span class="ident">Options</span>},
-        <span class="ident">ethereum::test_util::GANACHE_1</span>,
-        <span class="ident">Adapter</span>,
+<span class="kw">pub async fn </span>authenticate_as_publisher&lt;B&gt;(
+    <span class="kw-2">mut </span>request: axum::http::Request&lt;B&gt;,
+    next: Next&lt;B&gt;,
+) -&gt; <span class="prelude-ty">Result</span>&lt;axum::response::Response, ResponseError&gt; {
+    <span class="kw">let </span>auth_uid = request
+        .extensions()
+        .get::&lt;Auth&gt;()
+        .ok_or(ResponseError::Unauthorized)<span class="question-mark">?
+        </span>.uid;
+
+    <span class="kw">let </span>previous = request
+        .extensions_mut()
+        .insert(AuthenticateAs::Publisher(auth_uid));
+
+    <span class="macro">assert!</span>(
+        previous.is_none(),
+        <span class="string">&quot;Should not contain previous value of AuthenticateAs&quot;
+    </span>);
+
+    <span class="prelude-val">Ok</span>(next.run(request).<span class="kw">await</span>)
+}
+
+<span class="doccomment">/// Get&#39;s the Request IP from either `true-client-ip` or `x-forwarded-for`,
+/// splits the IPs separated by `,` (comma) and returns the first one.
+</span><span class="kw">fn </span>get_request_ip&lt;B&gt;(req: <span class="kw-2">&amp;</span>Request&lt;B&gt;) -&gt; <span class="prelude-ty">Option</span>&lt;String&gt; {
+    req.headers()
+        .get(<span class="string">&quot;true-client-ip&quot;</span>)
+        .or_else(|| req.headers().get(<span class="string">&quot;x-forwarded-for&quot;</span>))
+        .and_then(|hv| {
+            hv.to_str()
+                <span class="comment">// filter out empty headers
+                </span>.map(ToString::to_string)
+                .ok()
+                .filter(|ip| !ip.is_empty())
+        })
+        .and_then(|token| {
+            token
+                .split(<span class="string">&#39;,&#39;</span>)
+                .next()
+                <span class="comment">// filter out empty IP
+                </span>.filter(|ip| !ip.is_empty())
+                .map(ToString::to_string)
+        })
+}
+
+<span class="attribute">#[cfg(test)]</span>
+<span class="kw">mod </span>test {
+    <span class="kw">use </span>std::collections::HashMap;
+
+    <span class="kw">use </span>axum::{
+        body::Body,
+        http::{Request, StatusCode},
+        middleware::from_fn,
+        routing::get,
+        Extension, Router,
     };
-    <span class="kw">use</span> <span class="ident">hyper::Request</span>;
-    <span class="kw">use</span> <span class="ident">primitives</span>::{
-        <span class="ident">config::GANACHE_CONFIG</span>,
-        <span class="ident">test_util::IDS</span>,
-        <span class="ident">test_util</span>::{<span class="ident">DUMMY_AUTH</span>, <span class="ident">LEADER</span>},
+    <span class="kw">use </span>tower::Service;
+
+    <span class="kw">use </span>adapter::{
+        dummy::{Dummy, HeaderToken},
+        ethereum::test_util::GANACHE_1,
     };
+    <span class="kw">use </span>primitives::test_util::{DUMMY_AUTH, LEADER};
 
-    <span class="kw">use</span> <span class="ident">deadpool::managed::Object</span>;
+    <span class="kw">use crate</span>::{middleware::body_to_string, test_util::setup_dummy_app, Session};
 
-    <span class="kw">use</span> <span class="kw">crate</span>::{
-        <span class="ident">db::redis_pool</span>::{<span class="ident">Manager</span>, <span class="ident">TESTS_POOL</span>},
-        <span class="ident">Session</span>,
-    };
+    <span class="kw">use super</span>::<span class="kw-2">*</span>;
 
-    <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
+    <span class="attribute">#[tokio::test]</span>
+    <span class="kw">async fn </span>no_authentication_or_incorrect_value_should_not_add_session() {
+        <span class="kw">let </span>app_guard = setup_dummy_app().<span class="kw">await</span>;
+        <span class="kw">let </span>app = Arc::new(app_guard.app);
 
-    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">setup</span>() -&gt; (<span class="ident">Adapter</span><span class="op">&lt;</span><span class="ident">Dummy</span><span class="op">&gt;</span>, <span class="ident">Object</span><span class="op">&lt;</span><span class="ident">Manager</span><span class="op">&gt;</span>) {
-        <span class="kw">let</span> <span class="ident">connection</span> <span class="op">=</span> <span class="ident">TESTS_POOL</span>.<span class="ident">get</span>().<span class="kw">await</span>.<span class="ident">expect</span>(<span class="string">&quot;Should return Object&quot;</span>);
-        <span class="kw">let</span> <span class="ident">adapter_options</span> <span class="op">=</span> <span class="ident">Options</span> {
-            <span class="ident">dummy_identity</span>: <span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="ident">LEADER</span>],
-            <span class="ident">dummy_auth_tokens</span>: <span class="ident">DUMMY_AUTH</span>.<span class="ident">clone</span>(),
-            <span class="ident">dummy_chains</span>: <span class="ident">GANACHE_CONFIG</span>.<span class="ident">chains</span>.<span class="ident">values</span>().<span class="ident">cloned</span>().<span class="ident">collect</span>(),
-        };
+        <span class="kw">async fn </span>handle() -&gt; String {
+            <span class="string">&quot;Ok&quot;</span>.into()
+        }
 
-        (<span class="ident">Adapter::new</span>(<span class="ident">Dummy::init</span>(<span class="ident">adapter_options</span>)), <span class="ident">connection</span>)
+        <span class="kw">let </span><span class="kw-2">mut </span>router = Router::new()
+            .route(<span class="string">&quot;/&quot;</span>, get(handle))
+            .layer(from_fn(authenticate::&lt;Dummy, <span class="kw">_</span>&gt;));
+
+        {
+            <span class="kw">let </span>no_auth_req = Request::builder()
+                .extension(app.clone())
+                .body(Body::empty())
+                .expect(<span class="string">&quot;should never fail!&quot;</span>);
+
+            <span class="kw">let </span>no_auth = router
+                .call(no_auth_req)
+                .<span class="kw">await
+                </span>.expect(<span class="string">&quot;Handling the Request shouldn&#39;t have failed&quot;</span>);
+
+            <span class="macro">assert!</span>(
+                no_auth.extensions().get::&lt;Auth&gt;().is_none(),
+                <span class="string">&quot;There shouldn&#39;t be a Auth in the extensions&quot;
+            </span>);
+        }
+
+        <span class="comment">// there is a Header, but it has wrong format
+        </span>{
+            <span class="kw">let </span>incorrect_auth_req = Request::builder()
+                .header(AUTHORIZATION, <span class="string">&quot;Wrong Header&quot;</span>)
+                .extension(app.clone())
+                .body(Body::empty())
+                .expect(<span class="string">&quot;should never fail!&quot;</span>);
+
+            <span class="kw">let </span>incorrect_auth = router
+                .call(incorrect_auth_req)
+                .<span class="kw">await
+                </span>.expect(<span class="string">&quot;Handling the Request shouldn&#39;t have failed&quot;</span>);
+
+            <span class="macro">assert!</span>(
+                incorrect_auth.extensions().get::&lt;Auth&gt;().is_none(),
+                <span class="string">&quot;There shouldn&#39;t be an Auth in the extensions&quot;
+            </span>);
+        }
+
+        <span class="comment">// Token doesn&#39;t exist in the Adapter nor in Redis
+        </span>{
+            <span class="kw">let </span>non_existent_token_req = Request::builder()
+                .header(AUTHORIZATION, <span class="string">&quot;Bearer wrong-token&quot;</span>)
+                .extension(app.clone())
+                .body(Body::empty())
+                .unwrap();
+
+            <span class="kw">let </span>response = router
+                .call(non_existent_token_req)
+                .<span class="kw">await
+                </span>.expect(<span class="string">&quot;Handling the Request shouldn&#39;t have failed&quot;</span>);
+
+            <span class="macro">assert_eq!</span>(response.status(), StatusCode::BAD_REQUEST);
+            <span class="kw">let </span>response_body =
+                serde_json::from_str::&lt;HashMap&lt;String, String&gt;&gt;(<span class="kw-2">&amp;</span>body_to_string(response).<span class="kw">await</span>)
+                    .expect(<span class="string">&quot;Should deserialize&quot;</span>);
+            <span class="macro">assert_eq!</span>(<span class="string">&quot;Authentication: Dummy Authentication token format should be in the format: `{Auth Token}:chain_id:{Chain Id}` but &#39;wrong-token&#39; was provided&quot;</span>, response_body[<span class="string">&quot;message&quot;</span>])
+        }
     }
 
-    <span class="attribute">#[<span class="ident">tokio::test</span>]</span>
-    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">no_authentication_or_incorrect_value_should_not_add_session</span>() {
-        <span class="kw">let</span> <span class="ident">no_auth_req</span> <span class="op">=</span> <span class="ident">Request::builder</span>()
-            .<span class="ident">body</span>(<span class="ident">Body::empty</span>())
-            .<span class="ident">expect</span>(<span class="string">&quot;should never fail!&quot;</span>);
+    <span class="attribute">#[tokio::test]</span>
+    <span class="kw">async fn </span>session_from_correct_authentication_token() {
+        <span class="kw">let </span>app_guard = setup_dummy_app().<span class="kw">await</span>;
+        <span class="kw">let </span>app = Arc::new(app_guard.app);
 
-        <span class="kw">let</span> (<span class="ident">dummy_adapter</span>, <span class="ident">database</span>) <span class="op">=</span> <span class="ident">setup</span>().<span class="kw">await</span>;
-        <span class="kw">let</span> <span class="ident">no_auth</span> <span class="op">=</span> <span class="ident">for_request</span>(<span class="ident">no_auth_req</span>, <span class="kw-2">&amp;</span><span class="ident">dummy_adapter</span>, <span class="kw-2">&amp;</span><span class="ident">database</span>)
-            .<span class="kw">await</span>
-            .<span class="ident">expect</span>(<span class="string">&quot;Handling the Request shouldn&#39;t have failed&quot;</span>);
-
-        <span class="macro">assert!</span>(
-            <span class="ident">no_auth</span>.<span class="ident">extensions</span>().<span class="ident">get</span>::<span class="op">&lt;</span><span class="ident">Auth</span><span class="op">&gt;</span>().<span class="ident">is_none</span>(),
-            <span class="string">&quot;There shouldn&#39;t be a Session in the extensions&quot;</span>
-        );
-
-        <span class="comment">// there is a Header, but it has wrong format</span>
-        <span class="kw">let</span> <span class="ident">incorrect_auth_req</span> <span class="op">=</span> <span class="ident">Request::builder</span>()
-            .<span class="ident">header</span>(<span class="ident">AUTHORIZATION</span>, <span class="string">&quot;Wrong Header&quot;</span>)
-            .<span class="ident">body</span>(<span class="ident">Body::empty</span>())
-            .<span class="ident">unwrap</span>();
-        <span class="kw">let</span> <span class="ident">incorrect_auth</span> <span class="op">=</span> <span class="ident">for_request</span>(<span class="ident">incorrect_auth_req</span>, <span class="kw-2">&amp;</span><span class="ident">dummy_adapter</span>, <span class="kw-2">&amp;</span><span class="ident">database</span>)
-            .<span class="kw">await</span>
-            .<span class="ident">expect</span>(<span class="string">&quot;Handling the Request shouldn&#39;t have failed&quot;</span>);
-        <span class="macro">assert!</span>(
-            <span class="ident">incorrect_auth</span>.<span class="ident">extensions</span>().<span class="ident">get</span>::<span class="op">&lt;</span><span class="ident">Auth</span><span class="op">&gt;</span>().<span class="ident">is_none</span>(),
-            <span class="string">&quot;There shouldn&#39;t be a Session in the extensions&quot;</span>
-        );
-
-        <span class="comment">// Token doesn&#39;t exist in the Adapter nor in Redis</span>
-        <span class="kw">let</span> <span class="ident">non_existent_token_req</span> <span class="op">=</span> <span class="ident">Request::builder</span>()
-            .<span class="ident">header</span>(<span class="ident">AUTHORIZATION</span>, <span class="string">&quot;Bearer wrong-token&quot;</span>)
-            .<span class="ident">body</span>(<span class="ident">Body::empty</span>())
-            .<span class="ident">unwrap</span>();
-        <span class="kw">match</span> <span class="ident">for_request</span>(<span class="ident">non_existent_token_req</span>, <span class="kw-2">&amp;</span><span class="ident">dummy_adapter</span>, <span class="kw-2">&amp;</span><span class="ident">database</span>).<span class="kw">await</span> {
-            <span class="prelude-val">Err</span>(<span class="ident">error</span>) =&gt; {
-                <span class="macro">assert_eq!</span>(<span class="ident">error</span>.<span class="ident">to_string</span>(), <span class="string">&quot;Authentication: Dummy Authentication token format should be in the format: `{Auth Token}:chain_id:{Chain Id}` but &#39;wrong-token&#39; was provided&quot;</span>);
-            }
-            <span class="kw">_</span> =&gt; <span class="macro">panic!</span>(<span class="string">&quot;We shouldn&#39;t get a success response nor a different Error than BadRequest for this call&quot;</span>),
+        <span class="kw">let </span>header_token = HeaderToken {
+            token: DUMMY_AUTH[<span class="kw-2">&amp;</span>LEADER].clone(),
+            chain_id: GANACHE_1.chain_id,
         };
+
+        <span class="kw">async fn </span>handle(
+            Extension(auth): Extension&lt;Auth&gt;,
+            Extension(session): Extension&lt;Session&gt;,
+        ) -&gt; String {
+            <span class="macro">assert_eq!</span>(<span class="prelude-val">Some</span>(<span class="string">&quot;120.0.0.1&quot;</span>.to_string()), session.ip);
+            <span class="macro">assert_eq!</span>(<span class="kw-2">*</span>LEADER, auth.uid.to_address());
+
+            <span class="string">&quot;Ok&quot;</span>.into()
+        }
+
+        <span class="kw">let </span><span class="kw-2">mut </span>router = Router::new()
+            .route(<span class="string">&quot;/&quot;</span>, get(handle))
+            .layer(from_fn(authenticate::&lt;Dummy, <span class="kw">_</span>&gt;));
+
+        <span class="kw">let </span>auth_header = <span class="macro">format!</span>(<span class="string">&quot;Bearer {header_token}&quot;</span>);
+        <span class="kw">let </span>request = Request::builder()
+            .header(AUTHORIZATION, auth_header)
+            .header(<span class="string">&quot;true-client-ip&quot;</span>, <span class="string">&quot;120.0.0.1&quot;</span>)
+            .extension(app.clone())
+            .body(Body::empty())
+            .unwrap();
+
+        <span class="comment">// The handle takes care of the assertions for the Extensions for us
+        </span><span class="kw">let </span>response = router
+            .call(request)
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;Valid requests should succeed&quot;</span>);
+
+        <span class="macro">assert_eq!</span>(<span class="string">&quot;Ok&quot;</span>, body_to_string(response).<span class="kw">await</span>);
     }
 
-    <span class="attribute">#[<span class="ident">tokio::test</span>]</span>
-    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">session_from_correct_authentication_token</span>() {
-        <span class="kw">let</span> (<span class="ident">dummy_adapter</span>, <span class="ident">database</span>) <span class="op">=</span> <span class="ident">setup</span>().<span class="kw">await</span>;
-
-        <span class="kw">let</span> <span class="ident">header_token</span> <span class="op">=</span> <span class="ident">HeaderToken</span> {
-            <span class="ident">token</span>: <span class="ident">DUMMY_AUTH</span>[<span class="kw-2">&amp;</span><span class="ident">LEADER</span>].<span class="ident">clone</span>(),
-            <span class="ident">chain_id</span>: <span class="ident">GANACHE_1</span>.<span class="ident">chain_id</span>,
+    <span class="attribute">#[test]</span>
+    <span class="kw">fn </span>test_get_request_ip_headers() {
+        <span class="kw">let </span>build_request = |header: <span class="kw-2">&amp;</span>str, ips: <span class="kw-2">&amp;</span>str| -&gt; Request&lt;Body&gt; {
+            Request::builder()
+                .header(header, ips)
+                .body(Body::empty())
+                .unwrap()
         };
 
-        <span class="kw">let</span> <span class="ident">auth_header</span> <span class="op">=</span> <span class="macro">format!</span>(<span class="string">&quot;Bearer {header_token}&quot;</span>);
-        <span class="kw">let</span> <span class="ident">req</span> <span class="op">=</span> <span class="ident">Request::builder</span>()
-            .<span class="ident">header</span>(<span class="ident">AUTHORIZATION</span>, <span class="ident">auth_header</span>)
-            .<span class="ident">body</span>(<span class="ident">Body::empty</span>())
-            .<span class="ident">unwrap</span>();
+        <span class="comment">// No set headers
+        </span>{
+            <span class="kw">let </span>request = Request::builder().body(Body::empty()).unwrap();
+            <span class="kw">let </span>no_headers = get_request_ip(<span class="kw-2">&amp;</span>request);
+            <span class="macro">assert_eq!</span>(<span class="prelude-val">None</span>, no_headers);
+        }
 
-        <span class="kw">let</span> <span class="ident">altered_request</span> <span class="op">=</span> <span class="ident">for_request</span>(<span class="ident">req</span>, <span class="kw-2">&amp;</span><span class="ident">dummy_adapter</span>, <span class="kw-2">&amp;</span><span class="ident">database</span>)
-            .<span class="kw">await</span>
-            .<span class="ident">expect</span>(<span class="string">&quot;Valid requests should succeed&quot;</span>);
+        <span class="comment">// Empty headers
+        </span>{
+            <span class="kw">let </span>true_client_ip = build_request(<span class="string">&quot;true-client-ip&quot;</span>, <span class="string">&quot;&quot;</span>);
+            <span class="kw">let </span>x_forwarded_for = build_request(<span class="string">&quot;x-forwarded-for&quot;</span>, <span class="string">&quot;&quot;</span>);
 
-        <span class="kw">let</span> <span class="ident">auth</span> <span class="op">=</span> <span class="ident">altered_request</span>
-            .<span class="ident">extensions</span>()
-            .<span class="ident">get</span>::<span class="op">&lt;</span><span class="ident">Auth</span><span class="op">&gt;</span>()
-            .<span class="ident">expect</span>(<span class="string">&quot;There should be a Session set inside the request&quot;</span>);
+            <span class="kw">let </span>actual_true_client = get_request_ip(<span class="kw-2">&amp;</span>true_client_ip);
+            <span class="kw">let </span>actual_x_forwarded = get_request_ip(<span class="kw-2">&amp;</span>x_forwarded_for);
 
-        <span class="macro">assert_eq!</span>(<span class="kw-2">*</span><span class="ident">LEADER</span>, <span class="ident">auth</span>.<span class="ident">uid</span>.<span class="ident">to_address</span>());
+            <span class="macro">assert_eq!</span>(<span class="prelude-val">None</span>, actual_true_client);
+            <span class="macro">assert_eq!</span>(<span class="prelude-val">None</span>, actual_x_forwarded);
+        }
 
-        <span class="kw">let</span> <span class="ident">session</span> <span class="op">=</span> <span class="ident">altered_request</span>
-            .<span class="ident">extensions</span>()
-            .<span class="ident">get</span>::<span class="op">&lt;</span><span class="ident">Session</span><span class="op">&gt;</span>()
-            .<span class="ident">expect</span>(<span class="string">&quot;There should be a Session set inside the request&quot;</span>);
-        <span class="macro">assert!</span>(<span class="ident">session</span>.<span class="ident">ip</span>.<span class="ident">is_none</span>());
+        <span class="comment">// Empty IPs `&quot;,&quot;`
+        </span>{
+            <span class="kw">let </span>true_client_ip = build_request(<span class="string">&quot;true-client-ip&quot;</span>, <span class="string">&quot;,&quot;</span>);
+            <span class="kw">let </span>x_forwarded_for = build_request(<span class="string">&quot;x-forwarded-for&quot;</span>, <span class="string">&quot;,&quot;</span>);
+
+            <span class="kw">let </span>actual_true_client = get_request_ip(<span class="kw-2">&amp;</span>true_client_ip);
+            <span class="kw">let </span>actual_x_forwarded = get_request_ip(<span class="kw-2">&amp;</span>x_forwarded_for);
+
+            <span class="macro">assert_eq!</span>(<span class="prelude-val">None</span>, actual_true_client);
+            <span class="macro">assert_eq!</span>(<span class="prelude-val">None</span>, actual_x_forwarded);
+        }
+
+        <span class="comment">// &quot;true-client-ip&quot; - Single IP
+        </span>{
+            <span class="kw">let </span>ips = <span class="string">&quot;120.0.0.1&quot;</span>;
+            <span class="kw">let </span>true_client_ip = build_request(<span class="string">&quot;true-client-ip&quot;</span>, ips);
+            <span class="kw">let </span>actual_ips = get_request_ip(<span class="kw-2">&amp;</span>true_client_ip);
+
+            <span class="macro">assert_eq!</span>(<span class="prelude-val">Some</span>(ips.to_string()), actual_ips);
+        }
+
+        <span class="comment">// &quot;x-forwarded-for&quot; - Multiple IPs
+        </span>{
+            <span class="kw">let </span>ips = <span class="string">&quot;192.168.0.1,120.0.0.1,10.0.0.10&quot;</span>;
+            <span class="kw">let </span>true_client_ip = build_request(<span class="string">&quot;x-forwarded-for&quot;</span>, ips);
+            <span class="kw">let </span>actual_ips = get_request_ip(<span class="kw-2">&amp;</span>true_client_ip);
+
+            <span class="macro">assert_eq!</span>(<span class="prelude-val">Some</span>(<span class="string">&quot;192.168.0.1&quot;</span>.to_string()), actual_ips);
+        }
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (20ffea693 2022-08-11)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>

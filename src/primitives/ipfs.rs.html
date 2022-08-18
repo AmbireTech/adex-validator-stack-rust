@@ -308,315 +308,315 @@
 <span id="308">308</span>
 <span id="309">309</span>
 <span id="310">310</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">serde</span>::{<span class="ident">Deserialize</span>, <span class="ident">Serialize</span>};
+</pre><pre class="rust"><code><span class="kw">use </span>serde::{Deserialize, Serialize};
 
-<span class="kw">use</span> <span class="ident">std</span>::{<span class="ident">fmt</span>, <span class="ident">str::FromStr</span>};
-<span class="kw">use</span> <span class="ident">thiserror::Error</span>;
+<span class="kw">use </span>std::{fmt, str::FromStr};
+<span class="kw">use </span>thiserror::Error;
 
-<span class="kw">const</span> <span class="ident">URL_PREFIX</span>: <span class="kw-2">&amp;</span><span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;ipfs://&quot;</span>;
+<span class="kw">const </span>URL_PREFIX: <span class="kw-2">&amp;</span>str = <span class="string">&quot;ipfs://&quot;</span>;
 
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">cid</span>::{<span class="ident">Cid</span>, <span class="ident">Error</span>};
+<span class="kw">pub use </span>cid::{Cid, Error};
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Hash</span>, <span class="ident">Copy</span>, <span class="ident">Clone</span>, <span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">Eq</span>, <span class="ident">PartialEq</span>)]</span>
-<span class="attribute">#[<span class="ident">serde</span>(<span class="ident">try_from</span> <span class="op">=</span> <span class="string">&quot;String&quot;</span>, <span class="ident">into</span> <span class="op">=</span> <span class="string">&quot;String&quot;</span>)]</span>
-<span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::upper_case_acronyms</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">IPFS</span>(<span class="kw">pub</span> <span class="ident">cid::Cid</span>);
+<span class="attribute">#[derive(Hash, Copy, Clone, Serialize, Deserialize, Eq, PartialEq)]</span>
+<span class="attribute">#[serde(try_from = <span class="string">&quot;String&quot;</span>, into = <span class="string">&quot;String&quot;</span>)]</span>
+<span class="attribute">#[allow(clippy::upper_case_acronyms)]</span>
+<span class="kw">pub struct </span>IPFS(<span class="kw">pub </span>cid::Cid);
 
-<span class="kw">impl</span> <span class="ident">slog::Value</span> <span class="kw">for</span> <span class="ident">IPFS</span> {
-    <span class="kw">fn</span> <span class="ident">serialize</span>(
+<span class="kw">impl </span>slog::Value <span class="kw">for </span>IPFS {
+    <span class="kw">fn </span>serialize(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">_record</span>: <span class="kw-2">&amp;</span><span class="ident">slog::Record</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>,
-        <span class="ident">key</span>: <span class="ident">slog::Key</span>,
-        <span class="ident">serializer</span>: <span class="kw-2">&amp;mut</span> <span class="kw">dyn</span> <span class="ident">slog::Serializer</span>,
-    ) -&gt; <span class="ident">slog::Result</span> {
-        <span class="ident">serializer</span>.<span class="ident">emit_str</span>(<span class="ident">key</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>.<span class="ident">to_string</span>())
+        _record: <span class="kw-2">&amp;</span>slog::Record&lt;<span class="lifetime">&#39;_</span>&gt;,
+        key: slog::Key,
+        serializer: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>slog::Serializer,
+    ) -&gt; slog::Result {
+        serializer.emit_str(key, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>.to_string())
     }
 }
 
-<span class="kw">impl</span> <span class="ident">fmt::Debug</span> <span class="kw">for</span> <span class="ident">IPFS</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="ident">fmt::Result</span> {
-        <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;IPFS({})&quot;</span>, <span class="self">self</span>.<span class="number">0</span>)
+<span class="kw">impl </span>fmt::Debug <span class="kw">for </span>IPFS {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; fmt::Result {
+        <span class="macro">write!</span>(f, <span class="string">&quot;IPFS({})&quot;</span>, <span class="self">self</span>.<span class="number">0</span>)
     }
 }
 
-<span class="kw">impl</span> <span class="ident">fmt::Display</span> <span class="kw">for</span> <span class="ident">IPFS</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="ident">fmt::Result</span> {
-        <span class="self">self</span>.<span class="number">0</span>.<span class="ident">fmt</span>(<span class="ident">f</span>)
+<span class="kw">impl </span>fmt::Display <span class="kw">for </span>IPFS {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; fmt::Result {
+        <span class="self">self</span>.<span class="number">0</span>.fmt(f)
     }
 }
 
-<span class="kw">impl</span> <span class="ident">FromStr</span> <span class="kw">for</span> <span class="ident">IPFS</span> {
-    <span class="kw">type</span> <span class="prelude-val">Err</span> <span class="op">=</span> <span class="ident">cid::Error</span>;
+<span class="kw">impl </span>FromStr <span class="kw">for </span>IPFS {
+    <span class="kw">type </span><span class="prelude-val">Err </span>= cid::Error;
 
-    <span class="kw">fn</span> <span class="ident">from_str</span>(<span class="ident">s</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident"><span class="self">Self</span>::Err</span><span class="op">&gt;</span> {
-        <span class="ident"><span class="self">Self</span>::try_from</span>(<span class="ident">s</span>)
+    <span class="kw">fn </span>from_str(s: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, <span class="self">Self</span>::Err&gt; {
+        <span class="self">Self</span>::try_from(s)
     }
 }
 
-<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">IPFS</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">String</span> {
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">ipfs</span>: <span class="ident">IPFS</span>) -&gt; <span class="self">Self</span> {
-        <span class="ident">ipfs</span>.<span class="number">0</span>.<span class="ident">to_string</span>()
+<span class="kw">impl </span>From&lt;IPFS&gt; <span class="kw">for </span>String {
+    <span class="kw">fn </span>from(ipfs: IPFS) -&gt; <span class="self">Self </span>{
+        ipfs.<span class="number">0</span>.to_string()
     }
 }
 
-<span class="kw">impl</span> <span class="ident">TryFrom</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">IPFS</span> {
-    <span class="kw">type</span> <span class="ident">Error</span> <span class="op">=</span> <span class="ident">cid::Error</span>;
+<span class="kw">impl </span>TryFrom&lt;String&gt; <span class="kw">for </span>IPFS {
+    <span class="kw">type </span>Error = cid::Error;
 
-    <span class="kw">fn</span> <span class="ident">try_from</span>(<span class="ident">value</span>: <span class="ident">String</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident"><span class="self">Self</span>::Error</span><span class="op">&gt;</span> {
-        <span class="ident"><span class="self">Self</span>::try_from</span>(<span class="ident">value</span>.<span class="ident">as_str</span>())
+    <span class="kw">fn </span>try_from(value: String) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, <span class="self">Self</span>::Error&gt; {
+        <span class="self">Self</span>::try_from(value.as_str())
     }
 }
 
-<span class="kw">impl</span> <span class="ident">TryFrom</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">String</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">IPFS</span> {
-    <span class="kw">type</span> <span class="ident">Error</span> <span class="op">=</span> <span class="ident">cid::Error</span>;
+<span class="kw">impl </span>TryFrom&lt;<span class="kw-2">&amp;</span>String&gt; <span class="kw">for </span>IPFS {
+    <span class="kw">type </span>Error = cid::Error;
 
-    <span class="kw">fn</span> <span class="ident">try_from</span>(<span class="ident">value</span>: <span class="kw-2">&amp;</span><span class="ident">String</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident"><span class="self">Self</span>::Error</span><span class="op">&gt;</span> {
-        <span class="ident"><span class="self">Self</span>::try_from</span>(<span class="ident">value</span>.<span class="ident">as_str</span>())
+    <span class="kw">fn </span>try_from(value: <span class="kw-2">&amp;</span>String) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, <span class="self">Self</span>::Error&gt; {
+        <span class="self">Self</span>::try_from(value.as_str())
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="ident">TryFrom</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">str</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">IPFS</span> {
-    <span class="kw">type</span> <span class="ident">Error</span> <span class="op">=</span> <span class="ident">cid::Error</span>;
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; TryFrom&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>str&gt; <span class="kw">for </span>IPFS {
+    <span class="kw">type </span>Error = cid::Error;
 
-    <span class="kw">fn</span> <span class="ident">try_from</span>(<span class="ident">value</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident"><span class="self">Self</span>::Error</span><span class="op">&gt;</span> {
-        <span class="ident">cid::Cid::try_from</span>(<span class="ident">value</span>).<span class="ident">map</span>(<span class="self">Self</span>)
+    <span class="kw">fn </span>try_from(value: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, <span class="self">Self</span>::Error&gt; {
+        cid::Cid::try_from(value).map(<span class="self">Self</span>)
     }
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">Eq</span>, <span class="ident">PartialEq</span>)]</span>
-<span class="attribute">#[<span class="ident">serde</span>(<span class="ident">try_from</span> <span class="op">=</span> <span class="string">&quot;String&quot;</span>, <span class="ident">into</span> <span class="op">=</span> <span class="string">&quot;String&quot;</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Url</span>(<span class="ident">IPFS</span>);
+<span class="attribute">#[derive(Clone, Serialize, Deserialize, Eq, PartialEq)]</span>
+<span class="attribute">#[serde(try_from = <span class="string">&quot;String&quot;</span>, into = <span class="string">&quot;String&quot;</span>)]</span>
+<span class="kw">pub struct </span>Url(IPFS);
 
-<span class="kw">impl</span> <span class="ident">Url</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">to_url</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">url::Url</span> {
-        <span class="self">self</span>.<span class="ident">into</span>()
+<span class="kw">impl </span>Url {
+    <span class="kw">pub fn </span>to_url(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; url::Url {
+        <span class="self">self</span>.into()
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">into_ipfs</span>(<span class="self">self</span>) -&gt; <span class="ident">IPFS</span> {
-        <span class="self">self</span>.<span class="number">0</span>
-    }
+    <span class="kw">pub fn </span>into_ipfs(<span class="self">self</span>) -&gt; IPFS {
+        <span class="self">self</span>.<span class="number">0
+    </span>}
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">as_ipfs</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">IPFS</span> {
-        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>
-    }
+    <span class="kw">pub fn </span>as_ipfs(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>IPFS {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0
+    </span>}
 }
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;postgres&quot;</span>)]</span>
-<span class="kw">mod</span> <span class="ident">postgres</span> {
-    <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::IPFS</span>;
-    <span class="kw">use</span> <span class="ident">bytes::BytesMut</span>;
-    <span class="kw">use</span> <span class="ident">std::error::Error</span>;
-    <span class="kw">use</span> <span class="ident">tokio_postgres::types</span>::{<span class="ident">accepts</span>, <span class="ident">to_sql_checked</span>, <span class="ident">FromSql</span>, <span class="ident">IsNull</span>, <span class="ident">ToSql</span>, <span class="ident">Type</span>};
+<span class="attribute">#[cfg(feature = <span class="string">&quot;postgres&quot;</span>)]</span>
+<span class="kw">mod </span>postgres {
+    <span class="kw">use </span><span class="kw">super</span>::IPFS;
+    <span class="kw">use </span>bytes::BytesMut;
+    <span class="kw">use </span>std::error::Error;
+    <span class="kw">use </span>tokio_postgres::types::{accepts, to_sql_checked, FromSql, IsNull, ToSql, Type};
 
-    <span class="kw">impl</span> <span class="ident">ToSql</span> <span class="kw">for</span> <span class="ident">IPFS</span> {
-        <span class="kw">fn</span> <span class="ident">to_sql</span>(
+    <span class="kw">impl </span>ToSql <span class="kw">for </span>IPFS {
+        <span class="kw">fn </span>to_sql(
             <span class="kw-2">&amp;</span><span class="self">self</span>,
-            <span class="ident">ty</span>: <span class="kw-2">&amp;</span><span class="ident">Type</span>,
-            <span class="ident">w</span>: <span class="kw-2">&amp;mut</span> <span class="ident">BytesMut</span>,
-        ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">IsNull</span>, <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Error</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-            <span class="self">self</span>.<span class="number">0</span>.<span class="ident">to_string</span>().<span class="ident">to_sql</span>(<span class="ident">ty</span>, <span class="ident">w</span>)
+            ty: <span class="kw-2">&amp;</span>Type,
+            w: <span class="kw-2">&amp;mut </span>BytesMut,
+        ) -&gt; <span class="prelude-ty">Result</span>&lt;IsNull, Box&lt;<span class="kw">dyn </span>Error + Sync + Send&gt;&gt; {
+            <span class="self">self</span>.<span class="number">0</span>.to_string().to_sql(ty, w)
         }
 
-        <span class="macro">accepts!</span>(<span class="ident">TEXT</span>, <span class="ident">VARCHAR</span>);
+        <span class="macro">accepts!</span>(TEXT, VARCHAR);
         <span class="macro">to_sql_checked!</span>();
     }
 
-    <span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="ident">FromSql</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">IPFS</span> {
-        <span class="kw">fn</span> <span class="ident">from_sql</span>(<span class="ident">ty</span>: <span class="kw-2">&amp;</span><span class="ident">Type</span>, <span class="ident">raw</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> [<span class="ident">u8</span>]) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Error</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-            <span class="kw">let</span> <span class="ident">str_slice</span> <span class="op">=</span> <span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">str</span> <span class="kw">as</span> <span class="ident">FromSql</span><span class="op">&gt;</span><span class="ident">::from_sql</span>(<span class="ident">ty</span>, <span class="ident">raw</span>)<span class="question-mark">?</span>;
+    <span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; FromSql&lt;<span class="lifetime">&#39;a</span>&gt; <span class="kw">for </span>IPFS {
+        <span class="kw">fn </span>from_sql(ty: <span class="kw-2">&amp;</span>Type, raw: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>[u8]) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, Box&lt;<span class="kw">dyn </span>Error + Sync + Send&gt;&gt; {
+            <span class="kw">let </span>str_slice = &lt;<span class="kw-2">&amp;</span>str <span class="kw">as </span>FromSql&gt;::from_sql(ty, raw)<span class="question-mark">?</span>;
 
-            <span class="prelude-val">Ok</span>(<span class="ident">str_slice</span>.<span class="ident">parse</span>()<span class="question-mark">?</span>)
+            <span class="prelude-val">Ok</span>(str_slice.parse()<span class="question-mark">?</span>)
         }
 
-        <span class="macro">accepts!</span>(<span class="ident">TEXT</span>, <span class="ident">VARCHAR</span>);
+        <span class="macro">accepts!</span>(TEXT, VARCHAR);
     }
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Error</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">UrlError</span> {
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Parsing the IPFS Cid failed&quot;</span>)]</span>
-    <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::upper_case_acronyms</span>)]</span>
-    <span class="ident">IPFS</span>(<span class="attribute">#[<span class="ident">from</span>]</span> <span class="ident">cid::Error</span>),
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Url should start with {} prefix&quot;</span>, <span class="ident">URL_PREFIX</span>)]</span>
-    <span class="ident">NoPrefix</span>,
+<span class="attribute">#[derive(Debug, Error)]</span>
+<span class="kw">pub enum </span>UrlError {
+    <span class="attribute">#[error(<span class="string">&quot;Parsing the IPFS Cid failed&quot;</span>)]</span>
+    <span class="attribute">#[allow(clippy::upper_case_acronyms)]</span>
+    IPFS(<span class="attribute">#[from]</span> cid::Error),
+    <span class="attribute">#[error(<span class="string">&quot;Url should start with {} prefix&quot;</span>, URL_PREFIX)]</span>
+    NoPrefix,
 }
 
-<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">Url</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">url::Url</span> {
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">url</span>: <span class="ident">Url</span>) -&gt; <span class="self">Self</span> {
-        (<span class="kw-2">&amp;</span><span class="ident">url</span>).<span class="ident">into</span>()
+<span class="kw">impl </span>From&lt;Url&gt; <span class="kw">for </span>url::Url {
+    <span class="kw">fn </span>from(url: Url) -&gt; <span class="self">Self </span>{
+        (<span class="kw-2">&amp;</span>url).into()
     }
 }
 
-<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">Url</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">url::Url</span> {
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">url</span>: <span class="kw-2">&amp;</span><span class="ident">Url</span>) -&gt; <span class="self">Self</span> {
-        <span class="kw">let</span> <span class="ident">url_string</span> <span class="op">=</span> <span class="ident">url</span>.<span class="ident">to_string</span>();
+<span class="kw">impl </span>From&lt;<span class="kw-2">&amp;</span>Url&gt; <span class="kw">for </span>url::Url {
+    <span class="kw">fn </span>from(url: <span class="kw-2">&amp;</span>Url) -&gt; <span class="self">Self </span>{
+        <span class="kw">let </span>url_string = url.to_string();
 
-        <span class="ident">url::Url::parse</span>(<span class="kw-2">&amp;</span><span class="ident">url_string</span>).<span class="ident">expect</span>(<span class="string">&quot;This should never fail&quot;</span>)
+        url::Url::parse(<span class="kw-2">&amp;</span>url_string).expect(<span class="string">&quot;This should never fail&quot;</span>)
     }
 }
 
-<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">Url</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">String</span> {
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">url</span>: <span class="ident">Url</span>) -&gt; <span class="self">Self</span> {
-        <span class="ident">url</span>.<span class="ident">to_string</span>()
+<span class="kw">impl </span>From&lt;Url&gt; <span class="kw">for </span>String {
+    <span class="kw">fn </span>from(url: Url) -&gt; <span class="self">Self </span>{
+        url.to_string()
     }
 }
 
-<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">Url</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">String</span> {
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">url</span>: <span class="kw-2">&amp;</span><span class="ident">Url</span>) -&gt; <span class="self">Self</span> {
-        <span class="ident">url</span>.<span class="ident">to_string</span>()
+<span class="kw">impl </span>From&lt;<span class="kw-2">&amp;</span>Url&gt; <span class="kw">for </span>String {
+    <span class="kw">fn </span>from(url: <span class="kw-2">&amp;</span>Url) -&gt; <span class="self">Self </span>{
+        url.to_string()
     }
 }
 
-<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">IPFS</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Url</span> {
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">ipfs</span>: <span class="ident">IPFS</span>) -&gt; <span class="self">Self</span> {
-        <span class="self">Self</span>(<span class="ident">ipfs</span>)
+<span class="kw">impl </span>From&lt;IPFS&gt; <span class="kw">for </span>Url {
+    <span class="kw">fn </span>from(ipfs: IPFS) -&gt; <span class="self">Self </span>{
+        <span class="self">Self</span>(ipfs)
     }
 }
 
-<span class="kw">impl</span> <span class="ident">FromStr</span> <span class="kw">for</span> <span class="ident">Url</span> {
-    <span class="kw">type</span> <span class="prelude-val">Err</span> <span class="op">=</span> <span class="ident">UrlError</span>;
+<span class="kw">impl </span>FromStr <span class="kw">for </span>Url {
+    <span class="kw">type </span><span class="prelude-val">Err </span>= UrlError;
 
-    <span class="kw">fn</span> <span class="ident">from_str</span>(<span class="ident">s</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident"><span class="self">Self</span>::Err</span><span class="op">&gt;</span> {
-        <span class="ident"><span class="self">Self</span>::try_from</span>(<span class="ident">s</span>)
+    <span class="kw">fn </span>from_str(s: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, <span class="self">Self</span>::Err&gt; {
+        <span class="self">Self</span>::try_from(s)
     }
 }
 
-<span class="kw">impl</span> <span class="ident">TryFrom</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Url</span> {
-    <span class="kw">type</span> <span class="ident">Error</span> <span class="op">=</span> <span class="ident">UrlError</span>;
+<span class="kw">impl </span>TryFrom&lt;String&gt; <span class="kw">for </span>Url {
+    <span class="kw">type </span>Error = UrlError;
 
-    <span class="kw">fn</span> <span class="ident">try_from</span>(<span class="ident">value</span>: <span class="ident">String</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident"><span class="self">Self</span>::Error</span><span class="op">&gt;</span> {
-        <span class="ident"><span class="self">Self</span>::try_from</span>(<span class="ident">value</span>.<span class="ident">as_str</span>())
+    <span class="kw">fn </span>try_from(value: String) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, <span class="self">Self</span>::Error&gt; {
+        <span class="self">Self</span>::try_from(value.as_str())
     }
 }
 
-<span class="kw">impl</span> <span class="ident">TryFrom</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">str</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Url</span> {
-    <span class="kw">type</span> <span class="ident">Error</span> <span class="op">=</span> <span class="ident">UrlError</span>;
+<span class="kw">impl </span>TryFrom&lt;<span class="kw-2">&amp;</span>str&gt; <span class="kw">for </span>Url {
+    <span class="kw">type </span>Error = UrlError;
 
-    <span class="kw">fn</span> <span class="ident">try_from</span>(<span class="ident">value</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident"><span class="self">Self</span>::Error</span><span class="op">&gt;</span> {
-        <span class="kw">match</span> <span class="ident">value</span>.<span class="ident">strip_prefix</span>(<span class="string">&quot;ipfs://&quot;</span>) {
-            <span class="comment">// There is a prefix, everything is OK</span>
-            <span class="prelude-val">Some</span>(<span class="ident">stripped</span>) =&gt; <span class="prelude-val">Ok</span>(<span class="self">Self</span>(<span class="ident">IPFS::try_from</span>(<span class="ident">stripped</span>)<span class="question-mark">?</span>)),
-            <span class="prelude-val">None</span> =&gt; <span class="prelude-val">Err</span>(<span class="ident">UrlError::NoPrefix</span>),
+    <span class="kw">fn </span>try_from(value: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, <span class="self">Self</span>::Error&gt; {
+        <span class="kw">match </span>value.strip_prefix(<span class="string">&quot;ipfs://&quot;</span>) {
+            <span class="comment">// There is a prefix, everything is OK
+            </span><span class="prelude-val">Some</span>(stripped) =&gt; <span class="prelude-val">Ok</span>(<span class="self">Self</span>(IPFS::try_from(stripped)<span class="question-mark">?</span>)),
+            <span class="prelude-val">None </span>=&gt; <span class="prelude-val">Err</span>(UrlError::NoPrefix),
         }
     }
 }
 
-<span class="kw">impl</span> <span class="ident">TryFrom</span><span class="op">&lt;</span><span class="ident">url::Url</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Url</span> {
-    <span class="kw">type</span> <span class="ident">Error</span> <span class="op">=</span> <span class="ident">UrlError</span>;
+<span class="kw">impl </span>TryFrom&lt;url::Url&gt; <span class="kw">for </span>Url {
+    <span class="kw">type </span>Error = UrlError;
 
-    <span class="kw">fn</span> <span class="ident">try_from</span>(<span class="ident">url</span>: <span class="ident">url::Url</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident"><span class="self">Self</span>::Error</span><span class="op">&gt;</span> {
-        <span class="ident"><span class="self">Self</span>::try_from</span>(<span class="ident">url</span>.<span class="ident">to_string</span>())
+    <span class="kw">fn </span>try_from(url: url::Url) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, <span class="self">Self</span>::Error&gt; {
+        <span class="self">Self</span>::try_from(url.to_string())
     }
 }
 
-<span class="kw">impl</span> <span class="ident">fmt::Display</span> <span class="kw">for</span> <span class="ident">Url</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="ident">fmt::Result</span> {
-        <span class="kw">let</span> <span class="ident">url</span> <span class="op">=</span> <span class="ident">URL_PREFIX</span>.<span class="ident">to_string</span>() <span class="op">+</span> <span class="self">self</span>.<span class="number">0</span>.<span class="ident">to_string</span>().<span class="ident">as_str</span>();
+<span class="kw">impl </span>fmt::Display <span class="kw">for </span>Url {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; fmt::Result {
+        <span class="kw">let </span>url = URL_PREFIX.to_string() + <span class="self">self</span>.<span class="number">0</span>.to_string().as_str();
 
-        <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;{}&quot;</span>, <span class="ident">url</span>)
+        <span class="macro">write!</span>(f, <span class="string">&quot;{}&quot;</span>, url)
     }
 }
 
-<span class="kw">impl</span> <span class="ident">fmt::Debug</span> <span class="kw">for</span> <span class="ident">Url</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="ident">fmt::Result</span> {
-        <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;Url({})&quot;</span>, <span class="self">self</span>)
+<span class="kw">impl </span>fmt::Debug <span class="kw">for </span>Url {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; fmt::Result {
+        <span class="macro">write!</span>(f, <span class="string">&quot;Url({})&quot;</span>, <span class="self">self</span>)
     }
 }
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
-<span class="kw">mod</span> <span class="ident">test</span> {
-    <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
+<span class="attribute">#[cfg(test)]</span>
+<span class="kw">mod </span>test {
+    <span class="kw">use super</span>::<span class="kw-2">*</span>;
 
-    <span class="comment">// CID V0</span>
-    <span class="kw">static</span> <span class="ident">TESTS_IPFS_V0</span>: [<span class="kw-2">&amp;</span><span class="ident">str</span>; <span class="number">4</span>] <span class="op">=</span> [
+    <span class="comment">// CID V0
+    </span><span class="kw">static </span>TESTS_IPFS_V0: [<span class="kw-2">&amp;</span>str; <span class="number">4</span>] = [
         <span class="string">&quot;QmcUVX7fvoLMM93uN2bD3wGTH8MXSxeL8hojYfL2Lhp7mR&quot;</span>,
         <span class="string">&quot;Qmasg8FrbuSQpjFu3kRnZF9beg8rEBFrqgi1uXDRwCbX5f&quot;</span>,
         <span class="string">&quot;QmQnu8zrHsuVvnTJsEgDHYA8c1MmRL7YLiMD8uzDUJKcNq&quot;</span>,
         <span class="string">&quot;QmYYBULc9QDEaDr8HAXvVWHDmFfL2GvyumYRr1g4ERBC96&quot;</span>,
     ];
 
-    <span class="comment">// CID V1</span>
-    <span class="kw">static</span> <span class="ident">TESTS_IPFS_V1</span>: [<span class="kw-2">&amp;</span><span class="ident">str</span>; <span class="number">1</span>] <span class="op">=</span> [
-        <span class="comment">// V1 of the V0 ipfs: `QmcUVX7fvoLMM93uN2bD3wGTH8MXSxeL8hojYfL2Lhp7mR`</span>
-        <span class="string">&quot;bafybeif2h3mynaf3ylgdbs6arf6mczqycargt5cqm3rmel3wpjarlswway&quot;</span>,
+    <span class="comment">// CID V1
+    </span><span class="kw">static </span>TESTS_IPFS_V1: [<span class="kw-2">&amp;</span>str; <span class="number">1</span>] = [
+        <span class="comment">// V1 of the V0 ipfs: `QmcUVX7fvoLMM93uN2bD3wGTH8MXSxeL8hojYfL2Lhp7mR`
+        </span><span class="string">&quot;bafybeif2h3mynaf3ylgdbs6arf6mczqycargt5cqm3rmel3wpjarlswway&quot;</span>,
     ];
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">ipfs_from_string_and_serialize_deserialize</span>() {
-        <span class="kw">let</span> <span class="ident">check</span> <span class="op">=</span> <span class="op">|</span><span class="ident">ipfs_str</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">version</span>: <span class="ident">cid::Version</span><span class="op">|</span> {
-            <span class="kw">let</span> <span class="ident">ipfs</span> <span class="op">=</span> <span class="ident">IPFS::try_from</span>(<span class="ident">ipfs_str</span>).<span class="ident">expect</span>(<span class="string">&quot;should be ok&quot;</span>);
-            <span class="macro">assert_eq!</span>(<span class="ident">ipfs</span>.<span class="number">0</span>.<span class="ident">version</span>(), <span class="ident">version</span>);
-            <span class="macro">assert_eq!</span>(<span class="ident">ipfs</span>.<span class="number">0</span>.<span class="ident">to_string</span>(), <span class="ident">ipfs_str</span>);
+    <span class="attribute">#[test]</span>
+    <span class="kw">fn </span>ipfs_from_string_and_serialize_deserialize() {
+        <span class="kw">let </span>check = |ipfs_str: <span class="kw-2">&amp;</span>str, version: cid::Version| {
+            <span class="kw">let </span>ipfs = IPFS::try_from(ipfs_str).expect(<span class="string">&quot;should be ok&quot;</span>);
+            <span class="macro">assert_eq!</span>(ipfs.<span class="number">0</span>.version(), version);
+            <span class="macro">assert_eq!</span>(ipfs.<span class="number">0</span>.to_string(), ipfs_str);
 
-            <span class="kw">let</span> <span class="ident">expected_json</span> <span class="op">=</span> <span class="macro">format!</span>(<span class="string">&quot;\&quot;{}\&quot;&quot;</span>, <span class="ident">ipfs</span>);
-            <span class="kw">let</span> <span class="ident">actual_json</span> <span class="op">=</span> <span class="ident">serde_json::to_string</span>(<span class="kw-2">&amp;</span><span class="ident">ipfs</span>).<span class="ident">expect</span>(<span class="string">&quot;Should serialize&quot;</span>);
+            <span class="kw">let </span>expected_json = <span class="macro">format!</span>(<span class="string">&quot;\&quot;{}\&quot;&quot;</span>, ipfs);
+            <span class="kw">let </span>actual_json = serde_json::to_string(<span class="kw-2">&amp;</span>ipfs).expect(<span class="string">&quot;Should serialize&quot;</span>);
 
-            <span class="macro">assert_eq!</span>(<span class="ident">expected_json</span>, <span class="ident">actual_json</span>);
+            <span class="macro">assert_eq!</span>(expected_json, actual_json);
             <span class="macro">assert_eq!</span>(
-                <span class="ident">ipfs</span>,
-                <span class="ident">serde_json::from_str</span>(<span class="kw-2">&amp;</span><span class="ident">actual_json</span>).<span class="ident">expect</span>(<span class="string">&quot;Should Deserialize&quot;</span>)
+                ipfs,
+                serde_json::from_str(<span class="kw-2">&amp;</span>actual_json).expect(<span class="string">&quot;Should Deserialize&quot;</span>)
             )
         };
 
-        <span class="kw">for</span> <span class="kw-2">&amp;</span><span class="ident">ipfs_str</span> <span class="kw">in</span> <span class="ident">TESTS_IPFS_V0</span>.<span class="ident">iter</span>() {
-            <span class="ident">check</span>(<span class="ident">ipfs_str</span>, <span class="ident">cid::Version::V0</span>)
+        <span class="kw">for </span><span class="kw-2">&amp;</span>ipfs_str <span class="kw">in </span>TESTS_IPFS_V0.iter() {
+            check(ipfs_str, cid::Version::V0)
         }
 
-        <span class="kw">for</span> <span class="kw-2">&amp;</span><span class="ident">ipfs_str</span> <span class="kw">in</span> <span class="ident">TESTS_IPFS_V1</span>.<span class="ident">iter</span>() {
-            <span class="ident">check</span>(<span class="ident">ipfs_str</span>, <span class="ident">cid::Version::V1</span>)
+        <span class="kw">for </span><span class="kw-2">&amp;</span>ipfs_str <span class="kw">in </span>TESTS_IPFS_V1.iter() {
+            check(ipfs_str, cid::Version::V1)
         }
 
-        <span class="comment">// v0 != v1</span>
-        <span class="macro">assert_ne!</span>(
-            <span class="ident">IPFS::try_from</span>(<span class="ident">TESTS_IPFS_V0</span>[<span class="number">0</span>]).<span class="ident">expect</span>(<span class="string">&quot;Should create V0 IPFS&quot;</span>),
-            <span class="ident">IPFS::try_from</span>(<span class="ident">TESTS_IPFS_V1</span>[<span class="number">0</span>]).<span class="ident">expect</span>(<span class="string">&quot;Should create V1 IPFS&quot;</span>)
+        <span class="comment">// v0 != v1
+        </span><span class="macro">assert_ne!</span>(
+            IPFS::try_from(TESTS_IPFS_V0[<span class="number">0</span>]).expect(<span class="string">&quot;Should create V0 IPFS&quot;</span>),
+            IPFS::try_from(TESTS_IPFS_V1[<span class="number">0</span>]).expect(<span class="string">&quot;Should create V1 IPFS&quot;</span>)
         )
     }
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">url_from_string_serialize_deserialize_and_into_and_from_url</span>() {
-        <span class="comment">// Valid cases</span>
-        <span class="kw">for</span> <span class="kw-2">&amp;</span><span class="ident">ipfs_str</span> <span class="kw">in</span> <span class="ident">TESTS_IPFS_V1</span>.<span class="ident">iter</span>() {
-            <span class="kw">let</span> <span class="ident">url_string</span> <span class="op">=</span> <span class="macro">format!</span>(<span class="string">&quot;ipfs://{}&quot;</span>, <span class="ident">ipfs_str</span>);
+    <span class="attribute">#[test]</span>
+    <span class="kw">fn </span>url_from_string_serialize_deserialize_and_into_and_from_url() {
+        <span class="comment">// Valid cases
+        </span><span class="kw">for </span><span class="kw-2">&amp;</span>ipfs_str <span class="kw">in </span>TESTS_IPFS_V1.iter() {
+            <span class="kw">let </span>url_string = <span class="macro">format!</span>(<span class="string">&quot;ipfs://{}&quot;</span>, ipfs_str);
 
-            <span class="kw">let</span> <span class="ident">url</span> <span class="op">=</span> <span class="ident">Url::try_from</span>(<span class="ident">url_string</span>.<span class="ident">as_str</span>())
-                .<span class="ident">expect</span>(<span class="string">&quot;Should create from valid ipfs:// prefixed URL&quot;</span>);
+            <span class="kw">let </span>url = Url::try_from(url_string.as_str())
+                .expect(<span class="string">&quot;Should create from valid ipfs:// prefixed URL&quot;</span>);
 
-            <span class="macro">assert_eq!</span>(<span class="kw-2">&amp;</span><span class="ident">url_string</span>, <span class="kw-2">&amp;</span><span class="ident">url</span>.<span class="ident">to_string</span>());
+            <span class="macro">assert_eq!</span>(<span class="kw-2">&amp;</span>url_string, <span class="kw-2">&amp;</span>url.to_string());
             <span class="macro">assert_eq!</span>(
-                <span class="ident">url::Url::from_str</span>(<span class="kw-2">&amp;</span><span class="ident">url_string</span>).<span class="ident">expect</span>(<span class="string">&quot;Valid url::Url provided&quot;</span>),
-                <span class="ident">url</span>.<span class="ident">to_url</span>()
+                url::Url::from_str(<span class="kw-2">&amp;</span>url_string).expect(<span class="string">&quot;Valid url::Url provided&quot;</span>),
+                url.to_url()
             );
 
-            <span class="macro">assert_eq!</span>(<span class="kw-2">&amp;</span><span class="ident">url</span>, <span class="kw-2">&amp;</span><span class="ident">url_string</span>.<span class="ident">parse</span>::<span class="op">&lt;</span><span class="ident">Url</span><span class="op">&gt;</span>().<span class="ident">expect</span>(<span class="string">&quot;Should parse&quot;</span>));
+            <span class="macro">assert_eq!</span>(<span class="kw-2">&amp;</span>url, <span class="kw-2">&amp;</span>url_string.parse::&lt;Url&gt;().expect(<span class="string">&quot;Should parse&quot;</span>));
 
-            <span class="kw">let</span> <span class="ident">expected_json</span> <span class="op">=</span> <span class="macro">format!</span>(<span class="string">&quot;\&quot;{}\&quot;&quot;</span>, <span class="ident">url</span>);
-            <span class="kw">let</span> <span class="ident">actual_json</span> <span class="op">=</span> <span class="ident">serde_json::to_string</span>(<span class="kw-2">&amp;</span><span class="ident">url</span>).<span class="ident">expect</span>(<span class="string">&quot;Should serialize&quot;</span>);
+            <span class="kw">let </span>expected_json = <span class="macro">format!</span>(<span class="string">&quot;\&quot;{}\&quot;&quot;</span>, url);
+            <span class="kw">let </span>actual_json = serde_json::to_string(<span class="kw-2">&amp;</span>url).expect(<span class="string">&quot;Should serialize&quot;</span>);
 
-            <span class="macro">assert_eq!</span>(<span class="ident">expected_json</span>, <span class="ident">actual_json</span>);
+            <span class="macro">assert_eq!</span>(expected_json, actual_json);
             <span class="macro">assert_eq!</span>(
-                <span class="ident">url</span>,
-                <span class="ident">serde_json::from_str</span>(<span class="kw-2">&amp;</span><span class="ident">actual_json</span>).<span class="ident">expect</span>(<span class="string">&quot;Should Deserialize&quot;</span>)
+                url,
+                serde_json::from_str(<span class="kw-2">&amp;</span>actual_json).expect(<span class="string">&quot;Should Deserialize&quot;</span>)
             )
         }
 
-        <span class="comment">// Invalid cases</span>
-        <span class="comment">// CID V0 - Invalid scheme - valid IPFS</span>
-        <span class="macro">assert!</span>(<span class="macro">matches!</span>(
-            <span class="string">&quot;https://QmcUVX7fvoLMM93uN2bD3wGTH8MXSxeL8hojYfL2Lhp7mR&quot;</span>.<span class="ident">parse</span>::<span class="op">&lt;</span><span class="ident">Url</span><span class="op">&gt;</span>(),
-            <span class="prelude-val">Err</span>(<span class="ident">UrlError::NoPrefix</span>)
+        <span class="comment">// Invalid cases
+        // CID V0 - Invalid scheme - valid IPFS
+        </span><span class="macro">assert!</span>(<span class="macro">matches!</span>(
+            <span class="string">&quot;https://QmcUVX7fvoLMM93uN2bD3wGTH8MXSxeL8hojYfL2Lhp7mR&quot;</span>.parse::&lt;Url&gt;(),
+            <span class="prelude-val">Err</span>(UrlError::NoPrefix)
         ));
-        <span class="comment">// CID V0 - Invalid scheme - valid IPFS</span>
-        <span class="macro">assert!</span>(<span class="macro">matches!</span>(
-            <span class="string">&quot;ipfs://NotValid&quot;</span>.<span class="ident">parse</span>::<span class="op">&lt;</span><span class="ident">Url</span><span class="op">&gt;</span>(),
-            <span class="prelude-val">Err</span>(<span class="ident">UrlError::IPFS</span>(<span class="ident">cid::Error::ParsingError</span>)),
+        <span class="comment">// CID V0 - Invalid scheme - valid IPFS
+        </span><span class="macro">assert!</span>(<span class="macro">matches!</span>(
+            <span class="string">&quot;ipfs://NotValid&quot;</span>.parse::&lt;Url&gt;(),
+            <span class="prelude-val">Err</span>(UrlError::IPFS(cid::Error::ParsingError)),
         ));
-        <span class="comment">// CID V1 - Invalid scheme - valid IPFS</span>
-        <span class="macro">assert!</span>(<span class="macro">matches!</span>(
-            <span class="string">&quot;https://bafybeif2h3mynaf3ylgdbs6arf6mczqycargt5cqm3rmel3wpjarlswway&quot;</span>.<span class="ident">parse</span>::<span class="op">&lt;</span><span class="ident">Url</span><span class="op">&gt;</span>(),
-            <span class="prelude-val">Err</span>(<span class="ident">UrlError::NoPrefix</span>),
+        <span class="comment">// CID V1 - Invalid scheme - valid IPFS
+        </span><span class="macro">assert!</span>(<span class="macro">matches!</span>(
+            <span class="string">&quot;https://bafybeif2h3mynaf3ylgdbs6arf6mczqycargt5cqm3rmel3wpjarlswway&quot;</span>.parse::&lt;Url&gt;(),
+            <span class="prelude-val">Err</span>(UrlError::NoPrefix),
         ));
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="primitives" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (20ffea693 2022-08-11)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="primitives" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>

@@ -125,132 +125,132 @@
 <span id="125">125</span>
 <span id="126">126</span>
 <span id="127">127</span>
-</pre><pre class="rust"><code><span class="doccomment">//! The [`Ethereum`] client for the [`Adapter`].</span>
+</pre><pre class="rust"><code><span class="doccomment">//! The [`Ethereum`] client for the [`Adapter`].
 
-<span class="kw">use</span> <span class="ident">ethsign</span>::{<span class="ident">KeyFile</span>, <span class="ident">Protected</span>, <span class="ident">SecretKey</span>, <span class="ident">Signature</span>};
+</span><span class="kw">use </span>ethsign::{KeyFile, Protected, SecretKey, Signature};
 
-<span class="kw">use</span> <span class="ident">once_cell::sync::Lazy</span>;
-<span class="kw">use</span> <span class="ident">web3::signing::keccak256</span>;
+<span class="kw">use </span>once_cell::sync::Lazy;
+<span class="kw">use </span>web3::signing::keccak256;
 
-<span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">Adapter</span>, <span class="ident">LockedState</span>, <span class="ident">UnlockedState</span>};
+<span class="kw">use crate</span>::{Adapter, LockedState, UnlockedState};
 
-<span class="kw">pub</span> <span class="kw">use</span> {
-    <span class="ident">client</span>::{<span class="ident">Ethereum</span>, <span class="ident">Options</span>},
-    <span class="ident">error::Error</span>,
+<span class="kw">pub use </span>{
+    client::{Ethereum, Options},
+    error::Error,
 };
 
-<span class="kw">pub</span> <span class="kw">type</span> <span class="ident">UnlockedAdapter</span> <span class="op">=</span> <span class="ident">Adapter</span><span class="op">&lt;</span><span class="ident">client::Ethereum</span><span class="op">&lt;</span><span class="ident">UnlockedWallet</span><span class="op">&gt;</span>, <span class="ident">UnlockedState</span><span class="op">&gt;</span>;
-<span class="kw">pub</span> <span class="kw">type</span> <span class="ident">LockedAdapter</span> <span class="op">=</span> <span class="ident">Adapter</span><span class="op">&lt;</span><span class="ident">client::Ethereum</span><span class="op">&lt;</span><span class="ident">LockedWallet</span><span class="op">&gt;</span>, <span class="ident">LockedState</span><span class="op">&gt;</span>;
-<span class="kw">pub</span> <span class="kw">type</span> <span class="ident">LockedClient</span> <span class="op">=</span> <span class="ident">Ethereum</span><span class="op">&lt;</span><span class="ident">LockedWallet</span><span class="op">&gt;</span>;
-<span class="kw">pub</span> <span class="kw">type</span> <span class="ident">UnlockedClient</span> <span class="op">=</span> <span class="ident">Ethereum</span><span class="op">&lt;</span><span class="ident">UnlockedWallet</span><span class="op">&gt;</span>;
+<span class="kw">pub type </span>UnlockedAdapter = Adapter&lt;client::Ethereum&lt;UnlockedWallet&gt;, UnlockedState&gt;;
+<span class="kw">pub type </span>LockedAdapter = Adapter&lt;client::Ethereum&lt;LockedWallet&gt;, LockedState&gt;;
+<span class="kw">pub type </span>LockedClient = Ethereum&lt;LockedWallet&gt;;
+<span class="kw">pub type </span>UnlockedClient = Ethereum&lt;UnlockedWallet&gt;;
 
-<span class="kw">mod</span> <span class="ident">channel</span>;
-<span class="kw">mod</span> <span class="ident">client</span>;
-<span class="kw">mod</span> <span class="ident">error</span>;
+<span class="kw">mod </span>channel;
+<span class="kw">mod </span>client;
+<span class="kw">mod </span>error;
 
-<span class="doccomment">/// Ethereum Web Token</span>
-<span class="doccomment">/// See &lt;https://github.com/ethereum/EIPs/issues/1341&gt;</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// This module implements the Ethereum Web Token with 2 difference:</span>
-<span class="doccomment">/// - The signature includes the Ethereum signature mode, see [`crate::ethereum::ewt::ETH_SIGN_SUFFIX`]</span>
-<span class="doccomment">/// - The message being signed is not the `header.payload` directly,</span>
-<span class="doccomment">///   but the `keccak256(&quot;header.payload&quot;)`.</span>
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">ewt</span>;
+<span class="doccomment">/// Ethereum Web Token
+/// See &lt;https://github.com/ethereum/EIPs/issues/1341&gt;
+///
+/// This module implements the Ethereum Web Token with 2 difference:
+/// - The signature includes the Ethereum signature mode, see [`crate::ethereum::ewt::ETH_SIGN_SUFFIX`]
+/// - The message being signed is not the `header.payload` directly,
+///   but the `keccak256(&quot;header.payload&quot;)`.
+</span><span class="kw">pub mod </span>ewt;
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">any</span>(<span class="ident">test</span>, <span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;test-util&quot;</span>))]</span>
-<span class="attribute">#[<span class="ident">cfg_attr</span>(<span class="ident">docsrs</span>, <span class="ident">doc</span>(<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;test-util&quot;</span>)))]</span>
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">test_util</span>;
+<span class="attribute">#[cfg(any(test, feature = <span class="string">&quot;test-util&quot;</span>))]</span>
+<span class="attribute">#[cfg_attr(docsrs, doc(cfg(feature = <span class="string">&quot;test-util&quot;</span>)))]</span>
+<span class="kw">pub mod </span>test_util;
 
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">OUTPACE_ABI</span>: <span class="ident">Lazy</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> [<span class="ident">u8</span>]<span class="op">&gt;</span> <span class="op">=</span>
-    <span class="ident">Lazy::new</span>(<span class="op">|</span><span class="op">|</span> <span class="macro">include_bytes!</span>(<span class="string">&quot;../../lib/protocol-eth/abi/OUTPACE.json&quot;</span>));
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">ERC20_ABI</span>: <span class="ident">Lazy</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> [<span class="ident">u8</span>]<span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Lazy::new</span>(<span class="op">|</span><span class="op">|</span> {
+<span class="kw">pub static </span>OUTPACE_ABI: Lazy&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>[u8]&gt; =
+    Lazy::new(|| <span class="macro">include_bytes!</span>(<span class="string">&quot;../../lib/protocol-eth/abi/OUTPACE.json&quot;</span>));
+<span class="kw">pub static </span>ERC20_ABI: Lazy&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>[u8]&gt; = Lazy::new(|| {
     <span class="macro">include_str!</span>(<span class="string">&quot;../../lib/protocol-eth/abi/ERC20.json&quot;</span>)
-        .<span class="ident">trim_end_matches</span>(<span class="string">&#39;\n&#39;</span>)
-        .<span class="ident">as_bytes</span>()
+        .trim_end_matches(<span class="string">&#39;\n&#39;</span>)
+        .as_bytes()
 });
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">SWEEPER_ABI</span>: <span class="ident">Lazy</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> [<span class="ident">u8</span>]<span class="op">&gt;</span> <span class="op">=</span>
-    <span class="ident">Lazy::new</span>(<span class="op">|</span><span class="op">|</span> <span class="macro">include_bytes!</span>(<span class="string">&quot;../../lib/protocol-eth/abi/Sweeper.json&quot;</span>));
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">IDENTITY_ABI</span>: <span class="ident">Lazy</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> [<span class="ident">u8</span>]<span class="op">&gt;</span> <span class="op">=</span>
-    <span class="ident">Lazy::new</span>(<span class="op">|</span><span class="op">|</span> <span class="macro">include_bytes!</span>(<span class="string">&quot;../../lib/protocol-eth/abi/Identity5.2.json&quot;</span>));
+<span class="kw">pub static </span>SWEEPER_ABI: Lazy&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>[u8]&gt; =
+    Lazy::new(|| <span class="macro">include_bytes!</span>(<span class="string">&quot;../../lib/protocol-eth/abi/Sweeper.json&quot;</span>));
+<span class="kw">pub static </span>IDENTITY_ABI: Lazy&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>[u8]&gt; =
+    Lazy::new(|| <span class="macro">include_bytes!</span>(<span class="string">&quot;../../lib/protocol-eth/abi/Identity5.2.json&quot;</span>));
 
-<span class="doccomment">/// Hashes the passed message with the format of `Signed Data Standard`</span>
-<span class="doccomment">/// See https://eips.ethereum.org/EIPS/eip-191</span>
-<span class="kw">fn</span> <span class="ident">to_ethereum_signed</span>(<span class="ident">message</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) -&gt; [<span class="ident">u8</span>; <span class="number">32</span>] {
-    <span class="kw">let</span> <span class="ident">eth</span> <span class="op">=</span> <span class="string">&quot;\x19Ethereum Signed Message:\n&quot;</span>;
-    <span class="kw">let</span> <span class="ident">message_length</span> <span class="op">=</span> <span class="ident">message</span>.<span class="ident">len</span>();
+<span class="doccomment">/// Hashes the passed message with the format of `Signed Data Standard`
+/// See https://eips.ethereum.org/EIPS/eip-191
+</span><span class="kw">fn </span>to_ethereum_signed(message: <span class="kw-2">&amp;</span>[u8]) -&gt; [u8; <span class="number">32</span>] {
+    <span class="kw">let </span>eth = <span class="string">&quot;\x19Ethereum Signed Message:\n&quot;</span>;
+    <span class="kw">let </span>message_length = message.len();
 
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">bytes</span> <span class="op">=</span> <span class="macro">format!</span>(<span class="string">&quot;{}{}&quot;</span>, <span class="ident">eth</span>, <span class="ident">message_length</span>).<span class="ident">into_bytes</span>();
-    <span class="ident">bytes</span>.<span class="ident">extend</span>(<span class="ident">message</span>);
+    <span class="kw">let </span><span class="kw-2">mut </span>bytes = <span class="macro">format!</span>(<span class="string">&quot;{}{}&quot;</span>, eth, message_length).into_bytes();
+    bytes.extend(message);
 
-    <span class="ident">keccak256</span>(<span class="kw-2">&amp;</span><span class="ident">bytes</span>)
+    keccak256(<span class="kw-2">&amp;</span>bytes)
 }
 
-<span class="doccomment">/// Trait for encoding a signature into RSV array</span>
-<span class="doccomment">/// and V altered to be in &quot;Electrum&quot; notation, i.e. `v += 27`</span>
-<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">Electrum</span> {
-    <span class="doccomment">/// Encode the signature into RSV array (V altered to be in &quot;Electrum&quot; notation).</span>
-    <span class="doccomment">///`{r}{s}{v}`</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">///</span>
-    <span class="kw">fn</span> <span class="ident">to_electrum</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; [<span class="ident">u8</span>; <span class="number">65</span>];
+<span class="doccomment">/// Trait for encoding a signature into RSV array
+/// and V altered to be in &quot;Electrum&quot; notation, i.e. `v += 27`
+</span><span class="kw">pub trait </span>Electrum {
+    <span class="doccomment">/// Encode the signature into RSV array (V altered to be in &quot;Electrum&quot; notation).
+    ///`{r}{s}{v}`
+    ///
+    ///
+    </span><span class="kw">fn </span>to_electrum(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; [u8; <span class="number">65</span>];
 
-    <span class="doccomment">/// Parse bytes as a signature encoded as RSV (V in &quot;Electrum&quot; notation).</span>
-    <span class="doccomment">/// `{r}{s}{v}`</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Will return `None` if given data has invalid length or</span>
-    <span class="doccomment">/// if `V` (byte 64) component is not in electrum notation (`&lt; 27`)</span>
-    <span class="kw">fn</span> <span class="ident">from_electrum</span>(<span class="ident">data</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>
-    <span class="kw">where</span>
-        <span class="self">Self</span>: <span class="ident">Sized</span>;
+    <span class="doccomment">/// Parse bytes as a signature encoded as RSV (V in &quot;Electrum&quot; notation).
+    /// `{r}{s}{v}`
+    ///
+    /// Will return `None` if given data has invalid length or
+    /// if `V` (byte 64) component is not in electrum notation (`&lt; 27`)
+    </span><span class="kw">fn </span>from_electrum(data: <span class="kw-2">&amp;</span>[u8]) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="self">Self</span>&gt;
+    <span class="kw">where
+        </span><span class="self">Self</span>: Sized;
 }
 
-<span class="kw">impl</span> <span class="ident">Electrum</span> <span class="kw">for</span> <span class="ident">Signature</span> {
-    <span class="kw">fn</span> <span class="ident">to_electrum</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; [<span class="ident">u8</span>; <span class="number">65</span>] {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">electrum_array</span> <span class="op">=</span> [<span class="number">0_u8</span>; <span class="number">65</span>];
+<span class="kw">impl </span>Electrum <span class="kw">for </span>Signature {
+    <span class="kw">fn </span>to_electrum(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; [u8; <span class="number">65</span>] {
+        <span class="kw">let </span><span class="kw-2">mut </span>electrum_array = [<span class="number">0_u8</span>; <span class="number">65</span>];
 
-        <span class="comment">// R</span>
-        <span class="ident">electrum_array</span>[<span class="number">0</span>..<span class="number">32</span>].<span class="ident">copy_from_slice</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">r</span>);
-        <span class="comment">// S</span>
-        <span class="ident">electrum_array</span>[<span class="number">32</span>..<span class="number">64</span>].<span class="ident">copy_from_slice</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">s</span>);
-        <span class="comment">// V altered to be in &quot;Electrum&quot; notation</span>
-        <span class="ident">electrum_array</span>[<span class="number">64</span>] <span class="op">=</span> <span class="self">self</span>.<span class="ident">v</span> <span class="op">+</span> <span class="number">27</span>;
+        <span class="comment">// R
+        </span>electrum_array[<span class="number">0</span>..<span class="number">32</span>].copy_from_slice(<span class="kw-2">&amp;</span><span class="self">self</span>.r);
+        <span class="comment">// S
+        </span>electrum_array[<span class="number">32</span>..<span class="number">64</span>].copy_from_slice(<span class="kw-2">&amp;</span><span class="self">self</span>.s);
+        <span class="comment">// V altered to be in &quot;Electrum&quot; notation
+        </span>electrum_array[<span class="number">64</span>] = <span class="self">self</span>.v + <span class="number">27</span>;
 
-        <span class="ident">electrum_array</span>
+        electrum_array
     }
 
-    <span class="kw">fn</span> <span class="ident">from_electrum</span>(<span class="ident">sig</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="ident">sig</span>.<span class="ident">len</span>() <span class="op">!</span><span class="op">=</span> <span class="number">65</span> <span class="op">|</span><span class="op">|</span> <span class="ident">sig</span>[<span class="number">64</span>] <span class="op">&lt;</span> <span class="number">27</span> {
-            <span class="kw">return</span> <span class="prelude-val">None</span>;
+    <span class="kw">fn </span>from_electrum(sig: <span class="kw-2">&amp;</span>[u8]) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="self">Self</span>&gt; {
+        <span class="kw">if </span>sig.len() != <span class="number">65 </span>|| sig[<span class="number">64</span>] &lt; <span class="number">27 </span>{
+            <span class="kw">return </span><span class="prelude-val">None</span>;
         }
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">r</span> <span class="op">=</span> [<span class="number">0u8</span>; <span class="number">32</span>];
-        <span class="ident">r</span>.<span class="ident">copy_from_slice</span>(<span class="kw-2">&amp;</span><span class="ident">sig</span>[<span class="number">0</span>..<span class="number">32</span>]);
+        <span class="kw">let </span><span class="kw-2">mut </span>r = [<span class="number">0u8</span>; <span class="number">32</span>];
+        r.copy_from_slice(<span class="kw-2">&amp;</span>sig[<span class="number">0</span>..<span class="number">32</span>]);
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">s</span> <span class="op">=</span> [<span class="number">0u8</span>; <span class="number">32</span>];
-        <span class="ident">s</span>.<span class="ident">copy_from_slice</span>(<span class="kw-2">&amp;</span><span class="ident">sig</span>[<span class="number">32</span>..<span class="number">64</span>]);
+        <span class="kw">let </span><span class="kw-2">mut </span>s = [<span class="number">0u8</span>; <span class="number">32</span>];
+        s.copy_from_slice(<span class="kw-2">&amp;</span>sig[<span class="number">32</span>..<span class="number">64</span>]);
 
-        <span class="kw">let</span> <span class="ident">v</span> <span class="op">=</span> <span class="ident">sig</span>[<span class="number">64</span>] <span class="op">-</span> <span class="number">27</span>;
+        <span class="kw">let </span>v = sig[<span class="number">64</span>] - <span class="number">27</span>;
 
-        <span class="prelude-val">Some</span>(<span class="ident">Signature</span> { <span class="ident">v</span>, <span class="ident">r</span>, <span class="ident">s</span> })
+        <span class="prelude-val">Some</span>(Signature { v, r, s })
     }
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">UnlockedWallet</span> {
-    <span class="ident">wallet</span>: <span class="ident">SecretKey</span>,
+<span class="attribute">#[derive(Debug, Clone)]</span>
+<span class="kw">pub struct </span>UnlockedWallet {
+    wallet: SecretKey,
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">LockedWallet</span> {
-    <span class="ident">KeyStore</span> {
-        <span class="ident">keystore</span>: <span class="ident">KeyFile</span>,
-        <span class="ident">password</span>: <span class="ident">Protected</span>,
+<span class="attribute">#[derive(Debug, Clone)]</span>
+<span class="kw">pub enum </span>LockedWallet {
+    KeyStore {
+        keystore: KeyFile,
+        password: Protected,
     },
-    <span class="ident">PrivateKey</span>(<span class="ident">String</span>),
+    PrivateKey(String),
 }
 
-<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">WalletState</span>: <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Sync</span> {}
-<span class="kw">impl</span> <span class="ident">WalletState</span> <span class="kw">for</span> <span class="ident">UnlockedWallet</span> {}
-<span class="kw">impl</span> <span class="ident">WalletState</span> <span class="kw">for</span> <span class="ident">LockedWallet</span> {}
+<span class="kw">pub trait </span>WalletState: Send + Sync {}
+<span class="kw">impl </span>WalletState <span class="kw">for </span>UnlockedWallet {}
+<span class="kw">impl </span>WalletState <span class="kw">for </span>LockedWallet {}
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="adapter" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (20ffea693 2022-08-11)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="adapter" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>

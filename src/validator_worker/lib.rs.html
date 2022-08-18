@@ -136,143 +136,143 @@
 <span id="136">136</span>
 <span id="137">137</span>
 <span id="138">138</span>
-</pre><pre class="rust"><code><span class="attribute">#![<span class="ident">deny</span>(<span class="ident">rust_2018_idioms</span>)]</span>
-<span class="attribute">#![<span class="ident">deny</span>(<span class="ident">clippy::all</span>)]</span>
-<span class="attribute">#![<span class="ident">deny</span>(<span class="ident">rustdoc::broken_intra_doc_links</span>)]</span>
-<span class="attribute">#![<span class="ident">cfg_attr</span>(<span class="ident">docsrs</span>, <span class="ident">feature</span>(<span class="ident">doc_cfg</span>))]</span>
+</pre><pre class="rust"><code><span class="attribute">#![deny(rust_2018_idioms)]</span>
+<span class="attribute">#![deny(clippy::all)]</span>
+<span class="attribute">#![deny(rustdoc::broken_intra_doc_links)]</span>
+<span class="attribute">#![cfg_attr(docsrs, feature(doc_cfg))]</span>
 
-<span class="kw">use</span> <span class="ident">adapter::util</span>::{<span class="ident">get_balance_leaf</span>, <span class="ident">get_signable_state_root</span>, <span class="ident">BalanceLeafError</span>};
-<span class="kw">use</span> <span class="ident">primitives</span>::{
-    <span class="ident">balances::CheckedState</span>,
-    <span class="ident">merkle_tree</span>::{<span class="ident">Error</span> <span class="kw">as</span> <span class="ident">MerkleTreeError</span>, <span class="ident">MerkleTree</span>},
-    <span class="ident">Balances</span>, <span class="ident">ChannelId</span>,
+<span class="kw">use </span>adapter::util::{get_balance_leaf, get_signable_state_root, BalanceLeafError};
+<span class="kw">use </span>primitives::{
+    balances::CheckedState,
+    merkle_tree::{Error <span class="kw">as </span>MerkleTreeError, MerkleTree},
+    Balances, ChannelId,
 };
-<span class="kw">use</span> <span class="ident">thiserror::Error</span>;
+<span class="kw">use </span>thiserror::Error;
 
-<span class="attribute">#[<span class="ident">doc</span>(<span class="ident">inline</span>)]</span>
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident"><span class="self">self</span>::sentry_interface::SentryApi</span>;
-<span class="attribute">#[<span class="ident">doc</span>(<span class="ident">inline</span>)]</span>
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">worker::Worker</span>;
+<span class="attribute">#[doc(inline)]</span>
+<span class="kw">pub use </span><span class="self">self</span>::sentry_interface::SentryApi;
+<span class="attribute">#[doc(inline)]</span>
+<span class="kw">pub use </span>worker::Worker;
 
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">channel</span>;
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">error</span>;
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">follower</span>;
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">heartbeat</span>;
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">leader</span>;
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">sentry_interface</span>;
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">worker</span>;
+<span class="kw">pub mod </span>channel;
+<span class="kw">pub mod </span>error;
+<span class="kw">pub mod </span>follower;
+<span class="kw">pub mod </span>heartbeat;
+<span class="kw">pub mod </span>leader;
+<span class="kw">pub mod </span>sentry_interface;
+<span class="kw">pub mod </span>worker;
 
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">core</span> {
-    <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">follower_rules</span>;
+<span class="kw">pub mod </span>core {
+    <span class="kw">pub mod </span>follower_rules;
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Error</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">GetStateRootError</span> {
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Failed to get balance leaf&quot;</span>)]</span>
-    <span class="ident">BalanceLeaf</span>(<span class="attribute">#[<span class="ident">from</span>]</span> <span class="ident">BalanceLeafError</span>),
-    <span class="attribute">#[<span class="ident">error</span>(<span class="ident">transparent</span>)]</span>
-    <span class="ident">MerkleTree</span>(<span class="attribute">#[<span class="ident">from</span>]</span> <span class="ident">MerkleTreeError</span>),
+<span class="attribute">#[derive(Debug, Error)]</span>
+<span class="kw">pub enum </span>GetStateRootError {
+    <span class="attribute">#[error(<span class="string">&quot;Failed to get balance leaf&quot;</span>)]</span>
+    BalanceLeaf(<span class="attribute">#[from]</span> BalanceLeafError),
+    <span class="attribute">#[error(transparent)]</span>
+    MerkleTree(<span class="attribute">#[from]</span> MerkleTreeError),
 }
 
-<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">GetStateRoot</span> {
-    <span class="doccomment">/// Hashes the struct to produce a StateRoot `[u8; 32]`</span>
-    <span class="kw">fn</span> <span class="ident">hash</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">channel</span>: <span class="ident">ChannelId</span>, <span class="ident">token_precision</span>: <span class="ident">u8</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>[<span class="ident">u8</span>; <span class="number">32</span>], <span class="ident">GetStateRootError</span><span class="op">&gt;</span>;
+<span class="kw">pub trait </span>GetStateRoot {
+    <span class="doccomment">/// Hashes the struct to produce a StateRoot `[u8; 32]`
+    </span><span class="kw">fn </span>hash(<span class="kw-2">&amp;</span><span class="self">self</span>, channel: ChannelId, token_precision: u8) -&gt; <span class="prelude-ty">Result</span>&lt;[u8; <span class="number">32</span>], GetStateRootError&gt;;
 
-    <span class="doccomment">/// Calls `hash()` and then `hex::encode`s the result ready to be used in a Validator Message</span>
-    <span class="kw">fn</span> <span class="ident">encode</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">channel</span>: <span class="ident">ChannelId</span>, <span class="ident">token_precision</span>: <span class="ident">u8</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">String</span>, <span class="ident">GetStateRootError</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">hash</span>(<span class="ident">channel</span>, <span class="ident">token_precision</span>).<span class="ident">map</span>(<span class="ident">hex::encode</span>)
+    <span class="doccomment">/// Calls `hash()` and then `hex::encode`s the result ready to be used in a Validator Message
+    </span><span class="kw">fn </span>encode(<span class="kw-2">&amp;</span><span class="self">self</span>, channel: ChannelId, token_precision: u8) -&gt; <span class="prelude-ty">Result</span>&lt;String, GetStateRootError&gt; {
+        <span class="self">self</span>.hash(channel, token_precision).map(hex::encode)
     }
 }
 
-<span class="kw">impl</span> <span class="ident">GetStateRoot</span> <span class="kw">for</span> <span class="ident">Balances</span><span class="op">&lt;</span><span class="ident">CheckedState</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">hash</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">channel</span>: <span class="ident">ChannelId</span>, <span class="ident">token_precision</span>: <span class="ident">u8</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>[<span class="ident">u8</span>; <span class="number">32</span>], <span class="ident">GetStateRootError</span><span class="op">&gt;</span> {
-        <span class="ident">get_state_root_hash</span>(<span class="ident">channel</span>, <span class="self">self</span>, <span class="ident">token_precision</span>)
+<span class="kw">impl </span>GetStateRoot <span class="kw">for </span>Balances&lt;CheckedState&gt; {
+    <span class="kw">fn </span>hash(<span class="kw-2">&amp;</span><span class="self">self</span>, channel: ChannelId, token_precision: u8) -&gt; <span class="prelude-ty">Result</span>&lt;[u8; <span class="number">32</span>], GetStateRootError&gt; {
+        get_state_root_hash(channel, <span class="self">self</span>, token_precision)
     }
 }
 
-<span class="kw">fn</span> <span class="ident">get_state_root_hash</span>(
-    <span class="ident">channel</span>: <span class="ident">ChannelId</span>,
-    <span class="ident">balances</span>: <span class="kw-2">&amp;</span><span class="ident">Balances</span><span class="op">&lt;</span><span class="ident">CheckedState</span><span class="op">&gt;</span>,
-    <span class="ident">token_precision</span>: <span class="ident">u8</span>,
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>[<span class="ident">u8</span>; <span class="number">32</span>], <span class="ident">GetStateRootError</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">spenders</span> <span class="op">=</span> <span class="ident">balances</span>.<span class="ident">spenders</span>.<span class="ident">iter</span>().<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">address</span>, <span class="ident">amount</span>)<span class="op">|</span> {
-        <span class="ident">get_balance_leaf</span>(<span class="bool-val">true</span>, <span class="ident">address</span>, <span class="kw-2">&amp;</span><span class="ident">amount</span>.<span class="ident">to_precision</span>(<span class="ident">token_precision</span>))
+<span class="kw">fn </span>get_state_root_hash(
+    channel: ChannelId,
+    balances: <span class="kw-2">&amp;</span>Balances&lt;CheckedState&gt;,
+    token_precision: u8,
+) -&gt; <span class="prelude-ty">Result</span>&lt;[u8; <span class="number">32</span>], GetStateRootError&gt; {
+    <span class="kw">let </span>spenders = balances.spenders.iter().map(|(address, amount)| {
+        get_balance_leaf(<span class="bool-val">true</span>, address, <span class="kw-2">&amp;</span>amount.to_precision(token_precision))
     });
 
-    <span class="comment">// Note: MerkleTree takes care of deduplicating and sorting</span>
-    <span class="kw">let</span> <span class="ident">elems</span>: <span class="ident">Vec</span><span class="op">&lt;</span>[<span class="ident">u8</span>; <span class="number">32</span>]<span class="op">&gt;</span> <span class="op">=</span> <span class="ident">balances</span>
-        .<span class="ident">earners</span>
-        .<span class="ident">iter</span>()
-        .<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">acc</span>, <span class="ident">amount</span>)<span class="op">|</span> <span class="ident">get_balance_leaf</span>(<span class="bool-val">false</span>, <span class="ident">acc</span>, <span class="kw-2">&amp;</span><span class="ident">amount</span>.<span class="ident">to_precision</span>(<span class="ident">token_precision</span>)))
-        .<span class="ident">chain</span>(<span class="ident">spenders</span>)
-        .<span class="ident">collect</span>::<span class="op">&lt;</span><span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="kw">_</span>, <span class="kw">_</span><span class="op">&gt;</span><span class="op">&gt;</span>()<span class="question-mark">?</span>;
+    <span class="comment">// Note: MerkleTree takes care of deduplicating and sorting
+    </span><span class="kw">let </span>elems: Vec&lt;[u8; <span class="number">32</span>]&gt; = balances
+        .earners
+        .iter()
+        .map(|(acc, amount)| get_balance_leaf(<span class="bool-val">false</span>, acc, <span class="kw-2">&amp;</span>amount.to_precision(token_precision)))
+        .chain(spenders)
+        .collect::&lt;<span class="prelude-ty">Result</span>&lt;<span class="kw">_</span>, <span class="kw">_</span>&gt;&gt;()<span class="question-mark">?</span>;
 
-    <span class="kw">let</span> <span class="ident">tree</span> <span class="op">=</span> <span class="ident">MerkleTree::new</span>(<span class="kw-2">&amp;</span><span class="ident">elems</span>)<span class="question-mark">?</span>;
-    <span class="comment">// keccak256(channelId, balanceRoot)</span>
-    <span class="prelude-val">Ok</span>(<span class="ident">get_signable_state_root</span>(<span class="ident">channel</span>.<span class="ident">as_ref</span>(), <span class="kw-2">&amp;</span><span class="ident">tree</span>.<span class="ident">root</span>()))
+    <span class="kw">let </span>tree = MerkleTree::new(<span class="kw-2">&amp;</span>elems)<span class="question-mark">?</span>;
+    <span class="comment">// keccak256(channelId, balanceRoot)
+    </span><span class="prelude-val">Ok</span>(get_signable_state_root(channel.as_ref(), <span class="kw-2">&amp;</span>tree.root()))
 }
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
-<span class="kw">mod</span> <span class="ident">test</span> {
-    <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
+<span class="attribute">#[cfg(test)]</span>
+<span class="kw">mod </span>test {
+    <span class="kw">use super</span>::<span class="kw-2">*</span>;
 
-    <span class="kw">use</span> <span class="ident">primitives</span>::{
-        <span class="ident">channel::Nonce</span>,
-        <span class="ident">test_util</span>::{<span class="ident">CREATOR</span>, <span class="ident">FOLLOWER</span>, <span class="ident">GUARDIAN</span>, <span class="ident">IDS</span>, <span class="ident">LEADER</span>, <span class="ident">PUBLISHER</span>},
-        <span class="ident">Channel</span>,
+    <span class="kw">use </span>primitives::{
+        channel::Nonce,
+        test_util::{CREATOR, FOLLOWER, GUARDIAN, IDS, LEADER, PUBLISHER},
+        Channel,
     };
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="comment">// TODO: Double check this test - encoded value! after introducing `spenders` (&quot;spender&quot;, address, amount)</span>
-    <span class="kw">fn</span> <span class="ident">get_state_root_hash_returns_correct_hash</span>() {
-        <span class="kw">let</span> <span class="ident">channel</span> <span class="op">=</span> <span class="ident">Channel</span> {
-            <span class="ident">leader</span>: <span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="ident">LEADER</span>],
-            <span class="ident">follower</span>: <span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="ident">FOLLOWER</span>],
-            <span class="ident">guardian</span>: <span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="ident">GUARDIAN</span>].<span class="ident">to_address</span>(),
-            <span class="comment">// DAI on goerli</span>
-            <span class="ident">token</span>: <span class="string">&quot;0x73967c6a0904aa032c103b4104747e88c566b1a2&quot;</span>
-                .<span class="ident">parse</span>()
-                .<span class="ident">expect</span>(<span class="string">&quot;Valid DAI token address&quot;</span>),
-            <span class="ident">nonce</span>: <span class="ident">Nonce::from</span>(<span class="number">987_654_321_u32</span>),
+    <span class="attribute">#[test]</span>
+    <span class="comment">// TODO: Double check this test - encoded value! after introducing `spenders` (&quot;spender&quot;, address, amount)
+    </span><span class="kw">fn </span>get_state_root_hash_returns_correct_hash() {
+        <span class="kw">let </span>channel = Channel {
+            leader: IDS[<span class="kw-2">&amp;</span>LEADER],
+            follower: IDS[<span class="kw-2">&amp;</span>FOLLOWER],
+            guardian: IDS[<span class="kw-2">&amp;</span>GUARDIAN].to_address(),
+            <span class="comment">// DAI on goerli
+            </span>token: <span class="string">&quot;0x73967c6a0904aa032c103b4104747e88c566b1a2&quot;
+                </span>.parse()
+                .expect(<span class="string">&quot;Valid DAI token address&quot;</span>),
+            nonce: Nonce::from(<span class="number">987_654_321_u32</span>),
         };
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">balances</span> <span class="op">=</span> <span class="ident">Balances</span>::<span class="op">&lt;</span><span class="ident">CheckedState</span><span class="op">&gt;</span><span class="ident">::default</span>();
+        <span class="kw">let </span><span class="kw-2">mut </span>balances = Balances::&lt;CheckedState&gt;::default();
 
-        <span class="ident">balances</span>
-            .<span class="ident">spend</span>(<span class="kw-2">*</span><span class="ident">CREATOR</span>, <span class="kw-2">*</span><span class="ident">PUBLISHER</span>, <span class="number">3</span>.<span class="ident">into</span>())
-            .<span class="ident">expect</span>(<span class="string">&quot;Should spend amount successfully&quot;</span>);
+        balances
+            .spend(<span class="kw-2">*</span>CREATOR, <span class="kw-2">*</span>PUBLISHER, <span class="number">3</span>.into())
+            .expect(<span class="string">&quot;Should spend amount successfully&quot;</span>);
 
-        <span class="comment">// 18 - DAI</span>
-        <span class="kw">let</span> <span class="ident">actual_hash</span> <span class="op">=</span>
-            <span class="ident">get_state_root_hash</span>(<span class="ident">channel</span>.<span class="ident">id</span>(), <span class="kw-2">&amp;</span><span class="ident">balances</span>, <span class="number">18</span>).<span class="ident">expect</span>(<span class="string">&quot;should get state root hash&quot;</span>);
+        <span class="comment">// 18 - DAI
+        </span><span class="kw">let </span>actual_hash =
+            get_state_root_hash(channel.id(), <span class="kw-2">&amp;</span>balances, <span class="number">18</span>).expect(<span class="string">&quot;should get state root hash&quot;</span>);
 
         <span class="macro">assert_eq!</span>(
             <span class="string">&quot;15be990a567fe035369e3c308ca28d84a944a8acba484634249c0c4259d17162&quot;</span>,
-            <span class="ident">hex::encode</span>(<span class="ident">actual_hash</span>)
+            hex::encode(actual_hash)
         );
     }
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="doccomment">/// Because the old test only had earners &amp; it was using the old V4 Channel</span>
-    <span class="doccomment">/// we re-use it in order to double check if we haven&#39;t change anything with the `get_state_root_hash()` changes</span>
-    <span class="doccomment">/// when we introduced `spenders` `(&quot;spender&quot;, address, amount)` &amp; `UnifiedNum`</span>
-    <span class="kw">fn</span> <span class="ident">get_state_root_hash_returns_correct_hash_for_added_address_to_spenders</span>() {
-        <span class="kw">let</span> <span class="ident">channel</span> <span class="op">=</span> <span class="string">&quot;061d5e2a67d0a9a10f1c732bca12a676d83f79663a396f7d87b3e30b9b411088&quot;</span>
-            .<span class="ident">parse</span>()
-            .<span class="ident">expect</span>(<span class="string">&quot;Valid ChannelId&quot;</span>);
+    <span class="attribute">#[test]</span>
+    <span class="doccomment">/// Because the old test only had earners &amp; it was using the old V4 Channel
+    /// we re-use it in order to double check if we haven&#39;t change anything with the `get_state_root_hash()` changes
+    /// when we introduced `spenders` `(&quot;spender&quot;, address, amount)` &amp; `UnifiedNum`
+    </span><span class="kw">fn </span>get_state_root_hash_returns_correct_hash_for_added_address_to_spenders() {
+        <span class="kw">let </span>channel = <span class="string">&quot;061d5e2a67d0a9a10f1c732bca12a676d83f79663a396f7d87b3e30b9b411088&quot;
+            </span>.parse()
+            .expect(<span class="string">&quot;Valid ChannelId&quot;</span>);
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">balances</span> <span class="op">=</span> <span class="ident">Balances</span>::<span class="op">&lt;</span><span class="ident">CheckedState</span><span class="op">&gt;</span><span class="ident">::default</span>();
-        <span class="ident">balances</span>.<span class="ident">add_earner</span>(<span class="kw-2">*</span><span class="ident">PUBLISHER</span>);
+        <span class="kw">let </span><span class="kw-2">mut </span>balances = Balances::&lt;CheckedState&gt;::default();
+        balances.add_earner(<span class="kw-2">*</span>PUBLISHER);
 
-        <span class="comment">// 18 - DAI</span>
-        <span class="kw">let</span> <span class="ident">actual_hash</span> <span class="op">=</span>
-            <span class="ident">get_state_root_hash</span>(<span class="ident">channel</span>, <span class="kw-2">&amp;</span><span class="ident">balances</span>, <span class="number">18</span>).<span class="ident">expect</span>(<span class="string">&quot;should get state root hash&quot;</span>);
+        <span class="comment">// 18 - DAI
+        </span><span class="kw">let </span>actual_hash =
+            get_state_root_hash(channel, <span class="kw-2">&amp;</span>balances, <span class="number">18</span>).expect(<span class="string">&quot;should get state root hash&quot;</span>);
 
         <span class="macro">assert_eq!</span>(
             <span class="string">&quot;7cca99ab2dfa751aaf53b8d52ca903f2095d06879f86a8c383294d15b797912c&quot;</span>,
-            <span class="ident">hex::encode</span>(<span class="ident">actual_hash</span>)
+            hex::encode(actual_hash)
         );
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="validator_worker" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (20ffea693 2022-08-11)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="validator_worker" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>

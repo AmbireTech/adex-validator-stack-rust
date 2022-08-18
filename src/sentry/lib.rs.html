@@ -19,26 +19,26 @@
 <span id="19">19</span>
 <span id="20">20</span>
 <span id="21">21</span>
-</pre><pre class="rust"><code><span class="attribute">#![<span class="ident">deny</span>(<span class="ident">rust_2018_idioms</span>)]</span>
-<span class="attribute">#![<span class="ident">deny</span>(<span class="ident">clippy::all</span>)]</span>
-<span class="attribute">#![<span class="ident">deny</span>(<span class="ident">rustdoc::broken_intra_doc_links</span>)]</span>
-<span class="attribute">#![<span class="ident">cfg_attr</span>(<span class="ident">docsrs</span>, <span class="ident">feature</span>(<span class="ident">doc_cfg</span>))]</span>
+</pre><pre class="rust"><code><span class="attribute">#![deny(rust_2018_idioms)]</span>
+<span class="attribute">#![deny(clippy::all)]</span>
+<span class="attribute">#![deny(rustdoc::broken_intra_doc_links)]</span>
+<span class="attribute">#![cfg_attr(docsrs, feature(doc_cfg))]</span>
 
-<span class="attribute">#[<span class="ident">doc</span>(<span class="ident">inline</span>)]</span>
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">application</span>::{<span class="ident">Application</span>, <span class="ident">Auth</span>, <span class="ident">Session</span>};
+<span class="attribute">#[doc(inline)]</span>
+<span class="kw">pub use </span>application::{Application, Auth, Session};
 
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">access</span>;
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">analytics</span>;
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">application</span>;
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">db</span>;
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">middleware</span>;
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">payout</span>;
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">platform</span>;
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">response</span>;
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">routes</span>;
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">spender</span>;
+<span class="kw">pub mod </span>access;
+<span class="kw">pub mod </span>analytics;
+<span class="kw">pub mod </span>application;
+<span class="kw">pub mod </span>db;
+<span class="kw">pub mod </span>middleware;
+<span class="kw">pub mod </span>payout;
+<span class="kw">pub mod </span>platform;
+<span class="kw">pub mod </span>response;
+<span class="kw">pub mod </span>routes;
+<span class="kw">pub mod </span>spender;
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">test_util</span>;
+<span class="attribute">#[cfg(test)]</span>
+<span class="kw">pub mod </span>test_util;
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (20ffea693 2022-08-11)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>

@@ -240,247 +240,247 @@
 <span id="240">240</span>
 <span id="241">241</span>
 <span id="242">242</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">merkletree</span>::{<span class="ident">hash::Algorithm</span>, <span class="ident">merkle</span>, <span class="ident">merkle::VecStore</span>, <span class="ident">proof::Proof</span>};
-<span class="kw">use</span> <span class="ident">std</span>::{<span class="ident">fmt</span>, <span class="ident">iter::FromIterator</span>};
-<span class="kw">use</span> <span class="ident">thiserror::Error</span>;
-<span class="kw">use</span> <span class="ident">tiny_keccak</span>::{<span class="ident">Hasher</span>, <span class="ident">Keccak</span>};
+</pre><pre class="rust"><code><span class="kw">use </span>merkletree::{hash::Algorithm, merkle, merkle::VecStore, proof::Proof};
+<span class="kw">use </span>std::{fmt, iter::FromIterator};
+<span class="kw">use </span>thiserror::Error;
+<span class="kw">use </span>tiny_keccak::{Hasher, Keccak};
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>)]</span>
-<span class="kw">struct</span> <span class="ident">KeccakAlgorithm</span>(<span class="ident">Keccak</span>);
+<span class="attribute">#[derive(Clone)]</span>
+<span class="kw">struct </span>KeccakAlgorithm(Keccak);
 
-<span class="kw">impl</span> <span class="ident">fmt::Debug</span> <span class="kw">for</span> <span class="ident">KeccakAlgorithm</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="ident">fmt::Result</span> {
-        <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;Keccak256 Algorithm&quot;</span>)
+<span class="kw">impl </span>fmt::Debug <span class="kw">for </span>KeccakAlgorithm {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; fmt::Result {
+        <span class="macro">write!</span>(f, <span class="string">&quot;Keccak256 Algorithm&quot;</span>)
     }
 }
 
-<span class="kw">impl</span> <span class="ident">KeccakAlgorithm</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>() -&gt; <span class="ident">KeccakAlgorithm</span> {
-        <span class="ident">KeccakAlgorithm</span>(<span class="ident">Keccak::v256</span>())
+<span class="kw">impl </span>KeccakAlgorithm {
+    <span class="kw">pub fn </span>new() -&gt; KeccakAlgorithm {
+        KeccakAlgorithm(Keccak::v256())
     }
 }
 
-<span class="kw">impl</span> <span class="ident">Default</span> <span class="kw">for</span> <span class="ident">KeccakAlgorithm</span> {
-    <span class="kw">fn</span> <span class="ident">default</span>() -&gt; <span class="ident">KeccakAlgorithm</span> {
-        <span class="ident">KeccakAlgorithm::new</span>()
+<span class="kw">impl </span>Default <span class="kw">for </span>KeccakAlgorithm {
+    <span class="kw">fn </span>default() -&gt; KeccakAlgorithm {
+        KeccakAlgorithm::new()
     }
 }
 
-<span class="kw">impl</span> <span class="ident">std::hash::Hasher</span> <span class="kw">for</span> <span class="ident">KeccakAlgorithm</span> {
-    <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">fn</span> <span class="ident">write</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">msg</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) {
-        <span class="self">self</span>.<span class="number">0</span>.<span class="ident">update</span>(<span class="ident">msg</span>)
+<span class="kw">impl </span>std::hash::Hasher <span class="kw">for </span>KeccakAlgorithm {
+    <span class="attribute">#[inline]</span>
+    <span class="kw">fn </span>write(<span class="kw-2">&amp;mut </span><span class="self">self</span>, msg: <span class="kw-2">&amp;</span>[u8]) {
+        <span class="self">self</span>.<span class="number">0</span>.update(msg)
     }
 
-    <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">fn</span> <span class="ident">finish</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u64</span> {
+    <span class="attribute">#[inline]</span>
+    <span class="kw">fn </span>finish(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u64 {
         <span class="macro">unimplemented!</span>()
     }
 }
 
-<span class="kw">type</span> <span class="ident">MerkleItem</span> <span class="op">=</span> [<span class="ident">u8</span>; <span class="number">32</span>];
+<span class="kw">type </span>MerkleItem = [u8; <span class="number">32</span>];
 
-<span class="kw">impl</span> <span class="ident">Algorithm</span><span class="op">&lt;</span><span class="ident">MerkleItem</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">KeccakAlgorithm</span> {
-    <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">fn</span> <span class="ident">hash</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="ident">MerkleItem</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">res</span>: [<span class="ident">u8</span>; <span class="number">32</span>] <span class="op">=</span> [<span class="number">0</span>; <span class="number">32</span>];
-        <span class="self">self</span>.<span class="number">0</span>.<span class="ident">clone</span>().<span class="ident">finalize</span>(<span class="kw-2">&amp;mut</span> <span class="ident">res</span>);
-        <span class="ident">res</span>
+<span class="kw">impl </span>Algorithm&lt;MerkleItem&gt; <span class="kw">for </span>KeccakAlgorithm {
+    <span class="attribute">#[inline]</span>
+    <span class="kw">fn </span>hash(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; MerkleItem {
+        <span class="kw">let </span><span class="kw-2">mut </span>res: [u8; <span class="number">32</span>] = [<span class="number">0</span>; <span class="number">32</span>];
+        <span class="self">self</span>.<span class="number">0</span>.clone().finalize(<span class="kw-2">&amp;mut </span>res);
+        res
     }
 
-    <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">fn</span> <span class="ident">reset</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
-        <span class="self">self</span>.<span class="number">0</span> <span class="op">=</span> <span class="ident">Keccak::v256</span>()
+    <span class="attribute">#[inline]</span>
+    <span class="kw">fn </span>reset(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="self">self</span>.<span class="number">0 </span>= Keccak::v256()
     }
 
-    <span class="kw">fn</span> <span class="ident">leaf</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">leaf</span>: <span class="ident">MerkleItem</span>) -&gt; <span class="ident">MerkleItem</span> {
-        <span class="ident">leaf</span>
+    <span class="kw">fn </span>leaf(<span class="kw-2">&amp;mut </span><span class="self">self</span>, leaf: MerkleItem) -&gt; MerkleItem {
+        leaf
     }
 
-    <span class="kw">fn</span> <span class="ident">node</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">left</span>: <span class="ident">MerkleItem</span>, <span class="ident">right</span>: <span class="ident">MerkleItem</span>, <span class="ident">_height</span>: <span class="ident">usize</span>) -&gt; <span class="ident">MerkleItem</span> {
-        <span class="kw">use</span> <span class="ident">std::hash::Hasher</span>;
+    <span class="kw">fn </span>node(<span class="kw-2">&amp;mut </span><span class="self">self</span>, left: MerkleItem, right: MerkleItem, _height: usize) -&gt; MerkleItem {
+        <span class="kw">use </span>std::hash::Hasher;
 
-        <span class="comment">// This is a check for odd number of leaves items</span>
-        <span class="comment">// left == right since the right is a duplicate of left</span>
-        <span class="comment">// return the item unencoded as the JS impl</span>
-        <span class="kw">if</span> <span class="ident">left</span> <span class="op">==</span> <span class="ident">right</span> {
-            <span class="ident">left</span>
-        } <span class="kw">else</span> {
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">node_vec</span> <span class="op">=</span> <span class="macro">vec!</span>[<span class="ident">left</span>.<span class="ident">to_vec</span>(), <span class="ident">right</span>.<span class="ident">to_vec</span>()];
-            <span class="ident">node_vec</span>.<span class="ident">sort</span>();
+        <span class="comment">// This is a check for odd number of leaves items
+        // left == right since the right is a duplicate of left
+        // return the item unencoded as the JS impl
+        </span><span class="kw">if </span>left == right {
+            left
+        } <span class="kw">else </span>{
+            <span class="kw">let </span><span class="kw-2">mut </span>node_vec = <span class="macro">vec!</span>[left.to_vec(), right.to_vec()];
+            node_vec.sort();
 
-            <span class="kw">let</span> <span class="ident">flatten_node_vec</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">node_vec</span>.<span class="ident">into_iter</span>().<span class="ident">flatten</span>().<span class="ident">collect</span>();
-            <span class="self">self</span>.<span class="ident">write</span>(<span class="kw-2">&amp;</span><span class="ident">flatten_node_vec</span>);
-            <span class="self">self</span>.<span class="ident">hash</span>()
+            <span class="kw">let </span>flatten_node_vec: Vec&lt;u8&gt; = node_vec.into_iter().flatten().collect();
+            <span class="self">self</span>.write(<span class="kw-2">&amp;</span>flatten_node_vec);
+            <span class="self">self</span>.hash()
         }
     }
 }
 
-<span class="kw">type</span> <span class="ident">ExternalMerkleTree</span> <span class="op">=</span>
-    <span class="ident">merkletree::merkle::MerkleTree</span><span class="op">&lt;</span><span class="ident">MerkleItem</span>, <span class="ident">KeccakAlgorithm</span>, <span class="ident">VecStore</span><span class="op">&lt;</span><span class="ident">MerkleItem</span><span class="op">&gt;</span><span class="op">&gt;</span>;
+<span class="kw">type </span>ExternalMerkleTree =
+    merkletree::merkle::MerkleTree&lt;MerkleItem, KeccakAlgorithm, VecStore&lt;MerkleItem&gt;&gt;;
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
-<span class="kw">enum</span> <span class="ident">Tree</span> {
-    <span class="ident">SingleItem</span>(<span class="ident">MerkleItem</span>),
-    <span class="ident">MerkleTree</span>(<span class="ident">ExternalMerkleTree</span>),
+<span class="attribute">#[derive(Debug, Clone)]</span>
+<span class="kw">enum </span>Tree {
+    SingleItem(MerkleItem),
+    MerkleTree(ExternalMerkleTree),
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Error</span>, <span class="ident">Eq</span>, <span class="ident">PartialEq</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">Error</span> {
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;No leaves were provided&quot;</span>)]</span>
-    <span class="ident">ZeroLeaves</span>,
+<span class="attribute">#[derive(Debug, Error, Eq, PartialEq)]</span>
+<span class="kw">pub enum </span>Error {
+    <span class="attribute">#[error(<span class="string">&quot;No leaves were provided&quot;</span>)]</span>
+    ZeroLeaves,
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">MerkleTree</span> {
-    <span class="ident">tree</span>: <span class="ident">Tree</span>,
-    <span class="ident">root</span>: <span class="ident">MerkleItem</span>,
+<span class="attribute">#[derive(Debug)]</span>
+<span class="kw">pub struct </span>MerkleTree {
+    tree: Tree,
+    root: MerkleItem,
 }
 
-<span class="kw">impl</span> <span class="ident">MerkleTree</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">data</span>: <span class="kw-2">&amp;</span>[<span class="ident">MerkleItem</span>]) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">MerkleTree</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">leaves</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">MerkleItem</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">data</span>.<span class="ident">to_owned</span>();
-        <span class="comment">// sort the MerkleTree leaves</span>
-        <span class="ident">leaves</span>.<span class="ident">sort_unstable</span>();
-        <span class="comment">// remove duplicates **before** we check the leaves length</span>
-        <span class="ident">leaves</span>.<span class="ident">dedup_by</span>(<span class="op">|</span><span class="ident">a</span>, <span class="ident">b</span><span class="op">|</span> <span class="ident">a</span> <span class="op">==</span> <span class="ident">b</span>);
+<span class="kw">impl </span>MerkleTree {
+    <span class="kw">pub fn </span>new(data: <span class="kw-2">&amp;</span>[MerkleItem]) -&gt; <span class="prelude-ty">Result</span>&lt;MerkleTree, Error&gt; {
+        <span class="kw">let </span><span class="kw-2">mut </span>leaves: Vec&lt;MerkleItem&gt; = data.to_owned();
+        <span class="comment">// sort the MerkleTree leaves
+        </span>leaves.sort_unstable();
+        <span class="comment">// remove duplicates **before** we check the leaves length
+        </span>leaves.dedup_by(|a, b| a == b);
 
-        <span class="kw">let</span> <span class="ident">tree</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">leaves</span>.<span class="ident">len</span>() {
-            <span class="number">0</span> =&gt; <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error::ZeroLeaves</span>),
-            <span class="comment">// should never `panic!`, we have a single leaf after all</span>
-            <span class="number">1</span> =&gt; <span class="ident">Tree::SingleItem</span>(<span class="ident">leaves</span>.<span class="ident">remove</span>(<span class="number">0</span>)),
-            <span class="kw">_</span> =&gt; {
-                <span class="kw">let</span> <span class="ident">merkletree</span> <span class="op">=</span> <span class="ident">merkle::MerkleTree::from_iter</span>(<span class="ident">leaves</span>);
+        <span class="kw">let </span>tree = <span class="kw">match </span>leaves.len() {
+            <span class="number">0 </span>=&gt; <span class="kw">return </span><span class="prelude-val">Err</span>(Error::ZeroLeaves),
+            <span class="comment">// should never `panic!`, we have a single leaf after all
+            </span><span class="number">1 </span>=&gt; Tree::SingleItem(leaves.remove(<span class="number">0</span>)),
+            <span class="kw">_ </span>=&gt; {
+                <span class="kw">let </span>merkletree = merkle::MerkleTree::from_iter(leaves);
 
-                <span class="ident">Tree::MerkleTree</span>(<span class="ident">merkletree</span>)
+                Tree::MerkleTree(merkletree)
             }
         };
 
-        <span class="kw">let</span> <span class="ident">root</span>: <span class="ident">MerkleItem</span> <span class="op">=</span> <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="ident">tree</span> {
-            <span class="ident">Tree::SingleItem</span>(<span class="ident">root</span>) =&gt; <span class="ident">root</span>.<span class="ident">to_owned</span>(),
-            <span class="ident">Tree::MerkleTree</span>(<span class="ident">merkletree</span>) =&gt; <span class="ident">merkletree</span>.<span class="ident">root</span>(),
+        <span class="kw">let </span>root: MerkleItem = <span class="kw">match </span><span class="kw-2">&amp;</span>tree {
+            Tree::SingleItem(root) =&gt; root.to_owned(),
+            Tree::MerkleTree(merkletree) =&gt; merkletree.root(),
         };
 
-        <span class="prelude-val">Ok</span>(<span class="ident">MerkleTree</span> { <span class="ident">tree</span>, <span class="ident">root</span> })
+        <span class="prelude-val">Ok</span>(MerkleTree { tree, root })
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">root</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">MerkleItem</span> {
-        <span class="self">self</span>.<span class="ident">root</span>
+    <span class="kw">pub fn </span>root(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; MerkleItem {
+        <span class="self">self</span>.root
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">verify</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">proof</span>: (<span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">MerkleItem</span><span class="op">&gt;</span>, <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">bool</span><span class="op">&gt;</span>)) -&gt; <span class="ident">bool</span> {
-        <span class="kw">let</span> <span class="ident">proof</span> <span class="op">=</span> <span class="ident">Proof::new</span>(<span class="ident">proof</span>.<span class="number">0</span>, <span class="ident">proof</span>.<span class="number">1</span>);
-        <span class="ident">proof</span>.<span class="ident">validate</span>::<span class="op">&lt;</span><span class="ident">KeccakAlgorithm</span><span class="op">&gt;</span>()
+    <span class="kw">pub fn </span>verify(<span class="kw-2">&amp;</span><span class="self">self</span>, proof: (Vec&lt;MerkleItem&gt;, Vec&lt;bool&gt;)) -&gt; bool {
+        <span class="kw">let </span>proof = Proof::new(proof.<span class="number">0</span>, proof.<span class="number">1</span>);
+        proof.validate::&lt;KeccakAlgorithm&gt;()
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">proof</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">i</span>: <span class="ident">usize</span>) -&gt; (<span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">MerkleItem</span><span class="op">&gt;</span>, <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">bool</span><span class="op">&gt;</span>) {
-        <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">tree</span> {
-            <span class="ident">Tree::SingleItem</span>(<span class="kw">_</span>) =&gt; (<span class="macro">vec!</span>[], <span class="macro">vec!</span>[]),
-            <span class="ident">Tree::MerkleTree</span>(<span class="ident">merkle</span>) =&gt; {
-                <span class="kw">let</span> <span class="ident">proof</span> <span class="op">=</span> <span class="ident">merkle</span>.<span class="ident">gen_proof</span>(<span class="ident">i</span>);
-                <span class="kw">let</span> <span class="ident">path</span> <span class="op">=</span> <span class="ident">proof</span>.<span class="ident">path</span>();
-                <span class="kw">let</span> <span class="ident">lemma</span> <span class="op">=</span> <span class="ident">proof</span>.<span class="ident">lemma</span>();
-                (<span class="ident">lemma</span>.<span class="ident">to_owned</span>(), <span class="ident">path</span>.<span class="ident">to_owned</span>())
+    <span class="kw">pub fn </span>proof(<span class="kw-2">&amp;</span><span class="self">self</span>, i: usize) -&gt; (Vec&lt;MerkleItem&gt;, Vec&lt;bool&gt;) {
+        <span class="kw">match </span><span class="kw-2">&amp;</span><span class="self">self</span>.tree {
+            Tree::SingleItem(<span class="kw">_</span>) =&gt; (<span class="macro">vec!</span>[], <span class="macro">vec!</span>[]),
+            Tree::MerkleTree(merkle) =&gt; {
+                <span class="kw">let </span>proof = merkle.gen_proof(i);
+                <span class="kw">let </span>path = proof.path();
+                <span class="kw">let </span>lemma = proof.lemma();
+                (lemma.to_owned(), path.to_owned())
             }
         }
     }
 }
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
-<span class="kw">mod</span> <span class="ident">test</span> {
-    <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
-    <span class="kw">use</span> <span class="ident">hex::FromHex</span>;
+<span class="attribute">#[cfg(test)]</span>
+<span class="kw">mod </span>test {
+    <span class="kw">use super</span>::<span class="kw-2">*</span>;
+    <span class="kw">use </span>hex::FromHex;
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">it_returns_error_on_zero_leaves</span>() {
-        <span class="kw">let</span> <span class="ident">error</span> <span class="op">=</span> <span class="ident">MerkleTree::new</span>(<span class="kw-2">&amp;</span>[]).<span class="ident">expect_err</span>(<span class="string">&quot;ZeroLeaves error expected&quot;</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">Error::ZeroLeaves</span>, <span class="ident">error</span>);
+    <span class="attribute">#[test]</span>
+    <span class="kw">fn </span>it_returns_error_on_zero_leaves() {
+        <span class="kw">let </span>error = MerkleTree::new(<span class="kw-2">&amp;</span>[]).expect_err(<span class="string">&quot;ZeroLeaves error expected&quot;</span>);
+        <span class="macro">assert_eq!</span>(Error::ZeroLeaves, error);
     }
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">it_generates_correct_merkle_tree_that_correlates_with_js_impl</span>() {
-        <span class="kw">let</span> <span class="ident">h1</span> <span class="op">=</span> <span class="op">&lt;</span>[<span class="ident">u8</span>; <span class="number">32</span>]<span class="op">&gt;</span><span class="ident">::from_hex</span>(
+    <span class="attribute">#[test]</span>
+    <span class="kw">fn </span>it_generates_correct_merkle_tree_that_correlates_with_js_impl() {
+        <span class="kw">let </span>h1 = &lt;[u8; <span class="number">32</span>]&gt;::from_hex(
             <span class="string">&quot;71b1b2ad4db89eea341553b718f51f4f0aac03c6a596c4c0e1697f7b9d9da337&quot;</span>,
         )
-        .<span class="ident">unwrap</span>();
-        <span class="kw">let</span> <span class="ident">h2</span> <span class="op">=</span> <span class="op">&lt;</span>[<span class="ident">u8</span>; <span class="number">32</span>]<span class="op">&gt;</span><span class="ident">::from_hex</span>(
+        .unwrap();
+        <span class="kw">let </span>h2 = &lt;[u8; <span class="number">32</span>]&gt;::from_hex(
             <span class="string">&quot;778b613574ae22c119efb252f2a56cb05b0d137f8494c0193f4e015c49f43453&quot;</span>,
         )
-        .<span class="ident">unwrap</span>();
+        .unwrap();
 
-        <span class="kw">let</span> <span class="ident">top</span> <span class="op">=</span> <span class="ident">MerkleTree::new</span>(<span class="kw-2">&amp;</span>[<span class="ident">h1</span>, <span class="ident">h2</span>]).<span class="ident">expect</span>(<span class="string">&quot;Should create MerkleTree&quot;</span>);
+        <span class="kw">let </span>top = MerkleTree::new(<span class="kw-2">&amp;</span>[h1, h2]).expect(<span class="string">&quot;Should create MerkleTree&quot;</span>);
 
-        <span class="kw">let</span> <span class="ident">root</span> <span class="op">=</span> <span class="ident">hex::encode</span>(<span class="kw-2">&amp;</span><span class="ident">top</span>.<span class="ident">root</span>());
+        <span class="kw">let </span>root = hex::encode(<span class="kw-2">&amp;</span>top.root());
 
         <span class="macro">assert_eq!</span>(
-            <span class="ident">root</span>, <span class="string">&quot;70d6549669561c65fdc687b87743b67e494e1f4be5d19a2955507220e57baaa6&quot;</span>,
-            <span class="string">&quot;should generate the correct root&quot;</span>
-        );
+            root, <span class="string">&quot;70d6549669561c65fdc687b87743b67e494e1f4be5d19a2955507220e57baaa6&quot;</span>,
+            <span class="string">&quot;should generate the correct root&quot;
+        </span>);
 
-        <span class="kw">let</span> <span class="ident">proof</span> <span class="op">=</span> <span class="ident">top</span>.<span class="ident">proof</span>(<span class="number">0</span>);
+        <span class="kw">let </span>proof = top.proof(<span class="number">0</span>);
 
-        <span class="kw">let</span> <span class="ident">verified</span> <span class="op">=</span> <span class="ident">top</span>.<span class="ident">verify</span>(<span class="ident">proof</span>);
-        <span class="macro">assert!</span>(<span class="ident">verified</span>, <span class="string">&quot;should verify proof successfully&quot;</span>);
+        <span class="kw">let </span>verified = top.verify(proof);
+        <span class="macro">assert!</span>(verified, <span class="string">&quot;should verify proof successfully&quot;</span>);
     }
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">it_generates_correct_merkle_tree_with_duplicate_leaves</span>() {
-        <span class="kw">let</span> <span class="ident">h1</span> <span class="op">=</span> <span class="op">&lt;</span>[<span class="ident">u8</span>; <span class="number">32</span>]<span class="op">&gt;</span><span class="ident">::from_hex</span>(
+    <span class="attribute">#[test]</span>
+    <span class="kw">fn </span>it_generates_correct_merkle_tree_with_duplicate_leaves() {
+        <span class="kw">let </span>h1 = &lt;[u8; <span class="number">32</span>]&gt;::from_hex(
             <span class="string">&quot;71b1b2ad4db89eea341553b718f51f4f0aac03c6a596c4c0e1697f7b9d9da337&quot;</span>,
         )
-        .<span class="ident">unwrap</span>();
-        <span class="kw">let</span> <span class="ident">h2</span> <span class="op">=</span> <span class="op">&lt;</span>[<span class="ident">u8</span>; <span class="number">32</span>]<span class="op">&gt;</span><span class="ident">::from_hex</span>(
+        .unwrap();
+        <span class="kw">let </span>h2 = &lt;[u8; <span class="number">32</span>]&gt;::from_hex(
             <span class="string">&quot;778b613574ae22c119efb252f2a56cb05b0d137f8494c0193f4e015c49f43453&quot;</span>,
         )
-        .<span class="ident">unwrap</span>();
+        .unwrap();
 
-        <span class="comment">// duplicate leaves</span>
-        <span class="kw">let</span> <span class="ident">top</span> <span class="op">=</span> <span class="ident">MerkleTree::new</span>(<span class="kw-2">&amp;</span>[<span class="ident">h1</span>, <span class="ident">h2</span>, <span class="ident">h2</span>]).<span class="ident">expect</span>(<span class="string">&quot;Should create MerkleTree&quot;</span>);
+        <span class="comment">// duplicate leaves
+        </span><span class="kw">let </span>top = MerkleTree::new(<span class="kw-2">&amp;</span>[h1, h2, h2]).expect(<span class="string">&quot;Should create MerkleTree&quot;</span>);
 
-        <span class="kw">let</span> <span class="ident">root</span> <span class="op">=</span> <span class="ident">hex::encode</span>(<span class="kw-2">&amp;</span><span class="ident">top</span>.<span class="ident">root</span>());
+        <span class="kw">let </span>root = hex::encode(<span class="kw-2">&amp;</span>top.root());
 
         <span class="macro">assert_eq!</span>(
-            <span class="ident">root</span>, <span class="string">&quot;70d6549669561c65fdc687b87743b67e494e1f4be5d19a2955507220e57baaa6&quot;</span>,
-            <span class="string">&quot;should generate the correct root&quot;</span>
-        );
+            root, <span class="string">&quot;70d6549669561c65fdc687b87743b67e494e1f4be5d19a2955507220e57baaa6&quot;</span>,
+            <span class="string">&quot;should generate the correct root&quot;
+        </span>);
 
-        <span class="kw">let</span> <span class="ident">proof</span> <span class="op">=</span> <span class="ident">top</span>.<span class="ident">proof</span>(<span class="number">0</span>);
-        <span class="kw">let</span> <span class="ident">verified</span> <span class="op">=</span> <span class="ident">top</span>.<span class="ident">verify</span>(<span class="ident">proof</span>);
+        <span class="kw">let </span>proof = top.proof(<span class="number">0</span>);
+        <span class="kw">let </span>verified = top.verify(proof);
 
-        <span class="macro">assert!</span>(<span class="ident">verified</span>, <span class="string">&quot;should verify proof successfully&quot;</span>);
+        <span class="macro">assert!</span>(verified, <span class="string">&quot;should verify proof successfully&quot;</span>);
     }
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">it_generates_correct_merkle_tree_with_odd_leaves</span>() {
-        <span class="kw">let</span> <span class="ident">h1</span> <span class="op">=</span> <span class="op">&lt;</span>[<span class="ident">u8</span>; <span class="number">32</span>]<span class="op">&gt;</span><span class="ident">::from_hex</span>(
+    <span class="attribute">#[test]</span>
+    <span class="kw">fn </span>it_generates_correct_merkle_tree_with_odd_leaves() {
+        <span class="kw">let </span>h1 = &lt;[u8; <span class="number">32</span>]&gt;::from_hex(
             <span class="string">&quot;13c21db99584c9bb3e9ad98061f6ca39364049b328b74822be6303a4da18014d&quot;</span>,
         )
-        .<span class="ident">unwrap</span>();
-        <span class="kw">let</span> <span class="ident">h2</span> <span class="op">=</span> <span class="op">&lt;</span>[<span class="ident">u8</span>; <span class="number">32</span>]<span class="op">&gt;</span><span class="ident">::from_hex</span>(
+        .unwrap();
+        <span class="kw">let </span>h2 = &lt;[u8; <span class="number">32</span>]&gt;::from_hex(
             <span class="string">&quot;b1bea7b8b58cd47d475bfe07dbe6df33f50f7a76957c51cebe8254257542fd7d&quot;</span>,
         )
-        .<span class="ident">unwrap</span>();
+        .unwrap();
 
-        <span class="kw">let</span> <span class="ident">h3</span> <span class="op">=</span> <span class="op">&lt;</span>[<span class="ident">u8</span>; <span class="number">32</span>]<span class="op">&gt;</span><span class="ident">::from_hex</span>(
+        <span class="kw">let </span>h3 = &lt;[u8; <span class="number">32</span>]&gt;::from_hex(
             <span class="string">&quot;c455ef23d4db0091e1e25ef5d652a2832a1fc4fa82b8e66c290a692836e0cbe6&quot;</span>,
         )
-        .<span class="ident">unwrap</span>();
+        .unwrap();
 
-        <span class="comment">// odd leaves</span>
-        <span class="kw">let</span> <span class="ident">top</span> <span class="op">=</span> <span class="ident">MerkleTree::new</span>(<span class="kw-2">&amp;</span>[<span class="ident">h1</span>, <span class="ident">h2</span>, <span class="ident">h3</span>]).<span class="ident">expect</span>(<span class="string">&quot;Should create MerkleTree&quot;</span>);
+        <span class="comment">// odd leaves
+        </span><span class="kw">let </span>top = MerkleTree::new(<span class="kw-2">&amp;</span>[h1, h2, h3]).expect(<span class="string">&quot;Should create MerkleTree&quot;</span>);
 
-        <span class="kw">let</span> <span class="ident">root</span> <span class="op">=</span> <span class="ident">hex::encode</span>(<span class="kw-2">&amp;</span><span class="ident">top</span>.<span class="ident">root</span>());
+        <span class="kw">let </span>root = hex::encode(<span class="kw-2">&amp;</span>top.root());
 
         <span class="macro">assert_eq!</span>(
-            <span class="ident">root</span>, <span class="string">&quot;e68ea33571084e5dea276b089a10fa7be9d59accf3d7838c0d9b050bf72634a1&quot;</span>,
-            <span class="string">&quot;should generate the correct root&quot;</span>
-        );
+            root, <span class="string">&quot;e68ea33571084e5dea276b089a10fa7be9d59accf3d7838c0d9b050bf72634a1&quot;</span>,
+            <span class="string">&quot;should generate the correct root&quot;
+        </span>);
 
-        <span class="kw">let</span> <span class="ident">proof</span> <span class="op">=</span> <span class="ident">top</span>.<span class="ident">proof</span>(<span class="number">0</span>);
-        <span class="kw">let</span> <span class="ident">verified</span> <span class="op">=</span> <span class="ident">top</span>.<span class="ident">verify</span>(<span class="ident">proof</span>);
+        <span class="kw">let </span>proof = top.proof(<span class="number">0</span>);
+        <span class="kw">let </span>verified = top.verify(proof);
 
-        <span class="macro">assert!</span>(<span class="ident">verified</span>, <span class="string">&quot;should verify proof successfully&quot;</span>);
+        <span class="macro">assert!</span>(verified, <span class="string">&quot;should verify proof successfully&quot;</span>);
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="primitives" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (20ffea693 2022-08-11)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="primitives" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>

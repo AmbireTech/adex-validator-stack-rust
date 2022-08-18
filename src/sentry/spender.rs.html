@@ -90,97 +90,97 @@
 <span id="90">90</span>
 <span id="91">91</span>
 <span id="92">92</span>
-</pre><pre class="rust"><code><span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">fee</span> {
+</pre><pre class="rust"><code><span class="kw">pub mod </span>fee {
 
-    <span class="kw">use</span> <span class="ident">primitives</span>::{<span class="ident">Address</span>, <span class="ident">DomainError</span>, <span class="ident">UnifiedNum</span>, <span class="ident">ValidatorDesc</span>};
+    <span class="kw">use </span>primitives::{Address, DomainError, UnifiedNum, ValidatorDesc};
 
-    <span class="doccomment">/// Pro mile (per thousands, `1000`) in `UnifiedNum` precision, i.e. `1_000.00_000_000`.</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">PRO_MILLE</span>: <span class="ident">UnifiedNum</span> <span class="op">=</span> <span class="ident">UnifiedNum::from_u64</span>(<span class="number">1_000</span> <span class="op">*</span> <span class="ident">UnifiedNum::MULTIPLIER</span>);
+    <span class="doccomment">/// Pro mile (per thousands, `1000`) in `UnifiedNum` precision, i.e. `1_000.00_000_000`.
+    </span><span class="kw">pub const </span>PRO_MILLE: UnifiedNum = UnifiedNum::from_u64(<span class="number">1_000 </span>* UnifiedNum::MULTIPLIER);
 
-    <span class="doccomment">/// Calculates the fee for a given payout of the specified validator</span>
-    <span class="doccomment">/// This function will return None if the provided validator is not part of the Campaign / Channel</span>
-    <span class="doccomment">/// In the case of overflow when calculating the payout, an error will be returned</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">calculate_fee</span>(
-        (<span class="ident">_earner</span>, <span class="ident">payout</span>): (<span class="ident">Address</span>, <span class="ident">UnifiedNum</span>),
-        <span class="ident">validator</span>: <span class="kw-2">&amp;</span><span class="ident">ValidatorDesc</span>,
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">UnifiedNum</span>, <span class="ident">DomainError</span><span class="op">&gt;</span> {
-        <span class="comment">// should never overflow, but we guard against overflow</span>
-        <span class="comment">// `UnifiedNum::checked_div` will accurately floor the inner `u64` for the `UnifiedNum::PRECISION`</span>
-        <span class="ident">payout</span>
-            .<span class="ident">checked_mul</span>(<span class="kw-2">&amp;</span><span class="ident">validator</span>.<span class="ident">fee</span>)
-            .<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">pro_mille_fee</span><span class="op">|</span> <span class="ident">pro_mille_fee</span>.<span class="ident">checked_div</span>(<span class="kw-2">&amp;</span><span class="ident">PRO_MILLE</span>))
-            .<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">DomainError::InvalidArgument</span>(<span class="string">&quot;payout calculation overflow&quot;</span>.<span class="ident">to_string</span>()))
+    <span class="doccomment">/// Calculates the fee for a given payout of the specified validator
+    /// This function will return None if the provided validator is not part of the Campaign / Channel
+    /// In the case of overflow when calculating the payout, an error will be returned
+    </span><span class="kw">pub fn </span>calculate_fee(
+        (_earner, payout): (Address, UnifiedNum),
+        validator: <span class="kw-2">&amp;</span>ValidatorDesc,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;UnifiedNum, DomainError&gt; {
+        <span class="comment">// should never overflow, but we guard against overflow
+        // `UnifiedNum::checked_div` will accurately floor the inner `u64` for the `UnifiedNum::PRECISION`
+        </span>payout
+            .checked_mul(<span class="kw-2">&amp;</span>validator.fee)
+            .and_then(|pro_mille_fee| pro_mille_fee.checked_div(<span class="kw-2">&amp;</span>PRO_MILLE))
+            .ok_or_else(|| DomainError::InvalidArgument(<span class="string">&quot;payout calculation overflow&quot;</span>.to_string()))
     }
 
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
-    <span class="kw">mod</span> <span class="ident">test</span> {
-        <span class="kw">use</span> <span class="ident">primitives</span>::{
-            <span class="ident">test_util</span>::{<span class="ident">DUMMY_VALIDATOR_LEADER</span>, <span class="ident">PUBLISHER</span>},
-            <span class="ident">UnifiedNum</span>, <span class="ident">ValidatorDesc</span>,
+    <span class="attribute">#[cfg(test)]</span>
+    <span class="kw">mod </span>test {
+        <span class="kw">use </span>primitives::{
+            test_util::{DUMMY_VALIDATOR_LEADER, PUBLISHER},
+            UnifiedNum, ValidatorDesc,
         };
 
-        <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::spender::fee::calculate_fee</span>;
+        <span class="kw">use </span><span class="kw">crate</span>::spender::fee::calculate_fee;
 
-        <span class="attribute">#[<span class="ident">test</span>]</span>
-        <span class="kw">fn</span> <span class="ident">test_calculation_of_fee</span>() {
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">dummy_leader</span> <span class="op">=</span> <span class="ident">DUMMY_VALIDATOR_LEADER</span>.<span class="ident">clone</span>();
-            <span class="ident">dummy_leader</span>.<span class="ident">fee</span> <span class="op">=</span> <span class="ident">UnifiedNum::from</span>(<span class="number">10_000_000</span>);
+        <span class="attribute">#[test]</span>
+        <span class="kw">fn </span>test_calculation_of_fee() {
+            <span class="kw">let </span><span class="kw-2">mut </span>dummy_leader = DUMMY_VALIDATOR_LEADER.clone();
+            dummy_leader.fee = UnifiedNum::from(<span class="number">10_000_000</span>);
 
-            <span class="comment">// normal payout - no flooring</span>
-            {
-                <span class="comment">// 30 000 * 10 000 000 / 1 000 00 000 000 = 3</span>
+            <span class="comment">// normal payout - no flooring
+            </span>{
+                <span class="comment">// 30 000 * 10 000 000 / 1 000 00 000 000 = 3
 
-                <span class="comment">// 0.0003 * 0.1 / 1000.0 = 0.00000003 = UnifiedNum(3)</span>
-                <span class="comment">// 0.00 030 000 * 0.10 000 000 / 1 000 = 0.00 000 003</span>
-                <span class="kw">let</span> <span class="ident">payout</span> <span class="op">=</span> (<span class="kw-2">*</span><span class="ident">PUBLISHER</span>, <span class="ident">UnifiedNum::from</span>(<span class="number">30_000</span>));
+                // 0.0003 * 0.1 / 1000.0 = 0.00000003 = UnifiedNum(3)
+                // 0.00 030 000 * 0.10 000 000 / 1 000 = 0.00 000 003
+                </span><span class="kw">let </span>payout = (<span class="kw-2">*</span>PUBLISHER, UnifiedNum::from(<span class="number">30_000</span>));
 
-                <span class="kw">let</span> <span class="ident">validator_fee</span> <span class="op">=</span>
-                    <span class="ident">calculate_fee</span>(<span class="ident">payout</span>, <span class="kw-2">&amp;</span><span class="ident">dummy_leader</span>).<span class="ident">expect</span>(<span class="string">&quot;Should not overflow&quot;</span>);
+                <span class="kw">let </span>validator_fee =
+                    calculate_fee(payout, <span class="kw-2">&amp;</span>dummy_leader).expect(<span class="string">&quot;Should not overflow&quot;</span>);
 
                 <span class="macro">assert_eq!</span>(
-                    <span class="ident">UnifiedNum::from</span>(<span class="number">3</span>),
-                    <span class="ident">validator_fee</span>,
-                    <span class="string">&quot;fee should be 0.00000003 in UnifiedNum&quot;</span>
-                );
+                    UnifiedNum::from(<span class="number">3</span>),
+                    validator_fee,
+                    <span class="string">&quot;fee should be 0.00000003 in UnifiedNum&quot;
+                </span>);
             }
 
-            <span class="comment">// payout with flooring</span>
-            {
-                <span class="comment">// 66 000 * 10 000 000 / 100 000 000 000 = 6.6 = 6</span>
-                <span class="kw">let</span> <span class="ident">payout</span> <span class="op">=</span> (<span class="kw-2">*</span><span class="ident">PUBLISHER</span>, <span class="ident">UnifiedNum::from</span>(<span class="number">66_000</span>));
-                <span class="kw">let</span> <span class="ident">validator_fee</span> <span class="op">=</span>
-                    <span class="ident">calculate_fee</span>(<span class="ident">payout</span>, <span class="kw-2">&amp;</span><span class="ident">dummy_leader</span>).<span class="ident">expect</span>(<span class="string">&quot;Should not overflow&quot;</span>);
+            <span class="comment">// payout with flooring
+            </span>{
+                <span class="comment">// 66 000 * 10 000 000 / 100 000 000 000 = 6.6 = 6
+                </span><span class="kw">let </span>payout = (<span class="kw-2">*</span>PUBLISHER, UnifiedNum::from(<span class="number">66_000</span>));
+                <span class="kw">let </span>validator_fee =
+                    calculate_fee(payout, <span class="kw-2">&amp;</span>dummy_leader).expect(<span class="string">&quot;Should not overflow&quot;</span>);
 
-                <span class="macro">assert_eq!</span>(<span class="ident">UnifiedNum::from</span>(<span class="number">6</span>), <span class="ident">validator_fee</span>);
+                <span class="macro">assert_eq!</span>(UnifiedNum::from(<span class="number">6</span>), validator_fee);
             }
 
-            <span class="comment">// Overflow - even using `Ratio` for `UnifiedNum`, this should overflow</span>
-            {
-                <span class="kw">let</span> <span class="ident">very_high_fee</span> <span class="op">=</span> <span class="ident">ValidatorDesc</span> {
-                    <span class="ident">fee</span>: <span class="ident">UnifiedNum::from</span>(<span class="ident">u64::MAX</span>),
-                    ..<span class="ident">dummy_leader</span>.<span class="ident">clone</span>()
+            <span class="comment">// Overflow - even using `Ratio` for `UnifiedNum`, this should overflow
+            </span>{
+                <span class="kw">let </span>very_high_fee = ValidatorDesc {
+                    fee: UnifiedNum::from(u64::MAX),
+                    ..dummy_leader.clone()
                 };
-                <span class="comment">// u64::MAX * u64::MAX / 100 000 000 000</span>
-                <span class="kw">let</span> <span class="ident">payout</span> <span class="op">=</span> (<span class="kw-2">*</span><span class="ident">PUBLISHER</span>, <span class="ident">UnifiedNum::from</span>(<span class="ident">u64::MAX</span>));
+                <span class="comment">// u64::MAX * u64::MAX / 100 000 000 000
+                </span><span class="kw">let </span>payout = (<span class="kw-2">*</span>PUBLISHER, UnifiedNum::from(u64::MAX));
 
-                <span class="ident">calculate_fee</span>(<span class="ident">payout</span>, <span class="kw-2">&amp;</span><span class="ident">very_high_fee</span>).<span class="ident">expect_err</span>(<span class="string">&quot;Should overflow&quot;</span>);
+                calculate_fee(payout, <span class="kw-2">&amp;</span>very_high_fee).expect_err(<span class="string">&quot;Should overflow&quot;</span>);
             }
 
-            <span class="comment">// whole number payout</span>
-            {
-                <span class="comment">// e.g. 3 TOKENs</span>
-                <span class="kw">let</span> <span class="ident">payout</span> <span class="op">=</span> (<span class="kw-2">*</span><span class="ident">PUBLISHER</span>, <span class="ident">UnifiedNum::from</span>(<span class="number">300_000_000_u64</span>));
+            <span class="comment">// whole number payout
+            </span>{
+                <span class="comment">// e.g. 3 TOKENs
+                </span><span class="kw">let </span>payout = (<span class="kw-2">*</span>PUBLISHER, UnifiedNum::from(<span class="number">300_000_000_u64</span>));
 
-                <span class="comment">// 300 000 000 × 10 000 000 / 100 000 000 000</span>
-                <span class="kw">let</span> <span class="ident">validator_fee</span> <span class="op">=</span>
-                    <span class="ident">calculate_fee</span>(<span class="ident">payout</span>, <span class="kw-2">&amp;</span><span class="ident">dummy_leader</span>).<span class="ident">expect</span>(<span class="string">&quot;Should not overflow&quot;</span>);
+                <span class="comment">// 300 000 000 × 10 000 000 / 100 000 000 000
+                </span><span class="kw">let </span>validator_fee =
+                    calculate_fee(payout, <span class="kw-2">&amp;</span>dummy_leader).expect(<span class="string">&quot;Should not overflow&quot;</span>);
 
-                <span class="comment">// : 3 000 000 000 000</span>
-                <span class="comment">// 0.000003</span>
-                <span class="macro">assert_eq!</span>(<span class="ident">UnifiedNum::from</span>(<span class="number">30_000</span>), <span class="ident">validator_fee</span>);
+                <span class="comment">// : 3 000 000 000 000
+                // 0.000003
+                </span><span class="macro">assert_eq!</span>(UnifiedNum::from(<span class="number">30_000</span>), validator_fee);
             }
         }
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (20ffea693 2022-08-11)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>

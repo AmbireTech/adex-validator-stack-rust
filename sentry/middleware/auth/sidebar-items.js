@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":[["AuthRequired",""],["Authenticate",""],["IsAdmin",""]]};
+window.SIDEBAR_ITEMS = {"fn":[["authenticate","Creates a [`Session`] and additionally [`Auth`] if a Bearer token was provided."],["authenticate_as_advertiser",""],["authenticate_as_publisher",""],["authentication_required",""],["is_admin",""]]};

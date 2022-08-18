@@ -60,67 +60,67 @@
 <span id="60">60</span>
 <span id="61">61</span>
 <span id="62">62</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">std</span>::{<span class="ident">net::SocketAddr</span>, <span class="ident">sync::Arc</span>};
+</pre><pre class="rust"><code><span class="kw">use </span>std::{net::SocketAddr, sync::Arc};
 
-<span class="kw">use</span> <span class="ident">axum</span>::{<span class="ident">routing::get</span>, <span class="ident">Extension</span>, <span class="ident">Router</span>, <span class="ident">Server</span>};
-<span class="kw">use</span> <span class="ident">log::info</span>;
+<span class="kw">use </span>axum::{routing::get, Extension, Router, Server};
+<span class="kw">use </span>log::info;
 
-<span class="kw">use</span> <span class="ident">tera::Tera</span>;
+<span class="kw">use </span>tera::Tera;
 
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::routes</span>::{<span class="ident">get_index</span>, <span class="ident">get_preview_ad</span>, <span class="ident">get_preview_video</span>};
+<span class="kw">use </span><span class="kw">crate</span>::routes::{get_index, get_preview_ad, get_preview_video};
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">State</span> {
-    <span class="kw">pub</span> <span class="ident">tera</span>: <span class="ident">Tera</span>,
+<span class="attribute">#[derive(Debug)]</span>
+<span class="kw">pub struct </span>State {
+    <span class="kw">pub </span>tera: Tera,
 }
 
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Application</span> {
-    <span class="doccomment">/// The shared state of the application</span>
-    <span class="ident">state</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">State</span><span class="op">&gt;</span>,
+<span class="kw">pub struct </span>Application {
+    <span class="doccomment">/// The shared state of the application
+    </span>state: Arc&lt;State&gt;,
 }
 
-<span class="kw">impl</span> <span class="ident">Application</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>() -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">std::error::Error</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">serve_dir</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">std::env::current_dir</span>().<span class="ident">unwrap</span>() {
-            <span class="ident">serve_path</span> <span class="kw">if</span> <span class="ident">serve_path</span>.<span class="ident">ends_with</span>(<span class="string">&quot;serve&quot;</span>) =&gt; <span class="ident">serve_path</span>,
-            <span class="ident">adview_manager_path</span> <span class="kw">if</span> <span class="ident">adview_manager_path</span>.<span class="ident">ends_with</span>(<span class="string">&quot;adview-manager&quot;</span>) =&gt; {
-                <span class="ident">adview_manager_path</span>.<span class="ident">join</span>(<span class="string">&quot;serve&quot;</span>)
+<span class="kw">impl </span>Application {
+    <span class="kw">pub fn </span>new() -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, Box&lt;<span class="kw">dyn </span>std::error::Error&gt;&gt; {
+        <span class="kw">let </span>serve_dir = <span class="kw">match </span>std::env::current_dir().unwrap() {
+            serve_path <span class="kw">if </span>serve_path.ends_with(<span class="string">&quot;serve&quot;</span>) =&gt; serve_path,
+            adview_manager_path <span class="kw">if </span>adview_manager_path.ends_with(<span class="string">&quot;adview-manager&quot;</span>) =&gt; {
+                adview_manager_path.join(<span class="string">&quot;serve&quot;</span>)
             }
-            <span class="comment">// running from the Validator stack workspace</span>
-            <span class="ident">workspace_path</span> =&gt; <span class="ident">workspace_path</span>.<span class="ident">join</span>(<span class="string">&quot;adview-manager/serve&quot;</span>),
+            <span class="comment">// running from the Validator stack workspace
+            </span>workspace_path =&gt; workspace_path.join(<span class="string">&quot;adview-manager/serve&quot;</span>),
         };
 
-        <span class="kw">let</span> <span class="ident">templates_glob</span> <span class="op">=</span> <span class="macro">format!</span>(<span class="string">&quot;{}/templates/**/*.html&quot;</span>, <span class="ident">serve_dir</span>.<span class="ident">display</span>());
+        <span class="kw">let </span>templates_glob = <span class="macro">format!</span>(<span class="string">&quot;{}/templates/**/*.html&quot;</span>, serve_dir.display());
 
         <span class="macro">info!</span>(<span class="string">&quot;Tera templates glob path: {templates_glob}&quot;</span>);
-        <span class="comment">// Use globbing</span>
-        <span class="kw">let</span> <span class="ident">tera</span> <span class="op">=</span> <span class="ident">Tera::new</span>(<span class="kw-2">&amp;</span><span class="ident">templates_glob</span>)<span class="question-mark">?</span>;
+        <span class="comment">// Use globbing
+        </span><span class="kw">let </span>tera = Tera::new(<span class="kw-2">&amp;</span>templates_glob)<span class="question-mark">?</span>;
 
-        <span class="kw">let</span> <span class="ident">shared_state</span> <span class="op">=</span> <span class="ident">Arc::new</span>(<span class="ident">State</span> { <span class="ident">tera</span> });
+        <span class="kw">let </span>shared_state = Arc::new(State { tera });
 
-        <span class="prelude-val">Ok</span>(<span class="self">Self</span> {
-            <span class="ident">state</span>: <span class="ident">shared_state</span>,
+        <span class="prelude-val">Ok</span>(<span class="self">Self </span>{
+            state: shared_state,
         })
     }
 
-    <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">run</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">std::error::Error</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="comment">// build our application with a single route</span>
-        <span class="kw">let</span> <span class="ident">app</span> <span class="op">=</span> <span class="ident">Router::new</span>()
-            .<span class="ident">route</span>(<span class="string">&quot;/&quot;</span>, <span class="ident">get</span>(<span class="ident">get_index</span>))
-            .<span class="ident">route</span>(<span class="string">&quot;/preview/ad&quot;</span>, <span class="ident">get</span>(<span class="ident">get_preview_ad</span>))
-            .<span class="ident">route</span>(<span class="string">&quot;/preview/video&quot;</span>, <span class="ident">get</span>(<span class="ident">get_preview_video</span>))
-            .<span class="ident">layer</span>(<span class="ident">Extension</span>(<span class="self">self</span>.<span class="ident">state</span>.<span class="ident">clone</span>()));
+    <span class="kw">pub async fn </span>run(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;(), Box&lt;<span class="kw">dyn </span>std::error::Error&gt;&gt; {
+        <span class="comment">// build our application with a single route
+        </span><span class="kw">let </span>app = Router::new()
+            .route(<span class="string">&quot;/&quot;</span>, get(get_index))
+            .route(<span class="string">&quot;/preview/ad&quot;</span>, get(get_preview_ad))
+            .route(<span class="string">&quot;/preview/video&quot;</span>, get(get_preview_video))
+            .layer(Extension(<span class="self">self</span>.state.clone()));
 
-        <span class="kw">let</span> <span class="ident">socket_addr</span>: <span class="ident">SocketAddr</span> <span class="op">=</span> ([<span class="number">127</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">1</span>], <span class="number">3030</span>).<span class="ident">into</span>();
+        <span class="kw">let </span>socket_addr: SocketAddr = ([<span class="number">127</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">1</span>], <span class="number">3030</span>).into();
         <span class="macro">info!</span>(<span class="string">&quot;Server running on: {socket_addr}&quot;</span>);
 
-        <span class="comment">// run it with hyper on localhost:3030</span>
-        <span class="ident">Server::bind</span>(<span class="kw-2">&amp;</span><span class="ident">socket_addr</span>)
-            .<span class="ident">serve</span>(<span class="ident">app</span>.<span class="ident">into_make_service</span>())
+        <span class="comment">// run it with hyper on localhost:3030
+        </span>Server::bind(<span class="kw-2">&amp;</span>socket_addr)
+            .serve(app.into_make_service())
             .<span class="kw">await</span><span class="question-mark">?</span>;
 
         <span class="prelude-val">Ok</span>(())
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="adview_serve" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (20ffea693 2022-08-11)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="adview_serve" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>

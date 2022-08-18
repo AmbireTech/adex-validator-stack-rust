@@ -554,561 +554,561 @@
 <span id="554">554</span>
 <span id="555">555</span>
 <span id="556">556</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">chrono::Utc</span>;
-<span class="kw">use</span> <span class="ident">futures::future::try_join_all</span>;
-<span class="kw">use</span> <span class="ident">redis::aio::MultiplexedConnection</span>;
+</pre><pre class="rust"><code><span class="kw">use </span>chrono::Utc;
+<span class="kw">use </span>futures::future::try_join_all;
+<span class="kw">use </span>redis::aio::MultiplexedConnection;
 
-<span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">Auth</span>, <span class="ident">Session</span>};
-<span class="kw">use</span> <span class="ident">primitives</span>::{
-    <span class="ident">event_submission</span>::{<span class="ident">RateLimit</span>, <span class="ident">Rule</span>},
-    <span class="ident">sentry::Event</span>,
-    <span class="ident">Campaign</span>,
+<span class="kw">use crate</span>::{Auth, Session};
+<span class="kw">use </span>primitives::{
+    event_submission::{RateLimit, Rule},
+    sentry::Event,
+    Campaign,
 };
-<span class="kw">use</span> <span class="ident">std::cmp::PartialEq</span>;
-<span class="kw">use</span> <span class="ident">thiserror::Error</span>;
+<span class="kw">use </span>std::cmp::PartialEq;
+<span class="kw">use </span>thiserror::Error;
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>, <span class="ident">Error</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">Error</span> {
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Campaign is expired&quot;</span>)]</span>
-    <span class="ident">CampaignIsExpired</span>,
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;event submission restricted&quot;</span>)]</span>
-    <span class="ident">ForbiddenReferrer</span>,
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;{0}&quot;</span>)]</span>
-    <span class="ident">RulesError</span>(<span class="ident">String</span>),
+<span class="attribute">#[derive(Debug, PartialEq, Eq, Error)]</span>
+<span class="kw">pub enum </span>Error {
+    <span class="attribute">#[error(<span class="string">&quot;Campaign is expired&quot;</span>)]</span>
+    CampaignIsExpired,
+    <span class="attribute">#[error(<span class="string">&quot;event submission restricted&quot;</span>)]</span>
+    ForbiddenReferrer,
+    <span class="attribute">#[error(<span class="string">&quot;{0}&quot;</span>)]</span>
+    RulesError(String),
 }
 
-<span class="comment">// @TODO: Make pub(crate)</span>
-<span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">check_access</span>(
-    <span class="ident">redis</span>: <span class="kw-2">&amp;</span><span class="ident">MultiplexedConnection</span>,
-    <span class="ident">session</span>: <span class="kw-2">&amp;</span><span class="ident">Session</span>,
-    <span class="ident">auth</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">Auth</span><span class="op">&gt;</span>,
-    <span class="ident">rate_limit</span>: <span class="kw-2">&amp;</span><span class="ident">RateLimit</span>,
-    <span class="ident">campaign</span>: <span class="kw-2">&amp;</span><span class="ident">Campaign</span>,
-    <span class="ident">events</span>: <span class="kw-2">&amp;</span>[<span class="ident">Event</span>],
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">Error</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">current_time</span> <span class="op">=</span> <span class="ident">Utc::now</span>();
+<span class="comment">// @TODO: Make pub(crate)
+</span><span class="kw">pub async fn </span>check_access(
+    redis: <span class="kw-2">&amp;</span>MultiplexedConnection,
+    session: <span class="kw-2">&amp;</span>Session,
+    auth: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>Auth&gt;,
+    rate_limit: <span class="kw-2">&amp;</span>RateLimit,
+    campaign: <span class="kw-2">&amp;</span>Campaign,
+    events: <span class="kw-2">&amp;</span>[Event],
+) -&gt; <span class="prelude-ty">Result</span>&lt;(), Error&gt; {
+    <span class="kw">let </span>current_time = Utc::now();
 
-    <span class="kw">if</span> <span class="ident">current_time</span> <span class="op">&gt;</span> <span class="ident">campaign</span>.<span class="ident">active</span>.<span class="ident">to</span> {
-        <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error::CampaignIsExpired</span>);
+    <span class="kw">if </span>current_time &gt; campaign.active.to {
+        <span class="kw">return </span><span class="prelude-val">Err</span>(Error::CampaignIsExpired);
     }
-    <span class="kw">let</span> <span class="ident">auth_uid</span> <span class="op">=</span> <span class="ident">auth</span>.<span class="ident">map</span>(<span class="op">|</span><span class="ident">auth</span><span class="op">|</span> <span class="ident">auth</span>.<span class="ident">uid</span>.<span class="ident">to_string</span>()).<span class="ident">unwrap_or_default</span>();
+    <span class="kw">let </span>auth_uid = auth.map(|auth| auth.uid.to_string()).unwrap_or_default();
 
-    <span class="comment">// Rules for events</span>
-    <span class="kw">if</span> <span class="ident">forbidden_country</span>(<span class="ident">session</span>) <span class="op">|</span><span class="op">|</span> <span class="ident">forbidden_referrer</span>(<span class="ident">session</span>) {
-        <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error::ForbiddenReferrer</span>);
+    <span class="comment">// Rules for events
+    </span><span class="kw">if </span>forbidden_country(session) || forbidden_referrer(session) {
+        <span class="kw">return </span><span class="prelude-val">Err</span>(Error::ForbiddenReferrer);
     }
 
-    <span class="comment">// Used when `Campaign::event_submission` is `None`</span>
-    <span class="kw">let</span> <span class="ident">default_rules</span> <span class="op">=</span> [
-        <span class="ident">Rule</span> {
-            <span class="ident">uids</span>: <span class="prelude-val">Some</span>(<span class="macro">vec!</span>[<span class="ident">campaign</span>.<span class="ident">creator</span>.<span class="ident">to_string</span>()]),
-            <span class="ident">rate_limit</span>: <span class="prelude-val">None</span>,
+    <span class="comment">// Used when `Campaign::event_submission` is `None`
+    </span><span class="kw">let </span>default_rules = [
+        Rule {
+            uids: <span class="prelude-val">Some</span>(<span class="macro">vec!</span>[campaign.creator.to_string()]),
+            rate_limit: <span class="prelude-val">None</span>,
         },
-        <span class="ident">Rule</span> {
-            <span class="ident">uids</span>: <span class="prelude-val">None</span>,
-            <span class="ident">rate_limit</span>: <span class="prelude-val">Some</span>(<span class="ident">rate_limit</span>.<span class="ident">clone</span>()),
+        Rule {
+            uids: <span class="prelude-val">None</span>,
+            rate_limit: <span class="prelude-val">Some</span>(rate_limit.clone()),
         },
     ];
 
-    <span class="comment">// Enforce access limits</span>
-    <span class="kw">let</span> <span class="ident">allow_rules</span> <span class="op">=</span> <span class="ident">campaign</span>
-        .<span class="ident">event_submission</span>
-        .<span class="ident">as_ref</span>()
-        .<span class="ident">map</span>(<span class="op">|</span><span class="ident">ev_sub</span><span class="op">|</span> <span class="ident">ev_sub</span>.<span class="ident">allow</span>.<span class="ident">as_slice</span>())
-        .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="kw-2">&amp;</span><span class="ident">default_rules</span>);
+    <span class="comment">// Enforce access limits
+    </span><span class="kw">let </span>allow_rules = campaign
+        .event_submission
+        .as_ref()
+        .map(|ev_sub| ev_sub.allow.as_slice())
+        .unwrap_or_else(|| <span class="kw-2">&amp;</span>default_rules);
 
-    <span class="comment">// first, find an applicable access rule</span>
-    <span class="kw">let</span> <span class="ident">rules</span> <span class="op">=</span> <span class="ident">allow_rules</span>
-        .<span class="ident">iter</span>()
-        .<span class="ident">filter</span>(<span class="op">|</span><span class="ident">r</span><span class="op">|</span> <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="ident">r</span>.<span class="ident">uids</span> {
-            <span class="prelude-val">Some</span>(<span class="ident">uids</span>) =&gt; <span class="ident">uids</span>.<span class="ident">iter</span>().<span class="ident">any</span>(<span class="op">|</span><span class="ident">uid</span><span class="op">|</span> <span class="ident">uid</span>.<span class="ident">eq</span>(<span class="kw-2">&amp;</span><span class="ident">auth_uid</span>)),
-            <span class="prelude-val">None</span> =&gt; <span class="bool-val">true</span>,
+    <span class="comment">// first, find an applicable access rule
+    </span><span class="kw">let </span>rules = allow_rules
+        .iter()
+        .filter(|r| <span class="kw">match </span><span class="kw-2">&amp;</span>r.uids {
+            <span class="prelude-val">Some</span>(uids) =&gt; uids.iter().any(|uid| uid.eq(<span class="kw-2">&amp;</span>auth_uid)),
+            <span class="prelude-val">None </span>=&gt; <span class="bool-val">true</span>,
         })
-        .<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span><span class="op">&gt;</span>();
+        .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
 
-    <span class="kw">if</span> <span class="ident">rules</span>.<span class="ident">iter</span>().<span class="ident">any</span>(<span class="op">|</span><span class="ident">r</span><span class="op">|</span> <span class="ident">r</span>.<span class="ident">rate_limit</span>.<span class="ident">is_none</span>()) {
-        <span class="comment">// We matched a rule that has *no rateLimit*, so we&#39;re good</span>
-        <span class="kw">return</span> <span class="prelude-val">Ok</span>(());
+    <span class="kw">if </span>rules.iter().any(|r| r.rate_limit.is_none()) {
+        <span class="comment">// We matched a rule that has *no rateLimit*, so we&#39;re good
+        </span><span class="kw">return </span><span class="prelude-val">Ok</span>(());
     }
 
-    <span class="kw">let</span> <span class="ident">apply_all_rules</span> <span class="op">=</span> <span class="ident">try_join_all</span>(
-        <span class="ident">rules</span>
-            .<span class="ident">iter</span>()
-            .<span class="ident">map</span>(<span class="op">|</span><span class="ident">rule</span><span class="op">|</span> <span class="ident">apply_rule</span>(<span class="ident">redis</span>.<span class="ident">clone</span>(), <span class="ident">rule</span>, <span class="ident">events</span>, <span class="ident">campaign</span>, <span class="kw-2">&amp;</span><span class="ident">auth_uid</span>, <span class="ident">session</span>)),
+    <span class="kw">let </span>apply_all_rules = try_join_all(
+        rules
+            .iter()
+            .map(|rule| apply_rule(redis.clone(), rule, events, campaign, <span class="kw-2">&amp;</span>auth_uid, session)),
     );
 
-    <span class="ident">apply_all_rules</span>.<span class="kw">await</span>.<span class="ident">map_err</span>(<span class="ident">Error::RulesError</span>).<span class="ident">map</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> ())
+    apply_all_rules.<span class="kw">await</span>.map_err(Error::RulesError).map(|<span class="kw">_</span>| ())
 }
 
-<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">apply_rule</span>(
-    <span class="kw-2">mut</span> <span class="ident">redis</span>: <span class="ident">MultiplexedConnection</span>,
-    <span class="ident">rule</span>: <span class="kw-2">&amp;</span><span class="ident">Rule</span>,
-    <span class="ident">events</span>: <span class="kw-2">&amp;</span>[<span class="ident">Event</span>],
-    <span class="ident">campaign</span>: <span class="kw-2">&amp;</span><span class="ident">Campaign</span>,
-    <span class="ident">uid</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>,
-    <span class="ident">session</span>: <span class="kw-2">&amp;</span><span class="ident">Session</span>,
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">String</span><span class="op">&gt;</span> {
-    <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="ident">rule</span>.<span class="ident">rate_limit</span> {
-        <span class="prelude-val">Some</span>(<span class="ident">rate_limit</span>) =&gt; {
-            <span class="kw">let</span> <span class="ident">key</span> <span class="op">=</span> <span class="kw">if</span> <span class="kw-2">&amp;</span><span class="ident">rate_limit</span>.<span class="ident">limit_type</span> <span class="op">==</span> <span class="string">&quot;sid&quot;</span> {
+<span class="kw">async fn </span>apply_rule(
+    <span class="kw-2">mut </span>redis: MultiplexedConnection,
+    rule: <span class="kw-2">&amp;</span>Rule,
+    events: <span class="kw-2">&amp;</span>[Event],
+    campaign: <span class="kw-2">&amp;</span>Campaign,
+    uid: <span class="kw-2">&amp;</span>str,
+    session: <span class="kw-2">&amp;</span>Session,
+) -&gt; <span class="prelude-ty">Result</span>&lt;(), String&gt; {
+    <span class="kw">match </span><span class="kw-2">&amp;</span>rule.rate_limit {
+        <span class="prelude-val">Some</span>(rate_limit) =&gt; {
+            <span class="kw">let </span>key = <span class="kw">if </span><span class="kw-2">&amp;</span>rate_limit.limit_type == <span class="string">&quot;sid&quot; </span>{
                 <span class="prelude-val">Ok</span>(<span class="macro">format!</span>(
                     <span class="string">&quot;adexRateLimit:{}:{}&quot;</span>,
-                    <span class="ident">hex::encode</span>(<span class="ident">campaign</span>.<span class="ident">id</span>),
-                    <span class="ident">uid</span>
+                    hex::encode(campaign.id),
+                    uid
                 ))
-            } <span class="kw">else</span> <span class="kw">if</span> <span class="kw-2">&amp;</span><span class="ident">rate_limit</span>.<span class="ident">limit_type</span> <span class="op">==</span> <span class="string">&quot;ip&quot;</span> {
-                <span class="kw">if</span> <span class="ident">events</span>.<span class="ident">len</span>() <span class="op">!</span><span class="op">=</span> <span class="number">1</span> {
-                    <span class="prelude-val">Err</span>(<span class="string">&quot;rateLimit: only allows 1 event&quot;</span>.<span class="ident">to_string</span>())
-                } <span class="kw">else</span> {
+            } <span class="kw">else if </span><span class="kw-2">&amp;</span>rate_limit.limit_type == <span class="string">&quot;ip&quot; </span>{
+                <span class="kw">if </span>events.len() != <span class="number">1 </span>{
+                    <span class="prelude-val">Err</span>(<span class="string">&quot;rateLimit: only allows 1 event&quot;</span>.to_string())
+                } <span class="kw">else </span>{
                     <span class="prelude-val">Ok</span>(<span class="macro">format!</span>(
                         <span class="string">&quot;adexRateLimit:{}:{}&quot;</span>,
-                        <span class="ident">hex::encode</span>(<span class="ident">campaign</span>.<span class="ident">id</span>),
-                        <span class="ident">session</span>.<span class="ident">ip</span>.<span class="ident">as_ref</span>().<span class="ident">unwrap_or</span>(<span class="kw-2">&amp;</span><span class="ident">String::new</span>())
+                        hex::encode(campaign.id),
+                        session.ip.as_ref().unwrap_or(<span class="kw-2">&amp;</span>String::new())
                     ))
                 }
-            } <span class="kw">else</span> {
-                <span class="comment">// return for the whole function</span>
-                <span class="kw">return</span> <span class="prelude-val">Ok</span>(());
+            } <span class="kw">else </span>{
+                <span class="comment">// return for the whole function
+                </span><span class="kw">return </span><span class="prelude-val">Ok</span>(());
             }<span class="question-mark">?</span>;
 
-            <span class="kw">if</span> <span class="ident">redis::cmd</span>(<span class="string">&quot;EXISTS&quot;</span>)
-                .<span class="ident">arg</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>)
-                .<span class="ident">query_async</span>::<span class="op">&lt;</span><span class="kw">_</span>, <span class="ident">i8</span><span class="op">&gt;</span>(<span class="kw-2">&amp;mut</span> <span class="ident">redis</span>)
-                .<span class="kw">await</span>
-                .<span class="ident">map</span>(<span class="op">|</span><span class="ident">exists</span><span class="op">|</span> <span class="ident">exists</span> <span class="op">==</span> <span class="number">1</span>)
-                .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">error</span><span class="op">|</span> <span class="macro">format!</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">error</span>))<span class="question-mark">?</span>
-            {
-                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;rateLimit: too many requests&quot;</span>.<span class="ident">to_string</span>());
+            <span class="kw">if </span>redis::cmd(<span class="string">&quot;EXISTS&quot;</span>)
+                .arg(<span class="kw-2">&amp;</span>key)
+                .query_async::&lt;<span class="kw">_</span>, i8&gt;(<span class="kw-2">&amp;mut </span>redis)
+                .<span class="kw">await
+                </span>.map(|exists| exists == <span class="number">1</span>)
+                .map_err(|error| <span class="macro">format!</span>(<span class="string">&quot;{}&quot;</span>, error))<span class="question-mark">?
+            </span>{
+                <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;rateLimit: too many requests&quot;</span>.to_string());
             }
 
-            <span class="kw">let</span> <span class="ident">seconds</span> <span class="op">=</span> <span class="ident">rate_limit</span>.<span class="ident">time_frame</span>.<span class="ident">as_secs_f32</span>().<span class="ident">ceil</span>();
-            <span class="ident">redis::cmd</span>(<span class="string">&quot;SETEX&quot;</span>)
-                .<span class="ident">arg</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>)
-                .<span class="ident">arg</span>(<span class="ident">seconds</span> <span class="kw">as</span> <span class="ident">i32</span>)
-                .<span class="ident">arg</span>(<span class="string">&quot;1&quot;</span>)
-                .<span class="ident">query_async</span>::<span class="op">&lt;</span><span class="kw">_</span>, ()<span class="op">&gt;</span>(<span class="kw-2">&amp;mut</span> <span class="ident">redis</span>)
-                .<span class="kw">await</span>
-                .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">error</span><span class="op">|</span> <span class="macro">format!</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">error</span>))
+            <span class="kw">let </span>seconds = rate_limit.time_frame.as_secs_f32().ceil();
+            redis::cmd(<span class="string">&quot;SETEX&quot;</span>)
+                .arg(<span class="kw-2">&amp;</span>key)
+                .arg(seconds <span class="kw">as </span>i32)
+                .arg(<span class="string">&quot;1&quot;</span>)
+                .query_async::&lt;<span class="kw">_</span>, ()&gt;(<span class="kw-2">&amp;mut </span>redis)
+                .<span class="kw">await
+                </span>.map_err(|error| <span class="macro">format!</span>(<span class="string">&quot;{}&quot;</span>, error))
         }
-        <span class="prelude-val">None</span> =&gt; <span class="prelude-val">Ok</span>(()),
+        <span class="prelude-val">None </span>=&gt; <span class="prelude-val">Ok</span>(()),
     }
 }
 
-<span class="kw">fn</span> <span class="ident">forbidden_referrer</span>(<span class="ident">session</span>: <span class="kw-2">&amp;</span><span class="ident">Session</span>) -&gt; <span class="ident">bool</span> {
-    <span class="kw">match</span> <span class="ident">session</span>
-        .<span class="ident">referrer_header</span>
-        .<span class="ident">as_ref</span>()
-        .<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">rf</span><span class="op">|</span> <span class="ident">rf</span>.<span class="ident">split</span>(<span class="string">&#39;/&#39;</span>).<span class="ident">nth</span>(<span class="number">2</span>))
+<span class="kw">fn </span>forbidden_referrer(session: <span class="kw-2">&amp;</span>Session) -&gt; bool {
+    <span class="kw">match </span>session
+        .referrer_header
+        .as_ref()
+        .and_then(|rf| rf.split(<span class="string">&#39;/&#39;</span>).nth(<span class="number">2</span>))
     {
-        <span class="prelude-val">Some</span>(<span class="ident">hostname</span>) =&gt; {
-            <span class="ident">hostname</span> <span class="op">==</span> <span class="string">&quot;localhost&quot;</span>
-                <span class="op">|</span><span class="op">|</span> <span class="ident">hostname</span> <span class="op">==</span> <span class="string">&quot;127.0.0.1&quot;</span>
-                <span class="op">|</span><span class="op">|</span> <span class="ident">hostname</span>.<span class="ident">starts_with</span>(<span class="string">&quot;localhost:&quot;</span>)
-                <span class="op">|</span><span class="op">|</span> <span class="ident">hostname</span>.<span class="ident">starts_with</span>(<span class="string">&quot;127.0.0.1:&quot;</span>)
+        <span class="prelude-val">Some</span>(hostname) =&gt; {
+            hostname == <span class="string">&quot;localhost&quot;
+                </span>|| hostname == <span class="string">&quot;127.0.0.1&quot;
+                </span>|| hostname.starts_with(<span class="string">&quot;localhost:&quot;</span>)
+                || hostname.starts_with(<span class="string">&quot;127.0.0.1:&quot;</span>)
         }
-        <span class="prelude-val">None</span> =&gt; <span class="bool-val">false</span>,
+        <span class="prelude-val">None </span>=&gt; <span class="bool-val">false</span>,
     }
 }
 
-<span class="kw">fn</span> <span class="ident">forbidden_country</span>(<span class="ident">session</span>: <span class="kw-2">&amp;</span><span class="ident">Session</span>) -&gt; <span class="ident">bool</span> {
-    <span class="kw">match</span> <span class="ident">session</span>.<span class="ident">country</span>.<span class="ident">as_ref</span>() {
-        <span class="prelude-val">Some</span>(<span class="ident">country</span>) =&gt; <span class="ident">country</span> <span class="op">==</span> <span class="string">&quot;XX&quot;</span>,
-        <span class="prelude-val">None</span> =&gt; <span class="bool-val">false</span>,
+<span class="kw">fn </span>forbidden_country(session: <span class="kw-2">&amp;</span>Session) -&gt; bool {
+    <span class="kw">match </span>session.country.as_ref() {
+        <span class="prelude-val">Some</span>(country) =&gt; country == <span class="string">&quot;XX&quot;</span>,
+        <span class="prelude-val">None </span>=&gt; <span class="bool-val">false</span>,
     }
 }
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
-<span class="kw">mod</span> <span class="ident">test</span> {
-    <span class="kw">use</span> <span class="ident">std::time::Duration</span>;
+<span class="attribute">#[cfg(test)]</span>
+<span class="kw">mod </span>test {
+    <span class="kw">use </span>std::time::Duration;
 
-    <span class="kw">use</span> <span class="ident">chrono::TimeZone</span>;
-    <span class="kw">use</span> <span class="ident">primitives</span>::{
-        <span class="ident">config::GANACHE_CONFIG</span>,
-        <span class="ident">event_submission</span>::{<span class="ident">RateLimit</span>, <span class="ident">Rule</span>},
-        <span class="ident">sentry::Event</span>,
-        <span class="ident">test_util</span>::{<span class="ident">DUMMY_CAMPAIGN</span>, <span class="ident">DUMMY_IPFS</span>, <span class="ident">FOLLOWER</span>, <span class="ident">IDS</span>, <span class="ident">PUBLISHER_2</span>},
-        <span class="ident">Config</span>, <span class="ident">EventSubmission</span>,
+    <span class="kw">use </span>chrono::TimeZone;
+    <span class="kw">use </span>primitives::{
+        config::GANACHE_CONFIG,
+        event_submission::{RateLimit, Rule},
+        sentry::Event,
+        test_util::{DUMMY_CAMPAIGN, DUMMY_IPFS, FOLLOWER, IDS, PUBLISHER_2},
+        Config, EventSubmission,
     };
 
-    <span class="kw">use</span> <span class="ident">deadpool::managed::Object</span>;
+    <span class="kw">use </span>deadpool::managed::Object;
 
-    <span class="kw">use</span> <span class="kw">crate</span>::{
-        <span class="ident">db::redis_pool</span>::{<span class="ident">Manager</span>, <span class="ident">TESTS_POOL</span>},
-        <span class="ident">Session</span>,
+    <span class="kw">use crate</span>::{
+        db::redis_pool::{Manager, TESTS_POOL},
+        Session,
     };
 
-    <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
+    <span class="kw">use super</span>::<span class="kw-2">*</span>;
 
-    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">setup</span>() -&gt; (<span class="ident">Config</span>, <span class="ident">Object</span><span class="op">&lt;</span><span class="ident">Manager</span><span class="op">&gt;</span>) {
-        <span class="kw">let</span> <span class="ident">connection</span> <span class="op">=</span> <span class="ident">TESTS_POOL</span>.<span class="ident">get</span>().<span class="kw">await</span>.<span class="ident">expect</span>(<span class="string">&quot;Should return Object&quot;</span>);
-        <span class="kw">let</span> <span class="ident">config</span> <span class="op">=</span> <span class="ident">GANACHE_CONFIG</span>.<span class="ident">clone</span>();
+    <span class="kw">async fn </span>setup() -&gt; (Config, Object&lt;Manager&gt;) {
+        <span class="kw">let </span>connection = TESTS_POOL.get().<span class="kw">await</span>.expect(<span class="string">&quot;Should return Object&quot;</span>);
+        <span class="kw">let </span>config = GANACHE_CONFIG.clone();
 
-        (<span class="ident">config</span>, <span class="ident">connection</span>)
+        (config, connection)
     }
 
-    <span class="kw">fn</span> <span class="ident">get_campaign</span>(<span class="ident">with_rule</span>: <span class="ident">Rule</span>) -&gt; <span class="ident">Campaign</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">campaign</span> <span class="op">=</span> <span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">clone</span>();
+    <span class="kw">fn </span>get_campaign(with_rule: Rule) -&gt; Campaign {
+        <span class="kw">let </span><span class="kw-2">mut </span>campaign = DUMMY_CAMPAIGN.clone();
 
-        <span class="ident">campaign</span>.<span class="ident">event_submission</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">EventSubmission</span> {
-            <span class="ident">allow</span>: <span class="macro">vec!</span>[<span class="ident">with_rule</span>],
+        campaign.event_submission = <span class="prelude-val">Some</span>(EventSubmission {
+            allow: <span class="macro">vec!</span>[with_rule],
         });
 
-        <span class="ident">campaign</span>
+        campaign
     }
 
-    <span class="kw">fn</span> <span class="ident">get_impression_events</span>(<span class="ident">count</span>: <span class="ident">i8</span>) -&gt; <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Event</span><span class="op">&gt;</span> {
-        (<span class="number">0</span>..<span class="ident">count</span>)
-            .<span class="ident">map</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">Event::Impression</span> {
-                <span class="ident">publisher</span>: <span class="kw-2">*</span><span class="ident">PUBLISHER_2</span>,
-                <span class="ident">ad_unit</span>: <span class="ident">DUMMY_IPFS</span>[<span class="number">0</span>],
-                <span class="ident">ad_slot</span>: <span class="ident">DUMMY_IPFS</span>[<span class="number">1</span>],
-                <span class="ident">referrer</span>: <span class="prelude-val">None</span>,
+    <span class="kw">fn </span>get_impression_events(count: i8) -&gt; Vec&lt;Event&gt; {
+        (<span class="number">0</span>..count)
+            .map(|<span class="kw">_</span>| Event::Impression {
+                publisher: <span class="kw-2">*</span>PUBLISHER_2,
+                ad_unit: DUMMY_IPFS[<span class="number">0</span>],
+                ad_slot: DUMMY_IPFS[<span class="number">1</span>],
+                referrer: <span class="prelude-val">None</span>,
             })
-            .<span class="ident">collect</span>()
+            .collect()
     }
 
-    <span class="attribute">#[<span class="ident">tokio::test</span>]</span>
-    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">session_uid_rate_limit</span>() {
-        <span class="kw">let</span> (<span class="ident">config</span>, <span class="ident">database</span>) <span class="op">=</span> <span class="ident">setup</span>().<span class="kw">await</span>;
+    <span class="attribute">#[tokio::test]</span>
+    <span class="kw">async fn </span>session_uid_rate_limit() {
+        <span class="kw">let </span>(config, database) = setup().<span class="kw">await</span>;
 
-        <span class="kw">let</span> <span class="ident">rule</span> <span class="op">=</span> <span class="ident">Rule</span> {
-            <span class="ident">uids</span>: <span class="prelude-val">None</span>,
-            <span class="ident">rate_limit</span>: <span class="prelude-val">Some</span>(<span class="ident">RateLimit</span> {
-                <span class="ident">limit_type</span>: <span class="string">&quot;sid&quot;</span>.<span class="ident">to_string</span>(),
-                <span class="ident">time_frame</span>: <span class="ident">Duration::from_millis</span>(<span class="number">20_000</span>),
+        <span class="kw">let </span>rule = Rule {
+            uids: <span class="prelude-val">None</span>,
+            rate_limit: <span class="prelude-val">Some</span>(RateLimit {
+                limit_type: <span class="string">&quot;sid&quot;</span>.to_string(),
+                time_frame: Duration::from_millis(<span class="number">20_000</span>),
             }),
         };
-        <span class="kw">let</span> <span class="ident">campaign</span> <span class="op">=</span> <span class="ident">get_campaign</span>(<span class="ident">rule</span>);
+        <span class="kw">let </span>campaign = get_campaign(rule);
 
-        <span class="kw">let</span> <span class="ident">chain_context</span> <span class="op">=</span> <span class="ident">config</span>
-            .<span class="ident">find_chain_of</span>(<span class="ident">campaign</span>.<span class="ident">channel</span>.<span class="ident">token</span>)
-            .<span class="ident">expect</span>(<span class="string">&quot;Campaign&#39;s Channel.token should be set in config&quot;</span>);
+        <span class="kw">let </span>chain_context = config
+            .find_chain_of(campaign.channel.token)
+            .expect(<span class="string">&quot;Campaign&#39;s Channel.token should be set in config&quot;</span>);
 
-        <span class="kw">let</span> <span class="ident">auth</span> <span class="op">=</span> <span class="ident">Auth</span> {
-            <span class="ident">era</span>: <span class="number">0</span>,
-            <span class="ident">uid</span>: <span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="ident">FOLLOWER</span>],
-            <span class="ident">chain</span>: <span class="ident">chain_context</span>.<span class="ident">chain</span>.<span class="ident">clone</span>(),
+        <span class="kw">let </span>auth = Auth {
+            era: <span class="number">0</span>,
+            uid: IDS[<span class="kw-2">&amp;</span>FOLLOWER],
+            chain: chain_context.chain.clone(),
         };
 
-        <span class="kw">let</span> <span class="ident">session</span> <span class="op">=</span> <span class="ident">Session</span> {
-            <span class="ident">ip</span>: <span class="ident">Default::default</span>(),
-            <span class="ident">referrer_header</span>: <span class="prelude-val">None</span>,
-            <span class="ident">country</span>: <span class="prelude-val">None</span>,
-            <span class="ident">os</span>: <span class="prelude-val">None</span>,
+        <span class="kw">let </span>session = Session {
+            ip: Default::default(),
+            referrer_header: <span class="prelude-val">None</span>,
+            country: <span class="prelude-val">None</span>,
+            os: <span class="prelude-val">None</span>,
         };
 
-        <span class="kw">let</span> <span class="ident">events</span> <span class="op">=</span> <span class="ident">get_impression_events</span>(<span class="number">2</span>);
+        <span class="kw">let </span>events = get_impression_events(<span class="number">2</span>);
 
-        <span class="kw">let</span> <span class="ident">response</span> <span class="op">=</span> <span class="ident">check_access</span>(
-            <span class="kw-2">&amp;</span><span class="ident">database</span>,
-            <span class="kw-2">&amp;</span><span class="ident">session</span>,
-            <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span><span class="ident">auth</span>),
-            <span class="kw-2">&amp;</span><span class="ident">config</span>.<span class="ident">ip_rate_limit</span>,
-            <span class="kw-2">&amp;</span><span class="ident">campaign</span>,
-            <span class="kw-2">&amp;</span><span class="ident">events</span>,
+        <span class="kw">let </span>response = check_access(
+            <span class="kw-2">&amp;</span>database,
+            <span class="kw-2">&amp;</span>session,
+            <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>auth),
+            <span class="kw-2">&amp;</span>config.ip_rate_limit,
+            <span class="kw-2">&amp;</span>campaign,
+            <span class="kw-2">&amp;</span>events,
         )
         .<span class="kw">await</span>;
-        <span class="macro">assert_eq!</span>(<span class="prelude-val">Ok</span>(()), <span class="ident">response</span>);
+        <span class="macro">assert_eq!</span>(<span class="prelude-val">Ok</span>(()), response);
 
-        <span class="kw">let</span> <span class="ident">err_response</span> <span class="op">=</span> <span class="ident">check_access</span>(
-            <span class="kw-2">&amp;</span><span class="ident">database</span>,
-            <span class="kw-2">&amp;</span><span class="ident">session</span>,
-            <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span><span class="ident">auth</span>),
-            <span class="kw-2">&amp;</span><span class="ident">config</span>.<span class="ident">ip_rate_limit</span>,
-            <span class="kw-2">&amp;</span><span class="ident">campaign</span>,
-            <span class="kw-2">&amp;</span><span class="ident">events</span>,
+        <span class="kw">let </span>err_response = check_access(
+            <span class="kw-2">&amp;</span>database,
+            <span class="kw-2">&amp;</span>session,
+            <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>auth),
+            <span class="kw-2">&amp;</span>config.ip_rate_limit,
+            <span class="kw-2">&amp;</span>campaign,
+            <span class="kw-2">&amp;</span>events,
         )
         .<span class="kw">await</span>;
         <span class="macro">assert_eq!</span>(
-            <span class="prelude-val">Err</span>(<span class="ident">Error::RulesError</span>(
-                <span class="string">&quot;rateLimit: too many requests&quot;</span>.<span class="ident">to_string</span>()
+            <span class="prelude-val">Err</span>(Error::RulesError(
+                <span class="string">&quot;rateLimit: too many requests&quot;</span>.to_string()
             )),
-            <span class="ident">err_response</span>
+            err_response
         );
     }
 
-    <span class="attribute">#[<span class="ident">tokio::test</span>]</span>
-    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">ip_rate_limit</span>() {
-        <span class="kw">let</span> (<span class="ident">config</span>, <span class="ident">database</span>) <span class="op">=</span> <span class="ident">setup</span>().<span class="kw">await</span>;
+    <span class="attribute">#[tokio::test]</span>
+    <span class="kw">async fn </span>ip_rate_limit() {
+        <span class="kw">let </span>(config, database) = setup().<span class="kw">await</span>;
 
-        <span class="kw">let</span> <span class="ident">rule</span> <span class="op">=</span> <span class="ident">Rule</span> {
-            <span class="ident">uids</span>: <span class="prelude-val">None</span>,
-            <span class="ident">rate_limit</span>: <span class="prelude-val">Some</span>(<span class="ident">RateLimit</span> {
-                <span class="ident">limit_type</span>: <span class="string">&quot;ip&quot;</span>.<span class="ident">to_string</span>(),
-                <span class="ident">time_frame</span>: <span class="ident">Duration::from_millis</span>(<span class="number">1</span>),
+        <span class="kw">let </span>rule = Rule {
+            uids: <span class="prelude-val">None</span>,
+            rate_limit: <span class="prelude-val">Some</span>(RateLimit {
+                limit_type: <span class="string">&quot;ip&quot;</span>.to_string(),
+                time_frame: Duration::from_millis(<span class="number">1</span>),
             }),
         };
 
-        <span class="kw">let</span> <span class="ident">campaign</span> <span class="op">=</span> <span class="ident">get_campaign</span>(<span class="ident">rule</span>);
+        <span class="kw">let </span>campaign = get_campaign(rule);
 
-        <span class="kw">let</span> <span class="ident">chain_context</span> <span class="op">=</span> <span class="ident">config</span>
-            .<span class="ident">find_chain_of</span>(<span class="ident">campaign</span>.<span class="ident">channel</span>.<span class="ident">token</span>)
-            .<span class="ident">expect</span>(<span class="string">&quot;Campaign&#39;s Channel.token should be set in config&quot;</span>);
+        <span class="kw">let </span>chain_context = config
+            .find_chain_of(campaign.channel.token)
+            .expect(<span class="string">&quot;Campaign&#39;s Channel.token should be set in config&quot;</span>);
 
-        <span class="kw">let</span> <span class="ident">auth</span> <span class="op">=</span> <span class="ident">Auth</span> {
-            <span class="ident">era</span>: <span class="number">0</span>,
-            <span class="ident">uid</span>: <span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="ident">FOLLOWER</span>],
-            <span class="ident">chain</span>: <span class="ident">chain_context</span>.<span class="ident">chain</span>.<span class="ident">clone</span>(),
+        <span class="kw">let </span>auth = Auth {
+            era: <span class="number">0</span>,
+            uid: IDS[<span class="kw-2">&amp;</span>FOLLOWER],
+            chain: chain_context.chain.clone(),
         };
 
-        <span class="kw">let</span> <span class="ident">session</span> <span class="op">=</span> <span class="ident">Session</span> {
-            <span class="ident">ip</span>: <span class="ident">Default::default</span>(),
-            <span class="ident">referrer_header</span>: <span class="prelude-val">None</span>,
-            <span class="ident">country</span>: <span class="prelude-val">None</span>,
-            <span class="ident">os</span>: <span class="prelude-val">None</span>,
+        <span class="kw">let </span>session = Session {
+            ip: Default::default(),
+            referrer_header: <span class="prelude-val">None</span>,
+            country: <span class="prelude-val">None</span>,
+            os: <span class="prelude-val">None</span>,
         };
 
-        <span class="kw">let</span> <span class="ident">err_response</span> <span class="op">=</span> <span class="ident">check_access</span>(
-            <span class="kw-2">&amp;</span><span class="ident">database</span>,
-            <span class="kw-2">&amp;</span><span class="ident">session</span>,
-            <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span><span class="ident">auth</span>),
-            <span class="kw-2">&amp;</span><span class="ident">config</span>.<span class="ident">ip_rate_limit</span>,
-            <span class="kw-2">&amp;</span><span class="ident">campaign</span>,
-            <span class="kw-2">&amp;</span><span class="ident">get_impression_events</span>(<span class="number">2</span>),
+        <span class="kw">let </span>err_response = check_access(
+            <span class="kw-2">&amp;</span>database,
+            <span class="kw-2">&amp;</span>session,
+            <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>auth),
+            <span class="kw-2">&amp;</span>config.ip_rate_limit,
+            <span class="kw-2">&amp;</span>campaign,
+            <span class="kw-2">&amp;</span>get_impression_events(<span class="number">2</span>),
         )
         .<span class="kw">await</span>;
 
         <span class="macro">assert_eq!</span>(
-            <span class="prelude-val">Err</span>(<span class="ident">Error::RulesError</span>(
-                <span class="string">&quot;rateLimit: only allows 1 event&quot;</span>.<span class="ident">to_string</span>()
+            <span class="prelude-val">Err</span>(Error::RulesError(
+                <span class="string">&quot;rateLimit: only allows 1 event&quot;</span>.to_string()
             )),
-            <span class="ident">err_response</span>
+            err_response
         );
 
-        <span class="kw">let</span> <span class="ident">response</span> <span class="op">=</span> <span class="ident">check_access</span>(
-            <span class="kw-2">&amp;</span><span class="ident">database</span>,
-            <span class="kw-2">&amp;</span><span class="ident">session</span>,
-            <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span><span class="ident">auth</span>),
-            <span class="kw-2">&amp;</span><span class="ident">config</span>.<span class="ident">ip_rate_limit</span>,
-            <span class="kw-2">&amp;</span><span class="ident">campaign</span>,
-            <span class="kw-2">&amp;</span><span class="ident">get_impression_events</span>(<span class="number">1</span>),
+        <span class="kw">let </span>response = check_access(
+            <span class="kw-2">&amp;</span>database,
+            <span class="kw-2">&amp;</span>session,
+            <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>auth),
+            <span class="kw-2">&amp;</span>config.ip_rate_limit,
+            <span class="kw-2">&amp;</span>campaign,
+            <span class="kw-2">&amp;</span>get_impression_events(<span class="number">1</span>),
         )
         .<span class="kw">await</span>;
-        <span class="macro">assert_eq!</span>(<span class="prelude-val">Ok</span>(()), <span class="ident">response</span>);
+        <span class="macro">assert_eq!</span>(<span class="prelude-val">Ok</span>(()), response);
     }
 
-    <span class="attribute">#[<span class="ident">tokio::test</span>]</span>
-    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">check_access_past_channel_valid_until</span>() {
-        <span class="kw">let</span> (<span class="ident">config</span>, <span class="ident">database</span>) <span class="op">=</span> <span class="ident">setup</span>().<span class="kw">await</span>;
+    <span class="attribute">#[tokio::test]</span>
+    <span class="kw">async fn </span>check_access_past_channel_valid_until() {
+        <span class="kw">let </span>(config, database) = setup().<span class="kw">await</span>;
 
-        <span class="kw">let</span> <span class="ident">rule</span> <span class="op">=</span> <span class="ident">Rule</span> {
-            <span class="ident">uids</span>: <span class="prelude-val">None</span>,
-            <span class="ident">rate_limit</span>: <span class="prelude-val">Some</span>(<span class="ident">RateLimit</span> {
-                <span class="ident">limit_type</span>: <span class="string">&quot;ip&quot;</span>.<span class="ident">to_string</span>(),
-                <span class="ident">time_frame</span>: <span class="ident">Duration::from_millis</span>(<span class="number">1</span>),
+        <span class="kw">let </span>rule = Rule {
+            uids: <span class="prelude-val">None</span>,
+            rate_limit: <span class="prelude-val">Some</span>(RateLimit {
+                limit_type: <span class="string">&quot;ip&quot;</span>.to_string(),
+                time_frame: Duration::from_millis(<span class="number">1</span>),
             }),
         };
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">campaign</span> <span class="op">=</span> <span class="ident">get_campaign</span>(<span class="ident">rule</span>);
-        <span class="ident">campaign</span>.<span class="ident">active</span>.<span class="ident">to</span> <span class="op">=</span> <span class="ident">Utc</span>.<span class="ident">ymd</span>(<span class="number">1970</span>, <span class="number">1</span>, <span class="number">1</span>).<span class="ident">and_hms</span>(<span class="number">12</span>, <span class="number">00</span>, <span class="number">9</span>);
+        <span class="kw">let </span><span class="kw-2">mut </span>campaign = get_campaign(rule);
+        campaign.active.to = Utc.ymd(<span class="number">1970</span>, <span class="number">1</span>, <span class="number">1</span>).and_hms(<span class="number">12</span>, <span class="number">00</span>, <span class="number">9</span>);
 
-        <span class="kw">let</span> <span class="ident">chain_context</span> <span class="op">=</span> <span class="ident">config</span>
-            .<span class="ident">find_chain_of</span>(<span class="ident">campaign</span>.<span class="ident">channel</span>.<span class="ident">token</span>)
-            .<span class="ident">expect</span>(<span class="string">&quot;Campaign&#39;s Channel.token should be set in config&quot;</span>);
+        <span class="kw">let </span>chain_context = config
+            .find_chain_of(campaign.channel.token)
+            .expect(<span class="string">&quot;Campaign&#39;s Channel.token should be set in config&quot;</span>);
 
-        <span class="kw">let</span> <span class="ident">auth</span> <span class="op">=</span> <span class="ident">Auth</span> {
-            <span class="ident">era</span>: <span class="number">0</span>,
-            <span class="ident">uid</span>: <span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="ident">FOLLOWER</span>],
-            <span class="ident">chain</span>: <span class="ident">chain_context</span>.<span class="ident">chain</span>.<span class="ident">clone</span>(),
+        <span class="kw">let </span>auth = Auth {
+            era: <span class="number">0</span>,
+            uid: IDS[<span class="kw-2">&amp;</span>FOLLOWER],
+            chain: chain_context.chain.clone(),
         };
 
-        <span class="kw">let</span> <span class="ident">session</span> <span class="op">=</span> <span class="ident">Session</span> {
-            <span class="ident">ip</span>: <span class="ident">Default::default</span>(),
-            <span class="ident">referrer_header</span>: <span class="prelude-val">None</span>,
-            <span class="ident">country</span>: <span class="prelude-val">None</span>,
-            <span class="ident">os</span>: <span class="prelude-val">None</span>,
+        <span class="kw">let </span>session = Session {
+            ip: Default::default(),
+            referrer_header: <span class="prelude-val">None</span>,
+            country: <span class="prelude-val">None</span>,
+            os: <span class="prelude-val">None</span>,
         };
 
-        <span class="kw">let</span> <span class="ident">err_response</span> <span class="op">=</span> <span class="ident">check_access</span>(
-            <span class="kw-2">&amp;</span><span class="ident">database</span>,
-            <span class="kw-2">&amp;</span><span class="ident">session</span>,
-            <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span><span class="ident">auth</span>),
-            <span class="kw-2">&amp;</span><span class="ident">config</span>.<span class="ident">ip_rate_limit</span>,
-            <span class="kw-2">&amp;</span><span class="ident">campaign</span>,
-            <span class="kw-2">&amp;</span><span class="ident">get_impression_events</span>(<span class="number">2</span>),
+        <span class="kw">let </span>err_response = check_access(
+            <span class="kw-2">&amp;</span>database,
+            <span class="kw-2">&amp;</span>session,
+            <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>auth),
+            <span class="kw-2">&amp;</span>config.ip_rate_limit,
+            <span class="kw-2">&amp;</span>campaign,
+            <span class="kw-2">&amp;</span>get_impression_events(<span class="number">2</span>),
         )
         .<span class="kw">await</span>;
 
-        <span class="macro">assert_eq!</span>(<span class="prelude-val">Err</span>(<span class="ident">Error::CampaignIsExpired</span>), <span class="ident">err_response</span>);
+        <span class="macro">assert_eq!</span>(<span class="prelude-val">Err</span>(Error::CampaignIsExpired), err_response);
     }
 
-    <span class="attribute">#[<span class="ident">tokio::test</span>]</span>
-    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">with_forbidden_country</span>() {
-        <span class="kw">let</span> (<span class="ident">config</span>, <span class="ident">database</span>) <span class="op">=</span> <span class="ident">setup</span>().<span class="kw">await</span>;
+    <span class="attribute">#[tokio::test]</span>
+    <span class="kw">async fn </span>with_forbidden_country() {
+        <span class="kw">let </span>(config, database) = setup().<span class="kw">await</span>;
 
-        <span class="kw">let</span> <span class="ident">rule</span> <span class="op">=</span> <span class="ident">Rule</span> {
-            <span class="ident">uids</span>: <span class="prelude-val">None</span>,
-            <span class="ident">rate_limit</span>: <span class="prelude-val">Some</span>(<span class="ident">RateLimit</span> {
-                <span class="ident">limit_type</span>: <span class="string">&quot;ip&quot;</span>.<span class="ident">to_string</span>(),
-                <span class="ident">time_frame</span>: <span class="ident">Duration::from_millis</span>(<span class="number">1</span>),
+        <span class="kw">let </span>rule = Rule {
+            uids: <span class="prelude-val">None</span>,
+            rate_limit: <span class="prelude-val">Some</span>(RateLimit {
+                limit_type: <span class="string">&quot;ip&quot;</span>.to_string(),
+                time_frame: Duration::from_millis(<span class="number">1</span>),
             }),
         };
-        <span class="kw">let</span> <span class="ident">campaign</span> <span class="op">=</span> <span class="ident">get_campaign</span>(<span class="ident">rule</span>);
+        <span class="kw">let </span>campaign = get_campaign(rule);
 
-        <span class="kw">let</span> <span class="ident">chain_context</span> <span class="op">=</span> <span class="ident">config</span>
-            .<span class="ident">find_chain_of</span>(<span class="ident">campaign</span>.<span class="ident">channel</span>.<span class="ident">token</span>)
-            .<span class="ident">expect</span>(<span class="string">&quot;Campaign&#39;s Channel.token should be set in config&quot;</span>);
+        <span class="kw">let </span>chain_context = config
+            .find_chain_of(campaign.channel.token)
+            .expect(<span class="string">&quot;Campaign&#39;s Channel.token should be set in config&quot;</span>);
 
-        <span class="kw">let</span> <span class="ident">auth</span> <span class="op">=</span> <span class="ident">Auth</span> {
-            <span class="ident">era</span>: <span class="number">0</span>,
-            <span class="ident">uid</span>: <span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="ident">FOLLOWER</span>],
-            <span class="ident">chain</span>: <span class="ident">chain_context</span>.<span class="ident">chain</span>.<span class="ident">clone</span>(),
+        <span class="kw">let </span>auth = Auth {
+            era: <span class="number">0</span>,
+            uid: IDS[<span class="kw-2">&amp;</span>FOLLOWER],
+            chain: chain_context.chain.clone(),
         };
 
-        <span class="kw">let</span> <span class="ident">session</span> <span class="op">=</span> <span class="ident">Session</span> {
-            <span class="ident">ip</span>: <span class="ident">Default::default</span>(),
-            <span class="ident">referrer_header</span>: <span class="prelude-val">None</span>,
-            <span class="ident">country</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;XX&quot;</span>.<span class="ident">into</span>()),
-            <span class="ident">os</span>: <span class="prelude-val">None</span>,
+        <span class="kw">let </span>session = Session {
+            ip: Default::default(),
+            referrer_header: <span class="prelude-val">None</span>,
+            country: <span class="prelude-val">Some</span>(<span class="string">&quot;XX&quot;</span>.into()),
+            os: <span class="prelude-val">None</span>,
         };
 
-        <span class="kw">let</span> <span class="ident">err_response</span> <span class="op">=</span> <span class="ident">check_access</span>(
-            <span class="kw-2">&amp;</span><span class="ident">database</span>,
-            <span class="kw-2">&amp;</span><span class="ident">session</span>,
-            <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span><span class="ident">auth</span>),
-            <span class="kw-2">&amp;</span><span class="ident">config</span>.<span class="ident">ip_rate_limit</span>,
-            <span class="kw-2">&amp;</span><span class="ident">campaign</span>,
-            <span class="kw-2">&amp;</span><span class="ident">get_impression_events</span>(<span class="number">2</span>),
+        <span class="kw">let </span>err_response = check_access(
+            <span class="kw-2">&amp;</span>database,
+            <span class="kw-2">&amp;</span>session,
+            <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>auth),
+            <span class="kw-2">&amp;</span>config.ip_rate_limit,
+            <span class="kw-2">&amp;</span>campaign,
+            <span class="kw-2">&amp;</span>get_impression_events(<span class="number">2</span>),
         )
         .<span class="kw">await</span>;
 
-        <span class="macro">assert_eq!</span>(<span class="prelude-val">Err</span>(<span class="ident">Error::ForbiddenReferrer</span>), <span class="ident">err_response</span>);
+        <span class="macro">assert_eq!</span>(<span class="prelude-val">Err</span>(Error::ForbiddenReferrer), err_response);
     }
 
-    <span class="attribute">#[<span class="ident">tokio::test</span>]</span>
-    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">with_forbidden_referrer</span>() {
-        <span class="kw">let</span> (<span class="ident">config</span>, <span class="ident">database</span>) <span class="op">=</span> <span class="ident">setup</span>().<span class="kw">await</span>;
+    <span class="attribute">#[tokio::test]</span>
+    <span class="kw">async fn </span>with_forbidden_referrer() {
+        <span class="kw">let </span>(config, database) = setup().<span class="kw">await</span>;
 
-        <span class="kw">let</span> <span class="ident">rule</span> <span class="op">=</span> <span class="ident">Rule</span> {
-            <span class="ident">uids</span>: <span class="prelude-val">None</span>,
-            <span class="ident">rate_limit</span>: <span class="prelude-val">Some</span>(<span class="ident">RateLimit</span> {
-                <span class="ident">limit_type</span>: <span class="string">&quot;ip&quot;</span>.<span class="ident">to_string</span>(),
-                <span class="ident">time_frame</span>: <span class="ident">Duration::from_millis</span>(<span class="number">1</span>),
+        <span class="kw">let </span>rule = Rule {
+            uids: <span class="prelude-val">None</span>,
+            rate_limit: <span class="prelude-val">Some</span>(RateLimit {
+                limit_type: <span class="string">&quot;ip&quot;</span>.to_string(),
+                time_frame: Duration::from_millis(<span class="number">1</span>),
             }),
         };
-        <span class="kw">let</span> <span class="ident">campaign</span> <span class="op">=</span> <span class="ident">get_campaign</span>(<span class="ident">rule</span>);
+        <span class="kw">let </span>campaign = get_campaign(rule);
 
-        <span class="kw">let</span> <span class="ident">chain_context</span> <span class="op">=</span> <span class="ident">config</span>
-            .<span class="ident">find_chain_of</span>(<span class="ident">campaign</span>.<span class="ident">channel</span>.<span class="ident">token</span>)
-            .<span class="ident">expect</span>(<span class="string">&quot;Campaign&#39;s Channel.token should be set in config&quot;</span>);
+        <span class="kw">let </span>chain_context = config
+            .find_chain_of(campaign.channel.token)
+            .expect(<span class="string">&quot;Campaign&#39;s Channel.token should be set in config&quot;</span>);
 
-        <span class="kw">let</span> <span class="ident">auth</span> <span class="op">=</span> <span class="ident">Auth</span> {
-            <span class="ident">era</span>: <span class="number">0</span>,
-            <span class="ident">uid</span>: <span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="ident">FOLLOWER</span>],
-            <span class="ident">chain</span>: <span class="ident">chain_context</span>.<span class="ident">chain</span>.<span class="ident">clone</span>(),
+        <span class="kw">let </span>auth = Auth {
+            era: <span class="number">0</span>,
+            uid: IDS[<span class="kw-2">&amp;</span>FOLLOWER],
+            chain: chain_context.chain.clone(),
         };
 
-        <span class="kw">let</span> <span class="ident">session</span> <span class="op">=</span> <span class="ident">Session</span> {
-            <span class="ident">ip</span>: <span class="ident">Default::default</span>(),
-            <span class="ident">referrer_header</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;http://127.0.0.1&quot;</span>.<span class="ident">into</span>()),
-            <span class="ident">country</span>: <span class="prelude-val">None</span>,
-            <span class="ident">os</span>: <span class="prelude-val">None</span>,
+        <span class="kw">let </span>session = Session {
+            ip: Default::default(),
+            referrer_header: <span class="prelude-val">Some</span>(<span class="string">&quot;http://127.0.0.1&quot;</span>.into()),
+            country: <span class="prelude-val">None</span>,
+            os: <span class="prelude-val">None</span>,
         };
 
-        <span class="kw">let</span> <span class="ident">err_response</span> <span class="op">=</span> <span class="ident">check_access</span>(
-            <span class="kw-2">&amp;</span><span class="ident">database</span>,
-            <span class="kw-2">&amp;</span><span class="ident">session</span>,
-            <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span><span class="ident">auth</span>),
-            <span class="kw-2">&amp;</span><span class="ident">config</span>.<span class="ident">ip_rate_limit</span>,
-            <span class="kw-2">&amp;</span><span class="ident">campaign</span>,
-            <span class="kw-2">&amp;</span><span class="ident">get_impression_events</span>(<span class="number">2</span>),
+        <span class="kw">let </span>err_response = check_access(
+            <span class="kw-2">&amp;</span>database,
+            <span class="kw-2">&amp;</span>session,
+            <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>auth),
+            <span class="kw-2">&amp;</span>config.ip_rate_limit,
+            <span class="kw-2">&amp;</span>campaign,
+            <span class="kw-2">&amp;</span>get_impression_events(<span class="number">2</span>),
         )
         .<span class="kw">await</span>;
 
-        <span class="macro">assert_eq!</span>(<span class="prelude-val">Err</span>(<span class="ident">Error::ForbiddenReferrer</span>), <span class="ident">err_response</span>);
+        <span class="macro">assert_eq!</span>(<span class="prelude-val">Err</span>(Error::ForbiddenReferrer), err_response);
     }
 
-    <span class="attribute">#[<span class="ident">tokio::test</span>]</span>
-    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">no_rate_limit</span>() {
-        <span class="kw">let</span> (<span class="ident">config</span>, <span class="ident">database</span>) <span class="op">=</span> <span class="ident">setup</span>().<span class="kw">await</span>;
+    <span class="attribute">#[tokio::test]</span>
+    <span class="kw">async fn </span>no_rate_limit() {
+        <span class="kw">let </span>(config, database) = setup().<span class="kw">await</span>;
 
-        <span class="kw">let</span> <span class="ident">rule</span> <span class="op">=</span> <span class="ident">Rule</span> {
-            <span class="ident">uids</span>: <span class="prelude-val">None</span>,
-            <span class="ident">rate_limit</span>: <span class="prelude-val">None</span>,
+        <span class="kw">let </span>rule = Rule {
+            uids: <span class="prelude-val">None</span>,
+            rate_limit: <span class="prelude-val">None</span>,
         };
-        <span class="kw">let</span> <span class="ident">campaign</span> <span class="op">=</span> <span class="ident">get_campaign</span>(<span class="ident">rule</span>);
+        <span class="kw">let </span>campaign = get_campaign(rule);
 
-        <span class="kw">let</span> <span class="ident">chain_context</span> <span class="op">=</span> <span class="ident">config</span>
-            .<span class="ident">find_chain_of</span>(<span class="ident">campaign</span>.<span class="ident">channel</span>.<span class="ident">token</span>)
-            .<span class="ident">expect</span>(<span class="string">&quot;Campaign&#39;s Channel.token should be set in config&quot;</span>);
+        <span class="kw">let </span>chain_context = config
+            .find_chain_of(campaign.channel.token)
+            .expect(<span class="string">&quot;Campaign&#39;s Channel.token should be set in config&quot;</span>);
 
-        <span class="kw">let</span> <span class="ident">auth</span> <span class="op">=</span> <span class="ident">Auth</span> {
-            <span class="ident">era</span>: <span class="number">0</span>,
-            <span class="ident">uid</span>: <span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="ident">FOLLOWER</span>],
-            <span class="ident">chain</span>: <span class="ident">chain_context</span>.<span class="ident">chain</span>.<span class="ident">clone</span>(),
-        };
-
-        <span class="kw">let</span> <span class="ident">session</span> <span class="op">=</span> <span class="ident">Session</span> {
-            <span class="ident">ip</span>: <span class="ident">Default::default</span>(),
-            <span class="ident">referrer_header</span>: <span class="prelude-val">None</span>,
-            <span class="ident">country</span>: <span class="prelude-val">None</span>,
-            <span class="ident">os</span>: <span class="prelude-val">None</span>,
+        <span class="kw">let </span>auth = Auth {
+            era: <span class="number">0</span>,
+            uid: IDS[<span class="kw-2">&amp;</span>FOLLOWER],
+            chain: chain_context.chain.clone(),
         };
 
-        <span class="kw">let</span> <span class="ident">ok_response</span> <span class="op">=</span> <span class="ident">check_access</span>(
-            <span class="kw-2">&amp;</span><span class="ident">database</span>,
-            <span class="kw-2">&amp;</span><span class="ident">session</span>,
-            <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span><span class="ident">auth</span>),
-            <span class="kw-2">&amp;</span><span class="ident">config</span>.<span class="ident">ip_rate_limit</span>,
-            <span class="kw-2">&amp;</span><span class="ident">campaign</span>,
-            <span class="kw-2">&amp;</span><span class="ident">get_impression_events</span>(<span class="number">1</span>),
+        <span class="kw">let </span>session = Session {
+            ip: Default::default(),
+            referrer_header: <span class="prelude-val">None</span>,
+            country: <span class="prelude-val">None</span>,
+            os: <span class="prelude-val">None</span>,
+        };
+
+        <span class="kw">let </span>ok_response = check_access(
+            <span class="kw-2">&amp;</span>database,
+            <span class="kw-2">&amp;</span>session,
+            <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>auth),
+            <span class="kw-2">&amp;</span>config.ip_rate_limit,
+            <span class="kw-2">&amp;</span>campaign,
+            <span class="kw-2">&amp;</span>get_impression_events(<span class="number">1</span>),
         )
         .<span class="kw">await</span>;
 
-        <span class="macro">assert_eq!</span>(<span class="prelude-val">Ok</span>(()), <span class="ident">ok_response</span>);
+        <span class="macro">assert_eq!</span>(<span class="prelude-val">Ok</span>(()), ok_response);
     }
 
-    <span class="attribute">#[<span class="ident">tokio::test</span>]</span>
-    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">applied_rules</span>() {
-        <span class="kw">let</span> (<span class="ident">config</span>, <span class="kw-2">mut</span> <span class="ident">database</span>) <span class="op">=</span> <span class="ident">setup</span>().<span class="kw">await</span>;
+    <span class="attribute">#[tokio::test]</span>
+    <span class="kw">async fn </span>applied_rules() {
+        <span class="kw">let </span>(config, <span class="kw-2">mut </span>database) = setup().<span class="kw">await</span>;
 
-        <span class="kw">let</span> <span class="ident">rule</span> <span class="op">=</span> <span class="ident">Rule</span> {
-            <span class="ident">uids</span>: <span class="prelude-val">None</span>,
-            <span class="ident">rate_limit</span>: <span class="prelude-val">Some</span>(<span class="ident">RateLimit</span> {
-                <span class="ident">limit_type</span>: <span class="string">&quot;ip&quot;</span>.<span class="ident">to_string</span>(),
-                <span class="ident">time_frame</span>: <span class="ident">Duration::from_millis</span>(<span class="number">60_000</span>),
+        <span class="kw">let </span>rule = Rule {
+            uids: <span class="prelude-val">None</span>,
+            rate_limit: <span class="prelude-val">Some</span>(RateLimit {
+                limit_type: <span class="string">&quot;ip&quot;</span>.to_string(),
+                time_frame: Duration::from_millis(<span class="number">60_000</span>),
             }),
         };
-        <span class="kw">let</span> <span class="ident">campaign</span> <span class="op">=</span> <span class="ident">get_campaign</span>(<span class="ident">rule</span>);
+        <span class="kw">let </span>campaign = get_campaign(rule);
 
-        <span class="kw">let</span> <span class="ident">chain_context</span> <span class="op">=</span> <span class="ident">config</span>
-            .<span class="ident">find_chain_of</span>(<span class="ident">campaign</span>.<span class="ident">channel</span>.<span class="ident">token</span>)
-            .<span class="ident">expect</span>(<span class="string">&quot;Campaign&#39;s Channel.token should be set in config&quot;</span>);
+        <span class="kw">let </span>chain_context = config
+            .find_chain_of(campaign.channel.token)
+            .expect(<span class="string">&quot;Campaign&#39;s Channel.token should be set in config&quot;</span>);
 
-        <span class="kw">let</span> <span class="ident">auth</span> <span class="op">=</span> <span class="ident">Auth</span> {
-            <span class="ident">era</span>: <span class="number">0</span>,
-            <span class="ident">uid</span>: <span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="ident">FOLLOWER</span>],
-            <span class="ident">chain</span>: <span class="ident">chain_context</span>.<span class="ident">chain</span>.<span class="ident">clone</span>(),
+        <span class="kw">let </span>auth = Auth {
+            era: <span class="number">0</span>,
+            uid: IDS[<span class="kw-2">&amp;</span>FOLLOWER],
+            chain: chain_context.chain.clone(),
         };
 
-        <span class="kw">let</span> <span class="ident">session</span> <span class="op">=</span> <span class="ident">Session</span> {
-            <span class="ident">ip</span>: <span class="ident">Default::default</span>(),
-            <span class="ident">referrer_header</span>: <span class="prelude-val">None</span>,
-            <span class="ident">country</span>: <span class="prelude-val">None</span>,
-            <span class="ident">os</span>: <span class="prelude-val">None</span>,
+        <span class="kw">let </span>session = Session {
+            ip: Default::default(),
+            referrer_header: <span class="prelude-val">None</span>,
+            country: <span class="prelude-val">None</span>,
+            os: <span class="prelude-val">None</span>,
         };
 
-        <span class="kw">let</span> <span class="ident">ok_response</span> <span class="op">=</span> <span class="ident">check_access</span>(
-            <span class="kw-2">&amp;</span><span class="ident">database</span>,
-            <span class="kw-2">&amp;</span><span class="ident">session</span>,
-            <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span><span class="ident">auth</span>),
-            <span class="kw-2">&amp;</span><span class="ident">config</span>.<span class="ident">ip_rate_limit</span>,
-            <span class="kw-2">&amp;</span><span class="ident">campaign</span>,
-            <span class="kw-2">&amp;</span><span class="ident">get_impression_events</span>(<span class="number">1</span>),
+        <span class="kw">let </span>ok_response = check_access(
+            <span class="kw-2">&amp;</span>database,
+            <span class="kw-2">&amp;</span>session,
+            <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>auth),
+            <span class="kw-2">&amp;</span>config.ip_rate_limit,
+            <span class="kw-2">&amp;</span>campaign,
+            <span class="kw-2">&amp;</span>get_impression_events(<span class="number">1</span>),
         )
         .<span class="kw">await</span>;
 
-        <span class="macro">assert_eq!</span>(<span class="prelude-val">Ok</span>(()), <span class="ident">ok_response</span>);
-        <span class="kw">let</span> <span class="ident">key</span> <span class="op">=</span> <span class="string">&quot;adexRateLimit:936da01f9abd4d9d80c702af85c822a8:&quot;</span>.<span class="ident">to_string</span>();
-        <span class="kw">let</span> <span class="ident">value</span> <span class="op">=</span> <span class="string">&quot;1&quot;</span>.<span class="ident">to_string</span>();
+        <span class="macro">assert_eq!</span>(<span class="prelude-val">Ok</span>(()), ok_response);
+        <span class="kw">let </span>key = <span class="string">&quot;adexRateLimit:936da01f9abd4d9d80c702af85c822a8:&quot;</span>.to_string();
+        <span class="kw">let </span>value = <span class="string">&quot;1&quot;</span>.to_string();
 
-        <span class="kw">let</span> <span class="ident">value_in_redis</span> <span class="op">=</span> <span class="ident">redis::cmd</span>(<span class="string">&quot;GET&quot;</span>)
-            .<span class="ident">arg</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>)
-            <span class="comment">// Deref can&#39;t work here, so we need to call the `Object` -&gt; `Database.connection`</span>
-            .<span class="ident">query_async</span>::<span class="op">&lt;</span><span class="kw">_</span>, <span class="ident">String</span><span class="op">&gt;</span>(<span class="kw-2">&amp;mut</span> <span class="ident">database</span>.<span class="ident">connection</span>)
-            .<span class="kw">await</span>
-            .<span class="ident">expect</span>(<span class="string">&quot;should exist in redis&quot;</span>);
-        <span class="macro">assert_eq!</span>(<span class="kw-2">&amp;</span><span class="ident">value</span>, <span class="kw-2">&amp;</span><span class="ident">value_in_redis</span>);
+        <span class="kw">let </span>value_in_redis = redis::cmd(<span class="string">&quot;GET&quot;</span>)
+            .arg(<span class="kw-2">&amp;</span>key)
+            <span class="comment">// Deref can&#39;t work here, so we need to call the `Object` -&gt; `Database.connection`
+            </span>.query_async::&lt;<span class="kw">_</span>, String&gt;(<span class="kw-2">&amp;mut </span>database.connection)
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;should exist in redis&quot;</span>);
+        <span class="macro">assert_eq!</span>(<span class="kw-2">&amp;</span>value, <span class="kw-2">&amp;</span>value_in_redis);
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (20ffea693 2022-08-11)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>

@@ -3,11 +3,11 @@
     pub pagination: <a class="struct" href="../struct.Pagination.html" title="struct primitives::sentry::Pagination">Pagination</a>,
 }</code></pre></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p><code>GET /v5/campaign/list</code> response</p>
 <h2 id="examples"><a href="#examples">Examples</a></h2>
-<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">primitives::sentry::campaign_list::CampaignListResponse</span>;
-<span class="kw">use</span> <span class="ident">serde_json</span>::{<span class="ident">from_value</span>, <span class="ident">json</span>};
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>primitives::sentry::campaign_list::CampaignListResponse;
+<span class="kw">use </span>serde_json::{from_value, json};
 
-<span class="kw">fn</span> <span class="ident">main</span>() {
-    <span class="kw">let</span> <span class="ident">json</span> <span class="op">=</span> <span class="macro">json!</span>({
+<span class="kw">fn </span>main() {
+    <span class="kw">let </span>json = <span class="macro">json!</span>({
       <span class="string">&quot;campaigns&quot;</span>: [
         {
           <span class="string">&quot;id&quot;</span>: <span class="string">&quot;0x936da01f9abd4d9d80c702af85c822a8&quot;</span>,
@@ -16,32 +16,32 @@
             <span class="string">&quot;follower&quot;</span>: <span class="string">&quot;0xf3f583AEC5f7C030722Fe992A5688557e1B86ef7&quot;</span>,
             <span class="string">&quot;guardian&quot;</span>: <span class="string">&quot;0xe061E1EB461EaBE512759aa18A201B20Fe90631D&quot;</span>,
             <span class="string">&quot;token&quot;</span>: <span class="string">&quot;0x2BCaf6968aEC8A3b5126FBfAb5Fd419da6E8AD8E&quot;</span>,
-            <span class="string">&quot;nonce&quot;</span>: <span class="string">&quot;0&quot;</span>
-          },
+            <span class="string">&quot;nonce&quot;</span>: <span class="string">&quot;0&quot;
+          </span>},
           <span class="string">&quot;creator&quot;</span>: <span class="string">&quot;0xDd589B43793934EF6Ad266067A0d1D4896b0dff0&quot;</span>,
           <span class="string">&quot;budget&quot;</span>: <span class="string">&quot;15000000000&quot;</span>,
           <span class="string">&quot;validators&quot;</span>: [
             {
               <span class="string">&quot;id&quot;</span>: <span class="string">&quot;0x80690751969B234697e9059e04ed72195c3507fa&quot;</span>,
               <span class="string">&quot;fee&quot;</span>: <span class="string">&quot;500000000&quot;</span>,
-              <span class="string">&quot;url&quot;</span>: <span class="string">&quot;http://localhost:8005/&quot;</span>
-            },
+              <span class="string">&quot;url&quot;</span>: <span class="string">&quot;http://localhost:8005/&quot;
+            </span>},
             {
               <span class="string">&quot;id&quot;</span>: <span class="string">&quot;0xf3f583AEC5f7C030722Fe992A5688557e1B86ef7&quot;</span>,
               <span class="string">&quot;fee&quot;</span>: <span class="string">&quot;400000000&quot;</span>,
-              <span class="string">&quot;url&quot;</span>: <span class="string">&quot;http://localhost:8006/&quot;</span>
-            }
+              <span class="string">&quot;url&quot;</span>: <span class="string">&quot;http://localhost:8006/&quot;
+            </span>}
           ],
           <span class="string">&quot;title&quot;</span>: <span class="string">&quot;Dummy Campaign&quot;</span>,
           <span class="string">&quot;pricingBounds&quot;</span>: {
             <span class="string">&quot;CLICK&quot;</span>: {
               <span class="string">&quot;min&quot;</span>: <span class="string">&quot;6000000&quot;</span>,
-              <span class="string">&quot;max&quot;</span>: <span class="string">&quot;10000000&quot;</span>
-            },
+              <span class="string">&quot;max&quot;</span>: <span class="string">&quot;10000000&quot;
+            </span>},
             <span class="string">&quot;IMPRESSION&quot;</span>: {
               <span class="string">&quot;min&quot;</span>: <span class="string">&quot;4000000&quot;</span>,
-              <span class="string">&quot;max&quot;</span>: <span class="string">&quot;5000000&quot;</span>
-            }
+              <span class="string">&quot;max&quot;</span>: <span class="string">&quot;5000000&quot;
+            </span>}
           },
           <span class="string">&quot;eventSubmission&quot;</span>: {
             <span class="string">&quot;allow&quot;</span>: []
@@ -57,8 +57,8 @@
               <span class="string">&quot;created&quot;</span>: <span class="number">1564390800000_u64</span>,
               <span class="string">&quot;title&quot;</span>: <span class="string">&quot;Dummy AdUnit 1&quot;</span>,
               <span class="string">&quot;description&quot;</span>: <span class="string">&quot;Dummy AdUnit description 1&quot;</span>,
-              <span class="string">&quot;archived&quot;</span>: <span class="bool-val">false</span>
-            },
+              <span class="string">&quot;archived&quot;</span>: <span class="bool-val">false
+            </span>},
             {
               <span class="string">&quot;ipfs&quot;</span>: <span class="string">&quot;QmVhRDGXoM3Fg3HZD5xwMuxtb9ZErwC8wHt8CjsfxaiUbZ&quot;</span>,
               <span class="string">&quot;type&quot;</span>: <span class="string">&quot;legacy_250x250&quot;</span>,
@@ -69,13 +69,13 @@
               <span class="string">&quot;created&quot;</span>: <span class="number">1564390800000_u64</span>,
               <span class="string">&quot;title&quot;</span>: <span class="string">&quot;Dummy AdUnit 2&quot;</span>,
               <span class="string">&quot;description&quot;</span>: <span class="string">&quot;Dummy AdUnit description 2&quot;</span>,
-              <span class="string">&quot;archived&quot;</span>: <span class="bool-val">false</span>
-            }
+              <span class="string">&quot;archived&quot;</span>: <span class="bool-val">false
+            </span>}
           ],
           <span class="string">&quot;targetingRules&quot;</span>: [],
           <span class="string">&quot;created&quot;</span>: <span class="number">1612162800000_u64</span>,
-          <span class="string">&quot;activeTo&quot;</span>: <span class="number">4073414400000_u64</span>
-        },
+          <span class="string">&quot;activeTo&quot;</span>: <span class="number">4073414400000_u64
+        </span>},
         {
           <span class="string">&quot;id&quot;</span>: <span class="string">&quot;0x127b98248f4e4b73af409d10f62daeaa&quot;</span>,
           <span class="string">&quot;channel&quot;</span>: {
@@ -83,32 +83,32 @@
             <span class="string">&quot;follower&quot;</span>: <span class="string">&quot;0x80690751969B234697e9059e04ed72195c3507fa&quot;</span>,
             <span class="string">&quot;guardian&quot;</span>: <span class="string">&quot;0x79D358a3194d737880B3eFD94ADccD246af9F535&quot;</span>,
             <span class="string">&quot;token&quot;</span>: <span class="string">&quot;0x2BCaf6968aEC8A3b5126FBfAb5Fd419da6E8AD8E&quot;</span>,
-            <span class="string">&quot;nonce&quot;</span>: <span class="string">&quot;0&quot;</span>
-          },
+            <span class="string">&quot;nonce&quot;</span>: <span class="string">&quot;0&quot;
+          </span>},
           <span class="string">&quot;creator&quot;</span>: <span class="string">&quot;0xDd589B43793934EF6Ad266067A0d1D4896b0dff0&quot;</span>,
           <span class="string">&quot;budget&quot;</span>: <span class="string">&quot;2000000000&quot;</span>,
           <span class="string">&quot;validators&quot;</span>: [
             {
               <span class="string">&quot;id&quot;</span>: <span class="string">&quot;0xf3f583AEC5f7C030722Fe992A5688557e1B86ef7&quot;</span>,
               <span class="string">&quot;fee&quot;</span>: <span class="string">&quot;10000000&quot;</span>,
-              <span class="string">&quot;url&quot;</span>: <span class="string">&quot;http://localhost:8006/&quot;</span>
-            },
+              <span class="string">&quot;url&quot;</span>: <span class="string">&quot;http://localhost:8006/&quot;
+            </span>},
             {
               <span class="string">&quot;id&quot;</span>: <span class="string">&quot;0x80690751969B234697e9059e04ed72195c3507fa&quot;</span>,
               <span class="string">&quot;fee&quot;</span>: <span class="string">&quot;5000000&quot;</span>,
-              <span class="string">&quot;url&quot;</span>: <span class="string">&quot;http://localhost:8005/&quot;</span>
-            }
+              <span class="string">&quot;url&quot;</span>: <span class="string">&quot;http://localhost:8005/&quot;
+            </span>}
           ],
           <span class="string">&quot;title&quot;</span>: <span class="string">&quot;Dummy Campaign 2 in Chain #1337&quot;</span>,
           <span class="string">&quot;pricingBounds&quot;</span>: {
             <span class="string">&quot;CLICK&quot;</span>: {
               <span class="string">&quot;min&quot;</span>: <span class="string">&quot;300000000&quot;</span>,
-              <span class="string">&quot;max&quot;</span>: <span class="string">&quot;500000000&quot;</span>
-            },
+              <span class="string">&quot;max&quot;</span>: <span class="string">&quot;500000000&quot;
+            </span>},
             <span class="string">&quot;IMPRESSION&quot;</span>: {
               <span class="string">&quot;min&quot;</span>: <span class="string">&quot;100000000&quot;</span>,
-              <span class="string">&quot;max&quot;</span>: <span class="string">&quot;200000000&quot;</span>
-            }
+              <span class="string">&quot;max&quot;</span>: <span class="string">&quot;200000000&quot;
+            </span>}
           },
           <span class="string">&quot;eventSubmission&quot;</span>: {
             <span class="string">&quot;allow&quot;</span>: []
@@ -124,8 +124,8 @@
               <span class="string">&quot;created&quot;</span>: <span class="number">1564390800000_u64</span>,
               <span class="string">&quot;title&quot;</span>: <span class="string">&quot;Dummy AdUnit 1&quot;</span>,
               <span class="string">&quot;description&quot;</span>: <span class="string">&quot;Dummy AdUnit description 1&quot;</span>,
-              <span class="string">&quot;archived&quot;</span>: <span class="bool-val">false</span>
-            },
+              <span class="string">&quot;archived&quot;</span>: <span class="bool-val">false
+            </span>},
             {
               <span class="string">&quot;ipfs&quot;</span>: <span class="string">&quot;QmVhRDGXoM3Fg3HZD5xwMuxtb9ZErwC8wHt8CjsfxaiUbZ&quot;</span>,
               <span class="string">&quot;type&quot;</span>: <span class="string">&quot;legacy_250x250&quot;</span>,
@@ -136,14 +136,14 @@
               <span class="string">&quot;created&quot;</span>: <span class="number">1564390800000_u64</span>,
               <span class="string">&quot;title&quot;</span>: <span class="string">&quot;Dummy AdUnit 2&quot;</span>,
               <span class="string">&quot;description&quot;</span>: <span class="string">&quot;Dummy AdUnit description 2&quot;</span>,
-              <span class="string">&quot;archived&quot;</span>: <span class="bool-val">false</span>
-            }
+              <span class="string">&quot;archived&quot;</span>: <span class="bool-val">false
+            </span>}
           ],
           <span class="string">&quot;targetingRules&quot;</span>: [],
           <span class="string">&quot;created&quot;</span>: <span class="number">1612162800000_u64</span>,
           <span class="string">&quot;activeFrom&quot;</span>: <span class="number">1656280800000_u64</span>,
-          <span class="string">&quot;activeTo&quot;</span>: <span class="number">4073414400000_u64</span>
-        },
+          <span class="string">&quot;activeTo&quot;</span>: <span class="number">4073414400000_u64
+        </span>},
         {
           <span class="string">&quot;id&quot;</span>: <span class="string">&quot;0xa78f3492481b41a688488a7aa1ff17df&quot;</span>,
           <span class="string">&quot;channel&quot;</span>: {
@@ -151,32 +151,32 @@
             <span class="string">&quot;follower&quot;</span>: <span class="string">&quot;0xf3f583AEC5f7C030722Fe992A5688557e1B86ef7&quot;</span>,
             <span class="string">&quot;guardian&quot;</span>: <span class="string">&quot;0x79D358a3194d737880B3eFD94ADccD246af9F535&quot;</span>,
             <span class="string">&quot;token&quot;</span>: <span class="string">&quot;0x12a28f2bfBFfDf5842657235cC058242f40fDEa6&quot;</span>,
-            <span class="string">&quot;nonce&quot;</span>: <span class="string">&quot;1&quot;</span>
-          },
+            <span class="string">&quot;nonce&quot;</span>: <span class="string">&quot;1&quot;
+          </span>},
           <span class="string">&quot;creator&quot;</span>: <span class="string">&quot;0x541b401362Ea1D489D322579552B099e801F3632&quot;</span>,
           <span class="string">&quot;budget&quot;</span>: <span class="string">&quot;2000000000&quot;</span>,
           <span class="string">&quot;validators&quot;</span>: [
             {
               <span class="string">&quot;id&quot;</span>: <span class="string">&quot;0x80690751969B234697e9059e04ed72195c3507fa&quot;</span>,
               <span class="string">&quot;fee&quot;</span>: <span class="string">&quot;200000000&quot;</span>,
-              <span class="string">&quot;url&quot;</span>: <span class="string">&quot;http://localhost:8005/&quot;</span>
-            },
+              <span class="string">&quot;url&quot;</span>: <span class="string">&quot;http://localhost:8005/&quot;
+            </span>},
             {
               <span class="string">&quot;id&quot;</span>: <span class="string">&quot;0xf3f583AEC5f7C030722Fe992A5688557e1B86ef7&quot;</span>,
               <span class="string">&quot;fee&quot;</span>: <span class="string">&quot;175000000&quot;</span>,
-              <span class="string">&quot;url&quot;</span>: <span class="string">&quot;http://localhost:8006/&quot;</span>
-            }
+              <span class="string">&quot;url&quot;</span>: <span class="string">&quot;http://localhost:8006/&quot;
+            </span>}
           ],
           <span class="string">&quot;title&quot;</span>: <span class="string">&quot;Dummy Campaign 3 in Chain #1&quot;</span>,
           <span class="string">&quot;pricingBounds&quot;</span>: {
             <span class="string">&quot;CLICK&quot;</span>: {
               <span class="string">&quot;min&quot;</span>: <span class="string">&quot;3500000&quot;</span>,
-              <span class="string">&quot;max&quot;</span>: <span class="string">&quot;6500000&quot;</span>
-            },
+              <span class="string">&quot;max&quot;</span>: <span class="string">&quot;6500000&quot;
+            </span>},
             <span class="string">&quot;IMPRESSION&quot;</span>: {
               <span class="string">&quot;min&quot;</span>: <span class="string">&quot;1500000&quot;</span>,
-              <span class="string">&quot;max&quot;</span>: <span class="string">&quot;2500000&quot;</span>
-            }
+              <span class="string">&quot;max&quot;</span>: <span class="string">&quot;2500000&quot;
+            </span>}
           },
           <span class="string">&quot;eventSubmission&quot;</span>: {
             <span class="string">&quot;allow&quot;</span>: []
@@ -192,8 +192,8 @@
               <span class="string">&quot;created&quot;</span>: <span class="number">1564390800000_u64</span>,
               <span class="string">&quot;title&quot;</span>: <span class="string">&quot;Dummy AdUnit 3&quot;</span>,
               <span class="string">&quot;description&quot;</span>: <span class="string">&quot;Dummy AdUnit description 3&quot;</span>,
-              <span class="string">&quot;archived&quot;</span>: <span class="bool-val">false</span>
-            },
+              <span class="string">&quot;archived&quot;</span>: <span class="bool-val">false
+            </span>},
             {
               <span class="string">&quot;ipfs&quot;</span>: <span class="string">&quot;QmTAF3FsFDS7Ru8WChoD9ofiHTH8gAQfR4mYSnwxqTDpJH&quot;</span>,
               <span class="string">&quot;type&quot;</span>: <span class="string">&quot;legacy_250x250&quot;</span>,
@@ -204,19 +204,19 @@
               <span class="string">&quot;created&quot;</span>: <span class="number">1564390800000_u64</span>,
               <span class="string">&quot;title&quot;</span>: <span class="string">&quot;Dummy AdUnit 4&quot;</span>,
               <span class="string">&quot;description&quot;</span>: <span class="string">&quot;Dummy AdUnit description 4&quot;</span>,
-              <span class="string">&quot;archived&quot;</span>: <span class="bool-val">false</span>
-            }
+              <span class="string">&quot;archived&quot;</span>: <span class="bool-val">false
+            </span>}
           ],
           <span class="string">&quot;targetingRules&quot;</span>: [],
           <span class="string">&quot;created&quot;</span>: <span class="number">1612162800000_u64</span>,
-          <span class="string">&quot;activeTo&quot;</span>: <span class="number">4073414400000_u64</span>
-        }
+          <span class="string">&quot;activeTo&quot;</span>: <span class="number">4073414400000_u64
+        </span>}
       ],
       <span class="string">&quot;totalPages&quot;</span>: <span class="number">1</span>,
-      <span class="string">&quot;page&quot;</span>: <span class="number">0</span>
-    });
+      <span class="string">&quot;page&quot;</span>: <span class="number">0
+    </span>});
 
-    <span class="macro">assert!</span>(<span class="ident">from_value</span>::<span class="op">&lt;</span><span class="ident">CampaignListResponse</span><span class="op">&gt;</span>(<span class="ident">json</span>).<span class="ident">is_ok</span>());
+    <span class="macro">assert!</span>(from_value::&lt;CampaignListResponse&gt;(json).is_ok());
 }</code></pre></div>
 </div></details><h2 id="fields" class="fields small-section-header">Fields<a href="#fields" class="anchor"></a></h2><span id="structfield.campaigns" class="structfield small-section-header"><a href="#structfield.campaigns" class="anchor field"></a><code>campaigns: <a class="struct" href="https://doc.rust-lang.org/nightly/alloc/vec/struct.Vec.html" title="struct alloc::vec::Vec">Vec</a>&lt;<a class="struct" href="../../struct.Campaign.html" title="struct primitives::Campaign">Campaign</a>&gt;</code></span><span id="structfield.pagination" class="structfield small-section-header"><a href="#structfield.pagination" class="anchor field"></a><code>pagination: <a class="struct" href="../struct.Pagination.html" title="struct primitives::sentry::Pagination">Pagination</a></code></span><h2 id="trait-implementations" class="small-section-header">Trait Implementations<a href="#trait-implementations" class="anchor"></a></h2><div id="trait-implementations-list"><details class="rustdoc-toggle implementors-toggle" open><summary><section id="impl-Debug-for-CampaignListResponse" class="impl has-srclink"><span class="rightside"><a class="srclink" href="../../../src/primitives/sentry.rs.html#780">source</a></span><a href="#impl-Debug-for-CampaignListResponse" class="anchor"></a><h3 class="code-header in-band">impl <a class="trait" href="https://doc.rust-lang.org/nightly/core/fmt/trait.Debug.html" title="trait core::fmt::Debug">Debug</a> for <a class="struct" href="struct.CampaignListResponse.html" title="struct primitives::sentry::campaign_list::CampaignListResponse">CampaignListResponse</a></h3></section></summary><div class="impl-items"><details class="rustdoc-toggle method-toggle" open><summary><section id="method.fmt" class="method trait-impl has-srclink"><span class="rightside"><a class="srclink" href="../../../src/primitives/sentry.rs.html#780">source</a></span><a href="#method.fmt" class="anchor"></a><h4 class="code-header">fn <a href="https://doc.rust-lang.org/nightly/core/fmt/trait.Debug.html#tymethod.fmt" class="fnname">fmt</a>(&amp;self, f: &amp;mut <a class="struct" href="https://doc.rust-lang.org/nightly/core/fmt/struct.Formatter.html" title="struct core::fmt::Formatter">Formatter</a>&lt;'_&gt;) -&gt; <a class="type" href="https://doc.rust-lang.org/nightly/core/fmt/type.Result.html" title="type core::fmt::Result">Result</a></h4></section></summary><div class='docblock'><p>Formats the value using the given formatter. <a href="https://doc.rust-lang.org/nightly/core/fmt/trait.Debug.html#tymethod.fmt">Read more</a></p>
 </div></details></div></details><details class="rustdoc-toggle implementors-toggle" open><summary><section id="impl-Deserialize%3C%27de%3E-for-CampaignListResponse" class="impl has-srclink"><span class="rightside"><a class="srclink" href="../../../src/primitives/sentry.rs.html#780">source</a></span><a href="#impl-Deserialize%3C%27de%3E-for-CampaignListResponse" class="anchor"></a><h3 class="code-header in-band">impl&lt;'de&gt; <a class="trait" href="https://docs.rs/serde/1.0.137/serde/de/trait.Deserialize.html" title="trait serde::de::Deserialize">Deserialize</a>&lt;'de&gt; for <a class="struct" href="struct.CampaignListResponse.html" title="struct primitives::sentry::campaign_list::CampaignListResponse">CampaignListResponse</a></h3></section></summary><div class="impl-items"><details class="rustdoc-toggle method-toggle" open><summary><section id="method.deserialize" class="method trait-impl has-srclink"><span class="rightside"><a class="srclink" href="../../../src/primitives/sentry.rs.html#780">source</a></span><a href="#method.deserialize" class="anchor"></a><h4 class="code-header">fn <a href="https://docs.rs/serde/1.0.137/serde/de/trait.Deserialize.html#tymethod.deserialize" class="fnname">deserialize</a>&lt;__D&gt;(__deserializer: __D) -&gt; <a class="enum" href="https://doc.rust-lang.org/nightly/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;Self, __D::<a class="associatedtype" href="https://docs.rs/serde/1.0.137/serde/de/trait.Deserializer.html#associatedtype.Error" title="type serde::de::Deserializer::Error">Error</a>&gt; <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;__D: <a class="trait" href="https://docs.rs/serde/1.0.137/serde/de/trait.Deserializer.html" title="trait serde::de::Deserializer">Deserializer</a>&lt;'de&gt;,&nbsp;</span></h4></section></summary><div class='docblock'><p>Deserialize this value from the given Serde deserializer. <a href="https://docs.rs/serde/1.0.137/serde/de/trait.Deserialize.html#tymethod.deserialize">Read more</a></p>
@@ -239,12 +239,12 @@
 </div></details><details class="rustdoc-toggle method-toggle" open><summary><section id="method.deref_mut" class="method trait-impl has-srclink"><a href="#method.deref_mut" class="anchor"></a><h4 class="code-header">unsafe fn <a class="fnname">deref_mut</a>&lt;'a&gt;(ptr: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.usize.html">usize</a>) -&gt; <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.reference.html">&amp;'a mut </a>T</h4></section></summary><div class='docblock'><p>Mutably dereferences the given pointer. <a>Read more</a></p>
 </div></details><details class="rustdoc-toggle method-toggle" open><summary><section id="method.drop" class="method trait-impl has-srclink"><a href="#method.drop" class="anchor"></a><h4 class="code-header">unsafe fn <a class="fnname">drop</a>(ptr: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.usize.html">usize</a>)</h4></section></summary><div class='docblock'><p>Drops the object pointed to by the given pointer. <a>Read more</a></p>
 </div></details></div></details><details class="rustdoc-toggle implementors-toggle"><summary><section id="impl-Same%3CT%3E-for-CampaignListResponse" class="impl has-srclink"><span class="rightside"><a class="srclink" href="https://docs.rs/typenum/1.15.0/src/typenum/type_operators.rs.html#34">source</a></span><a href="#impl-Same%3CT%3E-for-CampaignListResponse" class="anchor"></a><h3 class="code-header in-band">impl&lt;T&gt; <a class="trait" href="https://docs.rs/typenum/1.15.0/typenum/type_operators/trait.Same.html" title="trait typenum::type_operators::Same">Same</a>&lt;T&gt; for T</h3></section></summary><div class="impl-items"><details class="rustdoc-toggle" open><summary><section id="associatedtype.Output" class="associatedtype trait-impl has-srclink"><a href="#associatedtype.Output" class="anchor"></a><h4 class="code-header">type <a href="https://docs.rs/typenum/1.15.0/typenum/type_operators/trait.Same.html#associatedtype.Output" class="associatedtype">Output</a> = T</h4></section></summary><div class='docblock'><p>Should always be <code>Self</code></p>
-</div></details></div></details><details class="rustdoc-toggle implementors-toggle"><summary><section id="impl-TryFrom%3CU%3E-for-CampaignListResponse" class="impl has-srclink"><span class="rightside"><a class="srclink" href="https://doc.rust-lang.org/nightly/src/core/convert/mod.rs.html#598">source</a></span><a href="#impl-TryFrom%3CU%3E-for-CampaignListResponse" class="anchor"></a><h3 class="code-header in-band">impl&lt;T, U&gt; <a class="trait" href="https://doc.rust-lang.org/nightly/core/convert/trait.TryFrom.html" title="trait core::convert::TryFrom">TryFrom</a>&lt;U&gt; for T <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;U: <a class="trait" href="https://doc.rust-lang.org/nightly/core/convert/trait.Into.html" title="trait core::convert::Into">Into</a>&lt;T&gt;,&nbsp;</span></h3></section></summary><div class="impl-items"><details class="rustdoc-toggle" open><summary><section id="associatedtype.Error-1" class="associatedtype trait-impl has-srclink"><a href="#associatedtype.Error-1" class="anchor"></a><h4 class="code-header">type <a href="https://doc.rust-lang.org/nightly/core/convert/trait.TryFrom.html#associatedtype.Error" class="associatedtype">Error</a> = <a class="enum" href="https://doc.rust-lang.org/nightly/core/convert/enum.Infallible.html" title="enum core::convert::Infallible">Infallible</a></h4></section></summary><div class='docblock'><p>The type returned in the event of a conversion error.</p>
+</div></details></div></details><details class="rustdoc-toggle implementors-toggle"><summary><section id="impl-TryFrom%3CU%3E-for-CampaignListResponse" class="impl has-srclink"><span class="rightside"><a class="srclink" href="https://doc.rust-lang.org/nightly/src/core/convert/mod.rs.html#598">source</a></span><a href="#impl-TryFrom%3CU%3E-for-CampaignListResponse" class="anchor"></a><h3 class="code-header in-band">impl&lt;T, U&gt; <a class="trait" href="https://doc.rust-lang.org/nightly/core/convert/trait.TryFrom.html" title="trait core::convert::TryFrom">TryFrom</a>&lt;U&gt; for T <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;U: <a class="trait" href="https://doc.rust-lang.org/nightly/core/convert/trait.Into.html" title="trait core::convert::Into">Into</a>&lt;T&gt;,&nbsp;</span></h3></section></summary><div class="impl-items"><details class="rustdoc-toggle" open><summary><section id="associatedtype.Error" class="associatedtype trait-impl has-srclink"><a href="#associatedtype.Error" class="anchor"></a><h4 class="code-header">type <a href="https://doc.rust-lang.org/nightly/core/convert/trait.TryFrom.html#associatedtype.Error" class="associatedtype">Error</a> = <a class="enum" href="https://doc.rust-lang.org/nightly/core/convert/enum.Infallible.html" title="enum core::convert::Infallible">Infallible</a></h4></section></summary><div class='docblock'><p>The type returned in the event of a conversion error.</p>
 </div></details><details class="rustdoc-toggle method-toggle" open><summary><section id="method.try_from" class="method trait-impl has-srclink"><span class="rightside"><span class="since" title="const unstable">const: <a href="https://github.com/rust-lang/rust/issues/88674" title="Tracking issue for const_convert">unstable</a></span> · <a class="srclink" href="https://doc.rust-lang.org/nightly/src/core/convert/mod.rs.html#604">source</a></span><a href="#method.try_from" class="anchor"></a><h4 class="code-header">fn <a href="https://doc.rust-lang.org/nightly/core/convert/trait.TryFrom.html#tymethod.try_from" class="fnname">try_from</a>(value: U) -&gt; <a class="enum" href="https://doc.rust-lang.org/nightly/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;T, &lt;T as <a class="trait" href="https://doc.rust-lang.org/nightly/core/convert/trait.TryFrom.html" title="trait core::convert::TryFrom">TryFrom</a>&lt;U&gt;&gt;::<a class="associatedtype" href="https://doc.rust-lang.org/nightly/core/convert/trait.TryFrom.html#associatedtype.Error" title="type core::convert::TryFrom::Error">Error</a>&gt;</h4></section></summary><div class='docblock'><p>Performs the conversion.</p>
-</div></details></div></details><details class="rustdoc-toggle implementors-toggle"><summary><section id="impl-TryInto%3CU%3E-for-CampaignListResponse" class="impl has-srclink"><span class="rightside"><a class="srclink" href="https://doc.rust-lang.org/nightly/src/core/convert/mod.rs.html#583">source</a></span><a href="#impl-TryInto%3CU%3E-for-CampaignListResponse" class="anchor"></a><h3 class="code-header in-band">impl&lt;T, U&gt; <a class="trait" href="https://doc.rust-lang.org/nightly/core/convert/trait.TryInto.html" title="trait core::convert::TryInto">TryInto</a>&lt;U&gt; for T <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;U: <a class="trait" href="https://doc.rust-lang.org/nightly/core/convert/trait.TryFrom.html" title="trait core::convert::TryFrom">TryFrom</a>&lt;T&gt;,&nbsp;</span></h3></section></summary><div class="impl-items"><details class="rustdoc-toggle" open><summary><section id="associatedtype.Error" class="associatedtype trait-impl has-srclink"><a href="#associatedtype.Error" class="anchor"></a><h4 class="code-header">type <a href="https://doc.rust-lang.org/nightly/core/convert/trait.TryInto.html#associatedtype.Error" class="associatedtype">Error</a> = &lt;U as <a class="trait" href="https://doc.rust-lang.org/nightly/core/convert/trait.TryFrom.html" title="trait core::convert::TryFrom">TryFrom</a>&lt;T&gt;&gt;::<a class="associatedtype" href="https://doc.rust-lang.org/nightly/core/convert/trait.TryFrom.html#associatedtype.Error" title="type core::convert::TryFrom::Error">Error</a></h4></section></summary><div class='docblock'><p>The type returned in the event of a conversion error.</p>
+</div></details></div></details><details class="rustdoc-toggle implementors-toggle"><summary><section id="impl-TryInto%3CU%3E-for-CampaignListResponse" class="impl has-srclink"><span class="rightside"><a class="srclink" href="https://doc.rust-lang.org/nightly/src/core/convert/mod.rs.html#583">source</a></span><a href="#impl-TryInto%3CU%3E-for-CampaignListResponse" class="anchor"></a><h3 class="code-header in-band">impl&lt;T, U&gt; <a class="trait" href="https://doc.rust-lang.org/nightly/core/convert/trait.TryInto.html" title="trait core::convert::TryInto">TryInto</a>&lt;U&gt; for T <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;U: <a class="trait" href="https://doc.rust-lang.org/nightly/core/convert/trait.TryFrom.html" title="trait core::convert::TryFrom">TryFrom</a>&lt;T&gt;,&nbsp;</span></h3></section></summary><div class="impl-items"><details class="rustdoc-toggle" open><summary><section id="associatedtype.Error-1" class="associatedtype trait-impl has-srclink"><a href="#associatedtype.Error-1" class="anchor"></a><h4 class="code-header">type <a href="https://doc.rust-lang.org/nightly/core/convert/trait.TryInto.html#associatedtype.Error" class="associatedtype">Error</a> = &lt;U as <a class="trait" href="https://doc.rust-lang.org/nightly/core/convert/trait.TryFrom.html" title="trait core::convert::TryFrom">TryFrom</a>&lt;T&gt;&gt;::<a class="associatedtype" href="https://doc.rust-lang.org/nightly/core/convert/trait.TryFrom.html#associatedtype.Error" title="type core::convert::TryFrom::Error">Error</a></h4></section></summary><div class='docblock'><p>The type returned in the event of a conversion error.</p>
 </div></details><details class="rustdoc-toggle method-toggle" open><summary><section id="method.try_into" class="method trait-impl has-srclink"><span class="rightside"><span class="since" title="const unstable">const: <a href="https://github.com/rust-lang/rust/issues/88674" title="Tracking issue for const_convert">unstable</a></span> · <a class="srclink" href="https://doc.rust-lang.org/nightly/src/core/convert/mod.rs.html#589">source</a></span><a href="#method.try_into" class="anchor"></a><h4 class="code-header">fn <a href="https://doc.rust-lang.org/nightly/core/convert/trait.TryInto.html#tymethod.try_into" class="fnname">try_into</a>(self) -&gt; <a class="enum" href="https://doc.rust-lang.org/nightly/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;U, &lt;U as <a class="trait" href="https://doc.rust-lang.org/nightly/core/convert/trait.TryFrom.html" title="trait core::convert::TryFrom">TryFrom</a>&lt;T&gt;&gt;::<a class="associatedtype" href="https://doc.rust-lang.org/nightly/core/convert/trait.TryFrom.html#associatedtype.Error" title="type core::convert::TryFrom::Error">Error</a>&gt;</h4></section></summary><div class='docblock'><p>Performs the conversion.</p>
 </div></details></div></details><details class="rustdoc-toggle implementors-toggle"><summary><section id="impl-VZip%3CV%3E-for-CampaignListResponse" class="impl has-srclink"><a href="#impl-VZip%3CV%3E-for-CampaignListResponse" class="anchor"></a><h3 class="code-header in-band">impl&lt;V, T&gt; VZip&lt;V&gt; for T <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;V: MultiLane&lt;T&gt;,&nbsp;</span></h3></section></summary><div class="impl-items"><section id="method.vzip" class="method trait-impl has-srclink"><a href="#method.vzip" class="anchor"></a><h4 class="code-header">fn <a class="fnname">vzip</a>(self) -&gt; V</h4></section></div></details><details class="rustdoc-toggle implementors-toggle"><summary><section id="impl-WithSubscriber-for-CampaignListResponse" class="impl has-srclink"><span class="rightside"><a class="srclink" href="https://docs.rs/tracing/0.1.35/src/tracing/instrument.rs.html#334">source</a></span><a href="#impl-WithSubscriber-for-CampaignListResponse" class="anchor"></a><h3 class="code-header in-band">impl&lt;T&gt; <a class="trait" href="https://docs.rs/tracing/0.1.35/tracing/instrument/trait.WithSubscriber.html" title="trait tracing::instrument::WithSubscriber">WithSubscriber</a> for T</h3></section></summary><div class="impl-items"><details class="rustdoc-toggle method-toggle" open><summary><section id="method.with_subscriber" class="method trait-impl has-srclink"><span class="rightside"><a class="srclink" href="https://docs.rs/tracing/0.1.35/src/tracing/instrument.rs.html#169-171">source</a></span><a href="#method.with_subscriber" class="anchor"></a><h4 class="code-header">fn <a href="https://docs.rs/tracing/0.1.35/tracing/instrument/trait.WithSubscriber.html#method.with_subscriber" class="fnname">with_subscriber</a>&lt;S&gt;(self, subscriber: S) -&gt; <a class="struct" href="https://docs.rs/tracing/0.1.35/tracing/instrument/struct.WithDispatch.html" title="struct tracing::instrument::WithDispatch">WithDispatch</a>&lt;Self&gt; <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;S: <a class="trait" href="https://doc.rust-lang.org/nightly/core/convert/trait.Into.html" title="trait core::convert::Into">Into</a>&lt;<a class="struct" href="https://docs.rs/tracing-core/0.1.22/tracing_core/dispatcher/struct.Dispatch.html" title="struct tracing_core::dispatcher::Dispatch">Dispatch</a>&gt;,&nbsp;</span></h4></section></summary><div class='docblock'><p>Attaches the provided <a href="https://docs.rs/tracing-core/0.1.22/tracing_core/subscriber/trait.Subscriber.html"><code>Subscriber</code></a> to this type, returning a
 <a href="https://docs.rs/tracing/0.1.35/tracing/instrument/struct.WithDispatch.html" title="WithDispatch"><code>WithDispatch</code></a> wrapper. <a href="https://docs.rs/tracing/0.1.35/tracing/instrument/trait.WithSubscriber.html#method.with_subscriber">Read more</a></p>
 </div></details><details class="rustdoc-toggle method-toggle" open><summary><section id="method.with_current_subscriber" class="method trait-impl has-srclink"><span class="rightside"><a class="srclink" href="https://docs.rs/tracing/0.1.35/src/tracing/instrument.rs.html#221">source</a></span><a href="#method.with_current_subscriber" class="anchor"></a><h4 class="code-header">fn <a href="https://docs.rs/tracing/0.1.35/tracing/instrument/trait.WithSubscriber.html#method.with_current_subscriber" class="fnname">with_current_subscriber</a>(self) -&gt; <a class="struct" href="https://docs.rs/tracing/0.1.35/tracing/instrument/struct.WithDispatch.html" title="struct tracing::instrument::WithDispatch">WithDispatch</a>&lt;Self&gt;</h4></section></summary><div class='docblock'><p>Attaches the current <a href="https://docs.rs/tracing/0.1.35/tracing/dispatcher/index.html#setting-the-default-subscriber">default</a> <a href="https://docs.rs/tracing-core/0.1.22/tracing_core/subscriber/trait.Subscriber.html"><code>Subscriber</code></a> to this type, returning a
 <a href="https://docs.rs/tracing/0.1.35/tracing/instrument/struct.WithDispatch.html" title="WithDispatch"><code>WithDispatch</code></a> wrapper. <a href="https://docs.rs/tracing/0.1.35/tracing/instrument/trait.WithSubscriber.html#method.with_current_subscriber">Read more</a></p>
-</div></details></div></details><section id="impl-DeserializeOwned-for-CampaignListResponse" class="impl has-srclink"><span class="rightside"><a class="srclink" href="https://docs.rs/serde/1.0.137/src/serde/de/mod.rs.html#605">source</a></span><a href="#impl-DeserializeOwned-for-CampaignListResponse" class="anchor"></a><h3 class="code-header in-band">impl&lt;T&gt; <a class="trait" href="https://docs.rs/serde/1.0.137/serde/de/trait.DeserializeOwned.html" title="trait serde::de::DeserializeOwned">DeserializeOwned</a> for T <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;T: for&lt;'de&gt; <a class="trait" href="https://docs.rs/serde/1.0.137/serde/de/trait.Deserialize.html" title="trait serde::de::Deserialize">Deserialize</a>&lt;'de&gt;,&nbsp;</span></h3></section><section id="impl-SendSyncUnwindSafe-for-CampaignListResponse" class="impl has-srclink"><a href="#impl-SendSyncUnwindSafe-for-CampaignListResponse" class="anchor"></a><h3 class="code-header in-band">impl&lt;T&gt; SendSyncUnwindSafe for T <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;T: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Send.html" title="trait core::marker::Send">Send</a> + <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Sync.html" title="trait core::marker::Sync">Sync</a> + <a class="trait" href="https://doc.rust-lang.org/nightly/core/panic/unwind_safe/trait.UnwindSafe.html" title="trait core::panic::unwind_safe::UnwindSafe">UnwindSafe</a> + ?<a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Sized.html" title="trait core::marker::Sized">Sized</a>,&nbsp;</span></h3></section></div></section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="primitives" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (20ffea693 2022-08-11)" ></div></body></html>
+</div></details></div></details><section id="impl-DeserializeOwned-for-CampaignListResponse" class="impl has-srclink"><span class="rightside"><a class="srclink" href="https://docs.rs/serde/1.0.137/src/serde/de/mod.rs.html#605">source</a></span><a href="#impl-DeserializeOwned-for-CampaignListResponse" class="anchor"></a><h3 class="code-header in-band">impl&lt;T&gt; <a class="trait" href="https://docs.rs/serde/1.0.137/serde/de/trait.DeserializeOwned.html" title="trait serde::de::DeserializeOwned">DeserializeOwned</a> for T <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;T: for&lt;'de&gt; <a class="trait" href="https://docs.rs/serde/1.0.137/serde/de/trait.Deserialize.html" title="trait serde::de::Deserialize">Deserialize</a>&lt;'de&gt;,&nbsp;</span></h3></section><section id="impl-SendSyncUnwindSafe-for-CampaignListResponse" class="impl has-srclink"><a href="#impl-SendSyncUnwindSafe-for-CampaignListResponse" class="anchor"></a><h3 class="code-header in-band">impl&lt;T&gt; SendSyncUnwindSafe for T <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;T: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Send.html" title="trait core::marker::Send">Send</a> + <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Sync.html" title="trait core::marker::Sync">Sync</a> + <a class="trait" href="https://doc.rust-lang.org/nightly/core/panic/unwind_safe/trait.UnwindSafe.html" title="trait core::panic::unwind_safe::UnwindSafe">UnwindSafe</a> + ?<a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Sized.html" title="trait core::marker::Sized">Sized</a>,&nbsp;</span></h3></section></div></section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="primitives" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>

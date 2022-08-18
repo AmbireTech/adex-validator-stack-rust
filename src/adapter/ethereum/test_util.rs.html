@@ -402,409 +402,409 @@
 <span id="402">402</span>
 <span id="403">403</span>
 <span id="404">404</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">once_cell::sync::Lazy</span>;
-<span class="kw">use</span> <span class="ident">std</span>::{<span class="ident">collections::HashMap</span>, <span class="ident">env::current_dir</span>, <span class="ident">num::NonZeroU8</span>};
-<span class="kw">use</span> <span class="ident">web3</span>::{
-    <span class="ident">contract</span>::{<span class="ident">Contract</span>, <span class="ident">Options</span> <span class="kw">as</span> <span class="ident">ContractOptions</span>},
-    <span class="ident">ethabi::Token</span>,
-    <span class="ident">transports::Http</span>,
-    <span class="ident">types</span>::{<span class="ident">H160</span>, <span class="ident">H256</span>, <span class="ident">U256</span>},
-    <span class="ident">Web3</span>,
+</pre><pre class="rust"><code><span class="kw">use </span>once_cell::sync::Lazy;
+<span class="kw">use </span>std::{collections::HashMap, env::current_dir, num::NonZeroU8};
+<span class="kw">use </span>web3::{
+    contract::{Contract, Options <span class="kw">as </span>ContractOptions},
+    ethabi::Token,
+    transports::Http,
+    types::{H160, H256, U256},
+    Web3,
 };
 
-<span class="kw">use</span> <span class="ident">primitives</span>::{
-    <span class="ident">channel</span>::{<span class="ident">Channel</span>, <span class="ident">Nonce</span>},
-    <span class="ident">config</span>::{<span class="ident">ChainInfo</span>, <span class="ident">TokenInfo</span>, <span class="ident">GANACHE_CONFIG</span>},
-    <span class="ident">test_util</span>::{
-        <span class="ident">ADVERTISER</span>, <span class="ident">ADVERTISER_2</span>, <span class="ident">CREATOR</span>, <span class="ident">FOLLOWER</span>, <span class="ident">GUARDIAN</span>, <span class="ident">GUARDIAN_2</span>, <span class="ident">LEADER</span>, <span class="ident">PUBLISHER</span>,
+<span class="kw">use </span>primitives::{
+    channel::{Channel, Nonce},
+    config::{ChainInfo, TokenInfo, GANACHE_CONFIG},
+    test_util::{
+        ADVERTISER, ADVERTISER_2, CREATOR, FOLLOWER, GUARDIAN, GUARDIAN_2, LEADER, PUBLISHER,
     },
-    <span class="ident">Address</span>, <span class="ident">BigNum</span>, <span class="ident">Chain</span>, <span class="ident">ValidatorId</span>,
+    Address, BigNum, Chain, ValidatorId,
 };
 
-<span class="kw">use</span> <span class="kw">super</span>::{
-    <span class="ident">channel::EthereumChannel</span>,
-    <span class="ident">client</span>::{<span class="ident">ChainTransport</span>, <span class="ident">Options</span>},
-    <span class="ident">IDENTITY_ABI</span>, <span class="ident">OUTPACE_ABI</span>, <span class="ident">SWEEPER_ABI</span>,
+<span class="kw">use super</span>::{
+    channel::EthereumChannel,
+    client::{ChainTransport, Options},
+    IDENTITY_ABI, OUTPACE_ABI, SWEEPER_ABI,
 };
 
-<span class="comment">// See `adex-eth-protocol` `contracts/mocks/Token.sol`</span>
-<span class="doccomment">/// Mocked Token ABI</span>
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">MOCK_TOKEN_ABI</span>: <span class="ident">Lazy</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> [<span class="ident">u8</span>]<span class="op">&gt;</span> <span class="op">=</span>
-    <span class="ident">Lazy::new</span>(<span class="op">|</span><span class="op">|</span> <span class="macro">include_bytes!</span>(<span class="string">&quot;../../tests/resources/mock_token_abi.json&quot;</span>));
-<span class="doccomment">/// Mocked Token bytecode in JSON</span>
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">MOCK_TOKEN_BYTECODE</span>: <span class="ident">Lazy</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> <span class="op">=</span>
-    <span class="ident">Lazy::new</span>(<span class="op">|</span><span class="op">|</span> <span class="macro">include_str!</span>(<span class="string">&quot;../../tests/resources/mock_token_bytecode.bin&quot;</span>));
-<span class="doccomment">/// Sweeper bytecode</span>
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">SWEEPER_BYTECODE</span>: <span class="ident">Lazy</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> <span class="op">=</span>
-    <span class="ident">Lazy::new</span>(<span class="op">|</span><span class="op">|</span> <span class="macro">include_str!</span>(<span class="string">&quot;../../../lib/protocol-eth/resources/bytecode/Sweeper.bin&quot;</span>));
-<span class="doccomment">/// Outpace bytecode</span>
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">OUTPACE_BYTECODE</span>: <span class="ident">Lazy</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> <span class="op">=</span>
-    <span class="ident">Lazy::new</span>(<span class="op">|</span><span class="op">|</span> <span class="macro">include_str!</span>(<span class="string">&quot;../../../lib/protocol-eth/resources/bytecode/OUTPACE.bin&quot;</span>));
-<span class="doccomment">/// Identity bytecode</span>
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">IDENTITY_BYTECODE</span>: <span class="ident">Lazy</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> <span class="op">=</span>
-    <span class="ident">Lazy::new</span>(<span class="op">|</span><span class="op">|</span> <span class="macro">include_str!</span>(<span class="string">&quot;../../../lib/protocol-eth/resources/bytecode/Identity5.2.bin&quot;</span>));
+<span class="comment">// See `adex-eth-protocol` `contracts/mocks/Token.sol`
+</span><span class="doccomment">/// Mocked Token ABI
+</span><span class="kw">pub static </span>MOCK_TOKEN_ABI: Lazy&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>[u8]&gt; =
+    Lazy::new(|| <span class="macro">include_bytes!</span>(<span class="string">&quot;../../tests/resources/mock_token_abi.json&quot;</span>));
+<span class="doccomment">/// Mocked Token bytecode in JSON
+</span><span class="kw">pub static </span>MOCK_TOKEN_BYTECODE: Lazy&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; =
+    Lazy::new(|| <span class="macro">include_str!</span>(<span class="string">&quot;../../tests/resources/mock_token_bytecode.bin&quot;</span>));
+<span class="doccomment">/// Sweeper bytecode
+</span><span class="kw">pub static </span>SWEEPER_BYTECODE: Lazy&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; =
+    Lazy::new(|| <span class="macro">include_str!</span>(<span class="string">&quot;../../../lib/protocol-eth/resources/bytecode/Sweeper.bin&quot;</span>));
+<span class="doccomment">/// Outpace bytecode
+</span><span class="kw">pub static </span>OUTPACE_BYTECODE: Lazy&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; =
+    Lazy::new(|| <span class="macro">include_str!</span>(<span class="string">&quot;../../../lib/protocol-eth/resources/bytecode/OUTPACE.bin&quot;</span>));
+<span class="doccomment">/// Identity bytecode
+</span><span class="kw">pub static </span>IDENTITY_BYTECODE: Lazy&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; =
+    Lazy::new(|| <span class="macro">include_str!</span>(<span class="string">&quot;../../../lib/protocol-eth/resources/bytecode/Identity5.2.bin&quot;</span>));
 
-<span class="doccomment">/// Uses local `keystore.json` file and it&#39;s address for testing and working with [`crate::Ethereum`]</span>
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">KEYSTORE_IDENTITY</span>: <span class="ident">Lazy</span><span class="op">&lt;</span>(<span class="ident">Address</span>, <span class="ident">Options</span>)<span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Lazy::new</span>(<span class="op">|</span><span class="op">|</span> {
-    <span class="comment">// The address of the keystore file in `adapter/test/resources/keystore.json`</span>
-    <span class="kw">let</span> <span class="ident">address</span> <span class="op">=</span> <span class="ident">Address::try_from</span>(<span class="string">&quot;0x2bDeAFAE53940669DaA6F519373f686c1f3d3393&quot;</span>)
-        .<span class="ident">expect</span>(<span class="string">&quot;failed to parse id&quot;</span>);
+<span class="doccomment">/// Uses local `keystore.json` file and it&#39;s address for testing and working with [`crate::Ethereum`]
+</span><span class="kw">pub static </span>KEYSTORE_IDENTITY: Lazy&lt;(Address, Options)&gt; = Lazy::new(|| {
+    <span class="comment">// The address of the keystore file in `adapter/test/resources/keystore.json`
+    </span><span class="kw">let </span>address = Address::try_from(<span class="string">&quot;0x2bDeAFAE53940669DaA6F519373f686c1f3d3393&quot;</span>)
+        .expect(<span class="string">&quot;failed to parse id&quot;</span>);
 
-    <span class="kw">let</span> <span class="ident">full_path</span> <span class="op">=</span> <span class="ident">current_dir</span>().<span class="ident">unwrap</span>();
-    <span class="comment">// it always starts in `adapter` folder because of the crate scope</span>
-    <span class="comment">// even when it&#39;s in the workspace</span>
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">keystore_file</span> <span class="op">=</span> <span class="ident">full_path</span>.<span class="ident">parent</span>().<span class="ident">unwrap</span>().<span class="ident">to_path_buf</span>();
-    <span class="ident">keystore_file</span>.<span class="ident">push</span>(<span class="string">&quot;adapter/tests/resources/keystore.json&quot;</span>);
+    <span class="kw">let </span>full_path = current_dir().unwrap();
+    <span class="comment">// it always starts in `adapter` folder because of the crate scope
+    // even when it&#39;s in the workspace
+    </span><span class="kw">let </span><span class="kw-2">mut </span>keystore_file = full_path.parent().unwrap().to_path_buf();
+    keystore_file.push(<span class="string">&quot;adapter/tests/resources/keystore.json&quot;</span>);
 
-    (<span class="ident">address</span>, <span class="ident">keystore_options</span>(<span class="string">&quot;keystore.json&quot;</span>, <span class="string">&quot;adexvalidator&quot;</span>))
+    (address, keystore_options(<span class="string">&quot;keystore.json&quot;</span>, <span class="string">&quot;adexvalidator&quot;</span>))
 });
 
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">KEYSTORES</span>: <span class="ident">Lazy</span><span class="op">&lt;</span><span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">Address</span>, <span class="ident">Options</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Lazy::new</span>(<span class="op">|</span><span class="op">|</span> {
+<span class="kw">pub static </span>KEYSTORES: Lazy&lt;HashMap&lt;Address, Options&gt;&gt; = Lazy::new(|| {
     <span class="macro">vec!</span>[
         (
-            <span class="kw-2">*</span><span class="ident">LEADER</span>,
-            <span class="ident">keystore_options</span>(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;{}_keystore.json&quot;</span>, <span class="kw-2">*</span><span class="ident">LEADER</span>), <span class="string">&quot;ganache0&quot;</span>),
+            <span class="kw-2">*</span>LEADER,
+            keystore_options(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;{}_keystore.json&quot;</span>, <span class="kw-2">*</span>LEADER), <span class="string">&quot;ganache0&quot;</span>),
         ),
         (
-            <span class="kw-2">*</span><span class="ident">FOLLOWER</span>,
-            <span class="ident">keystore_options</span>(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;{}_keystore.json&quot;</span>, <span class="kw-2">*</span><span class="ident">FOLLOWER</span>), <span class="string">&quot;ganache1&quot;</span>),
+            <span class="kw-2">*</span>FOLLOWER,
+            keystore_options(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;{}_keystore.json&quot;</span>, <span class="kw-2">*</span>FOLLOWER), <span class="string">&quot;ganache1&quot;</span>),
         ),
         (
-            <span class="kw-2">*</span><span class="ident">GUARDIAN</span>,
-            <span class="ident">keystore_options</span>(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;{}_keystore.json&quot;</span>, <span class="kw-2">*</span><span class="ident">GUARDIAN</span>), <span class="string">&quot;ganache2&quot;</span>),
+            <span class="kw-2">*</span>GUARDIAN,
+            keystore_options(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;{}_keystore.json&quot;</span>, <span class="kw-2">*</span>GUARDIAN), <span class="string">&quot;ganache2&quot;</span>),
         ),
         (
-            <span class="kw-2">*</span><span class="ident">CREATOR</span>,
-            <span class="ident">keystore_options</span>(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;{}_keystore.json&quot;</span>, <span class="kw-2">*</span><span class="ident">CREATOR</span>), <span class="string">&quot;ganache3&quot;</span>),
+            <span class="kw-2">*</span>CREATOR,
+            keystore_options(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;{}_keystore.json&quot;</span>, <span class="kw-2">*</span>CREATOR), <span class="string">&quot;ganache3&quot;</span>),
         ),
         (
-            <span class="kw-2">*</span><span class="ident">ADVERTISER</span>,
-            <span class="ident">keystore_options</span>(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;{}_keystore.json&quot;</span>, <span class="kw-2">*</span><span class="ident">ADVERTISER</span>), <span class="string">&quot;ganache4&quot;</span>),
+            <span class="kw-2">*</span>ADVERTISER,
+            keystore_options(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;{}_keystore.json&quot;</span>, <span class="kw-2">*</span>ADVERTISER), <span class="string">&quot;ganache4&quot;</span>),
         ),
         (
-            <span class="kw-2">*</span><span class="ident">PUBLISHER</span>,
-            <span class="ident">keystore_options</span>(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;{}_keystore.json&quot;</span>, <span class="kw-2">*</span><span class="ident">PUBLISHER</span>), <span class="string">&quot;ganache5&quot;</span>),
+            <span class="kw-2">*</span>PUBLISHER,
+            keystore_options(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;{}_keystore.json&quot;</span>, <span class="kw-2">*</span>PUBLISHER), <span class="string">&quot;ganache5&quot;</span>),
         ),
         (
-            <span class="kw-2">*</span><span class="ident">GUARDIAN_2</span>,
-            <span class="ident">keystore_options</span>(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;{}_keystore.json&quot;</span>, <span class="kw-2">*</span><span class="ident">GUARDIAN_2</span>), <span class="string">&quot;ganache6&quot;</span>),
+            <span class="kw-2">*</span>GUARDIAN_2,
+            keystore_options(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;{}_keystore.json&quot;</span>, <span class="kw-2">*</span>GUARDIAN_2), <span class="string">&quot;ganache6&quot;</span>),
         ),
-        <span class="comment">// Address 7</span>
-        <span class="comment">// (</span>
-        <span class="comment">//     *PUBLISHER_2,</span>
-        <span class="comment">//     keystore_options(&amp;format!(&quot;{}_keystore.json&quot;, *PUBLISHER_2), &quot;ganache7&quot;),</span>
-        <span class="comment">// ),</span>
-        (
-            <span class="kw-2">*</span><span class="ident">ADVERTISER_2</span>,
-            <span class="ident">keystore_options</span>(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;{}_keystore.json&quot;</span>, <span class="kw-2">*</span><span class="ident">ADVERTISER_2</span>), <span class="string">&quot;ganache8&quot;</span>),
+        <span class="comment">// Address 7
+        // (
+        //     *PUBLISHER_2,
+        //     keystore_options(&amp;format!(&quot;{}_keystore.json&quot;, *PUBLISHER_2), &quot;ganache7&quot;),
+        // ),
+        </span>(
+            <span class="kw-2">*</span>ADVERTISER_2,
+            keystore_options(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;{}_keystore.json&quot;</span>, <span class="kw-2">*</span>ADVERTISER_2), <span class="string">&quot;ganache8&quot;</span>),
         ),
     ]
-    .<span class="ident">into_iter</span>()
-    .<span class="ident">collect</span>()
+    .into_iter()
+    .collect()
 });
 
-<span class="comment">// /// [`Chain`] of the locally running `ganache-cli` chain with id #1</span>
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">GANACHE_1</span>: <span class="ident">Lazy</span><span class="op">&lt;</span><span class="ident">Chain</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Lazy::new</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">GANACHE_INFO_1</span>.<span class="ident">chain</span>.<span class="ident">clone</span>());
+<span class="comment">// /// [`Chain`] of the locally running `ganache-cli` chain with id #1
+</span><span class="kw">pub static </span>GANACHE_1: Lazy&lt;Chain&gt; = Lazy::new(|| GANACHE_INFO_1.chain.clone());
 
-<span class="doccomment">/// [`ChainInfo`] of the locally running `ganache-cli` chain with id #1</span>
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">GANACHE_INFO_1</span>: <span class="ident">Lazy</span><span class="op">&lt;</span><span class="ident">ChainInfo</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Lazy::new</span>(<span class="op">|</span><span class="op">|</span> {
-    <span class="ident">GANACHE_CONFIG</span>
-        .<span class="ident">chains</span>
-        .<span class="ident">get</span>(<span class="string">&quot;Ganache #1&quot;</span>)
-        .<span class="ident">expect</span>(<span class="string">&quot;Ganache Local chain 1 not found&quot;</span>)
-        .<span class="ident">clone</span>()
+<span class="doccomment">/// [`ChainInfo`] of the locally running `ganache-cli` chain with id #1
+</span><span class="kw">pub static </span>GANACHE_INFO_1: Lazy&lt;ChainInfo&gt; = Lazy::new(|| {
+    GANACHE_CONFIG
+        .chains
+        .get(<span class="string">&quot;Ganache #1&quot;</span>)
+        .expect(<span class="string">&quot;Ganache Local chain 1 not found&quot;</span>)
+        .clone()
 });
 
-<span class="doccomment">/// [`Chain`] of the locally running `ganache-cli` chain with id #1337</span>
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">GANACHE_1337</span>: <span class="ident">Lazy</span><span class="op">&lt;</span><span class="ident">Chain</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Lazy::new</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">GANACHE_INFO_1337</span>.<span class="ident">chain</span>.<span class="ident">clone</span>());
+<span class="doccomment">/// [`Chain`] of the locally running `ganache-cli` chain with id #1337
+</span><span class="kw">pub static </span>GANACHE_1337: Lazy&lt;Chain&gt; = Lazy::new(|| GANACHE_INFO_1337.chain.clone());
 
-<span class="doccomment">/// [`ChainInfo`] of the locally running `ganache-cli` chain with id #1337</span>
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">GANACHE_INFO_1337</span>: <span class="ident">Lazy</span><span class="op">&lt;</span><span class="ident">ChainInfo</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Lazy::new</span>(<span class="op">|</span><span class="op">|</span> {
-    <span class="ident">GANACHE_CONFIG</span>
-        .<span class="ident">chains</span>
-        .<span class="ident">get</span>(<span class="string">&quot;Ganache #1337&quot;</span>)
-        .<span class="ident">expect</span>(<span class="string">&quot;Ganache Local chain 1337 not found&quot;</span>)
-        .<span class="ident">clone</span>()
+<span class="doccomment">/// [`ChainInfo`] of the locally running `ganache-cli` chain with id #1337
+</span><span class="kw">pub static </span>GANACHE_INFO_1337: Lazy&lt;ChainInfo&gt; = Lazy::new(|| {
+    GANACHE_CONFIG
+        .chains
+        .get(<span class="string">&quot;Ganache #1337&quot;</span>)
+        .expect(<span class="string">&quot;Ganache Local chain 1337 not found&quot;</span>)
+        .clone()
 });
 
-<span class="doccomment">/// Initialized Ganache [`Web3`] instance using a Http transport for usage in tests.</span>
-<span class="doccomment">/// It uses the [`GANACHE_1337`] to initialize the client.</span>
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">GANACHE_1337_WEB3</span>: <span class="ident">Lazy</span><span class="op">&lt;</span><span class="ident">Web3</span><span class="op">&lt;</span><span class="ident">Http</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Lazy::new</span>(<span class="op">|</span><span class="op">|</span> {
-    <span class="ident">GANACHE_1337</span>
-        .<span class="ident">init_web3</span>()
-        .<span class="ident">expect</span>(<span class="string">&quot;Should init the Web3 client&quot;</span>)
+<span class="doccomment">/// Initialized Ganache [`Web3`] instance using a Http transport for usage in tests.
+/// It uses the [`GANACHE_1337`] to initialize the client.
+</span><span class="kw">pub static </span>GANACHE_1337_WEB3: Lazy&lt;Web3&lt;Http&gt;&gt; = Lazy::new(|| {
+    GANACHE_1337
+        .init_web3()
+        .expect(<span class="string">&quot;Should init the Web3 client&quot;</span>)
 });
 
-<span class="doccomment">/// This helper function generates the correct path to the keystore file from this file.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// The `file_name` located at `adapter/test/resources`</span>
-<span class="doccomment">/// The `password` for the keystore file</span>
-<span class="kw">fn</span> <span class="ident">keystore_options</span>(<span class="ident">file_name</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">password</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="ident">Options</span> {
-    <span class="kw">let</span> <span class="ident">full_path</span> <span class="op">=</span> <span class="ident">current_dir</span>().<span class="ident">unwrap</span>();
-    <span class="comment">// it always starts in `adapter` folder because of the crate scope</span>
-    <span class="comment">// even when it&#39;s in the workspace</span>
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">keystore_file</span> <span class="op">=</span> <span class="ident">full_path</span>.<span class="ident">parent</span>().<span class="ident">unwrap</span>().<span class="ident">to_path_buf</span>();
-    <span class="ident">keystore_file</span>.<span class="ident">push</span>(<span class="macro">format!</span>(<span class="string">&quot;adapter/tests/resources/{}&quot;</span>, <span class="ident">file_name</span>));
+<span class="doccomment">/// This helper function generates the correct path to the keystore file from this file.
+///
+/// The `file_name` located at `adapter/test/resources`
+/// The `password` for the keystore file
+</span><span class="kw">fn </span>keystore_options(file_name: <span class="kw-2">&amp;</span>str, password: <span class="kw-2">&amp;</span>str) -&gt; Options {
+    <span class="kw">let </span>full_path = current_dir().unwrap();
+    <span class="comment">// it always starts in `adapter` folder because of the crate scope
+    // even when it&#39;s in the workspace
+    </span><span class="kw">let </span><span class="kw-2">mut </span>keystore_file = full_path.parent().unwrap().to_path_buf();
+    keystore_file.push(<span class="macro">format!</span>(<span class="string">&quot;adapter/tests/resources/{}&quot;</span>, file_name));
 
-    <span class="ident">Options</span> {
-        <span class="ident">keystore_file</span>: <span class="ident">keystore_file</span>.<span class="ident">display</span>().<span class="ident">to_string</span>(),
-        <span class="ident">keystore_pwd</span>: <span class="ident">password</span>.<span class="ident">to_string</span>(),
+    Options {
+        keystore_file: keystore_file.display().to_string(),
+        keystore_pwd: password.to_string(),
     }
 }
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_test_channel</span>(<span class="ident">token_address</span>: <span class="ident">Address</span>) -&gt; <span class="ident">Channel</span> {
-    <span class="ident">Channel</span> {
-        <span class="ident">leader</span>: <span class="ident">ValidatorId::from</span>(<span class="kw-2">&amp;</span><span class="ident">LEADER</span>),
-        <span class="ident">follower</span>: <span class="ident">ValidatorId::from</span>(<span class="kw-2">&amp;</span><span class="ident">FOLLOWER</span>),
-        <span class="ident">guardian</span>: <span class="kw-2">*</span><span class="ident">GUARDIAN</span>,
-        <span class="ident">token</span>: <span class="ident">token_address</span>,
-        <span class="ident">nonce</span>: <span class="ident">Nonce::from</span>(<span class="number">12345_u32</span>),
+<span class="kw">pub fn </span>get_test_channel(token_address: Address) -&gt; Channel {
+    Channel {
+        leader: ValidatorId::from(<span class="kw-2">&amp;</span>LEADER),
+        follower: ValidatorId::from(<span class="kw-2">&amp;</span>FOLLOWER),
+        guardian: <span class="kw-2">*</span>GUARDIAN,
+        token: token_address,
+        nonce: Nonce::from(<span class="number">12345_u32</span>),
     }
 }
 
-<span class="doccomment">/// The Sweeper contract</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Initialized and ready for calling contract with [`Web3&lt;Http&gt;`].</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Sweeper</span> {
-    <span class="kw">pub</span> <span class="ident">contract</span>: <span class="ident">Contract</span><span class="op">&lt;</span><span class="ident">Http</span><span class="op">&gt;</span>,
-    <span class="kw">pub</span> <span class="ident">address</span>: <span class="ident">Address</span>,
+<span class="doccomment">/// The Sweeper contract
+///
+/// Initialized and ready for calling contract with [`Web3&lt;Http&gt;`].
+</span><span class="attribute">#[derive(Debug, Clone)]</span>
+<span class="kw">pub struct </span>Sweeper {
+    <span class="kw">pub </span>contract: Contract&lt;Http&gt;,
+    <span class="kw">pub </span>address: Address,
 }
 
-<span class="kw">impl</span> <span class="ident">Sweeper</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">web3</span>: <span class="kw-2">&amp;</span><span class="ident">Web3</span><span class="op">&lt;</span><span class="ident">Http</span><span class="op">&gt;</span>, <span class="ident">sweeper_address</span>: <span class="ident">Address</span>) -&gt; <span class="self">Self</span> {
-        <span class="kw">let</span> <span class="ident">sweeper_contract</span> <span class="op">=</span>
-            <span class="ident">Contract::from_json</span>(<span class="ident">web3</span>.<span class="ident">eth</span>(), <span class="ident">H160</span>(<span class="ident">sweeper_address</span>.<span class="ident">to_bytes</span>()), <span class="kw-2">&amp;</span><span class="ident">SWEEPER_ABI</span>)
-                .<span class="ident">expect</span>(<span class="string">&quot;Failed to init Sweeper contract from JSON ABI!&quot;</span>);
+<span class="kw">impl </span>Sweeper {
+    <span class="kw">pub fn </span>new(web3: <span class="kw-2">&amp;</span>Web3&lt;Http&gt;, sweeper_address: Address) -&gt; <span class="self">Self </span>{
+        <span class="kw">let </span>sweeper_contract =
+            Contract::from_json(web3.eth(), H160(sweeper_address.to_bytes()), <span class="kw-2">&amp;</span>SWEEPER_ABI)
+                .expect(<span class="string">&quot;Failed to init Sweeper contract from JSON ABI!&quot;</span>);
 
-        <span class="self">Self</span> {
-            <span class="ident">address</span>: <span class="ident">sweeper_address</span>,
-            <span class="ident">contract</span>: <span class="ident">sweeper_contract</span>,
+        <span class="self">Self </span>{
+            address: sweeper_address,
+            contract: sweeper_contract,
         }
     }
 
-    <span class="doccomment">/// Deploys the Sweeper contract from [`LEADER`]</span>
-    <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">deploy</span>(<span class="ident">web3</span>: <span class="kw-2">&amp;</span><span class="ident">Web3</span><span class="op">&lt;</span><span class="ident">Http</span><span class="op">&gt;</span>) -&gt; <span class="ident">web3::contract::Result</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">contract</span> <span class="op">=</span> <span class="ident">Contract::deploy</span>(<span class="ident">web3</span>.<span class="ident">eth</span>(), <span class="kw-2">&amp;</span><span class="ident">SWEEPER_ABI</span>)
-            .<span class="ident">expect</span>(<span class="string">&quot;Invalid ABI of Sweeper contract&quot;</span>)
-            .<span class="ident">confirmations</span>(<span class="number">0</span>)
-            .<span class="ident">options</span>(<span class="ident">ContractOptions::with</span>(<span class="op">|</span><span class="ident">opt</span><span class="op">|</span> {
-                <span class="ident">opt</span>.<span class="ident">gas_price</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="number">1</span>.<span class="ident">into</span>());
-                <span class="ident">opt</span>.<span class="ident">gas</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="number">6_721_975</span>.<span class="ident">into</span>());
+    <span class="doccomment">/// Deploys the Sweeper contract from [`LEADER`]
+    </span><span class="kw">pub async fn </span>deploy(web3: <span class="kw-2">&amp;</span>Web3&lt;Http&gt;) -&gt; web3::contract::Result&lt;<span class="self">Self</span>&gt; {
+        <span class="kw">let </span>contract = Contract::deploy(web3.eth(), <span class="kw-2">&amp;</span>SWEEPER_ABI)
+            .expect(<span class="string">&quot;Invalid ABI of Sweeper contract&quot;</span>)
+            .confirmations(<span class="number">0</span>)
+            .options(ContractOptions::with(|opt| {
+                opt.gas_price = <span class="prelude-val">Some</span>(<span class="number">1</span>.into());
+                opt.gas = <span class="prelude-val">Some</span>(<span class="number">6_721_975</span>.into());
             }))
-            .<span class="ident">execute</span>(<span class="kw-2">*</span><span class="ident">SWEEPER_BYTECODE</span>, (), <span class="ident">H160</span>(<span class="ident">LEADER</span>.<span class="ident">to_bytes</span>()))
+            .execute(<span class="kw-2">*</span>SWEEPER_BYTECODE, (), H160(LEADER.to_bytes()))
             .<span class="kw">await</span><span class="question-mark">?</span>;
 
-        <span class="kw">let</span> <span class="ident">sweeper_address</span> <span class="op">=</span> <span class="ident">Address::from</span>(<span class="ident">contract</span>.<span class="ident">address</span>().<span class="ident">to_fixed_bytes</span>());
+        <span class="kw">let </span>sweeper_address = Address::from(contract.address().to_fixed_bytes());
 
-        <span class="prelude-val">Ok</span>(<span class="self">Self</span> {
-            <span class="ident">contract</span>,
-            <span class="ident">address</span>: <span class="ident">sweeper_address</span>,
+        <span class="prelude-val">Ok</span>(<span class="self">Self </span>{
+            contract,
+            address: sweeper_address,
         })
     }
 
-    <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">sweep</span>(
+    <span class="kw">pub async fn </span>sweep(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">outpace_address</span>: [<span class="ident">u8</span>; <span class="number">20</span>],
-        <span class="ident">channel</span>: <span class="kw-2">&amp;</span><span class="ident">Channel</span>,
-        <span class="ident">depositor</span>: [<span class="ident">u8</span>; <span class="number">20</span>],
-    ) -&gt; <span class="ident">web3::contract::Result</span><span class="op">&lt;</span><span class="ident">H256</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">from_leader_account</span> <span class="op">=</span> <span class="ident">H160</span>(<span class="kw-2">*</span><span class="ident">LEADER</span>.<span class="ident">as_bytes</span>());
+        outpace_address: [u8; <span class="number">20</span>],
+        channel: <span class="kw-2">&amp;</span>Channel,
+        depositor: [u8; <span class="number">20</span>],
+    ) -&gt; web3::contract::Result&lt;H256&gt; {
+        <span class="kw">let </span>from_leader_account = H160(<span class="kw-2">*</span>LEADER.as_bytes());
 
-        <span class="self">self</span>.<span class="ident">contract</span>
-            .<span class="ident">call</span>(
+        <span class="self">self</span>.contract
+            .call(
                 <span class="string">&quot;sweep&quot;</span>,
                 (
-                    <span class="ident">Token::Address</span>(<span class="ident">H160</span>(<span class="ident">outpace_address</span>)),
-                    <span class="ident">channel</span>.<span class="ident">tokenize</span>(),
-                    <span class="ident">Token::Array</span>(<span class="macro">vec!</span>[<span class="ident">Token::Address</span>(<span class="ident">H160</span>(<span class="ident">depositor</span>))]),
+                    Token::Address(H160(outpace_address)),
+                    channel.tokenize(),
+                    Token::Array(<span class="macro">vec!</span>[Token::Address(H160(depositor))]),
                 ),
-                <span class="ident">from_leader_account</span>,
-                <span class="ident">ContractOptions::with</span>(<span class="op">|</span><span class="ident">opt</span><span class="op">|</span> {
-                    <span class="ident">opt</span>.<span class="ident">gas_price</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="number">1</span>.<span class="ident">into</span>());
-                    <span class="ident">opt</span>.<span class="ident">gas</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="number">6_721_975</span>.<span class="ident">into</span>());
+                from_leader_account,
+                ContractOptions::with(|opt| {
+                    opt.gas_price = <span class="prelude-val">Some</span>(<span class="number">1</span>.into());
+                    opt.gas = <span class="prelude-val">Some</span>(<span class="number">6_721_975</span>.into());
                 }),
             )
-            .<span class="kw">await</span>
-    }
+            .<span class="kw">await
+    </span>}
 }
-<span class="doccomment">/// The Mocked token API contract</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Used for mocking the tokens of an address.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Initialized and ready for calling contract with [`Web3&lt;Http&gt;`].</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Mocked ABI: [`MOCK_TOKEN_ABI`]</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Real ABI: [`crate::ethereum::ERC20_ABI`]</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Erc20Token</span> {
-    <span class="kw">pub</span> <span class="ident">web3</span>: <span class="ident">Web3</span><span class="op">&lt;</span><span class="ident">Http</span><span class="op">&gt;</span>,
-    <span class="kw">pub</span> <span class="ident">info</span>: <span class="ident">TokenInfo</span>,
-    <span class="kw">pub</span> <span class="ident">contract</span>: <span class="ident">Contract</span><span class="op">&lt;</span><span class="ident">Http</span><span class="op">&gt;</span>,
+<span class="doccomment">/// The Mocked token API contract
+///
+/// Used for mocking the tokens of an address.
+///
+/// Initialized and ready for calling contract with [`Web3&lt;Http&gt;`].
+///
+/// Mocked ABI: [`MOCK_TOKEN_ABI`]
+///
+/// Real ABI: [`crate::ethereum::ERC20_ABI`]
+</span><span class="attribute">#[derive(Debug, Clone)]</span>
+<span class="kw">pub struct </span>Erc20Token {
+    <span class="kw">pub </span>web3: Web3&lt;Http&gt;,
+    <span class="kw">pub </span>info: TokenInfo,
+    <span class="kw">pub </span>contract: Contract&lt;Http&gt;,
 }
 
-<span class="kw">impl</span> <span class="ident">Erc20Token</span> {
-    <span class="doccomment">/// Presumes a default TokenInfo</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">web3</span>: <span class="kw-2">&amp;</span><span class="ident">Web3</span><span class="op">&lt;</span><span class="ident">Http</span><span class="op">&gt;</span>, <span class="ident">token_info</span>: <span class="ident">TokenInfo</span>) -&gt; <span class="self">Self</span> {
-        <span class="kw">let</span> <span class="ident">token_contract</span> <span class="op">=</span> <span class="ident">Contract::from_json</span>(
-            <span class="ident">web3</span>.<span class="ident">eth</span>(),
-            <span class="ident">token_info</span>.<span class="ident">address</span>.<span class="ident">as_bytes</span>().<span class="ident">into</span>(),
-            <span class="kw-2">&amp;</span><span class="ident">MOCK_TOKEN_ABI</span>,
+<span class="kw">impl </span>Erc20Token {
+    <span class="doccomment">/// Presumes a default TokenInfo
+    </span><span class="kw">pub fn </span>new(web3: <span class="kw-2">&amp;</span>Web3&lt;Http&gt;, token_info: TokenInfo) -&gt; <span class="self">Self </span>{
+        <span class="kw">let </span>token_contract = Contract::from_json(
+            web3.eth(),
+            token_info.address.as_bytes().into(),
+            <span class="kw-2">&amp;</span>MOCK_TOKEN_ABI,
         )
-        .<span class="ident">expect</span>(<span class="string">&quot;Failed to init Outpace contract from JSON ABI!&quot;</span>);
+        .expect(<span class="string">&quot;Failed to init Outpace contract from JSON ABI!&quot;</span>);
 
-        <span class="self">Self</span> {
-            <span class="ident">web3</span>: <span class="ident">web3</span>.<span class="ident">clone</span>(),
-            <span class="ident">info</span>: <span class="ident">token_info</span>,
-            <span class="ident">contract</span>: <span class="ident">token_contract</span>,
+        <span class="self">Self </span>{
+            web3: web3.clone(),
+            info: token_info,
+            contract: token_contract,
         }
     }
 
-    <span class="doccomment">/// Deploys the Mock Token contract from [`LEADER`]</span>
-    <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">deploy</span>(
-        <span class="ident">web3</span>: <span class="kw-2">&amp;</span><span class="ident">Web3</span><span class="op">&lt;</span><span class="ident">Http</span><span class="op">&gt;</span>,
-        <span class="ident">min_campaign_budget</span>: <span class="ident">u64</span>,
-    ) -&gt; <span class="ident">web3::contract::Result</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">token_contract</span> <span class="op">=</span> <span class="ident">Contract::deploy</span>(<span class="ident">web3</span>.<span class="ident">eth</span>(), <span class="kw-2">&amp;</span><span class="ident">MOCK_TOKEN_ABI</span>)
-            .<span class="ident">expect</span>(<span class="string">&quot;Invalid ABI of Mock Token contract&quot;</span>)
-            .<span class="ident">confirmations</span>(<span class="number">0</span>)
-            .<span class="ident">options</span>(<span class="ident">ContractOptions::with</span>(<span class="op">|</span><span class="ident">opt</span><span class="op">|</span> {
-                <span class="ident">opt</span>.<span class="ident">gas_price</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="number">1_i32</span>.<span class="ident">into</span>());
-                <span class="ident">opt</span>.<span class="ident">gas</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="number">6_721_975_i32</span>.<span class="ident">into</span>());
+    <span class="doccomment">/// Deploys the Mock Token contract from [`LEADER`]
+    </span><span class="kw">pub async fn </span>deploy(
+        web3: <span class="kw-2">&amp;</span>Web3&lt;Http&gt;,
+        min_campaign_budget: u64,
+    ) -&gt; web3::contract::Result&lt;<span class="self">Self</span>&gt; {
+        <span class="kw">let </span>token_contract = Contract::deploy(web3.eth(), <span class="kw-2">&amp;</span>MOCK_TOKEN_ABI)
+            .expect(<span class="string">&quot;Invalid ABI of Mock Token contract&quot;</span>)
+            .confirmations(<span class="number">0</span>)
+            .options(ContractOptions::with(|opt| {
+                opt.gas_price = <span class="prelude-val">Some</span>(<span class="number">1_i32</span>.into());
+                opt.gas = <span class="prelude-val">Some</span>(<span class="number">6_721_975_i32</span>.into());
             }))
-            .<span class="ident">execute</span>(<span class="kw-2">*</span><span class="ident">MOCK_TOKEN_BYTECODE</span>, (), <span class="ident">H160</span>(<span class="ident">LEADER</span>.<span class="ident">to_bytes</span>()))
+            .execute(<span class="kw-2">*</span>MOCK_TOKEN_BYTECODE, (), H160(LEADER.to_bytes()))
             .<span class="kw">await</span><span class="question-mark">?</span>;
 
-        <span class="kw">let</span> <span class="ident">token_address</span> <span class="op">=</span> <span class="ident">Address::from</span>(<span class="ident">token_contract</span>.<span class="ident">address</span>().<span class="ident">to_fixed_bytes</span>());
+        <span class="kw">let </span>token_address = Address::from(token_contract.address().to_fixed_bytes());
 
-        <span class="kw">let</span> <span class="ident">token_info</span> <span class="op">=</span> <span class="ident">TokenInfo</span> {
-            <span class="ident">min_campaign_budget</span>: <span class="ident">BigNum::from</span>(<span class="ident">min_campaign_budget</span>),
-            <span class="ident">precision</span>: <span class="ident">NonZeroU8::new</span>(<span class="number">18</span>).<span class="ident">expect</span>(<span class="string">&quot;should create NonZeroU8&quot;</span>),
-            <span class="comment">// 0.000_001</span>
-            <span class="ident">min_validator_fee</span>: <span class="ident">BigNum::from</span>(<span class="number">1_000_000_000_000</span>),
-            <span class="ident">address</span>: <span class="ident">token_address</span>,
+        <span class="kw">let </span>token_info = TokenInfo {
+            min_campaign_budget: BigNum::from(min_campaign_budget),
+            precision: NonZeroU8::new(<span class="number">18</span>).expect(<span class="string">&quot;should create NonZeroU8&quot;</span>),
+            <span class="comment">// 0.000_001
+            </span>min_validator_fee: BigNum::from(<span class="number">1_000_000_000_000</span>),
+            address: token_address,
         };
 
-        <span class="prelude-val">Ok</span>(<span class="self">Self</span> {
-            <span class="ident">web3</span>: <span class="ident">web3</span>.<span class="ident">clone</span>(),
-            <span class="ident">info</span>: <span class="ident">token_info</span>,
-            <span class="ident">contract</span>: <span class="ident">token_contract</span>,
+        <span class="prelude-val">Ok</span>(<span class="self">Self </span>{
+            web3: web3.clone(),
+            info: token_info,
+            contract: token_contract,
         })
     }
 
-    <span class="doccomment">/// Set Mocked token balance</span>
-    <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">set_balance</span>(
+    <span class="doccomment">/// Set Mocked token balance
+    </span><span class="kw">pub async fn </span>set_balance(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">from</span>: [<span class="ident">u8</span>; <span class="number">20</span>],
-        <span class="ident">address</span>: [<span class="ident">u8</span>; <span class="number">20</span>],
-        <span class="ident">amount</span>: <span class="kw-2">&amp;</span><span class="ident">BigNum</span>,
-    ) -&gt; <span class="ident">web3::contract::Result</span><span class="op">&lt;</span><span class="ident">H256</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">amount</span> <span class="op">=</span> <span class="ident">U256::from_dec_str</span>(<span class="kw-2">&amp;</span><span class="ident">amount</span>.<span class="ident">to_string</span>()).<span class="ident">expect</span>(<span class="string">&quot;Should create U256&quot;</span>);
+        from: [u8; <span class="number">20</span>],
+        address: [u8; <span class="number">20</span>],
+        amount: <span class="kw-2">&amp;</span>BigNum,
+    ) -&gt; web3::contract::Result&lt;H256&gt; {
+        <span class="kw">let </span>amount = U256::from_dec_str(<span class="kw-2">&amp;</span>amount.to_string()).expect(<span class="string">&quot;Should create U256&quot;</span>);
 
-        <span class="self">self</span>.<span class="ident">contract</span>
-            .<span class="ident">call</span>(
+        <span class="self">self</span>.contract
+            .call(
                 <span class="string">&quot;setBalanceTo&quot;</span>,
-                (<span class="ident">H160</span>(<span class="ident">address</span>), <span class="ident">amount</span>),
-                <span class="ident">H160</span>(<span class="ident">from</span>),
-                <span class="ident">ContractOptions::default</span>(),
+                (H160(address), amount),
+                H160(from),
+                ContractOptions::default(),
             )
-            .<span class="kw">await</span>
-    }
+            .<span class="kw">await
+    </span>}
 }
 
-<span class="doccomment">/// The Outpace contract</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Initialized and ready for calling contract with [`Web3&lt;Http&gt;`].</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Outpace</span> {
-    <span class="kw">pub</span> <span class="ident">contract</span>: <span class="ident">Contract</span><span class="op">&lt;</span><span class="ident">Http</span><span class="op">&gt;</span>,
-    <span class="kw">pub</span> <span class="ident">address</span>: <span class="ident">Address</span>,
+<span class="doccomment">/// The Outpace contract
+///
+/// Initialized and ready for calling contract with [`Web3&lt;Http&gt;`].
+</span><span class="attribute">#[derive(Debug, Clone)]</span>
+<span class="kw">pub struct </span>Outpace {
+    <span class="kw">pub </span>contract: Contract&lt;Http&gt;,
+    <span class="kw">pub </span>address: Address,
 }
 
-<span class="kw">impl</span> <span class="ident">Outpace</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">web3</span>: <span class="kw-2">&amp;</span><span class="ident">Web3</span><span class="op">&lt;</span><span class="ident">Http</span><span class="op">&gt;</span>, <span class="ident">outpace_address</span>: <span class="ident">Address</span>) -&gt; <span class="self">Self</span> {
-        <span class="kw">let</span> <span class="ident">outpace_contract</span> <span class="op">=</span>
-            <span class="ident">Contract::from_json</span>(<span class="ident">web3</span>.<span class="ident">eth</span>(), <span class="ident">outpace_address</span>.<span class="ident">as_bytes</span>().<span class="ident">into</span>(), <span class="kw-2">&amp;</span><span class="ident">OUTPACE_ABI</span>)
-                .<span class="ident">expect</span>(<span class="string">&quot;Failed to init Outpace contract from JSON ABI!&quot;</span>);
+<span class="kw">impl </span>Outpace {
+    <span class="kw">pub fn </span>new(web3: <span class="kw-2">&amp;</span>Web3&lt;Http&gt;, outpace_address: Address) -&gt; <span class="self">Self </span>{
+        <span class="kw">let </span>outpace_contract =
+            Contract::from_json(web3.eth(), outpace_address.as_bytes().into(), <span class="kw-2">&amp;</span>OUTPACE_ABI)
+                .expect(<span class="string">&quot;Failed to init Outpace contract from JSON ABI!&quot;</span>);
 
-        <span class="self">Self</span> {
-            <span class="ident">address</span>: <span class="ident">outpace_address</span>,
-            <span class="ident">contract</span>: <span class="ident">outpace_contract</span>,
+        <span class="self">Self </span>{
+            address: outpace_address,
+            contract: outpace_contract,
         }
     }
 
-    <span class="doccomment">/// Deploys the Outpace contract from [`LEADER`]</span>
-    <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">deploy</span>(<span class="ident">web3</span>: <span class="kw-2">&amp;</span><span class="ident">Web3</span><span class="op">&lt;</span><span class="ident">Http</span><span class="op">&gt;</span>) -&gt; <span class="ident">web3::contract::Result</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">outpace_contract</span> <span class="op">=</span> <span class="ident">Contract::deploy</span>(<span class="ident">web3</span>.<span class="ident">eth</span>(), <span class="kw-2">&amp;</span><span class="ident">OUTPACE_ABI</span>)
-            .<span class="ident">expect</span>(<span class="string">&quot;Invalid ABI of Outpace contract&quot;</span>)
-            .<span class="ident">confirmations</span>(<span class="number">0</span>)
-            .<span class="ident">options</span>(<span class="ident">ContractOptions::with</span>(<span class="op">|</span><span class="ident">opt</span><span class="op">|</span> {
-                <span class="ident">opt</span>.<span class="ident">gas_price</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="number">1</span>.<span class="ident">into</span>());
-                <span class="ident">opt</span>.<span class="ident">gas</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="number">6_721_975</span>.<span class="ident">into</span>());
+    <span class="doccomment">/// Deploys the Outpace contract from [`LEADER`]
+    </span><span class="kw">pub async fn </span>deploy(web3: <span class="kw-2">&amp;</span>Web3&lt;Http&gt;) -&gt; web3::contract::Result&lt;<span class="self">Self</span>&gt; {
+        <span class="kw">let </span>outpace_contract = Contract::deploy(web3.eth(), <span class="kw-2">&amp;</span>OUTPACE_ABI)
+            .expect(<span class="string">&quot;Invalid ABI of Outpace contract&quot;</span>)
+            .confirmations(<span class="number">0</span>)
+            .options(ContractOptions::with(|opt| {
+                opt.gas_price = <span class="prelude-val">Some</span>(<span class="number">1</span>.into());
+                opt.gas = <span class="prelude-val">Some</span>(<span class="number">6_721_975</span>.into());
             }))
-            .<span class="ident">execute</span>(<span class="kw-2">*</span><span class="ident">OUTPACE_BYTECODE</span>, (), <span class="ident">H160</span>(<span class="ident">LEADER</span>.<span class="ident">to_bytes</span>()))
+            .execute(<span class="kw-2">*</span>OUTPACE_BYTECODE, (), H160(LEADER.to_bytes()))
             .<span class="kw">await</span><span class="question-mark">?</span>;
 
-        <span class="kw">let</span> <span class="ident">outpace_address</span> <span class="op">=</span> <span class="ident">Address::from</span>(<span class="ident">outpace_contract</span>.<span class="ident">address</span>().<span class="ident">to_fixed_bytes</span>());
+        <span class="kw">let </span>outpace_address = Address::from(outpace_contract.address().to_fixed_bytes());
 
-        <span class="prelude-val">Ok</span>(<span class="self">Self</span> {
-            <span class="ident">address</span>: <span class="ident">outpace_address</span>,
-            <span class="ident">contract</span>: <span class="ident">outpace_contract</span>,
+        <span class="prelude-val">Ok</span>(<span class="self">Self </span>{
+            address: outpace_address,
+            contract: outpace_contract,
         })
     }
 
-    <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">deposit</span>(
+    <span class="kw">pub async fn </span>deposit(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">channel</span>: <span class="kw-2">&amp;</span><span class="ident">Channel</span>,
-        <span class="ident">to</span>: [<span class="ident">u8</span>; <span class="number">20</span>],
-        <span class="ident">amount</span>: <span class="kw-2">&amp;</span><span class="ident">BigNum</span>,
-    ) -&gt; <span class="ident">web3::contract::Result</span><span class="op">&lt;</span><span class="ident">H256</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">amount</span> <span class="op">=</span> <span class="ident">U256::from_dec_str</span>(<span class="kw-2">&amp;</span><span class="ident">amount</span>.<span class="ident">to_string</span>()).<span class="ident">expect</span>(<span class="string">&quot;Should create U256&quot;</span>);
+        channel: <span class="kw-2">&amp;</span>Channel,
+        to: [u8; <span class="number">20</span>],
+        amount: <span class="kw-2">&amp;</span>BigNum,
+    ) -&gt; web3::contract::Result&lt;H256&gt; {
+        <span class="kw">let </span>amount = U256::from_dec_str(<span class="kw-2">&amp;</span>amount.to_string()).expect(<span class="string">&quot;Should create U256&quot;</span>);
 
-        <span class="self">self</span>.<span class="ident">contract</span>
-            .<span class="ident">call</span>(
+        <span class="self">self</span>.contract
+            .call(
                 <span class="string">&quot;deposit&quot;</span>,
-                (<span class="ident">channel</span>.<span class="ident">tokenize</span>(), <span class="ident">H160</span>(<span class="ident">to</span>), <span class="ident">amount</span>),
-                <span class="ident">H160</span>(<span class="ident">to</span>),
-                <span class="ident">ContractOptions::with</span>(<span class="op">|</span><span class="ident">opt</span><span class="op">|</span> {
-                    <span class="ident">opt</span>.<span class="ident">gas_price</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="number">1</span>.<span class="ident">into</span>());
-                    <span class="ident">opt</span>.<span class="ident">gas</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="number">6_721_975</span>.<span class="ident">into</span>());
+                (channel.tokenize(), H160(to), amount),
+                H160(to),
+                ContractOptions::with(|opt| {
+                    opt.gas_price = <span class="prelude-val">Some</span>(<span class="number">1</span>.into());
+                    opt.gas = <span class="prelude-val">Some</span>(<span class="number">6_721_975</span>.into());
                 }),
             )
-            .<span class="kw">await</span>
-    }
+            .<span class="kw">await
+    </span>}
 }
 
-<span class="doccomment">/// Deploys the Identity contract for the give `for_address`</span>
-<span class="doccomment">/// Adds privileges by the constructor for the `add_privileges_to` addresses</span>
-<span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">deploy_identity_contract</span>(
-    <span class="ident">web3</span>: <span class="kw-2">&amp;</span><span class="ident">Web3</span><span class="op">&lt;</span><span class="ident">Http</span><span class="op">&gt;</span>,
-    <span class="ident">for_address</span>: <span class="ident">Address</span>,
-    <span class="ident">add_privileges_to</span>: <span class="kw-2">&amp;</span>[<span class="ident">Address</span>],
-) -&gt; <span class="ident">web3::contract::Result</span><span class="op">&lt;</span>(<span class="ident">Address</span>, <span class="ident">Contract</span><span class="op">&lt;</span><span class="ident">Http</span><span class="op">&gt;</span>)<span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">add_privileges_to</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">add_privileges_to</span>
-        .<span class="ident">iter</span>()
-        .<span class="ident">map</span>(<span class="op">|</span><span class="ident">a</span><span class="op">|</span> <span class="ident">Token::Address</span>(<span class="ident">H160</span>(<span class="ident">a</span>.<span class="ident">to_bytes</span>())))
-        .<span class="ident">collect</span>();
+<span class="doccomment">/// Deploys the Identity contract for the give `for_address`
+/// Adds privileges by the constructor for the `add_privileges_to` addresses
+</span><span class="kw">pub async fn </span>deploy_identity_contract(
+    web3: <span class="kw-2">&amp;</span>Web3&lt;Http&gt;,
+    for_address: Address,
+    add_privileges_to: <span class="kw-2">&amp;</span>[Address],
+) -&gt; web3::contract::Result&lt;(Address, Contract&lt;Http&gt;)&gt; {
+    <span class="kw">let </span>add_privileges_to: Vec&lt;<span class="kw">_</span>&gt; = add_privileges_to
+        .iter()
+        .map(|a| Token::Address(H160(a.to_bytes())))
+        .collect();
 
-    <span class="kw">let</span> <span class="ident">identity_contract</span> <span class="op">=</span> <span class="ident">Contract::deploy</span>(<span class="ident">web3</span>.<span class="ident">eth</span>(), <span class="kw-2">&amp;</span><span class="ident">IDENTITY_ABI</span>)
-        .<span class="ident">expect</span>(<span class="string">&quot;Invalid ABI of Identity contract&quot;</span>)
-        .<span class="ident">confirmations</span>(<span class="number">0</span>)
-        .<span class="ident">options</span>(<span class="ident">ContractOptions::with</span>(<span class="op">|</span><span class="ident">opt</span><span class="op">|</span> {
-            <span class="ident">opt</span>.<span class="ident">gas_price</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="number">1</span>.<span class="ident">into</span>());
-            <span class="ident">opt</span>.<span class="ident">gas</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="number">6_721_975</span>.<span class="ident">into</span>());
+    <span class="kw">let </span>identity_contract = Contract::deploy(web3.eth(), <span class="kw-2">&amp;</span>IDENTITY_ABI)
+        .expect(<span class="string">&quot;Invalid ABI of Identity contract&quot;</span>)
+        .confirmations(<span class="number">0</span>)
+        .options(ContractOptions::with(|opt| {
+            opt.gas_price = <span class="prelude-val">Some</span>(<span class="number">1</span>.into());
+            opt.gas = <span class="prelude-val">Some</span>(<span class="number">6_721_975</span>.into());
         }))
-        .<span class="ident">execute</span>(
-            <span class="kw-2">*</span><span class="ident">IDENTITY_BYTECODE</span>,
-            <span class="ident">Token::Array</span>(<span class="ident">add_privileges_to</span>),
-            <span class="ident">H160</span>(<span class="ident">for_address</span>.<span class="ident">to_bytes</span>()),
+        .execute(
+            <span class="kw-2">*</span>IDENTITY_BYTECODE,
+            Token::Array(add_privileges_to),
+            H160(for_address.to_bytes()),
         )
         .<span class="kw">await</span><span class="question-mark">?</span>;
 
-    <span class="kw">let</span> <span class="ident">identity_address</span> <span class="op">=</span> <span class="ident">Address::from</span>(<span class="ident">identity_contract</span>.<span class="ident">address</span>().<span class="ident">to_fixed_bytes</span>());
+    <span class="kw">let </span>identity_address = Address::from(identity_contract.address().to_fixed_bytes());
 
-    <span class="prelude-val">Ok</span>((<span class="ident">identity_address</span>, <span class="ident">identity_contract</span>))
+    <span class="prelude-val">Ok</span>((identity_address, identity_contract))
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="adapter" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (20ffea693 2022-08-11)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="adapter" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>

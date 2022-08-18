@@ -489,370 +489,370 @@
 <span id="489">489</span>
 <span id="490">490</span>
 <span id="491">491</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="self">self</span>::campaign::FullCampaign</span>;
+</pre><pre class="rust"><code><span class="kw">use </span><span class="self">self</span>::campaign::FullCampaign;
 
-<span class="kw">use</span> <span class="kw">super</span>::{<span class="ident">Error</span>, <span class="ident">Value</span>};
-<span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">sentry::EventType</span>, <span class="ident">Address</span>, <span class="ident">IPFS</span>};
-<span class="kw">use</span> <span class="ident">chrono</span>::{<span class="ident">serde::ts_seconds</span>, <span class="ident">DateTime</span>, <span class="ident">Utc</span>};
-<span class="kw">use</span> <span class="ident">serde</span>::{<span class="ident">Deserialize</span>, <span class="ident">Serialize</span>};
+<span class="kw">use super</span>::{Error, Value};
+<span class="kw">use crate</span>::{sentry::EventType, Address, IPFS};
+<span class="kw">use </span>chrono::{serde::ts_seconds, DateTime, Utc};
+<span class="kw">use </span>serde::{Deserialize, Serialize};
 
-<span class="kw">use</span> <span class="ident">field</span>::{<span class="ident">Field</span>, <span class="ident">GetField</span>};
+<span class="kw">use </span>field::{Field, GetField};
 
-<span class="macro">serde_with::with_prefix!</span>(<span class="ident">adview_prefix</span> <span class="string">&quot;adView.&quot;</span>);
-<span class="macro">serde_with::with_prefix!</span>(<span class="ident">adslot_prefix</span> <span class="string">&quot;adSlot.&quot;</span>);
+<span class="macro">serde_with::with_prefix!</span>(adview_prefix <span class="string">&quot;adView.&quot;</span>);
+<span class="macro">serde_with::with_prefix!</span>(adslot_prefix <span class="string">&quot;adSlot.&quot;</span>);
 
-<span class="kw">pub</span> <span class="kw">type</span> <span class="ident">Map</span> <span class="op">=</span> <span class="ident">serde_json::Map</span><span class="op">&lt;</span><span class="ident">String</span>, <span class="ident">serde_json::Value</span><span class="op">&gt;</span>;
+<span class="kw">pub type </span>Map = serde_json::Map&lt;String, serde_json::Value&gt;;
 
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">field</span>;
+<span class="kw">pub mod </span>field;
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">Deserialize</span>, <span class="ident">PartialEq</span>)]</span>
-<span class="attribute">#[<span class="ident">serde</span>(<span class="ident">untagged</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">Get</span><span class="op">&lt;</span><span class="ident">G</span>, <span class="ident">V</span><span class="op">&gt;</span> {
-    <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">skip_deserializing</span>)]</span>
-    <span class="doccomment">/// We don&#39;t want to deserialize a Getter, we only deserialize Values</span>
-    <span class="doccomment">/// This will ensure that we only use a Map of values with `Get::Value` when we deserialize</span>
-    <span class="ident">Getter</span>(<span class="ident">G</span>),
-    <span class="ident">Value</span>(<span class="ident">V</span>),
+<span class="attribute">#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]</span>
+<span class="attribute">#[serde(untagged)]</span>
+<span class="kw">pub enum </span>Get&lt;G, V&gt; {
+    <span class="attribute">#[serde(skip_deserializing)]</span>
+    <span class="doccomment">/// We don&#39;t want to deserialize a Getter, we only deserialize Values
+    /// This will ensure that we only use a Map of values with `Get::Value` when we deserialize
+    </span>Getter(G),
+    Value(V),
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">PartialEq</span>)]</span>
-<span class="doccomment">/// Input is deserializable from the struct, however we should be careful,</span>
-<span class="doccomment">/// since all the fields should align with the enum Field</span>
-<span class="attribute">#[<span class="ident">serde</span>(<span class="ident">rename_all</span> <span class="op">=</span> <span class="string">&quot;camelCase&quot;</span>, <span class="ident">into</span> <span class="op">=</span> <span class="string">&quot;Map&quot;</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Input</span> {
-    <span class="doccomment">/// AdView scope, accessible only on the AdView</span>
-    <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">flatten</span>, <span class="ident">with</span> <span class="op">=</span> <span class="string">&quot;adview_prefix&quot;</span>)]</span>
-    <span class="kw">pub</span> <span class="ident">ad_view</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">AdView</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// Global scope, accessible everywhere</span>
-    <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">flatten</span>)]</span>
-    <span class="kw">pub</span> <span class="ident">global</span>: <span class="ident">Global</span>,
-    <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">flatten</span>)]</span>
-    <span class="kw">pub</span> <span class="ident">campaign</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">campaign::GetCampaign</span><span class="op">&gt;</span>,
-    <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">flatten</span>)]</span>
-    <span class="kw">pub</span> <span class="ident">balances</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">balances::GetBalances</span><span class="op">&gt;</span>,
-    <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">skip_serializing_if</span> <span class="op">=</span> <span class="string">&quot;Option::is_none&quot;</span>)]</span>
-    <span class="kw">pub</span> <span class="ident">ad_unit_id</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">IPFS</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// adSlot scope, accessible on Supermarket and AdView</span>
-    <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">flatten</span>, <span class="ident">with</span> <span class="op">=</span> <span class="string">&quot;adslot_prefix&quot;</span>)]</span>
-    <span class="kw">pub</span> <span class="ident">ad_slot</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">AdSlot</span><span class="op">&gt;</span>,
+<span class="attribute">#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]</span>
+<span class="doccomment">/// Input is deserializable from the struct, however we should be careful,
+/// since all the fields should align with the enum Field
+</span><span class="attribute">#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>, into = <span class="string">&quot;Map&quot;</span>)]</span>
+<span class="kw">pub struct </span>Input {
+    <span class="doccomment">/// AdView scope, accessible only on the AdView
+    </span><span class="attribute">#[serde(flatten, with = <span class="string">&quot;adview_prefix&quot;</span>)]</span>
+    <span class="kw">pub </span>ad_view: <span class="prelude-ty">Option</span>&lt;AdView&gt;,
+    <span class="doccomment">/// Global scope, accessible everywhere
+    </span><span class="attribute">#[serde(flatten)]</span>
+    <span class="kw">pub </span>global: Global,
+    <span class="attribute">#[serde(flatten)]</span>
+    <span class="kw">pub </span>campaign: <span class="prelude-ty">Option</span>&lt;campaign::GetCampaign&gt;,
+    <span class="attribute">#[serde(flatten)]</span>
+    <span class="kw">pub </span>balances: <span class="prelude-ty">Option</span>&lt;balances::GetBalances&gt;,
+    <span class="attribute">#[serde(skip_serializing_if = <span class="string">&quot;Option::is_none&quot;</span>)]</span>
+    <span class="kw">pub </span>ad_unit_id: <span class="prelude-ty">Option</span>&lt;IPFS&gt;,
+    <span class="doccomment">/// adSlot scope, accessible on Supermarket and AdView
+    </span><span class="attribute">#[serde(flatten, with = <span class="string">&quot;adslot_prefix&quot;</span>)]</span>
+    <span class="kw">pub </span>ad_slot: <span class="prelude-ty">Option</span>&lt;AdSlot&gt;,
 }
 
-<span class="kw">impl</span> <span class="ident">Input</span> {
-    <span class="doccomment">/// Sets the Channel Getter</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">with_campaign</span>(<span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">campaign</span>: <span class="ident"><span class="kw">crate</span>::Campaign</span>) -&gt; <span class="self">Self</span> {
-        <span class="self">self</span>.<span class="ident">campaign</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">Get::Getter</span>(<span class="ident">FullCampaign</span> {
-            <span class="ident">campaign</span>,
-            <span class="ident">event_type</span>: <span class="self">self</span>.<span class="ident">global</span>.<span class="ident">event_type</span>,
+<span class="kw">impl </span>Input {
+    <span class="doccomment">/// Sets the Channel Getter
+    </span><span class="kw">pub fn </span>with_campaign(<span class="kw-2">mut </span><span class="self">self</span>, campaign: <span class="kw">crate</span>::Campaign) -&gt; <span class="self">Self </span>{
+        <span class="self">self</span>.campaign = <span class="prelude-val">Some</span>(Get::Getter(FullCampaign {
+            campaign,
+            event_type: <span class="self">self</span>.global.event_type,
         }));
 
-        <span class="self">self</span>
-    }
+        <span class="self">self
+    </span>}
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">with_balances</span>(<span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">balances</span>: <span class="ident"><span class="kw">crate</span>::UnifiedMap</span>) -&gt; <span class="self">Self</span> {
-        <span class="self">self</span>.<span class="ident">balances</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">Get::Getter</span>(<span class="ident">balances::Getter</span> {
-            <span class="ident">balances</span>,
-            <span class="ident">publisher_id</span>: <span class="self">self</span>.<span class="ident">global</span>.<span class="ident">publisher_id</span>,
+    <span class="kw">pub fn </span>with_balances(<span class="kw-2">mut </span><span class="self">self</span>, balances: <span class="kw">crate</span>::UnifiedMap) -&gt; <span class="self">Self </span>{
+        <span class="self">self</span>.balances = <span class="prelude-val">Some</span>(Get::Getter(balances::Getter {
+            balances,
+            publisher_id: <span class="self">self</span>.global.publisher_id,
         }));
 
-        <span class="self">self</span>
+        <span class="self">self
+    </span>}
+
+    <span class="doccomment">/// This method will try to parse the `Field` from the string
+    /// then it will get the field value, but there isn&#39;t one,
+    /// it will return `Error::UnknownVariable`, otherwise it will return the value
+    </span><span class="kw">pub fn </span>try_get(<span class="kw-2">&amp;</span><span class="self">self</span>, field: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Result</span>&lt;Value, Error&gt; {
+        <span class="kw">let </span>field = field.parse::&lt;Field&gt;().map_err(|<span class="kw">_</span>| Error::UnknownVariable)<span class="question-mark">?</span>;
+
+        <span class="self">self</span>.get(<span class="kw-2">&amp;</span>field).ok_or(Error::UnknownVariable)
     }
 
-    <span class="doccomment">/// This method will try to parse the `Field` from the string</span>
-    <span class="doccomment">/// then it will get the field value, but there isn&#39;t one,</span>
-    <span class="doccomment">/// it will return `Error::UnknownVariable`, otherwise it will return the value</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">try_get</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">field</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Value</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">field</span> <span class="op">=</span> <span class="ident">field</span>.<span class="ident">parse</span>::<span class="op">&lt;</span><span class="ident">Field</span><span class="op">&gt;</span>().<span class="ident">map_err</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">Error::UnknownVariable</span>)<span class="question-mark">?</span>;
-
-        <span class="self">self</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">field</span>).<span class="ident">ok_or</span>(<span class="ident">Error::UnknownVariable</span>)
-    }
-
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">to_map</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Map</span> {
-        <span class="ident">field::FIELDS</span>
-            .<span class="ident">iter</span>()
-            .<span class="ident">filter_map</span>(<span class="op">|</span><span class="ident">field</span><span class="op">|</span> {
-                <span class="self">self</span>.<span class="ident">get</span>(<span class="ident">field</span>)
-                    .<span class="ident">map</span>(<span class="op">|</span><span class="ident">value</span><span class="op">|</span> (<span class="ident">field</span>.<span class="ident">to_string</span>(), <span class="ident">value</span>.<span class="ident">into</span>()))
+    <span class="kw">pub fn </span>to_map(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Map {
+        field::FIELDS
+            .iter()
+            .filter_map(|field| {
+                <span class="self">self</span>.get(field)
+                    .map(|value| (field.to_string(), value.into()))
             })
-            .<span class="ident">collect</span>()
+            .collect()
     }
 }
 
-<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">Input</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Map</span> {
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">input</span>: <span class="ident">Input</span>) -&gt; <span class="self">Self</span> {
-        <span class="ident">input</span>.<span class="ident">to_map</span>()
+<span class="kw">impl </span>From&lt;Input&gt; <span class="kw">for </span>Map {
+    <span class="kw">fn </span>from(input: Input) -&gt; <span class="self">Self </span>{
+        input.to_map()
     }
 }
 
-<span class="kw">impl</span> <span class="ident">GetField</span> <span class="kw">for</span> <span class="ident">Input</span> {
-    <span class="kw">type</span> <span class="ident">Output</span> <span class="op">=</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Value</span><span class="op">&gt;</span>;
-    <span class="kw">type</span> <span class="ident">Field</span> <span class="op">=</span> <span class="ident">Field</span>;
+<span class="kw">impl </span>GetField <span class="kw">for </span>Input {
+    <span class="kw">type </span>Output = <span class="prelude-ty">Option</span>&lt;Value&gt;;
+    <span class="kw">type </span>Field = Field;
 
-    <span class="kw">fn</span> <span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">field</span>: <span class="kw-2">&amp;</span><span class="ident"><span class="self">Self</span>::Field</span>) -&gt; <span class="ident"><span class="self">Self</span>::Output</span> {
-        <span class="kw">match</span> <span class="ident">field</span> {
-            <span class="ident">Field::AdView</span>(<span class="ident">ad_view</span>) =&gt; <span class="self">self</span>.<span class="ident">ad_view</span>.<span class="ident">get</span>(<span class="ident">ad_view</span>),
-            <span class="ident">Field::Global</span>(<span class="ident">global</span>) =&gt; <span class="self">self</span>.<span class="ident">global</span>.<span class="ident">get</span>(<span class="ident">global</span>),
-            <span class="ident">Field::Campaign</span>(<span class="ident">channel</span>) =&gt; <span class="self">self</span>.<span class="ident">campaign</span>.<span class="ident">get</span>(<span class="ident">channel</span>).<span class="ident">flatten</span>(),
-            <span class="ident">Field::Balances</span>(<span class="ident">balances</span>) =&gt; <span class="self">self</span>.<span class="ident">balances</span>.<span class="ident">get</span>(<span class="ident">balances</span>).<span class="ident">flatten</span>(),
-            <span class="ident">Field::AdSlot</span>(<span class="ident">ad_slot</span>) =&gt; <span class="self">self</span>.<span class="ident">ad_slot</span>.<span class="ident">get</span>(<span class="ident">ad_slot</span>).<span class="ident">flatten</span>(),
-            <span class="ident">Field::AdUnit</span>(<span class="ident">ad_unit</span>) =&gt; <span class="kw">match</span> <span class="ident">ad_unit</span> {
-                <span class="ident">field::AdUnit::AdUnitId</span> =&gt; <span class="self">self</span>
-                    .<span class="ident">ad_unit_id</span>
-                    .<span class="ident">as_ref</span>()
-                    .<span class="ident">map</span>(<span class="op">|</span><span class="ident">ipfs</span><span class="op">|</span> <span class="ident">Value::String</span>(<span class="ident">ipfs</span>.<span class="ident">to_string</span>())),
+    <span class="kw">fn </span>get(<span class="kw-2">&amp;</span><span class="self">self</span>, field: <span class="kw-2">&amp;</span><span class="self">Self</span>::Field) -&gt; <span class="self">Self</span>::Output {
+        <span class="kw">match </span>field {
+            Field::AdView(ad_view) =&gt; <span class="self">self</span>.ad_view.get(ad_view),
+            Field::Global(global) =&gt; <span class="self">self</span>.global.get(global),
+            Field::Campaign(channel) =&gt; <span class="self">self</span>.campaign.get(channel).flatten(),
+            Field::Balances(balances) =&gt; <span class="self">self</span>.balances.get(balances).flatten(),
+            Field::AdSlot(ad_slot) =&gt; <span class="self">self</span>.ad_slot.get(ad_slot).flatten(),
+            Field::AdUnit(ad_unit) =&gt; <span class="kw">match </span>ad_unit {
+                field::AdUnit::AdUnitId =&gt; <span class="self">self
+                    </span>.ad_unit_id
+                    .as_ref()
+                    .map(|ipfs| Value::String(ipfs.to_string())),
             },
         }
     }
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>)]</span>
-<span class="attribute">#[<span class="ident">serde</span>(<span class="ident">rename_all</span> <span class="op">=</span> <span class="string">&quot;camelCase&quot;</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">AdView</span> {
-    <span class="kw">pub</span> <span class="ident">seconds_since_campaign_impression</span>: <span class="ident">u64</span>,
-    <span class="kw">pub</span> <span class="ident">has_custom_preferences</span>: <span class="ident">bool</span>,
-    <span class="kw">pub</span> <span class="ident">navigator_language</span>: <span class="ident">String</span>,
+<span class="attribute">#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]</span>
+<span class="attribute">#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]</span>
+<span class="kw">pub struct </span>AdView {
+    <span class="kw">pub </span>seconds_since_campaign_impression: u64,
+    <span class="kw">pub </span>has_custom_preferences: bool,
+    <span class="kw">pub </span>navigator_language: String,
 }
 
-<span class="kw">impl</span> <span class="ident">GetField</span> <span class="kw">for</span> <span class="ident">AdView</span> {
-    <span class="kw">type</span> <span class="ident">Output</span> <span class="op">=</span> <span class="ident">Value</span>;
-    <span class="kw">type</span> <span class="ident">Field</span> <span class="op">=</span> <span class="ident">field::AdView</span>;
+<span class="kw">impl </span>GetField <span class="kw">for </span>AdView {
+    <span class="kw">type </span>Output = Value;
+    <span class="kw">type </span>Field = field::AdView;
 
-    <span class="kw">fn</span> <span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">field</span>: <span class="kw-2">&amp;</span><span class="ident"><span class="self">Self</span>::Field</span>) -&gt; <span class="ident"><span class="self">Self</span>::Output</span> {
-        <span class="kw">match</span> <span class="ident">field</span> {
-            <span class="ident">field::AdView::SecondsSinceCampaignImpression</span> =&gt; {
-                <span class="ident">Value::Number</span>(<span class="self">self</span>.<span class="ident">seconds_since_campaign_impression</span>.<span class="ident">into</span>())
+    <span class="kw">fn </span>get(<span class="kw-2">&amp;</span><span class="self">self</span>, field: <span class="kw-2">&amp;</span><span class="self">Self</span>::Field) -&gt; <span class="self">Self</span>::Output {
+        <span class="kw">match </span>field {
+            field::AdView::SecondsSinceCampaignImpression =&gt; {
+                Value::Number(<span class="self">self</span>.seconds_since_campaign_impression.into())
             }
-            <span class="ident">field::AdView::HasCustomPreferences</span> =&gt; <span class="ident">Value::Bool</span>(<span class="self">self</span>.<span class="ident">has_custom_preferences</span>),
-            <span class="ident">field::AdView::NavigatorLanguage</span> =&gt; <span class="ident">Value::String</span>(<span class="self">self</span>.<span class="ident">navigator_language</span>.<span class="ident">clone</span>()),
+            field::AdView::HasCustomPreferences =&gt; Value::Bool(<span class="self">self</span>.has_custom_preferences),
+            field::AdView::NavigatorLanguage =&gt; Value::String(<span class="self">self</span>.navigator_language.clone()),
         }
     }
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>)]</span>
-<span class="attribute">#[<span class="ident">serde</span>(<span class="ident">rename_all</span> <span class="op">=</span> <span class="string">&quot;camelCase&quot;</span>)]</span>
-<span class="doccomment">/// Global scope, accessible everywhere</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Global</span> {
-    <span class="doccomment">/// We still use `String`, because the `Event`s have an `Option`al `AdSlot` value.</span>
-    <span class="kw">pub</span> <span class="ident">ad_slot_id</span>: <span class="ident">IPFS</span>,
-    <span class="kw">pub</span> <span class="ident">ad_slot_type</span>: <span class="ident">String</span>,
-    <span class="kw">pub</span> <span class="ident">publisher_id</span>: <span class="ident">Address</span>,
-    <span class="kw">pub</span> <span class="ident">country</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>,
-    <span class="kw">pub</span> <span class="ident">event_type</span>: <span class="ident">EventType</span>,
-    <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">with</span> <span class="op">=</span> <span class="string">&quot;ts_seconds&quot;</span>)]</span>
-    <span class="kw">pub</span> <span class="ident">seconds_since_epoch</span>: <span class="ident">DateTime</span><span class="op">&lt;</span><span class="ident">Utc</span><span class="op">&gt;</span>,
-    <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">rename</span> <span class="op">=</span> <span class="string">&quot;userAgentOS&quot;</span>)]</span>
-    <span class="kw">pub</span> <span class="ident">user_agent_os</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>,
-    <span class="kw">pub</span> <span class="ident">user_agent_browser_family</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>,
+<span class="attribute">#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]</span>
+<span class="attribute">#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]</span>
+<span class="doccomment">/// Global scope, accessible everywhere
+</span><span class="kw">pub struct </span>Global {
+    <span class="doccomment">/// We still use `String`, because the `Event`s have an `Option`al `AdSlot` value.
+    </span><span class="kw">pub </span>ad_slot_id: IPFS,
+    <span class="kw">pub </span>ad_slot_type: String,
+    <span class="kw">pub </span>publisher_id: Address,
+    <span class="kw">pub </span>country: <span class="prelude-ty">Option</span>&lt;String&gt;,
+    <span class="kw">pub </span>event_type: EventType,
+    <span class="attribute">#[serde(with = <span class="string">&quot;ts_seconds&quot;</span>)]</span>
+    <span class="kw">pub </span>seconds_since_epoch: DateTime&lt;Utc&gt;,
+    <span class="attribute">#[serde(rename = <span class="string">&quot;userAgentOS&quot;</span>)]</span>
+    <span class="kw">pub </span>user_agent_os: <span class="prelude-ty">Option</span>&lt;String&gt;,
+    <span class="kw">pub </span>user_agent_browser_family: <span class="prelude-ty">Option</span>&lt;String&gt;,
 }
 
-<span class="kw">impl</span> <span class="ident">GetField</span> <span class="kw">for</span> <span class="ident">Global</span> {
-    <span class="kw">type</span> <span class="ident">Output</span> <span class="op">=</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Value</span><span class="op">&gt;</span>;
-    <span class="kw">type</span> <span class="ident">Field</span> <span class="op">=</span> <span class="ident">field::Global</span>;
+<span class="kw">impl </span>GetField <span class="kw">for </span>Global {
+    <span class="kw">type </span>Output = <span class="prelude-ty">Option</span>&lt;Value&gt;;
+    <span class="kw">type </span>Field = field::Global;
 
-    <span class="kw">fn</span> <span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">field</span>: <span class="kw-2">&amp;</span><span class="ident"><span class="self">Self</span>::Field</span>) -&gt; <span class="ident"><span class="self">Self</span>::Output</span> {
-        <span class="kw">match</span> <span class="ident">field</span> {
-            <span class="ident">field::Global::AdSlotId</span> =&gt; <span class="prelude-val">Some</span>(<span class="ident">Value::String</span>(<span class="self">self</span>.<span class="ident">ad_slot_id</span>.<span class="ident">to_string</span>())),
-            <span class="ident">field::Global::AdSlotType</span> =&gt; <span class="prelude-val">Some</span>(<span class="ident">Value::String</span>(<span class="self">self</span>.<span class="ident">ad_slot_type</span>.<span class="ident">clone</span>())),
-            <span class="ident">field::Global::PublisherId</span> =&gt; <span class="prelude-val">Some</span>(<span class="ident">Value::String</span>(<span class="self">self</span>.<span class="ident">publisher_id</span>.<span class="ident">to_string</span>())),
-            <span class="ident">field::Global::Country</span> =&gt; <span class="self">self</span>.<span class="ident">country</span>.<span class="ident">clone</span>().<span class="ident">map</span>(<span class="ident">Value::String</span>),
-            <span class="ident">field::Global::EventType</span> =&gt; <span class="prelude-val">Some</span>(<span class="ident">Value::String</span>(<span class="self">self</span>.<span class="ident">event_type</span>.<span class="ident">to_string</span>())),
-            <span class="ident">field::Global::SecondsSinceEpoch</span> =&gt; {
-                <span class="comment">// no need to convert to u64, this value should always be positive</span>
-                <span class="prelude-val">Some</span>(<span class="ident">Value::new_number</span>(<span class="self">self</span>.<span class="ident">seconds_since_epoch</span>.<span class="ident">timestamp</span>()))
+    <span class="kw">fn </span>get(<span class="kw-2">&amp;</span><span class="self">self</span>, field: <span class="kw-2">&amp;</span><span class="self">Self</span>::Field) -&gt; <span class="self">Self</span>::Output {
+        <span class="kw">match </span>field {
+            field::Global::AdSlotId =&gt; <span class="prelude-val">Some</span>(Value::String(<span class="self">self</span>.ad_slot_id.to_string())),
+            field::Global::AdSlotType =&gt; <span class="prelude-val">Some</span>(Value::String(<span class="self">self</span>.ad_slot_type.clone())),
+            field::Global::PublisherId =&gt; <span class="prelude-val">Some</span>(Value::String(<span class="self">self</span>.publisher_id.to_string())),
+            field::Global::Country =&gt; <span class="self">self</span>.country.clone().map(Value::String),
+            field::Global::EventType =&gt; <span class="prelude-val">Some</span>(Value::String(<span class="self">self</span>.event_type.to_string())),
+            field::Global::SecondsSinceEpoch =&gt; {
+                <span class="comment">// no need to convert to u64, this value should always be positive
+                </span><span class="prelude-val">Some</span>(Value::new_number(<span class="self">self</span>.seconds_since_epoch.timestamp()))
             }
-            <span class="ident">field::Global::UserAgentOS</span> =&gt; <span class="self">self</span>.<span class="ident">user_agent_os</span>.<span class="ident">clone</span>().<span class="ident">map</span>(<span class="ident">Value::String</span>),
-            <span class="ident">field::Global::UserAgentBrowserFamily</span> =&gt; {
-                <span class="self">self</span>.<span class="ident">user_agent_browser_family</span>.<span class="ident">clone</span>().<span class="ident">map</span>(<span class="ident">Value::String</span>)
+            field::Global::UserAgentOS =&gt; <span class="self">self</span>.user_agent_os.clone().map(Value::String),
+            field::Global::UserAgentBrowserFamily =&gt; {
+                <span class="self">self</span>.user_agent_browser_family.clone().map(Value::String)
             }
         }
     }
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">PartialEq</span>)]</span>
-<span class="attribute">#[<span class="ident">serde</span>(<span class="ident">rename_all</span> <span class="op">=</span> <span class="string">&quot;camelCase&quot;</span>)]</span>
-<span class="doccomment">/// AdSlot scope, accessible on Supermarket and AdView</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">AdSlot</span> {
-    <span class="kw">pub</span> <span class="ident">categories</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>,
-    <span class="kw">pub</span> <span class="ident">hostname</span>: <span class="ident">String</span>,
-    <span class="kw">pub</span> <span class="ident">alexa_rank</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">f64</span><span class="op">&gt;</span>,
+<span class="attribute">#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]</span>
+<span class="attribute">#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]</span>
+<span class="doccomment">/// AdSlot scope, accessible on Supermarket and AdView
+</span><span class="kw">pub struct </span>AdSlot {
+    <span class="kw">pub </span>categories: Vec&lt;String&gt;,
+    <span class="kw">pub </span>hostname: String,
+    <span class="kw">pub </span>alexa_rank: <span class="prelude-ty">Option</span>&lt;f64&gt;,
 }
 
-<span class="kw">impl</span> <span class="ident">GetField</span> <span class="kw">for</span> <span class="ident">AdSlot</span> {
-    <span class="kw">type</span> <span class="ident">Output</span> <span class="op">=</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Value</span><span class="op">&gt;</span>;
-    <span class="kw">type</span> <span class="ident">Field</span> <span class="op">=</span> <span class="ident">field::AdSlot</span>;
+<span class="kw">impl </span>GetField <span class="kw">for </span>AdSlot {
+    <span class="kw">type </span>Output = <span class="prelude-ty">Option</span>&lt;Value&gt;;
+    <span class="kw">type </span>Field = field::AdSlot;
 
-    <span class="kw">fn</span> <span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">field</span>: <span class="kw-2">&amp;</span><span class="ident"><span class="self">Self</span>::Field</span>) -&gt; <span class="ident"><span class="self">Self</span>::Output</span> {
-        <span class="kw">match</span> <span class="ident">field</span> {
-            <span class="ident">field::AdSlot::Categories</span> =&gt; <span class="prelude-val">Some</span>(<span class="ident">Value::Array</span>(
-                <span class="self">self</span>.<span class="ident">categories</span>
-                    .<span class="ident">iter</span>()
-                    .<span class="ident">map</span>(<span class="op">|</span><span class="ident">string</span><span class="op">|</span> <span class="ident">Value::String</span>(<span class="ident">string</span>.<span class="ident">clone</span>()))
-                    .<span class="ident">collect</span>(),
+    <span class="kw">fn </span>get(<span class="kw-2">&amp;</span><span class="self">self</span>, field: <span class="kw-2">&amp;</span><span class="self">Self</span>::Field) -&gt; <span class="self">Self</span>::Output {
+        <span class="kw">match </span>field {
+            field::AdSlot::Categories =&gt; <span class="prelude-val">Some</span>(Value::Array(
+                <span class="self">self</span>.categories
+                    .iter()
+                    .map(|string| Value::String(string.clone()))
+                    .collect(),
             )),
-            <span class="ident">field::AdSlot::Hostname</span> =&gt; <span class="prelude-val">Some</span>(<span class="ident">Value::String</span>(<span class="self">self</span>.<span class="ident">hostname</span>.<span class="ident">clone</span>())),
-            <span class="ident">field::AdSlot::AlexaRank</span> =&gt; <span class="self">self</span>
-                .<span class="ident">alexa_rank</span>
-                .<span class="ident">and_then</span>(<span class="ident">serde_json::Number::from_f64</span>)
-                .<span class="ident">map</span>(<span class="ident">Value::Number</span>),
+            field::AdSlot::Hostname =&gt; <span class="prelude-val">Some</span>(Value::String(<span class="self">self</span>.hostname.clone())),
+            field::AdSlot::AlexaRank =&gt; <span class="self">self
+                </span>.alexa_rank
+                .and_then(serde_json::Number::from_f64)
+                .map(Value::Number),
         }
     }
 }
 
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">campaign</span> {
-    <span class="kw">use</span> <span class="ident">serde::Deserialize</span>;
+<span class="kw">pub mod </span>campaign {
+    <span class="kw">use </span>serde::Deserialize;
 
-    <span class="kw">use</span> <span class="kw">super</span>::{<span class="ident">field</span>, <span class="ident">Get</span>, <span class="ident">GetField</span>, <span class="ident">Value</span>};
-    <span class="kw">use</span> <span class="kw">crate</span>::{
-        <span class="ident">sentry::EventType</span>, <span class="ident">targeting::get_pricing_bounds</span>, <span class="ident">Address</span>, <span class="ident">CampaignId</span>, <span class="ident">ToHex</span>, <span class="ident">UnifiedNum</span>,
+    <span class="kw">use super</span>::{field, Get, GetField, Value};
+    <span class="kw">use crate</span>::{
+        sentry::EventType, targeting::get_pricing_bounds, Address, CampaignId, ToHex, UnifiedNum,
     };
 
-    <span class="kw">pub</span> <span class="kw">type</span> <span class="ident">GetCampaign</span> <span class="op">=</span> <span class="ident">Get</span><span class="op">&lt;</span><span class="ident">FullCampaign</span>, <span class="ident">Values</span><span class="op">&gt;</span>;
+    <span class="kw">pub type </span>GetCampaign = Get&lt;FullCampaign, Values&gt;;
 
-    <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">Deserialize</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>)]</span>
-    <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">rename_all</span> <span class="op">=</span> <span class="string">&quot;camelCase&quot;</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Values</span> {
-        <span class="kw">pub</span> <span class="ident">advertiser_id</span>: <span class="ident">Address</span>,
-        <span class="kw">pub</span> <span class="ident">campaign_id</span>: <span class="ident">CampaignId</span>,
-        <span class="kw">pub</span> <span class="ident">campaign_seconds_active</span>: <span class="ident">u64</span>,
-        <span class="kw">pub</span> <span class="ident">campaign_seconds_duration</span>: <span class="ident">u64</span>,
-        <span class="kw">pub</span> <span class="ident">campaign_budget</span>: <span class="ident">UnifiedNum</span>,
-        <span class="kw">pub</span> <span class="ident">event_min_price</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">UnifiedNum</span><span class="op">&gt;</span>,
-        <span class="kw">pub</span> <span class="ident">event_max_price</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">UnifiedNum</span><span class="op">&gt;</span>,
+    <span class="attribute">#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]</span>
+    <span class="attribute">#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]</span>
+    <span class="kw">pub struct </span>Values {
+        <span class="kw">pub </span>advertiser_id: Address,
+        <span class="kw">pub </span>campaign_id: CampaignId,
+        <span class="kw">pub </span>campaign_seconds_active: u64,
+        <span class="kw">pub </span>campaign_seconds_duration: u64,
+        <span class="kw">pub </span>campaign_budget: UnifiedNum,
+        <span class="kw">pub </span>event_min_price: <span class="prelude-ty">Option</span>&lt;UnifiedNum&gt;,
+        <span class="kw">pub </span>event_max_price: <span class="prelude-ty">Option</span>&lt;UnifiedNum&gt;,
     }
 
-    <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">PartialEq</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">FullCampaign</span> {
-        <span class="kw">pub</span> <span class="ident">campaign</span>: <span class="ident"><span class="kw">crate</span>::Campaign</span>,
-        <span class="kw">pub</span>(<span class="kw">super</span>) <span class="ident">event_type</span>: <span class="ident">EventType</span>,
+    <span class="attribute">#[derive(Debug, Clone, PartialEq)]</span>
+    <span class="kw">pub struct </span>FullCampaign {
+        <span class="kw">pub </span>campaign: <span class="kw">crate</span>::Campaign,
+        <span class="kw">pub</span>(<span class="kw">super</span>) event_type: EventType,
     }
 
-    <span class="kw">impl</span> <span class="ident">GetField</span> <span class="kw">for</span> <span class="ident">Get</span><span class="op">&lt;</span><span class="ident">FullCampaign</span>, <span class="ident">Values</span><span class="op">&gt;</span> {
-        <span class="kw">type</span> <span class="ident">Output</span> <span class="op">=</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Value</span><span class="op">&gt;</span>;
-        <span class="kw">type</span> <span class="ident">Field</span> <span class="op">=</span> <span class="ident">field::Campaign</span>;
+    <span class="kw">impl </span>GetField <span class="kw">for </span>Get&lt;FullCampaign, Values&gt; {
+        <span class="kw">type </span>Output = <span class="prelude-ty">Option</span>&lt;Value&gt;;
+        <span class="kw">type </span>Field = field::Campaign;
 
-        <span class="kw">fn</span> <span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">field</span>: <span class="kw-2">&amp;</span><span class="ident"><span class="self">Self</span>::Field</span>) -&gt; <span class="ident"><span class="self">Self</span>::Output</span> {
-            <span class="kw">match</span> <span class="ident">field</span> {
-                <span class="ident">field::Campaign::AdvertiserId</span> =&gt; <span class="prelude-val">Some</span>(<span class="ident">Value::String</span>(<span class="kw">match</span> <span class="self">self</span> {
-                    <span class="ident">Get::Getter</span>(<span class="ident">FullCampaign</span> { <span class="ident">campaign</span>, .. }) =&gt; <span class="ident">campaign</span>.<span class="ident">creator</span>.<span class="ident">to_string</span>(),
-                    <span class="ident">Get::Value</span>(<span class="ident">Values</span> { <span class="ident">advertiser_id</span>, .. }) =&gt; <span class="ident">advertiser_id</span>.<span class="ident">to_string</span>(),
+        <span class="kw">fn </span>get(<span class="kw-2">&amp;</span><span class="self">self</span>, field: <span class="kw-2">&amp;</span><span class="self">Self</span>::Field) -&gt; <span class="self">Self</span>::Output {
+            <span class="kw">match </span>field {
+                field::Campaign::AdvertiserId =&gt; <span class="prelude-val">Some</span>(Value::String(<span class="kw">match </span><span class="self">self </span>{
+                    Get::Getter(FullCampaign { campaign, .. }) =&gt; campaign.creator.to_string(),
+                    Get::Value(Values { advertiser_id, .. }) =&gt; advertiser_id.to_string(),
                 })),
-                <span class="ident">field::Campaign::CampaignId</span> =&gt; <span class="prelude-val">Some</span>(<span class="ident">Value::String</span>(<span class="kw">match</span> <span class="self">self</span> {
-                    <span class="ident">Get::Getter</span>(<span class="ident">FullCampaign</span> { <span class="ident">campaign</span>, .. }) =&gt; <span class="ident">campaign</span>.<span class="ident">id</span>.<span class="ident">to_hex_prefixed</span>(),
-                    <span class="ident">Get::Value</span>(<span class="ident">Values</span> { <span class="ident">campaign_id</span>, .. }) =&gt; <span class="ident">campaign_id</span>.<span class="ident">to_hex_prefixed</span>(),
+                field::Campaign::CampaignId =&gt; <span class="prelude-val">Some</span>(Value::String(<span class="kw">match </span><span class="self">self </span>{
+                    Get::Getter(FullCampaign { campaign, .. }) =&gt; campaign.id.to_hex_prefixed(),
+                    Get::Value(Values { campaign_id, .. }) =&gt; campaign_id.to_hex_prefixed(),
                 })),
-                <span class="ident">field::Campaign::CampaignSecondsActive</span> =&gt; <span class="prelude-val">Some</span>(<span class="ident">Value::Number</span>(<span class="kw">match</span> <span class="self">self</span> {
-                    <span class="ident">Get::Getter</span>(<span class="ident">FullCampaign</span> { <span class="ident">campaign</span>, .. }) =&gt; {
-                        <span class="kw">let</span> <span class="ident">duration</span> <span class="op">=</span>
-                            <span class="ident">chrono::Utc::now</span>() <span class="op">-</span> <span class="ident">campaign</span>.<span class="ident">active</span>.<span class="ident">from</span>.<span class="ident">unwrap_or</span>(<span class="ident">campaign</span>.<span class="ident">created</span>);
+                field::Campaign::CampaignSecondsActive =&gt; <span class="prelude-val">Some</span>(Value::Number(<span class="kw">match </span><span class="self">self </span>{
+                    Get::Getter(FullCampaign { campaign, .. }) =&gt; {
+                        <span class="kw">let </span>duration =
+                            chrono::Utc::now() - campaign.active.from.unwrap_or(campaign.created);
 
-                        <span class="kw">let</span> <span class="ident">seconds</span> <span class="op">=</span> <span class="ident">duration</span>
-                            .<span class="ident">to_std</span>()
-                            .<span class="ident">map</span>(<span class="op">|</span><span class="ident">duration</span><span class="op">|</span> <span class="ident">duration</span>.<span class="ident">as_secs</span>())
-                            .<span class="ident">unwrap_or</span>(<span class="number">0</span>);
+                        <span class="kw">let </span>seconds = duration
+                            .to_std()
+                            .map(|duration| duration.as_secs())
+                            .unwrap_or(<span class="number">0</span>);
 
-                        <span class="ident">seconds</span>.<span class="ident">into</span>()
+                        seconds.into()
                     }
-                    <span class="ident">Get::Value</span>(<span class="ident">Values</span> {
-                        <span class="ident">campaign_seconds_active</span>,
+                    Get::Value(Values {
+                        campaign_seconds_active,
                         ..
-                    }) =&gt; (<span class="kw-2">*</span><span class="ident">campaign_seconds_active</span>).<span class="ident">into</span>(),
+                    }) =&gt; (<span class="kw-2">*</span>campaign_seconds_active).into(),
                 })),
-                <span class="ident">field::Campaign::CampaignSecondsDuration</span> =&gt; <span class="prelude-val">Some</span>(<span class="ident">Value::Number</span>(<span class="kw">match</span> <span class="self">self</span> {
-                    <span class="ident">Get::Getter</span>(<span class="ident">FullCampaign</span> { <span class="ident">campaign</span>, .. }) =&gt; {
-                        <span class="kw">let</span> <span class="ident">duration</span> <span class="op">=</span>
-                            <span class="ident">campaign</span>.<span class="ident">active</span>.<span class="ident">to</span> <span class="op">-</span> <span class="ident">campaign</span>.<span class="ident">active</span>.<span class="ident">from</span>.<span class="ident">unwrap_or</span>(<span class="ident">campaign</span>.<span class="ident">created</span>);
+                field::Campaign::CampaignSecondsDuration =&gt; <span class="prelude-val">Some</span>(Value::Number(<span class="kw">match </span><span class="self">self </span>{
+                    Get::Getter(FullCampaign { campaign, .. }) =&gt; {
+                        <span class="kw">let </span>duration =
+                            campaign.active.to - campaign.active.from.unwrap_or(campaign.created);
 
-                        <span class="kw">let</span> <span class="ident">seconds</span> <span class="op">=</span> <span class="ident">duration</span>
-                            .<span class="ident">to_std</span>()
-                            .<span class="ident">map</span>(<span class="op">|</span><span class="ident">std_duration</span><span class="op">|</span> <span class="ident">std_duration</span>.<span class="ident">as_secs</span>())
-                            .<span class="ident">unwrap_or</span>(<span class="number">0</span>);
+                        <span class="kw">let </span>seconds = duration
+                            .to_std()
+                            .map(|std_duration| std_duration.as_secs())
+                            .unwrap_or(<span class="number">0</span>);
 
-                        <span class="ident">seconds</span>.<span class="ident">into</span>()
+                        seconds.into()
                     }
-                    <span class="ident">Get::Value</span>(<span class="ident">Values</span> {
-                        <span class="ident">campaign_seconds_duration</span>,
+                    Get::Value(Values {
+                        campaign_seconds_duration,
                         ..
-                    }) =&gt; (<span class="kw-2">*</span><span class="ident">campaign_seconds_duration</span>).<span class="ident">into</span>(),
+                    }) =&gt; (<span class="kw-2">*</span>campaign_seconds_duration).into(),
                 })),
-                <span class="ident">field::Campaign::CampaignBudget</span> =&gt; <span class="prelude-val">Some</span>(<span class="ident">Value::UnifiedNum</span>(<span class="kw">match</span> <span class="self">self</span> {
-                    <span class="ident">Get::Getter</span>(<span class="ident">FullCampaign</span> { <span class="ident">campaign</span>, .. }) =&gt; <span class="ident">campaign</span>.<span class="ident">budget</span>,
-                    <span class="ident">Get::Value</span>(<span class="ident">Values</span> {
-                        <span class="ident">campaign_budget</span>, ..
-                    }) =&gt; <span class="kw-2">*</span><span class="ident">campaign_budget</span>,
+                field::Campaign::CampaignBudget =&gt; <span class="prelude-val">Some</span>(Value::UnifiedNum(<span class="kw">match </span><span class="self">self </span>{
+                    Get::Getter(FullCampaign { campaign, .. }) =&gt; campaign.budget,
+                    Get::Value(Values {
+                        campaign_budget, ..
+                    }) =&gt; <span class="kw-2">*</span>campaign_budget,
                 })),
-                <span class="ident">field::Campaign::EventMinPrice</span> =&gt; <span class="kw">match</span> <span class="self">self</span> {
-                    <span class="ident">Get::Getter</span>(<span class="ident">FullCampaign</span> {
-                        <span class="ident">campaign</span>,
-                        <span class="ident">event_type</span>,
-                    }) =&gt; <span class="prelude-val">Some</span>(<span class="ident">Value::UnifiedNum</span>(
-                        <span class="ident">get_pricing_bounds</span>(<span class="ident">campaign</span>, <span class="ident">event_type</span>).<span class="ident">min</span>,
+                field::Campaign::EventMinPrice =&gt; <span class="kw">match </span><span class="self">self </span>{
+                    Get::Getter(FullCampaign {
+                        campaign,
+                        event_type,
+                    }) =&gt; <span class="prelude-val">Some</span>(Value::UnifiedNum(
+                        get_pricing_bounds(campaign, event_type).min,
                     )),
-                    <span class="ident">Get::Value</span>(<span class="ident">Values</span> {
-                        <span class="ident">event_min_price</span>, ..
-                    }) =&gt; <span class="ident">event_min_price</span>.<span class="ident">map</span>(<span class="ident">Value::UnifiedNum</span>),
+                    Get::Value(Values {
+                        event_min_price, ..
+                    }) =&gt; event_min_price.map(Value::UnifiedNum),
                 },
-                <span class="ident">field::Campaign::EventMaxPrice</span> =&gt; <span class="kw">match</span> <span class="self">self</span> {
-                    <span class="ident">Get::Getter</span>(<span class="ident">FullCampaign</span> {
-                        <span class="ident">campaign</span>,
-                        <span class="ident">event_type</span>,
-                    }) =&gt; <span class="prelude-val">Some</span>(<span class="ident">Value::UnifiedNum</span>(
-                        <span class="ident">get_pricing_bounds</span>(<span class="ident">campaign</span>, <span class="ident">event_type</span>).<span class="ident">max</span>,
+                field::Campaign::EventMaxPrice =&gt; <span class="kw">match </span><span class="self">self </span>{
+                    Get::Getter(FullCampaign {
+                        campaign,
+                        event_type,
+                    }) =&gt; <span class="prelude-val">Some</span>(Value::UnifiedNum(
+                        get_pricing_bounds(campaign, event_type).max,
                     )),
-                    <span class="ident">Get::Value</span>(<span class="ident">Values</span> {
-                        <span class="ident">event_max_price</span>, ..
-                    }) =&gt; <span class="ident">event_max_price</span>.<span class="ident">map</span>(<span class="ident">Value::UnifiedNum</span>),
+                    Get::Value(Values {
+                        event_max_price, ..
+                    }) =&gt; event_max_price.map(Value::UnifiedNum),
                 },
             }
         }
     }
 }
 
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">balances</span> {
-    <span class="kw">use</span> <span class="kw">super</span>::{<span class="ident">field</span>, <span class="ident">Get</span>, <span class="ident">GetField</span>, <span class="ident">Value</span>};
-    <span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">Address</span>, <span class="ident">UnifiedMap</span>, <span class="ident">UnifiedNum</span>};
-    <span class="kw">use</span> <span class="ident">serde::Deserialize</span>;
+<span class="kw">pub mod </span>balances {
+    <span class="kw">use super</span>::{field, Get, GetField, Value};
+    <span class="kw">use crate</span>::{Address, UnifiedMap, UnifiedNum};
+    <span class="kw">use </span>serde::Deserialize;
 
-    <span class="kw">pub</span> <span class="kw">type</span> <span class="ident">GetBalances</span> <span class="op">=</span> <span class="ident">Get</span><span class="op">&lt;</span><span class="ident">Getter</span>, <span class="ident">Values</span><span class="op">&gt;</span>;
+    <span class="kw">pub type </span>GetBalances = Get&lt;Getter, Values&gt;;
 
-    <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">Deserialize</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>)]</span>
-    <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">rename_all</span> <span class="op">=</span> <span class="string">&quot;camelCase&quot;</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Values</span> {
-        <span class="kw">pub</span> <span class="ident">campaign_total_spent</span>: <span class="ident">UnifiedNum</span>,
-        <span class="kw">pub</span> <span class="ident">publisher_earned_from_campaign</span>: <span class="ident">UnifiedNum</span>,
+    <span class="attribute">#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]</span>
+    <span class="attribute">#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]</span>
+    <span class="kw">pub struct </span>Values {
+        <span class="kw">pub </span>campaign_total_spent: UnifiedNum,
+        <span class="kw">pub </span>publisher_earned_from_campaign: UnifiedNum,
     }
 
-    <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Getter</span> {
-        <span class="kw">pub</span> <span class="ident">balances</span>: <span class="ident">UnifiedMap</span>,
-        <span class="kw">pub</span>(<span class="kw">super</span>) <span class="ident">publisher_id</span>: <span class="ident">Address</span>,
+    <span class="attribute">#[derive(Debug, Clone, PartialEq, Eq)]</span>
+    <span class="kw">pub struct </span>Getter {
+        <span class="kw">pub </span>balances: UnifiedMap,
+        <span class="kw">pub</span>(<span class="kw">super</span>) publisher_id: Address,
     }
 
-    <span class="kw">impl</span> <span class="ident">GetField</span> <span class="kw">for</span> <span class="ident">Get</span><span class="op">&lt;</span><span class="ident">Getter</span>, <span class="ident">Values</span><span class="op">&gt;</span> {
-        <span class="kw">type</span> <span class="ident">Output</span> <span class="op">=</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Value</span><span class="op">&gt;</span>;
-        <span class="kw">type</span> <span class="ident">Field</span> <span class="op">=</span> <span class="ident">field::Balances</span>;
+    <span class="kw">impl </span>GetField <span class="kw">for </span>Get&lt;Getter, Values&gt; {
+        <span class="kw">type </span>Output = <span class="prelude-ty">Option</span>&lt;Value&gt;;
+        <span class="kw">type </span>Field = field::Balances;
 
-        <span class="kw">fn</span> <span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">field</span>: <span class="kw-2">&amp;</span><span class="ident"><span class="self">Self</span>::Field</span>) -&gt; <span class="ident"><span class="self">Self</span>::Output</span> {
-            <span class="kw">match</span> <span class="ident">field</span> {
-                <span class="ident">field::Balances::CampaignTotalSpent</span> =&gt; <span class="kw">match</span> <span class="self">self</span> {
-                    <span class="ident">Get::Getter</span>(<span class="ident">Getter</span> { <span class="ident">balances</span>, .. }) =&gt; <span class="ident">balances</span>
-                        .<span class="ident">values</span>()
-                        .<span class="ident">sum</span>::<span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">UnifiedNum</span><span class="op">&gt;</span><span class="op">&gt;</span>()
-                        .<span class="ident">map</span>(<span class="ident">Value::UnifiedNum</span>),
-                    <span class="ident">Get::Value</span>(<span class="ident">Values</span> {
-                        <span class="ident">campaign_total_spent</span>,
+        <span class="kw">fn </span>get(<span class="kw-2">&amp;</span><span class="self">self</span>, field: <span class="kw-2">&amp;</span><span class="self">Self</span>::Field) -&gt; <span class="self">Self</span>::Output {
+            <span class="kw">match </span>field {
+                field::Balances::CampaignTotalSpent =&gt; <span class="kw">match </span><span class="self">self </span>{
+                    Get::Getter(Getter { balances, .. }) =&gt; balances
+                        .values()
+                        .sum::&lt;<span class="prelude-ty">Option</span>&lt;UnifiedNum&gt;&gt;()
+                        .map(Value::UnifiedNum),
+                    Get::Value(Values {
+                        campaign_total_spent,
                         ..
-                    }) =&gt; <span class="prelude-val">Some</span>(<span class="ident">Value::UnifiedNum</span>(<span class="kw-2">*</span><span class="ident">campaign_total_spent</span>)),
+                    }) =&gt; <span class="prelude-val">Some</span>(Value::UnifiedNum(<span class="kw-2">*</span>campaign_total_spent)),
                 },
-                <span class="comment">// Leave the default of `0` if the publisher is not found in the balances.</span>
-                <span class="ident">field::Balances::PublisherEarnedFromCampaign</span> =&gt; {
-                    <span class="prelude-val">Some</span>(<span class="ident">Value::UnifiedNum</span>(<span class="kw">match</span> <span class="self">self</span> {
-                        <span class="ident">Get::Getter</span>(<span class="ident">Getter</span> {
-                            <span class="ident">balances</span>,
-                            <span class="ident">publisher_id</span>,
-                        }) =&gt; <span class="ident">balances</span>.<span class="ident">get</span>(<span class="ident">publisher_id</span>).<span class="ident">cloned</span>().<span class="ident">unwrap_or_default</span>(),
-                        <span class="ident">Get::Value</span>(<span class="ident">Values</span> {
-                            <span class="ident">publisher_earned_from_campaign</span>,
+                <span class="comment">// Leave the default of `0` if the publisher is not found in the balances.
+                </span>field::Balances::PublisherEarnedFromCampaign =&gt; {
+                    <span class="prelude-val">Some</span>(Value::UnifiedNum(<span class="kw">match </span><span class="self">self </span>{
+                        Get::Getter(Getter {
+                            balances,
+                            publisher_id,
+                        }) =&gt; balances.get(publisher_id).cloned().unwrap_or_default(),
+                        Get::Value(Values {
+                            publisher_earned_from_campaign,
                             ..
-                        }) =&gt; <span class="kw-2">*</span><span class="ident">publisher_earned_from_campaign</span>,
+                        }) =&gt; <span class="kw-2">*</span>publisher_earned_from_campaign,
                     }))
                 }
             }
@@ -860,25 +860,25 @@
     }
 }
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
-<span class="kw">mod</span> <span class="ident">test</span> {
-    <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
-    <span class="kw">use</span> <span class="kw">crate</span>::{
-        <span class="ident">sentry::IMPRESSION</span>,
-        <span class="ident">test_util</span>::{<span class="ident">LEADER</span>, <span class="ident">PUBLISHER</span>},
+<span class="attribute">#[cfg(test)]</span>
+<span class="kw">mod </span>test {
+    <span class="kw">use super</span>::<span class="kw-2">*</span>;
+    <span class="kw">use crate</span>::{
+        sentry::IMPRESSION,
+        test_util::{LEADER, PUBLISHER},
     };
-    <span class="kw">pub</span> <span class="kw">use</span> <span class="kw">crate</span>::{
-        <span class="ident">test_util</span>::{<span class="ident">DUMMY_CAMPAIGN</span> <span class="kw">as</span> <span class="ident">CAMPAIGN</span>, <span class="ident">DUMMY_IPFS</span> <span class="kw">as</span> <span class="ident">IPFS</span>},
-        <span class="ident">AdUnit</span>, <span class="ident">UnifiedMap</span>,
+    <span class="kw">pub use crate</span>::{
+        test_util::{DUMMY_CAMPAIGN <span class="kw">as </span>CAMPAIGN, DUMMY_IPFS <span class="kw">as </span>IPFS},
+        AdUnit, UnifiedMap,
     };
-    <span class="kw">use</span> <span class="ident">chrono</span>::{<span class="ident">TimeZone</span>, <span class="ident">Utc</span>};
-    <span class="kw">use</span> <span class="ident">serde_json::json</span>;
+    <span class="kw">use </span>chrono::{TimeZone, Utc};
+    <span class="kw">use </span>serde_json::json;
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">input_serialization_and_deserialization</span>() {
-        <span class="kw">let</span> <span class="ident">full_json</span> <span class="op">=</span> <span class="macro">json!</span>({
-            <span class="comment">// Global scope, accessible everywhere</span>
-            <span class="string">&quot;adView.secondsSinceCampaignImpression&quot;</span>: <span class="number">10</span>,
+    <span class="attribute">#[test]</span>
+    <span class="kw">fn </span>input_serialization_and_deserialization() {
+        <span class="kw">let </span>full_json = <span class="macro">json!</span>({
+            <span class="comment">// Global scope, accessible everywhere
+            </span><span class="string">&quot;adView.secondsSinceCampaignImpression&quot;</span>: <span class="number">10</span>,
             <span class="string">&quot;adView.hasCustomPreferences&quot;</span>: <span class="bool-val">true</span>,
             <span class="string">&quot;adView.navigatorLanguage&quot;</span>: <span class="string">&quot;en&quot;</span>,
             <span class="string">&quot;adSlotId&quot;</span>: <span class="string">&quot;QmcUVX7fvoLMM93uN2bD3wGTH8MXSxeL8hojYfL2Lhp7mR&quot;</span>,
@@ -886,12 +886,12 @@
             <span class="string">&quot;publisherId&quot;</span>: <span class="string">&quot;0xE882ebF439207a70dDcCb39E13CA8506c9F45fD9&quot;</span>,
             <span class="string">&quot;country&quot;</span>: <span class="string">&quot;BG&quot;</span>,
             <span class="string">&quot;eventType&quot;</span>: <span class="string">&quot;IMPRESSION&quot;</span>,
-            <span class="comment">// 06/06/2020 @ 12:00pm (UTC)</span>
-            <span class="string">&quot;secondsSinceEpoch&quot;</span>: <span class="number">1591444800</span>,
+            <span class="comment">// 06/06/2020 @ 12:00pm (UTC)
+            </span><span class="string">&quot;secondsSinceEpoch&quot;</span>: <span class="number">1591444800</span>,
             <span class="string">&quot;userAgentOS&quot;</span>: <span class="string">&quot;Ubuntu&quot;</span>,
             <span class="string">&quot;userAgentBrowserFamily&quot;</span>: <span class="string">&quot;Firefox&quot;</span>,
-            <span class="comment">// Global scope, accessible everywhere, campaign-dependant</span>
-            <span class="string">&quot;adUnitId&quot;</span>: <span class="string">&quot;Qmasg8FrbuSQpjFu3kRnZF9beg8rEBFrqgi1uXDRwCbX5f&quot;</span>,
+            <span class="comment">// Global scope, accessible everywhere, campaign-dependant
+            </span><span class="string">&quot;adUnitId&quot;</span>: <span class="string">&quot;Qmasg8FrbuSQpjFu3kRnZF9beg8rEBFrqgi1uXDRwCbX5f&quot;</span>,
             <span class="string">&quot;advertiserId&quot;</span>: <span class="string">&quot;0xaCBaDA2d5830d1875ae3D2de207A1363B316Df2F&quot;</span>,
             <span class="string">&quot;campaignId&quot;</span>: <span class="string">&quot;0x936da01f9abd4d9d80c702af85c822a8&quot;</span>,
             <span class="string">&quot;campaignTotalSpent&quot;</span>: <span class="string">&quot;40&quot;</span>,
@@ -901,84 +901,84 @@
             <span class="string">&quot;eventMinPrice&quot;</span>: <span class="string">&quot;1&quot;</span>,
             <span class="string">&quot;eventMaxPrice&quot;</span>: <span class="string">&quot;10&quot;</span>,
             <span class="string">&quot;publisherEarnedFromCampaign&quot;</span>: <span class="string">&quot;30&quot;</span>,
-            <span class="comment">// adSlot scope, accessible on Supermarket and AdView</span>
-            <span class="string">&quot;adSlot.categories&quot;</span>: [<span class="string">&quot;IAB3&quot;</span>, <span class="string">&quot;IAB13-7&quot;</span>, <span class="string">&quot;IAB5&quot;</span>],
+            <span class="comment">// adSlot scope, accessible on Supermarket and AdView
+            </span><span class="string">&quot;adSlot.categories&quot;</span>: [<span class="string">&quot;IAB3&quot;</span>, <span class="string">&quot;IAB13-7&quot;</span>, <span class="string">&quot;IAB5&quot;</span>],
             <span class="string">&quot;adSlot.hostname&quot;</span>: <span class="string">&quot;adex.network&quot;</span>,
             <span class="string">&quot;adSlot.alexaRank&quot;</span>: <span class="number">2.0</span>,
         });
 
-        <span class="kw">let</span> <span class="ident">actual_date</span> <span class="op">=</span> <span class="ident">Utc</span>.<span class="ident">ymd</span>(<span class="number">2020</span>, <span class="number">6</span>, <span class="number">6</span>).<span class="ident">and_hms</span>(<span class="number">12</span>, <span class="number">0</span>, <span class="number">0</span>);
+        <span class="kw">let </span>actual_date = Utc.ymd(<span class="number">2020</span>, <span class="number">6</span>, <span class="number">6</span>).and_hms(<span class="number">12</span>, <span class="number">0</span>, <span class="number">0</span>);
 
-        <span class="kw">let</span> <span class="ident">balances</span>: <span class="ident">UnifiedMap</span> <span class="op">=</span> <span class="macro">vec!</span>[(<span class="kw-2">*</span><span class="ident">PUBLISHER</span>, <span class="number">30</span>.<span class="ident">into</span>()), (<span class="kw-2">*</span><span class="ident">LEADER</span>, <span class="number">10</span>.<span class="ident">into</span>())]
-            .<span class="ident">into_iter</span>()
-            .<span class="ident">collect</span>();
+        <span class="kw">let </span>balances: UnifiedMap = <span class="macro">vec!</span>[(<span class="kw-2">*</span>PUBLISHER, <span class="number">30</span>.into()), (<span class="kw-2">*</span>LEADER, <span class="number">10</span>.into())]
+            .into_iter()
+            .collect();
 
-        <span class="kw">let</span> <span class="ident">full_input</span> <span class="op">=</span> <span class="ident">Input</span> {
-            <span class="ident">ad_view</span>: <span class="prelude-val">Some</span>(<span class="ident">AdView</span> {
-                <span class="ident">seconds_since_campaign_impression</span>: <span class="number">10</span>,
-                <span class="ident">has_custom_preferences</span>: <span class="bool-val">true</span>,
-                <span class="ident">navigator_language</span>: <span class="string">&quot;en&quot;</span>.<span class="ident">into</span>(),
+        <span class="kw">let </span>full_input = Input {
+            ad_view: <span class="prelude-val">Some</span>(AdView {
+                seconds_since_campaign_impression: <span class="number">10</span>,
+                has_custom_preferences: <span class="bool-val">true</span>,
+                navigator_language: <span class="string">&quot;en&quot;</span>.into(),
             }),
-            <span class="ident">global</span>: <span class="ident">Global</span> {
-                <span class="ident">ad_slot_id</span>: <span class="ident">IPFS</span>[<span class="number">0</span>],
-                <span class="ident">ad_slot_type</span>: <span class="string">&quot;legacy_300x100&quot;</span>.<span class="ident">into</span>(),
-                <span class="ident">publisher_id</span>: <span class="kw-2">*</span><span class="ident">PUBLISHER</span>,
-                <span class="ident">country</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;BG&quot;</span>.<span class="ident">into</span>()),
-                <span class="ident">event_type</span>: <span class="ident">IMPRESSION</span>,
-                <span class="ident">seconds_since_epoch</span>: <span class="ident">actual_date</span>,
-                <span class="ident">user_agent_os</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;Ubuntu&quot;</span>.<span class="ident">into</span>()),
-                <span class="ident">user_agent_browser_family</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;Firefox&quot;</span>.<span class="ident">into</span>()),
+            global: Global {
+                ad_slot_id: IPFS[<span class="number">0</span>],
+                ad_slot_type: <span class="string">&quot;legacy_300x100&quot;</span>.into(),
+                publisher_id: <span class="kw-2">*</span>PUBLISHER,
+                country: <span class="prelude-val">Some</span>(<span class="string">&quot;BG&quot;</span>.into()),
+                event_type: IMPRESSION,
+                seconds_since_epoch: actual_date,
+                user_agent_os: <span class="prelude-val">Some</span>(<span class="string">&quot;Ubuntu&quot;</span>.into()),
+                user_agent_browser_family: <span class="prelude-val">Some</span>(<span class="string">&quot;Firefox&quot;</span>.into()),
             },
-            <span class="comment">// Channel can only be tested with a Value, since the campaign_seconds_* are calculated based on current DateTime</span>
-            <span class="ident">campaign</span>: <span class="prelude-val">Some</span>(<span class="ident">Get::Value</span>(<span class="ident">campaign::Values</span> {
-                <span class="ident">advertiser_id</span>: <span class="ident">CAMPAIGN</span>.<span class="ident">creator</span>,
-                <span class="ident">campaign_id</span>: <span class="ident">CAMPAIGN</span>.<span class="ident">id</span>,
-                <span class="ident">campaign_seconds_active</span>: <span class="number">40633521</span>,
-                <span class="ident">campaign_seconds_duration</span>: <span class="number">2509030800</span>,
-                <span class="ident">campaign_budget</span>: <span class="ident">CAMPAIGN</span>.<span class="ident">budget</span>,
-                <span class="ident">event_min_price</span>: <span class="prelude-val">Some</span>(
-                    <span class="ident">CAMPAIGN</span>
-                        .<span class="ident">pricing</span>(<span class="ident">IMPRESSION</span>)
-                        .<span class="ident">map</span>(<span class="op">|</span><span class="ident">price</span><span class="op">|</span> <span class="ident">price</span>.<span class="ident">min</span>)
-                        .<span class="ident">expect</span>(<span class="string">&quot;should have price&quot;</span>),
+            <span class="comment">// Channel can only be tested with a Value, since the campaign_seconds_* are calculated based on current DateTime
+            </span>campaign: <span class="prelude-val">Some</span>(Get::Value(campaign::Values {
+                advertiser_id: CAMPAIGN.creator,
+                campaign_id: CAMPAIGN.id,
+                campaign_seconds_active: <span class="number">40633521</span>,
+                campaign_seconds_duration: <span class="number">2509030800</span>,
+                campaign_budget: CAMPAIGN.budget,
+                event_min_price: <span class="prelude-val">Some</span>(
+                    CAMPAIGN
+                        .pricing(IMPRESSION)
+                        .map(|price| price.min)
+                        .expect(<span class="string">&quot;should have price&quot;</span>),
                 ),
-                <span class="ident">event_max_price</span>: <span class="prelude-val">Some</span>(
-                    <span class="ident">CAMPAIGN</span>
-                        .<span class="ident">pricing</span>(<span class="ident">IMPRESSION</span>)
-                        .<span class="ident">map</span>(<span class="op">|</span><span class="ident">price</span><span class="op">|</span> <span class="ident">price</span>.<span class="ident">max</span>)
-                        .<span class="ident">expect</span>(<span class="string">&quot;Should have price&quot;</span>),
+                event_max_price: <span class="prelude-val">Some</span>(
+                    CAMPAIGN
+                        .pricing(IMPRESSION)
+                        .map(|price| price.max)
+                        .expect(<span class="string">&quot;Should have price&quot;</span>),
                 ),
             })),
-            <span class="ident">balances</span>: <span class="prelude-val">Some</span>(<span class="ident">Get::Getter</span>(<span class="ident">balances::Getter</span> {
-                <span class="ident">balances</span>,
-                <span class="ident">publisher_id</span>: <span class="kw-2">*</span><span class="ident">PUBLISHER</span>,
+            balances: <span class="prelude-val">Some</span>(Get::Getter(balances::Getter {
+                balances,
+                publisher_id: <span class="kw-2">*</span>PUBLISHER,
             })),
-            <span class="ident">ad_unit_id</span>: <span class="prelude-val">Some</span>(<span class="ident">IPFS</span>[<span class="number">1</span>]),
-            <span class="ident">ad_slot</span>: <span class="prelude-val">Some</span>(<span class="ident">AdSlot</span> {
-                <span class="ident">categories</span>: <span class="macro">vec!</span>[<span class="string">&quot;IAB3&quot;</span>.<span class="ident">into</span>(), <span class="string">&quot;IAB13-7&quot;</span>.<span class="ident">into</span>(), <span class="string">&quot;IAB5&quot;</span>.<span class="ident">into</span>()],
-                <span class="ident">hostname</span>: <span class="string">&quot;adex.network&quot;</span>.<span class="ident">into</span>(),
-                <span class="ident">alexa_rank</span>: <span class="prelude-val">Some</span>(<span class="number">2.0</span>),
+            ad_unit_id: <span class="prelude-val">Some</span>(IPFS[<span class="number">1</span>]),
+            ad_slot: <span class="prelude-val">Some</span>(AdSlot {
+                categories: <span class="macro">vec!</span>[<span class="string">&quot;IAB3&quot;</span>.into(), <span class="string">&quot;IAB13-7&quot;</span>.into(), <span class="string">&quot;IAB5&quot;</span>.into()],
+                hostname: <span class="string">&quot;adex.network&quot;</span>.into(),
+                alexa_rank: <span class="prelude-val">Some</span>(<span class="number">2.0</span>),
             }),
         };
 
-        <span class="kw">let</span> <span class="ident">ser_actual_json</span> <span class="op">=</span> <span class="ident">serde_json::to_value</span>(<span class="ident">full_input</span>.<span class="ident">clone</span>()).<span class="ident">expect</span>(<span class="string">&quot;Should serialize&quot;</span>);
+        <span class="kw">let </span>ser_actual_json = serde_json::to_value(full_input.clone()).expect(<span class="string">&quot;Should serialize&quot;</span>);
 
-        <span class="macro">pretty_assertions::assert_eq!</span>(<span class="ident">full_json</span>, <span class="ident">ser_actual_json</span>);
-        <span class="macro">pretty_assertions::assert_eq!</span>(<span class="ident">full_json</span>.<span class="ident">to_string</span>(), <span class="ident">ser_actual_json</span>.<span class="ident">to_string</span>());
+        <span class="macro">pretty_assertions::assert_eq!</span>(full_json, ser_actual_json);
+        <span class="macro">pretty_assertions::assert_eq!</span>(full_json.to_string(), ser_actual_json.to_string());
 
-        <span class="kw">let</span> <span class="ident">de_actual_input</span> <span class="op">=</span>
-            <span class="ident">serde_json::from_value</span>::<span class="op">&lt;</span><span class="ident">Input</span><span class="op">&gt;</span>(<span class="ident">ser_actual_json</span>).<span class="ident">expect</span>(<span class="string">&quot;Should deserialize&quot;</span>);
+        <span class="kw">let </span>de_actual_input =
+            serde_json::from_value::&lt;Input&gt;(ser_actual_json).expect(<span class="string">&quot;Should deserialize&quot;</span>);
 
-        <span class="comment">// Compare Map, instead of Input, since Getters are serialized as Values and we cannot compare Inputs.</span>
-        <span class="kw">let</span> <span class="ident">expected_map</span>: <span class="ident">Map</span> <span class="op">=</span> <span class="ident">full_input</span>.<span class="ident">into</span>();
-        <span class="kw">let</span> <span class="ident">actual_map</span>: <span class="ident">Map</span> <span class="op">=</span> <span class="ident">de_actual_input</span>.<span class="ident">into</span>();
+        <span class="comment">// Compare Map, instead of Input, since Getters are serialized as Values and we cannot compare Inputs.
+        </span><span class="kw">let </span>expected_map: Map = full_input.into();
+        <span class="kw">let </span>actual_map: Map = de_actual_input.into();
 
         <span class="macro">pretty_assertions::assert_eq!</span>(
-            <span class="ident">expected_map</span>,
-            <span class="ident">actual_map</span>,
-            <span class="string">&quot;Comparing the output Maps of the Inputs failed&quot;</span>
-        );
+            expected_map,
+            actual_map,
+            <span class="string">&quot;Comparing the output Maps of the Inputs failed&quot;
+        </span>);
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="primitives" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (20ffea693 2022-08-11)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="primitives" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>

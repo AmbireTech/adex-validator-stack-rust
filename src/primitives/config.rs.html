@@ -322,329 +322,329 @@
 <span id="322">322</span>
 <span id="323">323</span>
 <span id="324">324</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="kw">crate</span>::{
-    <span class="ident">chain</span>::{<span class="ident">Chain</span>, <span class="ident">ChainId</span>},
-    <span class="ident">event_submission::RateLimit</span>,
-    <span class="ident">util::ApiUrl</span>,
-    <span class="ident">Address</span>, <span class="ident">BigNum</span>, <span class="ident">ChainOf</span>, <span class="ident">ValidatorId</span>,
+</pre><pre class="rust"><code><span class="kw">use crate</span>::{
+    chain::{Chain, ChainId},
+    event_submission::RateLimit,
+    util::ApiUrl,
+    Address, BigNum, ChainOf, ValidatorId,
 };
-<span class="kw">use</span> <span class="ident">once_cell::sync::Lazy</span>;
-<span class="kw">use</span> <span class="ident">serde</span>::{<span class="ident">Deserialize</span>, <span class="ident">Deserializer</span>, <span class="ident">Serialize</span>};
-<span class="kw">use</span> <span class="ident">std</span>::{<span class="ident">collections::HashMap</span>, <span class="ident">num::NonZeroU8</span>, <span class="ident">time::Duration</span>};
-<span class="kw">use</span> <span class="ident">thiserror::Error</span>;
+<span class="kw">use </span>once_cell::sync::Lazy;
+<span class="kw">use </span>serde::{Deserialize, Deserializer, Serialize};
+<span class="kw">use </span>std::{collections::HashMap, num::NonZeroU8, time::Duration};
+<span class="kw">use </span>thiserror::Error;
 
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">toml::de::Error</span> <span class="kw">as</span> <span class="ident">TomlError</span>;
+<span class="kw">pub use </span>toml::de::Error <span class="kw">as </span>TomlError;
 
-<span class="doccomment">/// Production configuration found in `docs/config/prod.toml`</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// ```toml</span>
-<span class="attribute">#[<span class="ident">doc</span> <span class="op">=</span> <span class="macro">include_str!</span>(<span class="string">&quot;../../docs/config/prod.toml&quot;</span>)]</span>
-<span class="doccomment">/// ```</span>
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">PRODUCTION_CONFIG</span>: <span class="ident">Lazy</span><span class="op">&lt;</span><span class="ident">Config</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Lazy::new</span>(<span class="op">|</span><span class="op">|</span> {
-    <span class="ident">toml::from_str</span>(<span class="macro">include_str!</span>(<span class="string">&quot;../../docs/config/prod.toml&quot;</span>))
-        .<span class="ident">expect</span>(<span class="string">&quot;Failed to parse prod.toml config file&quot;</span>)
+<span class="doccomment">/// Production configuration found in `docs/config/prod.toml`
+///
+/// ```toml
+</span><span class="attribute">#[doc = <span class="macro">include_str!</span>(<span class="string">&quot;../../docs/config/prod.toml&quot;</span>)]</span>
+<span class="doccomment">/// ```
+</span><span class="kw">pub static </span>PRODUCTION_CONFIG: Lazy&lt;Config&gt; = Lazy::new(|| {
+    toml::from_str(<span class="macro">include_str!</span>(<span class="string">&quot;../../docs/config/prod.toml&quot;</span>))
+        .expect(<span class="string">&quot;Failed to parse prod.toml config file&quot;</span>)
 });
 
-<span class="doccomment">/// Ganache (dev) configuration found in `docs/config/ganache.toml`</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// ```toml</span>
-<span class="attribute">#[<span class="ident">doc</span> <span class="op">=</span> <span class="macro">include_str!</span>(<span class="string">&quot;../../docs/config/ganache.toml&quot;</span>)]</span>
-<span class="doccomment">/// ```</span>
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">GANACHE_CONFIG</span>: <span class="ident">Lazy</span><span class="op">&lt;</span><span class="ident">Config</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Lazy::new</span>(<span class="op">|</span><span class="op">|</span> {
-    <span class="ident">Config::try_toml</span>(<span class="macro">include_str!</span>(<span class="string">&quot;../../docs/config/ganache.toml&quot;</span>))
-        .<span class="ident">expect</span>(<span class="string">&quot;Failed to parse ganache.toml config file&quot;</span>)
+<span class="doccomment">/// Ganache (dev) configuration found in `docs/config/ganache.toml`
+///
+/// ```toml
+</span><span class="attribute">#[doc = <span class="macro">include_str!</span>(<span class="string">&quot;../../docs/config/ganache.toml&quot;</span>)]</span>
+<span class="doccomment">/// ```
+</span><span class="kw">pub static </span>GANACHE_CONFIG: Lazy&lt;Config&gt; = Lazy::new(|| {
+    Config::try_toml(<span class="macro">include_str!</span>(<span class="string">&quot;../../docs/config/ganache.toml&quot;</span>))
+        .expect(<span class="string">&quot;Failed to parse ganache.toml config file&quot;</span>)
 });
 
-<span class="doccomment">/// The environment in which the application is running</span>
-<span class="doccomment">/// Defaults to [`Environment::Development`]</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Deserialize</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>, <span class="ident">Clone</span>, <span class="ident">Copy</span>)]</span>
-<span class="attribute">#[<span class="ident">serde</span>(<span class="ident">rename_all</span> <span class="op">=</span> <span class="string">&quot;camelCase&quot;</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">Environment</span> {
-    <span class="doccomment">/// The default development setup is running `ganache-cli` locally.</span>
-    <span class="ident">Development</span>,
-    <span class="ident">Production</span>,
+<span class="doccomment">/// The environment in which the application is running
+/// Defaults to [`Environment::Development`]
+</span><span class="attribute">#[derive(Debug, Deserialize, PartialEq, Eq, Clone, Copy)]</span>
+<span class="attribute">#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]</span>
+<span class="kw">pub enum </span>Environment {
+    <span class="doccomment">/// The default development setup is running `ganache-cli` locally.
+    </span>Development,
+    Production,
 }
 
-<span class="kw">impl</span> <span class="ident">Default</span> <span class="kw">for</span> <span class="ident">Environment</span> {
-    <span class="kw">fn</span> <span class="ident">default</span>() -&gt; <span class="self">Self</span> {
-        <span class="ident"><span class="self">Self</span>::Development</span>
+<span class="kw">impl </span>Default <span class="kw">for </span>Environment {
+    <span class="kw">fn </span>default() -&gt; <span class="self">Self </span>{
+        <span class="self">Self</span>::Development
     }
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Config</span> {
-    <span class="doccomment">/// The maximum number of [`Channel`](crate::Channel)s that the worker</span>
-    <span class="doccomment">/// can process for one tick.</span>
-    <span class="kw">pub</span> <span class="ident">max_channels</span>: <span class="ident">u32</span>,
-    <span class="doccomment">/// The maximum number of [`Channel`](crate::Channel)s per page</span>
-    <span class="doccomment">/// returned by Sentry&#39;s GET `/v5/channel/list` route.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Also see: [`ChannelListResponse`](crate::sentry::channel_list::ChannelListResponse)</span>
-    <span class="kw">pub</span> <span class="ident">channels_find_limit</span>: <span class="ident">u32</span>,
-    <span class="doccomment">/// The maximum number of [`Campaign`](crate::Campaign)s per page</span>
-    <span class="doccomment">/// returned by Sentry&#39;s GET `/v5/campaign/list` route.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Also see: [`CampaignListResponse`](crate::sentry::campaign_list::CampaignListResponse)</span>
-    <span class="kw">pub</span> <span class="ident">campaigns_find_limit</span>: <span class="ident">u32</span>,
-    <span class="doccomment">/// The maximum number of [`Spender`](crate::spender::Spender)s per page</span>
-    <span class="doccomment">/// returned by Sentry&#39;s GET `/v5/channel/0xXXX.../spender/all` route.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Also see: [`AllSpendersResponse`](crate::sentry::AllSpendersResponse)</span>
-    <span class="kw">pub</span> <span class="ident">spendable_find_limit</span>: <span class="ident">u32</span>,
-    <span class="doccomment">/// The Validator Worker tick time.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// The [`Channel`](crate::Channel)s&#39; tick and the wait time should both</span>
-    <span class="doccomment">/// finish before running a new tick in the Validator Worker.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// In milliseconds</span>
-    <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">deserialize_with</span> <span class="op">=</span> <span class="string">&quot;milliseconds_to_std_duration&quot;</span>)]</span>
-    <span class="kw">pub</span> <span class="ident">wait_time</span>: <span class="ident">Duration</span>,
-    <span class="doccomment">/// The maximum allowed limit of [`ValidatorMessage`](crate::sentry::ValidatorMessage)s per page</span>
-    <span class="doccomment">/// returned by Sentry&#39;s GET `/v5/channel/0xXXX.../validator-messages` route.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Request query also has a `limit` parameter, which can be used to return</span>
-    <span class="doccomment">/// &lt;= `msgs_find_limit` messages in the request.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Also see: [`ValidatorMessagesListResponse`](crate::sentry::ValidatorMessagesListResponse),</span>
-    <span class="doccomment">/// [`ValidatorMessagesListQuery`](crate::sentry::ValidatorMessagesListQuery)</span>
-    <span class="kw">pub</span> <span class="ident">msgs_find_limit</span>: <span class="ident">u32</span>,
-    <span class="doccomment">/// The maximum allowed limit of [`FetchedAnalytics`](crate::sentry::FetchedAnalytics)s per page</span>
-    <span class="doccomment">/// returned by Sentry&#39;s GET `/v5/analytics` routes:</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// - GET `/v5/analytics`</span>
-    <span class="doccomment">/// - GET `/v5/analytics/for-publisher`</span>
-    <span class="doccomment">/// - GET `/v5/analytics/for-advertiser`</span>
-    <span class="doccomment">/// - GET `/v5/analytics/for-admin`</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Request query also has a `limit` parameter, which can be used to return</span>
-    <span class="doccomment">/// &lt;= `analytics_find_limit` messages in the request.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Also see: [`AnalyticsQuery`](crate::analytics::AnalyticsQuery)</span>
-    <span class="kw">pub</span> <span class="ident">analytics_find_limit</span>: <span class="ident">u32</span>,
-    <span class="doccomment">/// A timeout to be used when collecting the Analytics for a requests:</span>
-    <span class="doccomment">/// - GET `/v5/analytics`</span>
-    <span class="doccomment">/// - GET `/v5/analytics/for-publisher`</span>
-    <span class="doccomment">/// - GET `/v5/analytics/for-advertiser`</span>
-    <span class="doccomment">/// - GET `/v5/analytics/for-admin`</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// In milliseconds</span>
-    <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">deserialize_with</span> <span class="op">=</span> <span class="string">&quot;milliseconds_to_std_duration&quot;</span>)]</span>
-    <span class="kw">pub</span> <span class="ident">analytics_maxtime</span>: <span class="ident">Duration</span>,
-    <span class="doccomment">/// The amount of time that should have passed before sending a new heartbeat.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// In milliseconds</span>
-    <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">deserialize_with</span> <span class="op">=</span> <span class="string">&quot;milliseconds_to_std_duration&quot;</span>)]</span>
-    <span class="kw">pub</span> <span class="ident">heartbeat_time</span>: <span class="ident">Duration</span>,
-    <span class="doccomment">/// The pro miles below which the [`ApproveState`](crate::validator::ApproveState)</span>
-    <span class="doccomment">/// becomes **unhealthy** in the [`Channel`](crate::Channel)&#39;s Follower.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Also see: [`ApproveState.is_healthy`](crate::validator::ApproveState::is_healthy)</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// In pro milles (&lt;= 1000)</span>
-    <span class="kw">pub</span> <span class="ident">health_threshold_promilles</span>: <span class="ident">u32</span>,
-    <span class="doccomment">/// The pro milles below which the [`ApproveState`](crate::validator::ApproveState)</span>
-    <span class="doccomment">/// will not be triggered and instead a [`RejectState`](crate::validator::RejectState)</span>
-    <span class="doccomment">/// will be propagated by the [`Channel`](crate::Channel)&#39;s Follower.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// In pro milles (&lt;= 1000)</span>
-    <span class="kw">pub</span> <span class="ident">health_unsignable_promilles</span>: <span class="ident">u32</span>,
-    <span class="doccomment">/// Sets the timeout for propagating a Validator message ([`MessageTypes`](crate::validator::MessageTypes))</span>
-    <span class="doccomment">/// to a validator.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// In milliseconds</span>
-    <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">deserialize_with</span> <span class="op">=</span> <span class="string">&quot;milliseconds_to_std_duration&quot;</span>)]</span>
-    <span class="kw">pub</span> <span class="ident">propagation_timeout</span>: <span class="ident">Duration</span>,
-    <span class="doccomment">/// The Client timeout for `SentryApi`.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// This includes all requests made to sentry except propagating messages.</span>
-    <span class="doccomment">/// When propagating messages we make requests to foreign Sentry</span>
-    <span class="doccomment">/// instances and we use a separate timeout -</span>
-    <span class="doccomment">/// [`Config.propagation_timeout`](Config::propagation_timeout).</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// In milliseconds</span>
-    <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">deserialize_with</span> <span class="op">=</span> <span class="string">&quot;milliseconds_to_std_duration&quot;</span>)]</span>
-    <span class="kw">pub</span> <span class="ident">fetch_timeout</span>: <span class="ident">Duration</span>,
-    <span class="doccomment">/// The Client timeout for `SentryApi` when collecting all channels</span>
-    <span class="doccomment">/// and Validators using the `/campaign/list` route.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// In milliseconds</span>
-    <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">deserialize_with</span> <span class="op">=</span> <span class="string">&quot;milliseconds_to_std_duration&quot;</span>)]</span>
-    <span class="kw">pub</span> <span class="ident">all_campaigns_timeout</span>: <span class="ident">Duration</span>,
-    <span class="doccomment">/// The timeout for a single tick of a [`Channel`](crate::Channel) in</span>
-    <span class="doccomment">/// the Validator Worker.</span>
-    <span class="doccomment">/// This timeout is applied to both the leader and follower ticks.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// In milliseconds</span>
-    <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">deserialize_with</span> <span class="op">=</span> <span class="string">&quot;milliseconds_to_std_duration&quot;</span>)]</span>
-    <span class="kw">pub</span> <span class="ident">channel_tick_timeout</span>: <span class="ident">Duration</span>,
-    <span class="doccomment">/// The default IP rate limit that will be imposed if</span>
-    <span class="doccomment">/// [`Campaign.event_submission`](crate::Campaign::event_submission) is [`None`].</span>
-    <span class="kw">pub</span> <span class="ident">ip_rate_limit</span>: <span class="ident">RateLimit</span>,
-    <span class="doccomment">/// An optional whitelisted addresses for [`Campaign.creator`](crate::Campaign::creator)s.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// If empty, any address will be allowed to create a [`Campaign`](crate::Campaign).</span>
-    <span class="kw">pub</span> <span class="ident">creators_whitelist</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// An optional whitelisted Validator addresses for [`Campaign.validators`](crate::Campaign::validators).</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// If empty, any address will be allowed to be a validator in a [`Campaign`](crate::Campaign).</span>
-    <span class="kw">pub</span> <span class="ident">validators_whitelist</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">ValidatorId</span><span class="op">&gt;</span>,
-    <span class="kw">pub</span> <span class="ident">admins</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// The key of this map is a human-readable text of the Chain name</span>
-    <span class="doccomment">/// for readability in the configuration file.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// - To get the chain of a token address use [`Config::find_chain_of()`].</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// - To get a [`ChainInfo`] only by a [`ChainId`] use [`Config::find_chain()`].</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// **NOTE:** Make sure that a Token [`Address`] is unique across all Chains,</span>
-    <span class="doccomment">/// otherwise [`Config::find_chain_of()`] will fetch only one of them and cause unexpected problems.</span>
-    <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">rename</span> <span class="op">=</span> <span class="string">&quot;chain&quot;</span>)]</span>
-    <span class="kw">pub</span> <span class="ident">chains</span>: <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">String</span>, <span class="ident">ChainInfo</span><span class="op">&gt;</span>,
-    <span class="kw">pub</span> <span class="ident">platform</span>: <span class="ident">PlatformConfig</span>,
-    <span class="kw">pub</span> <span class="ident">limits</span>: <span class="ident">Limits</span>,
+<span class="attribute">#[derive(Serialize, Deserialize, Debug, Clone)]</span>
+<span class="kw">pub struct </span>Config {
+    <span class="doccomment">/// The maximum number of [`Channel`](crate::Channel)s that the worker
+    /// can process for one tick.
+    </span><span class="kw">pub </span>max_channels: u32,
+    <span class="doccomment">/// The maximum number of [`Channel`](crate::Channel)s per page
+    /// returned by Sentry&#39;s GET `/v5/channel/list` route.
+    ///
+    /// Also see: [`ChannelListResponse`](crate::sentry::channel_list::ChannelListResponse)
+    </span><span class="kw">pub </span>channels_find_limit: u32,
+    <span class="doccomment">/// The maximum number of [`Campaign`](crate::Campaign)s per page
+    /// returned by Sentry&#39;s GET `/v5/campaign/list` route.
+    ///
+    /// Also see: [`CampaignListResponse`](crate::sentry::campaign_list::CampaignListResponse)
+    </span><span class="kw">pub </span>campaigns_find_limit: u32,
+    <span class="doccomment">/// The maximum number of [`Spender`](crate::spender::Spender)s per page
+    /// returned by Sentry&#39;s GET `/v5/channel/0xXXX.../spender/all` route.
+    ///
+    /// Also see: [`AllSpendersResponse`](crate::sentry::AllSpendersResponse)
+    </span><span class="kw">pub </span>spendable_find_limit: u32,
+    <span class="doccomment">/// The Validator Worker tick time.
+    ///
+    /// The [`Channel`](crate::Channel)s&#39; tick and the wait time should both
+    /// finish before running a new tick in the Validator Worker.
+    ///
+    /// In milliseconds
+    </span><span class="attribute">#[serde(deserialize_with = <span class="string">&quot;milliseconds_to_std_duration&quot;</span>)]</span>
+    <span class="kw">pub </span>wait_time: Duration,
+    <span class="doccomment">/// The maximum allowed limit of [`ValidatorMessage`](crate::sentry::ValidatorMessage)s per page
+    /// returned by Sentry&#39;s GET `/v5/channel/0xXXX.../validator-messages` route.
+    ///
+    /// Request query also has a `limit` parameter, which can be used to return
+    /// &lt;= `msgs_find_limit` messages in the request.
+    ///
+    /// Also see: [`ValidatorMessagesListResponse`](crate::sentry::ValidatorMessagesListResponse),
+    /// [`ValidatorMessagesListQuery`](crate::sentry::ValidatorMessagesListQuery)
+    </span><span class="kw">pub </span>msgs_find_limit: u32,
+    <span class="doccomment">/// The maximum allowed limit of [`FetchedAnalytics`](crate::sentry::FetchedAnalytics)s per page
+    /// returned by Sentry&#39;s GET `/v5/analytics` routes:
+    ///
+    /// - GET `/v5/analytics`
+    /// - GET `/v5/analytics/for-publisher`
+    /// - GET `/v5/analytics/for-advertiser`
+    /// - GET `/v5/analytics/for-admin`
+    ///
+    /// Request query also has a `limit` parameter, which can be used to return
+    /// &lt;= `analytics_find_limit` messages in the request.
+    ///
+    /// Also see: [`AnalyticsQuery`](crate::analytics::AnalyticsQuery)
+    </span><span class="kw">pub </span>analytics_find_limit: u32,
+    <span class="doccomment">/// A timeout to be used when collecting the Analytics for a requests:
+    /// - GET `/v5/analytics`
+    /// - GET `/v5/analytics/for-publisher`
+    /// - GET `/v5/analytics/for-advertiser`
+    /// - GET `/v5/analytics/for-admin`
+    ///
+    /// In milliseconds
+    </span><span class="attribute">#[serde(deserialize_with = <span class="string">&quot;milliseconds_to_std_duration&quot;</span>)]</span>
+    <span class="kw">pub </span>analytics_maxtime: Duration,
+    <span class="doccomment">/// The amount of time that should have passed before sending a new heartbeat.
+    ///
+    /// In milliseconds
+    </span><span class="attribute">#[serde(deserialize_with = <span class="string">&quot;milliseconds_to_std_duration&quot;</span>)]</span>
+    <span class="kw">pub </span>heartbeat_time: Duration,
+    <span class="doccomment">/// The pro miles below which the [`ApproveState`](crate::validator::ApproveState)
+    /// becomes **unhealthy** in the [`Channel`](crate::Channel)&#39;s Follower.
+    ///
+    /// Also see: [`ApproveState.is_healthy`](crate::validator::ApproveState::is_healthy)
+    ///
+    /// In pro milles (&lt;= 1000)
+    </span><span class="kw">pub </span>health_threshold_promilles: u32,
+    <span class="doccomment">/// The pro milles below which the [`ApproveState`](crate::validator::ApproveState)
+    /// will not be triggered and instead a [`RejectState`](crate::validator::RejectState)
+    /// will be propagated by the [`Channel`](crate::Channel)&#39;s Follower.
+    ///
+    /// In pro milles (&lt;= 1000)
+    </span><span class="kw">pub </span>health_unsignable_promilles: u32,
+    <span class="doccomment">/// Sets the timeout for propagating a Validator message ([`MessageTypes`](crate::validator::MessageTypes))
+    /// to a validator.
+    ///
+    /// In milliseconds
+    </span><span class="attribute">#[serde(deserialize_with = <span class="string">&quot;milliseconds_to_std_duration&quot;</span>)]</span>
+    <span class="kw">pub </span>propagation_timeout: Duration,
+    <span class="doccomment">/// The Client timeout for `SentryApi`.
+    ///
+    /// This includes all requests made to sentry except propagating messages.
+    /// When propagating messages we make requests to foreign Sentry
+    /// instances and we use a separate timeout -
+    /// [`Config.propagation_timeout`](Config::propagation_timeout).
+    ///
+    /// In milliseconds
+    </span><span class="attribute">#[serde(deserialize_with = <span class="string">&quot;milliseconds_to_std_duration&quot;</span>)]</span>
+    <span class="kw">pub </span>fetch_timeout: Duration,
+    <span class="doccomment">/// The Client timeout for `SentryApi` when collecting all channels
+    /// and Validators using the `/campaign/list` route.
+    ///
+    /// In milliseconds
+    </span><span class="attribute">#[serde(deserialize_with = <span class="string">&quot;milliseconds_to_std_duration&quot;</span>)]</span>
+    <span class="kw">pub </span>all_campaigns_timeout: Duration,
+    <span class="doccomment">/// The timeout for a single tick of a [`Channel`](crate::Channel) in
+    /// the Validator Worker.
+    /// This timeout is applied to both the leader and follower ticks.
+    ///
+    /// In milliseconds
+    </span><span class="attribute">#[serde(deserialize_with = <span class="string">&quot;milliseconds_to_std_duration&quot;</span>)]</span>
+    <span class="kw">pub </span>channel_tick_timeout: Duration,
+    <span class="doccomment">/// The default IP rate limit that will be imposed if
+    /// [`Campaign.event_submission`](crate::Campaign::event_submission) is [`None`].
+    </span><span class="kw">pub </span>ip_rate_limit: RateLimit,
+    <span class="doccomment">/// An optional whitelisted addresses for [`Campaign.creator`](crate::Campaign::creator)s.
+    ///
+    /// If empty, any address will be allowed to create a [`Campaign`](crate::Campaign).
+    </span><span class="kw">pub </span>creators_whitelist: Vec&lt;Address&gt;,
+    <span class="doccomment">/// An optional whitelisted Validator addresses for [`Campaign.validators`](crate::Campaign::validators).
+    ///
+    /// If empty, any address will be allowed to be a validator in a [`Campaign`](crate::Campaign).
+    </span><span class="kw">pub </span>validators_whitelist: Vec&lt;ValidatorId&gt;,
+    <span class="kw">pub </span>admins: Vec&lt;Address&gt;,
+    <span class="doccomment">/// The key of this map is a human-readable text of the Chain name
+    /// for readability in the configuration file.
+    ///
+    /// - To get the chain of a token address use [`Config::find_chain_of()`].
+    ///
+    /// - To get a [`ChainInfo`] only by a [`ChainId`] use [`Config::find_chain()`].
+    ///
+    /// **NOTE:** Make sure that a Token [`Address`] is unique across all Chains,
+    /// otherwise [`Config::find_chain_of()`] will fetch only one of them and cause unexpected problems.
+    </span><span class="attribute">#[serde(rename = <span class="string">&quot;chain&quot;</span>)]</span>
+    <span class="kw">pub </span>chains: HashMap&lt;String, ChainInfo&gt;,
+    <span class="kw">pub </span>platform: PlatformConfig,
+    <span class="kw">pub </span>limits: Limits,
 }
 
-<span class="kw">impl</span> <span class="ident">Config</span> {
-    <span class="doccomment">/// Utility method that will deserialize a Toml file content into a [`Config`].</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Rather than relying on the `toml` crate directly, use this method instead.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">try_toml</span>(<span class="ident">toml</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">TomlError</span><span class="op">&gt;</span> {
-        <span class="ident">toml::from_str</span>(<span class="ident">toml</span>)
+<span class="kw">impl </span>Config {
+    <span class="doccomment">/// Utility method that will deserialize a Toml file content into a [`Config`].
+    ///
+    /// Rather than relying on the `toml` crate directly, use this method instead.
+    </span><span class="kw">pub fn </span>try_toml(toml: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, TomlError&gt; {
+        toml::from_str(toml)
     }
 
-    <span class="doccomment">/// Finds a [`Chain`] based on the [`ChainId`].</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">find_chain</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">chain_id</span>: <span class="ident">ChainId</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">ChainInfo</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">chains</span>
-            .<span class="ident">values</span>()
-            .<span class="ident">find</span>(<span class="op">|</span><span class="ident">chain_info</span><span class="op">|</span> <span class="ident">chain_info</span>.<span class="ident">chain</span>.<span class="ident">chain_id</span> <span class="op">==</span> <span class="ident">chain_id</span>)
+    <span class="doccomment">/// Finds a [`Chain`] based on the [`ChainId`].
+    </span><span class="kw">pub fn </span>find_chain(<span class="kw-2">&amp;</span><span class="self">self</span>, chain_id: ChainId) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>ChainInfo&gt; {
+        <span class="self">self</span>.chains
+            .values()
+            .find(|chain_info| chain_info.chain.chain_id == chain_id)
     }
 
-    <span class="doccomment">/// Finds the pair of Chain &amp; Token, given only a token [`Address`].</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">find_chain_of</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">token</span>: <span class="ident">Address</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ChainOf</span><span class="op">&lt;</span>()<span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">chains</span>.<span class="ident">values</span>().<span class="ident">find_map</span>(<span class="op">|</span><span class="ident">chain_info</span><span class="op">|</span> {
-            <span class="ident">chain_info</span>
-                .<span class="ident">tokens</span>
-                .<span class="ident">values</span>()
-                .<span class="ident">find</span>(<span class="op">|</span><span class="ident">token_info</span><span class="op">|</span> <span class="ident">token_info</span>.<span class="ident">address</span> <span class="op">==</span> <span class="ident">token</span>)
-                .<span class="ident">map</span>(<span class="op">|</span><span class="ident">token_info</span><span class="op">|</span> <span class="ident">ChainOf::new</span>(<span class="ident">chain_info</span>.<span class="ident">chain</span>.<span class="ident">clone</span>(), <span class="ident">token_info</span>.<span class="ident">clone</span>()))
+    <span class="doccomment">/// Finds the pair of Chain &amp; Token, given only a token [`Address`].
+    </span><span class="kw">pub fn </span>find_chain_of(<span class="kw-2">&amp;</span><span class="self">self</span>, token: Address) -&gt; <span class="prelude-ty">Option</span>&lt;ChainOf&lt;()&gt;&gt; {
+        <span class="self">self</span>.chains.values().find_map(|chain_info| {
+            chain_info
+                .tokens
+                .values()
+                .find(|token_info| token_info.address == token)
+                .map(|token_info| ChainOf::new(chain_info.chain.clone(), token_info.clone()))
         })
     }
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">PlatformConfig</span> {
-    <span class="kw">pub</span> <span class="ident">url</span>: <span class="ident">ApiUrl</span>,
-    <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">deserialize_with</span> <span class="op">=</span> <span class="string">&quot;milliseconds_to_std_duration&quot;</span>)]</span>
-    <span class="kw">pub</span> <span class="ident">keep_alive_interval</span>: <span class="ident">Duration</span>,
+<span class="attribute">#[derive(Serialize, Deserialize, Debug, Clone)]</span>
+<span class="kw">pub struct </span>PlatformConfig {
+    <span class="kw">pub </span>url: ApiUrl,
+    <span class="attribute">#[serde(deserialize_with = <span class="string">&quot;milliseconds_to_std_duration&quot;</span>)]</span>
+    <span class="kw">pub </span>keep_alive_interval: Duration,
 }
 
-<span class="doccomment">/// Configured chain with tokens.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>, <span class="ident">Serialize</span>, <span class="ident">Deserialize</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ChainInfo</span> {
-    <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">flatten</span>)]</span>
-    <span class="kw">pub</span> <span class="ident">chain</span>: <span class="ident">Chain</span>,
-    <span class="doccomment">/// A Chain should always have whitelisted tokens configured,</span>
-    <span class="doccomment">/// otherwise there is no reason to have the chain set up.</span>
-    <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">rename</span> <span class="op">=</span> <span class="string">&quot;token&quot;</span>)]</span>
-    <span class="kw">pub</span> <span class="ident">tokens</span>: <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">String</span>, <span class="ident">TokenInfo</span><span class="op">&gt;</span>,
+<span class="doccomment">/// Configured chain with tokens.
+</span><span class="attribute">#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]</span>
+<span class="kw">pub struct </span>ChainInfo {
+    <span class="attribute">#[serde(flatten)]</span>
+    <span class="kw">pub </span>chain: Chain,
+    <span class="doccomment">/// A Chain should always have whitelisted tokens configured,
+    /// otherwise there is no reason to have the chain set up.
+    </span><span class="attribute">#[serde(rename = <span class="string">&quot;token&quot;</span>)]</span>
+    <span class="kw">pub </span>tokens: HashMap&lt;String, TokenInfo&gt;,
 }
 
-<span class="kw">impl</span> <span class="ident">ChainInfo</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">find_token</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">token</span>: <span class="ident">Address</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">TokenInfo</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">tokens</span>
-            .<span class="ident">values</span>()
-            .<span class="ident">find</span>(<span class="op">|</span><span class="ident">token_info</span><span class="op">|</span> <span class="ident">token_info</span>.<span class="ident">address</span> <span class="op">==</span> <span class="ident">token</span>)
+<span class="kw">impl </span>ChainInfo {
+    <span class="kw">pub fn </span>find_token(<span class="kw-2">&amp;</span><span class="self">self</span>, token: Address) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>TokenInfo&gt; {
+        <span class="self">self</span>.tokens
+            .values()
+            .find(|token_info| token_info.address == token)
     }
 }
 
-<span class="doccomment">/// Configured Token in a specific [`Chain`].</span>
-<span class="doccomment">/// Precision can differ for the same token from one [`Chain`] to another.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">Eq</span>, <span class="ident">PartialEq</span>, <span class="ident">Hash</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">TokenInfo</span> {
-    <span class="kw">pub</span> <span class="ident">min_campaign_budget</span>: <span class="ident">BigNum</span>,
-    <span class="kw">pub</span> <span class="ident">min_validator_fee</span>: <span class="ident">BigNum</span>,
-    <span class="kw">pub</span> <span class="ident">precision</span>: <span class="ident">NonZeroU8</span>,
-    <span class="kw">pub</span> <span class="ident">address</span>: <span class="ident">Address</span>,
+<span class="doccomment">/// Configured Token in a specific [`Chain`].
+/// Precision can differ for the same token from one [`Chain`] to another.
+</span><span class="attribute">#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq, Hash)]</span>
+<span class="kw">pub struct </span>TokenInfo {
+    <span class="kw">pub </span>min_campaign_budget: BigNum,
+    <span class="kw">pub </span>min_validator_fee: BigNum,
+    <span class="kw">pub </span>precision: NonZeroU8,
+    <span class="kw">pub </span>address: Address,
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Limits</span> {
-    <span class="kw">pub</span> <span class="ident">units_for_slot</span>: <span class="ident">limits::UnitsForSlot</span>,
+<span class="attribute">#[derive(Serialize, Deserialize, Debug, Clone)]</span>
+<span class="kw">pub struct </span>Limits {
+    <span class="kw">pub </span>units_for_slot: limits::UnitsForSlot,
 }
 
-<span class="kw">fn</span> <span class="ident">milliseconds_to_std_duration</span><span class="op">&lt;</span><span class="lifetime">&#39;de</span>, <span class="ident">D</span><span class="op">&gt;</span>(<span class="ident">deserializer</span>: <span class="ident">D</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Duration</span>, <span class="ident">D::Error</span><span class="op">&gt;</span>
-<span class="kw">where</span>
-    <span class="ident">D</span>: <span class="ident">Deserializer</span><span class="op">&lt;</span><span class="lifetime">&#39;de</span><span class="op">&gt;</span>,
+<span class="kw">fn </span>milliseconds_to_std_duration&lt;<span class="lifetime">&#39;de</span>, D&gt;(deserializer: D) -&gt; <span class="prelude-ty">Result</span>&lt;Duration, D::Error&gt;
+<span class="kw">where
+    </span>D: Deserializer&lt;<span class="lifetime">&#39;de</span>&gt;,
 {
-    <span class="kw">use</span> <span class="ident">serde::de::Error</span>;
-    <span class="kw">use</span> <span class="ident">toml::Value</span>;
+    <span class="kw">use </span>serde::de::Error;
+    <span class="kw">use </span>toml::Value;
 
-    <span class="kw">let</span> <span class="ident">toml_value</span>: <span class="ident">Value</span> <span class="op">=</span> <span class="ident">Value::deserialize</span>(<span class="ident">deserializer</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span>toml_value: Value = Value::deserialize(deserializer)<span class="question-mark">?</span>;
 
-    <span class="kw">let</span> <span class="ident">milliseconds</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">toml_value</span> {
-        <span class="ident">Value::Integer</span>(<span class="ident">mills</span>) =&gt; <span class="ident">u64::try_from</span>(<span class="ident">mills</span>).<span class="ident">map_err</span>(<span class="ident">Error::custom</span>),
-        <span class="kw">_</span> =&gt; <span class="prelude-val">Err</span>(<span class="ident">Error::custom</span>(<span class="string">&quot;Only integers allowed for this value&quot;</span>)),
+    <span class="kw">let </span>milliseconds = <span class="kw">match </span>toml_value {
+        Value::Integer(mills) =&gt; u64::try_from(mills).map_err(Error::custom),
+        <span class="kw">_ </span>=&gt; <span class="prelude-val">Err</span>(Error::custom(<span class="string">&quot;Only integers allowed for this value&quot;</span>)),
     }<span class="question-mark">?</span>;
 
-    <span class="prelude-val">Ok</span>(<span class="ident">Duration::from_millis</span>(<span class="ident">milliseconds</span>))
+    <span class="prelude-val">Ok</span>(Duration::from_millis(milliseconds))
 }
 
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">limits</span> {
-    <span class="kw">use</span> <span class="ident">serde</span>::{<span class="ident">Deserialize</span>, <span class="ident">Serialize</span>};
+<span class="kw">pub mod </span>limits {
+    <span class="kw">use </span>serde::{Deserialize, Serialize};
 
-    <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::UnifiedNum</span>;
+    <span class="kw">use </span><span class="kw">crate</span>::UnifiedNum;
 
-    <span class="doccomment">/// Limits applied to the `POST /units-for-slot` route</span>
-    <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">UnitsForSlot</span> {
-        <span class="doccomment">/// The maximum number of campaigns a publisher can earn from.</span>
-        <span class="doccomment">/// This will limit the returned Campaigns to the set number.</span>
-        <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">default</span>)]</span>
-        <span class="kw">pub</span> <span class="ident">max_campaigns_earning_from</span>: <span class="ident">u16</span>,
-        <span class="doccomment">/// If the resulting targeting price is lower than this value,</span>
-        <span class="doccomment">/// it will filter out the given AdUnit.</span>
-        <span class="kw">pub</span> <span class="ident">global_min_impression_price</span>: <span class="ident">UnifiedNum</span>,
+    <span class="doccomment">/// Limits applied to the `POST /units-for-slot` route
+    </span><span class="attribute">#[derive(Serialize, Deserialize, Debug, Clone)]</span>
+    <span class="kw">pub struct </span>UnitsForSlot {
+        <span class="doccomment">/// The maximum number of campaigns a publisher can earn from.
+        /// This will limit the returned Campaigns to the set number.
+        </span><span class="attribute">#[serde(default)]</span>
+        <span class="kw">pub </span>max_campaigns_earning_from: u16,
+        <span class="doccomment">/// If the resulting targeting price is lower than this value,
+        /// it will filter out the given AdUnit.
+        </span><span class="kw">pub </span>global_min_impression_price: UnifiedNum,
     }
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Error</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">ConfigError</span> {
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Toml parsing: {0}&quot;</span>)]</span>
-    <span class="ident">Toml</span>(<span class="attribute">#[<span class="ident">from</span>]</span> <span class="ident">toml::de::Error</span>),
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;File reading: {0}&quot;</span>)]</span>
-    <span class="ident">InvalidFile</span>(<span class="attribute">#[<span class="ident">from</span>]</span> <span class="ident">std::io::Error</span>),
+<span class="attribute">#[derive(Debug, Error)]</span>
+<span class="kw">pub enum </span>ConfigError {
+    <span class="attribute">#[error(<span class="string">&quot;Toml parsing: {0}&quot;</span>)]</span>
+    Toml(<span class="attribute">#[from]</span> toml::de::Error),
+    <span class="attribute">#[error(<span class="string">&quot;File reading: {0}&quot;</span>)]</span>
+    InvalidFile(<span class="attribute">#[from]</span> std::io::Error),
 }
 
-<span class="doccomment">/// If no `config_file` path is provided it will load the [`Environment`] configuration.</span>
-<span class="doccomment">/// If `config_file` path is provided it will try to read and parse the file in Toml format.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">configuration</span>(
-    <span class="ident">environment</span>: <span class="ident">Environment</span>,
-    <span class="ident">config_file</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">str</span><span class="op">&gt;</span>,
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Config</span>, <span class="ident">ConfigError</span><span class="op">&gt;</span> {
-    <span class="kw">match</span> <span class="ident">config_file</span> {
-        <span class="prelude-val">Some</span>(<span class="ident">config_file</span>) =&gt; {
-            <span class="kw">let</span> <span class="ident">content</span> <span class="op">=</span> <span class="ident">std::fs::read</span>(<span class="ident">config_file</span>)<span class="question-mark">?</span>;
+<span class="doccomment">/// If no `config_file` path is provided it will load the [`Environment`] configuration.
+/// If `config_file` path is provided it will try to read and parse the file in Toml format.
+</span><span class="kw">pub fn </span>configuration(
+    environment: Environment,
+    config_file: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>str&gt;,
+) -&gt; <span class="prelude-ty">Result</span>&lt;Config, ConfigError&gt; {
+    <span class="kw">match </span>config_file {
+        <span class="prelude-val">Some</span>(config_file) =&gt; {
+            <span class="kw">let </span>content = std::fs::read(config_file)<span class="question-mark">?</span>;
 
-            <span class="prelude-val">Ok</span>(<span class="ident">toml::from_slice</span>(<span class="kw-2">&amp;</span><span class="ident">content</span>)<span class="question-mark">?</span>)
+            <span class="prelude-val">Ok</span>(toml::from_slice(<span class="kw-2">&amp;</span>content)<span class="question-mark">?</span>)
         }
-        <span class="prelude-val">None</span> =&gt; <span class="kw">match</span> <span class="ident">environment</span> {
-            <span class="ident">Environment::Production</span> =&gt; <span class="prelude-val">Ok</span>(<span class="ident">PRODUCTION_CONFIG</span>.<span class="ident">clone</span>()),
-            <span class="ident">Environment::Development</span> =&gt; <span class="prelude-val">Ok</span>(<span class="ident">GANACHE_CONFIG</span>.<span class="ident">clone</span>()),
+        <span class="prelude-val">None </span>=&gt; <span class="kw">match </span>environment {
+            Environment::Production =&gt; <span class="prelude-val">Ok</span>(PRODUCTION_CONFIG.clone()),
+            Environment::Development =&gt; <span class="prelude-val">Ok</span>(GANACHE_CONFIG.clone()),
         },
     }
 }
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
-<span class="kw">mod</span> <span class="ident">test</span> {
-    <span class="kw">use</span> <span class="kw">super</span>::{<span class="ident">GANACHE_CONFIG</span>, <span class="ident">PRODUCTION_CONFIG</span>};
+<span class="attribute">#[cfg(test)]</span>
+<span class="kw">mod </span>test {
+    <span class="kw">use super</span>::{GANACHE_CONFIG, PRODUCTION_CONFIG};
 
-    <span class="doccomment">/// Makes sure that both config files are correct and won&#39;t be left in a</span>
-    <span class="doccomment">/// broken state.</span>
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">correct_config_files</span>() {
-        <span class="kw">let</span> <span class="ident">_ganache</span> <span class="op">=</span> <span class="ident">GANACHE_CONFIG</span>.<span class="ident">clone</span>();
-        <span class="kw">let</span> <span class="ident">_production</span> <span class="op">=</span> <span class="ident">PRODUCTION_CONFIG</span>.<span class="ident">clone</span>();
+    <span class="doccomment">/// Makes sure that both config files are correct and won&#39;t be left in a
+    /// broken state.
+    </span><span class="attribute">#[test]</span>
+    <span class="kw">fn </span>correct_config_files() {
+        <span class="kw">let </span>_ganache = GANACHE_CONFIG.clone();
+        <span class="kw">let </span>_production = PRODUCTION_CONFIG.clone();
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="primitives" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (20ffea693 2022-08-11)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="primitives" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>

@@ -50,57 +50,57 @@
 <span id="50">50</span>
 <span id="51">51</span>
 <span id="52">52</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">tiny_keccak</span>::{<span class="ident">Hasher</span>, <span class="ident">Keccak</span>};
+</pre><pre class="rust"><code><span class="kw">use </span>tiny_keccak::{Hasher, Keccak};
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">checksum</span>(<span class="ident">address</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="ident">String</span> {
-    <span class="kw">let</span> <span class="ident">address</span> <span class="op">=</span> <span class="ident">address</span>.<span class="ident">trim_start_matches</span>(<span class="string">&quot;0x&quot;</span>).<span class="ident">to_lowercase</span>();
+<span class="kw">pub fn </span>checksum(address: <span class="kw-2">&amp;</span>str) -&gt; String {
+    <span class="kw">let </span>address = address.trim_start_matches(<span class="string">&quot;0x&quot;</span>).to_lowercase();
 
-    <span class="kw">let</span> <span class="ident">address_hash</span> <span class="op">=</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">hasher</span> <span class="op">=</span> <span class="ident">Keccak::v256</span>();
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">result</span>: [<span class="ident">u8</span>; <span class="number">32</span>] <span class="op">=</span> [<span class="number">0</span>; <span class="number">32</span>];
+    <span class="kw">let </span>address_hash = {
+        <span class="kw">let </span><span class="kw-2">mut </span>hasher = Keccak::v256();
+        <span class="kw">let </span><span class="kw-2">mut </span>result: [u8; <span class="number">32</span>] = [<span class="number">0</span>; <span class="number">32</span>];
 
-        <span class="ident">hasher</span>.<span class="ident">update</span>(<span class="ident">address</span>.<span class="ident">as_bytes</span>());
-        <span class="ident">hasher</span>.<span class="ident">finalize</span>(<span class="kw-2">&amp;mut</span> <span class="ident">result</span>);
+        hasher.update(address.as_bytes());
+        hasher.finalize(<span class="kw-2">&amp;mut </span>result);
 
-        <span class="ident">hex::encode</span>(<span class="ident">result</span>)
+        hex::encode(result)
     };
 
-    <span class="ident">address</span>
-        .<span class="ident">char_indices</span>()
-        .<span class="ident">fold</span>(<span class="ident">String::from</span>(<span class="string">&quot;0x&quot;</span>), <span class="op">|</span><span class="kw-2">mut</span> <span class="ident">acc</span>, (<span class="ident">index</span>, <span class="ident">address_char</span>)<span class="op">|</span> {
-            <span class="comment">// this cannot fail since it&#39;s Keccak256 hashed</span>
-            <span class="kw">let</span> <span class="ident">n</span> <span class="op">=</span> <span class="ident">u16::from_str_radix</span>(<span class="kw-2">&amp;</span><span class="ident">address_hash</span>[<span class="ident">index</span>..<span class="ident">index</span> <span class="op">+</span> <span class="number">1</span>], <span class="number">16</span>).<span class="ident">unwrap</span>();
+    address
+        .char_indices()
+        .fold(String::from(<span class="string">&quot;0x&quot;</span>), |<span class="kw-2">mut </span>acc, (index, address_char)| {
+            <span class="comment">// this cannot fail since it&#39;s Keccak256 hashed
+            </span><span class="kw">let </span>n = u16::from_str_radix(<span class="kw-2">&amp;</span>address_hash[index..index + <span class="number">1</span>], <span class="number">16</span>).unwrap();
 
-            <span class="kw">if</span> <span class="ident">n</span> <span class="op">&gt;</span> <span class="number">7</span> {
-                <span class="comment">// make char uppercase if ith character is 9..f</span>
-                <span class="ident">acc</span>.<span class="ident">push_str</span>(<span class="kw-2">&amp;</span><span class="ident">address_char</span>.<span class="ident">to_uppercase</span>().<span class="ident">to_string</span>())
-            } <span class="kw">else</span> {
-                <span class="comment">// already lowercased</span>
-                <span class="ident">acc</span>.<span class="ident">push</span>(<span class="ident">address_char</span>)
+            <span class="kw">if </span>n &gt; <span class="number">7 </span>{
+                <span class="comment">// make char uppercase if ith character is 9..f
+                </span>acc.push_str(<span class="kw-2">&amp;</span>address_char.to_uppercase().to_string())
+            } <span class="kw">else </span>{
+                <span class="comment">// already lowercased
+                </span>acc.push(address_char)
             }
 
-            <span class="ident">acc</span>
+            acc
         })
 }
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
-<span class="kw">mod</span> <span class="ident">test</span> {
-    <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
+<span class="attribute">#[cfg(test)]</span>
+<span class="kw">mod </span>test {
+    <span class="kw">use super</span>::<span class="kw-2">*</span>;
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">it_checksums</span>() {
-        <span class="kw">let</span> <span class="ident">expected_checksum</span> <span class="op">=</span> <span class="string">&quot;0xce07CbB7e054514D590a0262C93070D838bFBA2e&quot;</span>;
+    <span class="attribute">#[test]</span>
+    <span class="kw">fn </span>it_checksums() {
+        <span class="kw">let </span>expected_checksum = <span class="string">&quot;0xce07CbB7e054514D590a0262C93070D838bFBA2e&quot;</span>;
 
-        <span class="kw">let</span> <span class="ident">non_checksummed</span> <span class="op">=</span> <span class="ident">expected_checksum</span>.<span class="ident">to_lowercase</span>();
+        <span class="kw">let </span>non_checksummed = expected_checksum.to_lowercase();
 
-        <span class="macro">assert_eq!</span>(<span class="ident">expected_checksum</span>, <span class="ident">checksum</span>(<span class="kw-2">&amp;</span><span class="ident">non_checksummed</span>));
+        <span class="macro">assert_eq!</span>(expected_checksum, checksum(<span class="kw-2">&amp;</span>non_checksummed));
 
-        <span class="kw">let</span> <span class="ident">non_prefixed</span> <span class="op">=</span> <span class="ident">non_checksummed</span>
-            .<span class="ident">strip_prefix</span>(<span class="string">&quot;0x&quot;</span>)
-            .<span class="ident">expect</span>(<span class="string">&quot;should have prefix&quot;</span>);
+        <span class="kw">let </span>non_prefixed = non_checksummed
+            .strip_prefix(<span class="string">&quot;0x&quot;</span>)
+            .expect(<span class="string">&quot;should have prefix&quot;</span>);
 
-        <span class="macro">assert_eq!</span>(<span class="ident">expected_checksum</span>, <span class="ident">checksum</span>(<span class="ident">non_prefixed</span>))
+        <span class="macro">assert_eq!</span>(expected_checksum, checksum(non_prefixed))
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="primitives" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (20ffea693 2022-08-11)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="primitives" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>

@@ -331,338 +331,338 @@
 <span id="331">331</span>
 <span id="332">332</span>
 <span id="333">333</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">parse_display</span>::{<span class="ident">Display</span> <span class="kw">as</span> <span class="ident">DeriveDisplay</span>, <span class="ident">FromStr</span> <span class="kw">as</span> <span class="ident">DeriveFromStr</span>};
-<span class="kw">use</span> <span class="ident">serde</span>::{<span class="ident">Deserialize</span>, <span class="ident">Serialize</span>};
-<span class="kw">use</span> <span class="ident">std::str::FromStr</span>;
+</pre><pre class="rust"><code><span class="kw">use </span>parse_display::{Display <span class="kw">as </span>DeriveDisplay, FromStr <span class="kw">as </span>DeriveFromStr};
+<span class="kw">use </span>serde::{Deserialize, Serialize};
+<span class="kw">use </span>std::str::FromStr;
 
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::targeting::Error</span>;
+<span class="kw">use </span><span class="kw">crate</span>::targeting::Error;
 
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">FIELDS</span>: [<span class="ident">Field</span>; <span class="number">24</span>] <span class="op">=</span> [
-    <span class="comment">// AdView scope, accessible only on the AdView</span>
-    <span class="ident">Field::AdView</span>(<span class="ident">AdView::SecondsSinceCampaignImpression</span>),
-    <span class="ident">Field::AdView</span>(<span class="ident">AdView::HasCustomPreferences</span>),
-    <span class="ident">Field::AdView</span>(<span class="ident">AdView::NavigatorLanguage</span>),
-    <span class="comment">// Global scope, accessible everywhere</span>
-    <span class="ident">Field::Global</span>(<span class="ident">Global::AdSlotId</span>),
-    <span class="ident">Field::Global</span>(<span class="ident">Global::AdSlotType</span>),
-    <span class="ident">Field::Global</span>(<span class="ident">Global::PublisherId</span>),
-    <span class="ident">Field::Global</span>(<span class="ident">Global::Country</span>),
-    <span class="ident">Field::Global</span>(<span class="ident">Global::EventType</span>),
-    <span class="ident">Field::Global</span>(<span class="ident">Global::SecondsSinceEpoch</span>),
-    <span class="ident">Field::Global</span>(<span class="ident">Global::UserAgentOS</span>),
-    <span class="ident">Field::Global</span>(<span class="ident">Global::UserAgentBrowserFamily</span>),
-    <span class="comment">// Campaign-dependant - Global scope, accessible everywhere</span>
-    <span class="comment">// AdUnit</span>
-    <span class="ident">Field::AdUnit</span>(<span class="ident">AdUnit::AdUnitId</span>),
-    <span class="comment">// Campaign</span>
-    <span class="ident">Field::Campaign</span>(<span class="ident">Campaign::AdvertiserId</span>),
-    <span class="ident">Field::Campaign</span>(<span class="ident">Campaign::CampaignId</span>),
-    <span class="ident">Field::Campaign</span>(<span class="ident">Campaign::CampaignSecondsActive</span>),
-    <span class="ident">Field::Campaign</span>(<span class="ident">Campaign::CampaignSecondsDuration</span>),
-    <span class="ident">Field::Campaign</span>(<span class="ident">Campaign::CampaignBudget</span>),
-    <span class="ident">Field::Campaign</span>(<span class="ident">Campaign::EventMinPrice</span>),
-    <span class="ident">Field::Campaign</span>(<span class="ident">Campaign::EventMaxPrice</span>),
-    <span class="comment">// Balances</span>
-    <span class="ident">Field::Balances</span>(<span class="ident">Balances::CampaignTotalSpent</span>),
-    <span class="ident">Field::Balances</span>(<span class="ident">Balances::PublisherEarnedFromCampaign</span>),
-    <span class="comment">// AdSlot scope, accessible on Supermarket and AdView</span>
-    <span class="ident">Field::AdSlot</span>(<span class="ident">AdSlot::Categories</span>),
-    <span class="ident">Field::AdSlot</span>(<span class="ident">AdSlot::Hostname</span>),
-    <span class="ident">Field::AdSlot</span>(<span class="ident">AdSlot::AlexaRank</span>),
+<span class="kw">pub const </span>FIELDS: [Field; <span class="number">24</span>] = [
+    <span class="comment">// AdView scope, accessible only on the AdView
+    </span>Field::AdView(AdView::SecondsSinceCampaignImpression),
+    Field::AdView(AdView::HasCustomPreferences),
+    Field::AdView(AdView::NavigatorLanguage),
+    <span class="comment">// Global scope, accessible everywhere
+    </span>Field::Global(Global::AdSlotId),
+    Field::Global(Global::AdSlotType),
+    Field::Global(Global::PublisherId),
+    Field::Global(Global::Country),
+    Field::Global(Global::EventType),
+    Field::Global(Global::SecondsSinceEpoch),
+    Field::Global(Global::UserAgentOS),
+    Field::Global(Global::UserAgentBrowserFamily),
+    <span class="comment">// Campaign-dependant - Global scope, accessible everywhere
+    // AdUnit
+    </span>Field::AdUnit(AdUnit::AdUnitId),
+    <span class="comment">// Campaign
+    </span>Field::Campaign(Campaign::AdvertiserId),
+    Field::Campaign(Campaign::CampaignId),
+    Field::Campaign(Campaign::CampaignSecondsActive),
+    Field::Campaign(Campaign::CampaignSecondsDuration),
+    Field::Campaign(Campaign::CampaignBudget),
+    Field::Campaign(Campaign::EventMinPrice),
+    Field::Campaign(Campaign::EventMaxPrice),
+    <span class="comment">// Balances
+    </span>Field::Balances(Balances::CampaignTotalSpent),
+    Field::Balances(Balances::PublisherEarnedFromCampaign),
+    <span class="comment">// AdSlot scope, accessible on Supermarket and AdView
+    </span>Field::AdSlot(AdSlot::Categories),
+    Field::AdSlot(AdSlot::Hostname),
+    Field::AdSlot(AdSlot::AlexaRank),
 ];
 
-<span class="attribute">#[<span class="ident">derive</span>(
-    <span class="ident">Hash</span>, <span class="ident">Copy</span>, <span class="ident">Clone</span>, <span class="ident">Debug</span>, <span class="ident">Eq</span>, <span class="ident">PartialEq</span>, <span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">DeriveFromStr</span>, <span class="ident">DeriveDisplay</span>,
+<span class="attribute">#[derive(
+    Hash, Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize, DeriveFromStr, DeriveDisplay,
 )]</span>
-<span class="attribute">#[<span class="ident">serde</span>(<span class="ident">into</span> <span class="op">=</span> <span class="string">&quot;String&quot;</span>, <span class="ident">try_from</span> <span class="op">=</span> <span class="string">&quot;String&quot;</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">Field</span> {
-    <span class="doccomment">/// AdView scope, accessible only on the AdView</span>
-    <span class="attribute">#[<span class="ident">display</span>(<span class="string">&quot;adView.{0}&quot;</span>)]</span>
-    <span class="ident">AdView</span>(<span class="ident">AdView</span>),
-    <span class="doccomment">/// Global scope, accessible everywhere</span>
-    <span class="attribute">#[<span class="ident">display</span>(<span class="string">&quot;{0}&quot;</span>)]</span>
-    <span class="ident">Global</span>(<span class="ident">Global</span>),
-    <span class="doccomment">/// Global scope, accessible everywhere, campaign-dependant</span>
-    <span class="attribute">#[<span class="ident">display</span>(<span class="string">&quot;{0}&quot;</span>)]</span>
-    <span class="ident">AdUnit</span>(<span class="ident">AdUnit</span>),
-    <span class="doccomment">/// Global scope, accessible everywhere, campaign-dependant</span>
-    <span class="attribute">#[<span class="ident">display</span>(<span class="string">&quot;{0}&quot;</span>)]</span>
-    <span class="ident">Campaign</span>(<span class="ident">Campaign</span>),
-    <span class="doccomment">/// Global scope, accessible everywhere, campaign-dependant</span>
-    <span class="attribute">#[<span class="ident">display</span>(<span class="string">&quot;{0}&quot;</span>)]</span>
-    <span class="ident">Balances</span>(<span class="ident">Balances</span>),
-    <span class="doccomment">/// AdSlot scope, accessible on Supermarket and AdView</span>
-    <span class="attribute">#[<span class="ident">display</span>(<span class="string">&quot;adSlot.{0}&quot;</span>)]</span>
-    <span class="ident">AdSlot</span>(<span class="ident">AdSlot</span>),
+<span class="attribute">#[serde(into = <span class="string">&quot;String&quot;</span>, try_from = <span class="string">&quot;String&quot;</span>)]</span>
+<span class="kw">pub enum </span>Field {
+    <span class="doccomment">/// AdView scope, accessible only on the AdView
+    </span><span class="attribute">#[display(<span class="string">&quot;adView.{0}&quot;</span>)]</span>
+    AdView(AdView),
+    <span class="doccomment">/// Global scope, accessible everywhere
+    </span><span class="attribute">#[display(<span class="string">&quot;{0}&quot;</span>)]</span>
+    Global(Global),
+    <span class="doccomment">/// Global scope, accessible everywhere, campaign-dependant
+    </span><span class="attribute">#[display(<span class="string">&quot;{0}&quot;</span>)]</span>
+    AdUnit(AdUnit),
+    <span class="doccomment">/// Global scope, accessible everywhere, campaign-dependant
+    </span><span class="attribute">#[display(<span class="string">&quot;{0}&quot;</span>)]</span>
+    Campaign(Campaign),
+    <span class="doccomment">/// Global scope, accessible everywhere, campaign-dependant
+    </span><span class="attribute">#[display(<span class="string">&quot;{0}&quot;</span>)]</span>
+    Balances(Balances),
+    <span class="doccomment">/// AdSlot scope, accessible on Supermarket and AdView
+    </span><span class="attribute">#[display(<span class="string">&quot;adSlot.{0}&quot;</span>)]</span>
+    AdSlot(AdSlot),
 }
 
-<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">Field</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">String</span> {
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">field</span>: <span class="ident">Field</span>) -&gt; <span class="self">Self</span> {
-        <span class="ident">field</span>.<span class="ident">to_string</span>()
+<span class="kw">impl </span>From&lt;Field&gt; <span class="kw">for </span>String {
+    <span class="kw">fn </span>from(field: Field) -&gt; <span class="self">Self </span>{
+        field.to_string()
     }
 }
 
-<span class="kw">impl</span> <span class="ident">TryFrom</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Field</span> {
-    <span class="kw">type</span> <span class="ident">Error</span> <span class="op">=</span> <span class="ident">Error</span>;
+<span class="kw">impl </span>TryFrom&lt;String&gt; <span class="kw">for </span>Field {
+    <span class="kw">type </span>Error = Error;
 
-    <span class="kw">fn</span> <span class="ident">try_from</span>(<span class="ident">value</span>: <span class="ident">String</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident"><span class="self">Self</span>::Error</span><span class="op">&gt;</span> {
-        <span class="ident">Field::from_str</span>(<span class="kw-2">&amp;</span><span class="ident">value</span>).<span class="ident">map_err</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">Error::UnknownVariable</span>)
+    <span class="kw">fn </span>try_from(value: String) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, <span class="self">Self</span>::Error&gt; {
+        Field::from_str(<span class="kw-2">&amp;</span>value).map_err(|<span class="kw">_</span>| Error::UnknownVariable)
     }
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">Serialize</span>, <span class="ident">Deserialize</span>)]</span>
-<span class="attribute">#[<span class="ident">serde</span>(<span class="ident">untagged</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">Get</span><span class="op">&lt;</span><span class="ident">G</span>, <span class="ident">V</span><span class="op">&gt;</span> {
-    <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">skip_deserializing</span>)]</span>
-    <span class="doccomment">/// We don&#39;t want to deserialize a Getter, we only deserialize Values</span>
-    <span class="doccomment">/// This will ensure that we only use a Map of values with `Get::Value` when we deserialize</span>
-    <span class="doccomment">/// We also serialize the getter into a Value struct</span>
-    <span class="ident">Getter</span>(<span class="ident">G</span>),
-    <span class="ident">Value</span>(<span class="ident">V</span>),
+<span class="attribute">#[derive(Debug, Clone, Serialize, Deserialize)]</span>
+<span class="attribute">#[serde(untagged)]</span>
+<span class="kw">pub enum </span>Get&lt;G, V&gt; {
+    <span class="attribute">#[serde(skip_deserializing)]</span>
+    <span class="doccomment">/// We don&#39;t want to deserialize a Getter, we only deserialize Values
+    /// This will ensure that we only use a Map of values with `Get::Value` when we deserialize
+    /// We also serialize the getter into a Value struct
+    </span>Getter(G),
+    Value(V),
 }
 
-<span class="doccomment">/// We keep the `GetField` implementation on each individual `Get&lt;Getter, Values&gt;` implementation</span>
-<span class="doccomment">/// to lower the risk of a field diverging as 2 different `Value` types</span>
-<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">GetField</span> {
-    <span class="kw">type</span> <span class="ident">Output</span>;
-    <span class="kw">type</span> <span class="ident">Field</span>;
+<span class="doccomment">/// We keep the `GetField` implementation on each individual `Get&lt;Getter, Values&gt;` implementation
+/// to lower the risk of a field diverging as 2 different `Value` types
+</span><span class="kw">pub trait </span>GetField {
+    <span class="kw">type </span>Output;
+    <span class="kw">type </span>Field;
 
-    <span class="kw">fn</span> <span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">field</span>: <span class="kw-2">&amp;</span><span class="ident"><span class="self">Self</span>::Field</span>) -&gt; <span class="ident"><span class="self">Self</span>::Output</span>;
+    <span class="kw">fn </span>get(<span class="kw-2">&amp;</span><span class="self">self</span>, field: <span class="kw-2">&amp;</span><span class="self">Self</span>::Field) -&gt; <span class="self">Self</span>::Output;
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="ident">GetField</span> <span class="kw">for</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>
-<span class="kw">where</span>
-    <span class="ident">T</span>: <span class="ident">GetField</span>,
+<span class="kw">impl</span>&lt;T&gt; GetField <span class="kw">for </span><span class="prelude-ty">Option</span>&lt;T&gt;
+<span class="kw">where
+    </span>T: GetField,
 {
-    <span class="kw">type</span> <span class="ident">Output</span> <span class="op">=</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">T::Output</span><span class="op">&gt;</span>;
-    <span class="kw">type</span> <span class="ident">Field</span> <span class="op">=</span> <span class="ident">T::Field</span>;
+    <span class="kw">type </span>Output = <span class="prelude-ty">Option</span>&lt;T::Output&gt;;
+    <span class="kw">type </span>Field = T::Field;
 
-    <span class="kw">fn</span> <span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">field</span>: <span class="kw-2">&amp;</span><span class="ident"><span class="self">Self</span>::Field</span>) -&gt; <span class="ident"><span class="self">Self</span>::Output</span> {
-        <span class="self">self</span>.<span class="ident">as_ref</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">get_field</span><span class="op">|</span> <span class="ident">get_field</span>.<span class="ident">get</span>(<span class="ident">field</span>))
+    <span class="kw">fn </span>get(<span class="kw-2">&amp;</span><span class="self">self</span>, field: <span class="kw-2">&amp;</span><span class="self">Self</span>::Field) -&gt; <span class="self">Self</span>::Output {
+        <span class="self">self</span>.as_ref().map(|get_field| get_field.get(field))
     }
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Hash</span>, <span class="ident">Copy</span>, <span class="ident">Clone</span>, <span class="ident">Debug</span>, <span class="ident">Eq</span>, <span class="ident">PartialEq</span>, <span class="ident">DeriveFromStr</span>, <span class="ident">DeriveDisplay</span>)]</span>
-<span class="attribute">#[<span class="ident">display</span>(<span class="ident">style</span> <span class="op">=</span> <span class="string">&quot;camelCase&quot;</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">AdUnit</span> {
-    <span class="ident">AdUnitId</span>,
+<span class="attribute">#[derive(Hash, Copy, Clone, Debug, Eq, PartialEq, DeriveFromStr, DeriveDisplay)]</span>
+<span class="attribute">#[display(style = <span class="string">&quot;camelCase&quot;</span>)]</span>
+<span class="kw">pub enum </span>AdUnit {
+    AdUnitId,
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Hash</span>, <span class="ident">Copy</span>, <span class="ident">Clone</span>, <span class="ident">Debug</span>, <span class="ident">Eq</span>, <span class="ident">PartialEq</span>, <span class="ident">DeriveFromStr</span>, <span class="ident">DeriveDisplay</span>)]</span>
-<span class="attribute">#[<span class="ident">display</span>(<span class="ident">style</span> <span class="op">=</span> <span class="string">&quot;camelCase&quot;</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">Campaign</span> {
-    <span class="ident">AdvertiserId</span>,
-    <span class="ident">CampaignId</span>,
-    <span class="ident">CampaignSecondsActive</span>,
-    <span class="ident">CampaignSecondsDuration</span>,
-    <span class="ident">CampaignBudget</span>,
-    <span class="ident">EventMinPrice</span>,
-    <span class="ident">EventMaxPrice</span>,
+<span class="attribute">#[derive(Hash, Copy, Clone, Debug, Eq, PartialEq, DeriveFromStr, DeriveDisplay)]</span>
+<span class="attribute">#[display(style = <span class="string">&quot;camelCase&quot;</span>)]</span>
+<span class="kw">pub enum </span>Campaign {
+    AdvertiserId,
+    CampaignId,
+    CampaignSecondsActive,
+    CampaignSecondsDuration,
+    CampaignBudget,
+    EventMinPrice,
+    EventMaxPrice,
 }
 
-<span class="kw">impl</span> <span class="ident">TryFrom</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Campaign</span> {
-    <span class="kw">type</span> <span class="ident">Error</span> <span class="op">=</span> <span class="ident">parse_display::ParseError</span>;
+<span class="kw">impl </span>TryFrom&lt;String&gt; <span class="kw">for </span>Campaign {
+    <span class="kw">type </span>Error = parse_display::ParseError;
 
-    <span class="kw">fn</span> <span class="ident">try_from</span>(<span class="ident">value</span>: <span class="ident">String</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident"><span class="self">Self</span>::Error</span><span class="op">&gt;</span> {
-        <span class="ident"><span class="self">Self</span>::from_str</span>(<span class="kw-2">&amp;</span><span class="ident">value</span>)
+    <span class="kw">fn </span>try_from(value: String) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, <span class="self">Self</span>::Error&gt; {
+        <span class="self">Self</span>::from_str(<span class="kw-2">&amp;</span>value)
     }
 }
 
-<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">Campaign</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">String</span> {
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">channel</span>: <span class="ident">Campaign</span>) -&gt; <span class="self">Self</span> {
-        <span class="ident">channel</span>.<span class="ident">to_string</span>()
+<span class="kw">impl </span>From&lt;Campaign&gt; <span class="kw">for </span>String {
+    <span class="kw">fn </span>from(channel: Campaign) -&gt; <span class="self">Self </span>{
+        channel.to_string()
     }
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(
-    <span class="ident">Hash</span>, <span class="ident">Copy</span>, <span class="ident">Clone</span>, <span class="ident">Debug</span>, <span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">Eq</span>, <span class="ident">PartialEq</span>, <span class="ident">DeriveFromStr</span>, <span class="ident">DeriveDisplay</span>,
+<span class="attribute">#[derive(
+    Hash, Copy, Clone, Debug, Serialize, Deserialize, Eq, PartialEq, DeriveFromStr, DeriveDisplay,
 )]</span>
-<span class="attribute">#[<span class="ident">serde</span>(<span class="ident">into</span> <span class="op">=</span> <span class="string">&quot;String&quot;</span>, <span class="ident">try_from</span> <span class="op">=</span> <span class="string">&quot;String&quot;</span>)]</span>
-<span class="attribute">#[<span class="ident">display</span>(<span class="ident">style</span> <span class="op">=</span> <span class="string">&quot;camelCase&quot;</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">Balances</span> {
-    <span class="ident">CampaignTotalSpent</span>,
-    <span class="comment">// TODO: AIP#61 Should be dropped since we can&#39;t know</span>
-    <span class="ident">PublisherEarnedFromCampaign</span>,
+<span class="attribute">#[serde(into = <span class="string">&quot;String&quot;</span>, try_from = <span class="string">&quot;String&quot;</span>)]</span>
+<span class="attribute">#[display(style = <span class="string">&quot;camelCase&quot;</span>)]</span>
+<span class="kw">pub enum </span>Balances {
+    CampaignTotalSpent,
+    <span class="comment">// TODO: AIP#61 Should be dropped since we can&#39;t know
+    </span>PublisherEarnedFromCampaign,
 }
 
-<span class="kw">impl</span> <span class="ident">TryFrom</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Balances</span> {
-    <span class="kw">type</span> <span class="ident">Error</span> <span class="op">=</span> <span class="ident">parse_display::ParseError</span>;
+<span class="kw">impl </span>TryFrom&lt;String&gt; <span class="kw">for </span>Balances {
+    <span class="kw">type </span>Error = parse_display::ParseError;
 
-    <span class="kw">fn</span> <span class="ident">try_from</span>(<span class="ident">value</span>: <span class="ident">String</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident"><span class="self">Self</span>::Error</span><span class="op">&gt;</span> {
-        <span class="ident"><span class="self">Self</span>::from_str</span>(<span class="kw-2">&amp;</span><span class="ident">value</span>)
+    <span class="kw">fn </span>try_from(value: String) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, <span class="self">Self</span>::Error&gt; {
+        <span class="self">Self</span>::from_str(<span class="kw-2">&amp;</span>value)
     }
 }
 
-<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">Balances</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">String</span> {
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">balances</span>: <span class="ident">Balances</span>) -&gt; <span class="self">Self</span> {
-        <span class="ident">balances</span>.<span class="ident">to_string</span>()
+<span class="kw">impl </span>From&lt;Balances&gt; <span class="kw">for </span>String {
+    <span class="kw">fn </span>from(balances: Balances) -&gt; <span class="self">Self </span>{
+        balances.to_string()
     }
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(
-    <span class="ident">Hash</span>, <span class="ident">Copy</span>, <span class="ident">Clone</span>, <span class="ident">Debug</span>, <span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">Eq</span>, <span class="ident">PartialEq</span>, <span class="ident">DeriveFromStr</span>, <span class="ident">DeriveDisplay</span>,
+<span class="attribute">#[derive(
+    Hash, Copy, Clone, Debug, Serialize, Deserialize, Eq, PartialEq, DeriveFromStr, DeriveDisplay,
 )]</span>
-<span class="attribute">#[<span class="ident">serde</span>(<span class="ident">into</span> <span class="op">=</span> <span class="string">&quot;String&quot;</span>, <span class="ident">try_from</span> <span class="op">=</span> <span class="string">&quot;String&quot;</span>)]</span>
-<span class="attribute">#[<span class="ident">display</span>(<span class="ident">style</span> <span class="op">=</span> <span class="string">&quot;camelCase&quot;</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">AdSlot</span> {
-    <span class="ident">Categories</span>,
-    <span class="ident">Hostname</span>,
-    <span class="ident">AlexaRank</span>,
+<span class="attribute">#[serde(into = <span class="string">&quot;String&quot;</span>, try_from = <span class="string">&quot;String&quot;</span>)]</span>
+<span class="attribute">#[display(style = <span class="string">&quot;camelCase&quot;</span>)]</span>
+<span class="kw">pub enum </span>AdSlot {
+    Categories,
+    Hostname,
+    AlexaRank,
 }
 
-<span class="kw">impl</span> <span class="ident">TryFrom</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">AdSlot</span> {
-    <span class="kw">type</span> <span class="ident">Error</span> <span class="op">=</span> <span class="ident">parse_display::ParseError</span>;
+<span class="kw">impl </span>TryFrom&lt;String&gt; <span class="kw">for </span>AdSlot {
+    <span class="kw">type </span>Error = parse_display::ParseError;
 
-    <span class="kw">fn</span> <span class="ident">try_from</span>(<span class="ident">value</span>: <span class="ident">String</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident"><span class="self">Self</span>::Error</span><span class="op">&gt;</span> {
-        <span class="ident"><span class="self">Self</span>::from_str</span>(<span class="kw-2">&amp;</span><span class="ident">value</span>)
+    <span class="kw">fn </span>try_from(value: String) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, <span class="self">Self</span>::Error&gt; {
+        <span class="self">Self</span>::from_str(<span class="kw-2">&amp;</span>value)
     }
 }
 
-<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">AdSlot</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">String</span> {
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">ad_slot</span>: <span class="ident">AdSlot</span>) -&gt; <span class="self">Self</span> {
-        <span class="ident">ad_slot</span>.<span class="ident">to_string</span>()
+<span class="kw">impl </span>From&lt;AdSlot&gt; <span class="kw">for </span>String {
+    <span class="kw">fn </span>from(ad_slot: AdSlot) -&gt; <span class="self">Self </span>{
+        ad_slot.to_string()
     }
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Hash</span>, <span class="ident">Copy</span>, <span class="ident">Clone</span>, <span class="ident">Debug</span>, <span class="ident">Eq</span>, <span class="ident">PartialEq</span>, <span class="ident">DeriveFromStr</span>, <span class="ident">DeriveDisplay</span>)]</span>
-<span class="attribute">#[<span class="ident">display</span>(<span class="ident">style</span> <span class="op">=</span> <span class="string">&quot;camelCase&quot;</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">AdView</span> {
-    <span class="ident">SecondsSinceCampaignImpression</span>,
-    <span class="ident">HasCustomPreferences</span>,
-    <span class="ident">NavigatorLanguage</span>,
+<span class="attribute">#[derive(Hash, Copy, Clone, Debug, Eq, PartialEq, DeriveFromStr, DeriveDisplay)]</span>
+<span class="attribute">#[display(style = <span class="string">&quot;camelCase&quot;</span>)]</span>
+<span class="kw">pub enum </span>AdView {
+    SecondsSinceCampaignImpression,
+    HasCustomPreferences,
+    NavigatorLanguage,
 }
 
-<span class="kw">impl</span> <span class="ident">TryFrom</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">AdView</span> {
-    <span class="kw">type</span> <span class="ident">Error</span> <span class="op">=</span> <span class="ident">parse_display::ParseError</span>;
+<span class="kw">impl </span>TryFrom&lt;String&gt; <span class="kw">for </span>AdView {
+    <span class="kw">type </span>Error = parse_display::ParseError;
 
-    <span class="kw">fn</span> <span class="ident">try_from</span>(<span class="ident">value</span>: <span class="ident">String</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident"><span class="self">Self</span>::Error</span><span class="op">&gt;</span> {
-        <span class="ident"><span class="self">Self</span>::from_str</span>(<span class="kw-2">&amp;</span><span class="ident">value</span>)
+    <span class="kw">fn </span>try_from(value: String) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, <span class="self">Self</span>::Error&gt; {
+        <span class="self">Self</span>::from_str(<span class="kw-2">&amp;</span>value)
     }
 }
 
-<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">AdView</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">String</span> {
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">ad_view</span>: <span class="ident">AdView</span>) -&gt; <span class="self">Self</span> {
-        <span class="ident">ad_view</span>.<span class="ident">to_string</span>()
+<span class="kw">impl </span>From&lt;AdView&gt; <span class="kw">for </span>String {
+    <span class="kw">fn </span>from(ad_view: AdView) -&gt; <span class="self">Self </span>{
+        ad_view.to_string()
     }
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(
-    <span class="ident">Hash</span>, <span class="ident">Copy</span>, <span class="ident">Clone</span>, <span class="ident">Debug</span>, <span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">Eq</span>, <span class="ident">PartialEq</span>, <span class="ident">DeriveFromStr</span>, <span class="ident">DeriveDisplay</span>,
+<span class="attribute">#[derive(
+    Hash, Copy, Clone, Debug, Serialize, Deserialize, Eq, PartialEq, DeriveFromStr, DeriveDisplay,
 )]</span>
-<span class="attribute">#[<span class="ident">display</span>(<span class="ident">style</span> <span class="op">=</span> <span class="string">&quot;camelCase&quot;</span>)]</span>
-<span class="attribute">#[<span class="ident">serde</span>(<span class="ident">into</span> <span class="op">=</span> <span class="string">&quot;String&quot;</span>, <span class="ident">try_from</span> <span class="op">=</span> <span class="string">&quot;String&quot;</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">Global</span> {
-    <span class="ident">AdSlotId</span>,
-    <span class="ident">AdSlotType</span>,
-    <span class="ident">PublisherId</span>,
-    <span class="ident">Country</span>,
-    <span class="ident">EventType</span>,
-    <span class="ident">SecondsSinceEpoch</span>,
-    <span class="attribute">#[<span class="ident">display</span>(<span class="string">&quot;userAgentOS&quot;</span>)]</span>
-    <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::upper_case_acronyms</span>)]</span>
-    <span class="ident">UserAgentOS</span>,
-    <span class="ident">UserAgentBrowserFamily</span>,
+<span class="attribute">#[display(style = <span class="string">&quot;camelCase&quot;</span>)]</span>
+<span class="attribute">#[serde(into = <span class="string">&quot;String&quot;</span>, try_from = <span class="string">&quot;String&quot;</span>)]</span>
+<span class="kw">pub enum </span>Global {
+    AdSlotId,
+    AdSlotType,
+    PublisherId,
+    Country,
+    EventType,
+    SecondsSinceEpoch,
+    <span class="attribute">#[display(<span class="string">&quot;userAgentOS&quot;</span>)]</span>
+    <span class="attribute">#[allow(clippy::upper_case_acronyms)]</span>
+    UserAgentOS,
+    UserAgentBrowserFamily,
 }
 
-<span class="kw">impl</span> <span class="ident">TryFrom</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Global</span> {
-    <span class="kw">type</span> <span class="ident">Error</span> <span class="op">=</span> <span class="ident">parse_display::ParseError</span>;
+<span class="kw">impl </span>TryFrom&lt;String&gt; <span class="kw">for </span>Global {
+    <span class="kw">type </span>Error = parse_display::ParseError;
 
-    <span class="kw">fn</span> <span class="ident">try_from</span>(<span class="ident">value</span>: <span class="ident">String</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident"><span class="self">Self</span>::Error</span><span class="op">&gt;</span> {
-        <span class="ident"><span class="self">Self</span>::from_str</span>(<span class="kw-2">&amp;</span><span class="ident">value</span>)
+    <span class="kw">fn </span>try_from(value: String) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, <span class="self">Self</span>::Error&gt; {
+        <span class="self">Self</span>::from_str(<span class="kw-2">&amp;</span>value)
     }
 }
 
-<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">Global</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">String</span> {
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">global</span>: <span class="ident">Global</span>) -&gt; <span class="self">Self</span> {
-        <span class="ident">global</span>.<span class="ident">to_string</span>()
+<span class="kw">impl </span>From&lt;Global&gt; <span class="kw">for </span>String {
+    <span class="kw">fn </span>from(global: Global) -&gt; <span class="self">Self </span>{
+        global.to_string()
     }
 }
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
-<span class="kw">mod</span> <span class="ident">test</span> {
-    <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::targeting::Value</span>;
-    <span class="kw">use</span> <span class="ident">serde_json</span>::{<span class="ident">json</span>, <span class="ident">Value</span> <span class="kw">as</span> <span class="ident">SerdeValue</span>};
-    <span class="kw">use</span> <span class="ident">std::collections::HashMap</span>;
+<span class="attribute">#[cfg(test)]</span>
+<span class="kw">mod </span>test {
+    <span class="kw">use </span><span class="kw">crate</span>::targeting::Value;
+    <span class="kw">use </span>serde_json::{json, Value <span class="kw">as </span>SerdeValue};
+    <span class="kw">use </span>std::collections::HashMap;
 
-    <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
+    <span class="kw">use super</span>::<span class="kw-2">*</span>;
 
-    <span class="kw">fn</span> <span class="ident">test_fields</span>() -&gt; <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">Field</span>, <span class="ident">SerdeValue</span><span class="op">&gt;</span> {
+    <span class="kw">fn </span>test_fields() -&gt; HashMap&lt;Field, SerdeValue&gt; {
         <span class="macro">vec!</span>[
             (
-                <span class="ident">Field::AdView</span>(<span class="ident">AdView::SecondsSinceCampaignImpression</span>),
+                Field::AdView(AdView::SecondsSinceCampaignImpression),
                 <span class="macro">json!</span>(<span class="string">&quot;adView.secondsSinceCampaignImpression&quot;</span>),
             ),
-            (<span class="ident">Field::Global</span>(<span class="ident">Global::AdSlotId</span>), <span class="macro">json!</span>(<span class="string">&quot;adSlotId&quot;</span>)),
+            (Field::Global(Global::AdSlotId), <span class="macro">json!</span>(<span class="string">&quot;adSlotId&quot;</span>)),
         ]
-        .<span class="ident">into_iter</span>()
-        .<span class="ident">collect</span>()
+        .into_iter()
+        .collect()
     }
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">serialize_and_deserialize_field</span>() {
-        <span class="kw">for</span> (<span class="ident">expected_field</span>, <span class="ident">value</span>) <span class="kw">in</span> <span class="ident">test_fields</span>() {
-            <span class="kw">let</span> <span class="ident">actual</span>: <span class="ident">Field</span> <span class="op">=</span> <span class="ident">serde_json::from_value</span>(<span class="ident">value</span>).<span class="ident">expect</span>(<span class="string">&quot;Should deserialize&quot;</span>);
+    <span class="attribute">#[test]</span>
+    <span class="kw">fn </span>serialize_and_deserialize_field() {
+        <span class="kw">for </span>(expected_field, value) <span class="kw">in </span>test_fields() {
+            <span class="kw">let </span>actual: Field = serde_json::from_value(value).expect(<span class="string">&quot;Should deserialize&quot;</span>);
 
-            <span class="macro">assert_eq!</span>(<span class="ident">expected_field</span>, <span class="ident">actual</span>);
+            <span class="macro">assert_eq!</span>(expected_field, actual);
         }
     }
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">from_serde_to_hashmap_of_fields_and_values</span>() {
-        <span class="kw">let</span> <span class="ident">field_1</span> <span class="op">=</span> <span class="ident">Field::AdView</span>(<span class="ident">AdView::SecondsSinceCampaignImpression</span>);
-        <span class="kw">let</span> <span class="ident">field_2</span> <span class="op">=</span> <span class="ident">Field::AdView</span>(<span class="ident">AdView::HasCustomPreferences</span>);
-        <span class="kw">let</span> <span class="ident">expected</span>: <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">Field</span>, <span class="ident">Value</span><span class="op">&gt;</span> <span class="op">=</span> <span class="macro">vec!</span>[
-            (<span class="ident">field_1</span>, <span class="ident">Value::Number</span>(<span class="number">5</span>.<span class="ident">into</span>())),
-            (<span class="ident">field_2</span>, <span class="ident">Value::Bool</span>(<span class="bool-val">true</span>)),
+    <span class="attribute">#[test]</span>
+    <span class="kw">fn </span>from_serde_to_hashmap_of_fields_and_values() {
+        <span class="kw">let </span>field_1 = Field::AdView(AdView::SecondsSinceCampaignImpression);
+        <span class="kw">let </span>field_2 = Field::AdView(AdView::HasCustomPreferences);
+        <span class="kw">let </span>expected: HashMap&lt;Field, Value&gt; = <span class="macro">vec!</span>[
+            (field_1, Value::Number(<span class="number">5</span>.into())),
+            (field_2, Value::Bool(<span class="bool-val">true</span>)),
         ]
-        .<span class="ident">into_iter</span>()
-        .<span class="ident">collect</span>();
+        .into_iter()
+        .collect();
 
-        <span class="kw">let</span> <span class="ident">map</span> <span class="op">=</span> <span class="macro">json!</span>({
+        <span class="kw">let </span>map = <span class="macro">json!</span>({
             <span class="string">&quot;adView.secondsSinceCampaignImpression&quot;</span>: <span class="number">5</span>,
-            <span class="string">&quot;adView.hasCustomPreferences&quot;</span>: <span class="bool-val">true</span>
-        });
+            <span class="string">&quot;adView.hasCustomPreferences&quot;</span>: <span class="bool-val">true
+        </span>});
 
-        <span class="kw">let</span> <span class="ident">actual</span>: <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">Field</span>, <span class="ident">Value</span><span class="op">&gt;</span> <span class="op">=</span>
-            <span class="ident">serde_json::from_value</span>(<span class="ident">map</span>).<span class="ident">expect</span>(<span class="string">&quot;should deserialize&quot;</span>);
+        <span class="kw">let </span>actual: HashMap&lt;Field, Value&gt; =
+            serde_json::from_value(map).expect(<span class="string">&quot;should deserialize&quot;</span>);
 
-        <span class="macro">assert_eq!</span>(<span class="ident">expected</span>, <span class="ident">actual</span>);
+        <span class="macro">assert_eq!</span>(expected, actual);
     }
 
-    <span class="kw">fn</span> <span class="ident">test_field</span>(<span class="ident">field</span>: <span class="ident">Field</span>, <span class="ident">expected_value</span>: <span class="ident">SerdeValue</span>) {
+    <span class="kw">fn </span>test_field(field: Field, expected_value: SerdeValue) {
         <span class="macro">assert_eq!</span>(
-            <span class="ident">serde_json::to_value</span>(<span class="kw-2">&amp;</span><span class="ident">field</span>).<span class="ident">expect</span>(<span class="string">&quot;Should serialize&quot;</span>),
-            <span class="ident">expected_value</span>
+            serde_json::to_value(<span class="kw-2">&amp;</span>field).expect(<span class="string">&quot;Should serialize&quot;</span>),
+            expected_value
         );
     }
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">serializes_each_type_of_field_name</span>() {
-        <span class="ident">test_field</span>(
-            <span class="ident">Field::AdView</span>(<span class="ident">AdView::SecondsSinceCampaignImpression</span>),
-            <span class="ident">SerdeValue::String</span>(<span class="string">&quot;adView.secondsSinceCampaignImpression&quot;</span>.<span class="ident">into</span>()),
+    <span class="attribute">#[test]</span>
+    <span class="kw">fn </span>serializes_each_type_of_field_name() {
+        test_field(
+            Field::AdView(AdView::SecondsSinceCampaignImpression),
+            SerdeValue::String(<span class="string">&quot;adView.secondsSinceCampaignImpression&quot;</span>.into()),
         );
-        <span class="ident">test_field</span>(
-            <span class="ident">Field::Global</span>(<span class="ident">Global::AdSlotId</span>),
-            <span class="ident">SerdeValue::String</span>(<span class="string">&quot;adSlotId&quot;</span>.<span class="ident">into</span>()),
+        test_field(
+            Field::Global(Global::AdSlotId),
+            SerdeValue::String(<span class="string">&quot;adSlotId&quot;</span>.into()),
         );
-        <span class="ident">test_field</span>(
-            <span class="ident">Field::AdUnit</span>(<span class="ident">AdUnit::AdUnitId</span>),
-            <span class="ident">SerdeValue::String</span>(<span class="string">&quot;adUnitId&quot;</span>.<span class="ident">into</span>()),
+        test_field(
+            Field::AdUnit(AdUnit::AdUnitId),
+            SerdeValue::String(<span class="string">&quot;adUnitId&quot;</span>.into()),
         );
-        <span class="ident">test_field</span>(
-            <span class="ident">Field::Campaign</span>(<span class="ident">Campaign::CampaignBudget</span>),
-            <span class="ident">SerdeValue::String</span>(<span class="string">&quot;campaignBudget&quot;</span>.<span class="ident">into</span>()),
+        test_field(
+            Field::Campaign(Campaign::CampaignBudget),
+            SerdeValue::String(<span class="string">&quot;campaignBudget&quot;</span>.into()),
         );
-        <span class="ident">test_field</span>(
-            <span class="ident">Field::Balances</span>(<span class="ident">Balances::PublisherEarnedFromCampaign</span>),
-            <span class="ident">SerdeValue::String</span>(<span class="string">&quot;publisherEarnedFromCampaign&quot;</span>.<span class="ident">into</span>()),
+        test_field(
+            Field::Balances(Balances::PublisherEarnedFromCampaign),
+            SerdeValue::String(<span class="string">&quot;publisherEarnedFromCampaign&quot;</span>.into()),
         );
-        <span class="ident">test_field</span>(
-            <span class="ident">Field::AdSlot</span>(<span class="ident">AdSlot::Hostname</span>),
-            <span class="ident">SerdeValue::String</span>(<span class="string">&quot;adSlot.hostname&quot;</span>.<span class="ident">into</span>()),
+        test_field(
+            Field::AdSlot(AdSlot::Hostname),
+            SerdeValue::String(<span class="string">&quot;adSlot.hostname&quot;</span>.into()),
         );
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../../../" data-current-crate="primitives" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (20ffea693 2022-08-11)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../../" data-current-crate="primitives" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>

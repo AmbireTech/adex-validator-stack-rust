@@ -244,251 +244,251 @@
 <span id="244">244</span>
 <span id="245">245</span>
 <span id="246">246</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">std</span>::{<span class="ident">fmt</span>, <span class="ident">str::FromStr</span>};
+</pre><pre class="rust"><code><span class="kw">use </span>std::{fmt, str::FromStr};
 
-<span class="kw">use</span> <span class="ident">parse_display::Display</span>;
-<span class="kw">use</span> <span class="ident">serde</span>::{<span class="ident">Deserialize</span>, <span class="ident">Serialize</span>};
-<span class="kw">use</span> <span class="ident">thiserror::Error</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">url::ParseError</span>;
-<span class="kw">use</span> <span class="ident">url::Url</span>;
+<span class="kw">use </span>parse_display::Display;
+<span class="kw">use </span>serde::{Deserialize, Serialize};
+<span class="kw">use </span>thiserror::Error;
+<span class="kw">pub use </span>url::ParseError;
+<span class="kw">use </span>url::Url;
 
-<span class="comment">// `url::Url::scheme()` returns lower-cased ASCII string without `:`</span>
-<span class="kw">const</span> <span class="ident">SCHEMES</span>: [<span class="kw-2">&amp;</span><span class="ident">str</span>; <span class="number">2</span>] <span class="op">=</span> [<span class="string">&quot;http&quot;</span>, <span class="string">&quot;https&quot;</span>];
+<span class="comment">// `url::Url::scheme()` returns lower-cased ASCII string without `:`
+</span><span class="kw">const </span>SCHEMES: [<span class="kw-2">&amp;</span>str; <span class="number">2</span>] = [<span class="string">&quot;http&quot;</span>, <span class="string">&quot;https&quot;</span>];
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Error</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">Error</span> {
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Invalid scheme &#39;{0}&#39;, only &#39;http&#39; &amp; &#39;https&#39; are allowed&quot;</span>)]</span>
-    <span class="ident">InvalidScheme</span>(<span class="ident">String</span>),
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;The Url has to be a base, i.e. `data:`, `mailto:` etc. are not allowed&quot;</span>)]</span>
-    <span class="ident">ShouldBeABase</span>,
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Having a fragment (i.e. `#fragment`) is not allowed&quot;</span>)]</span>
-    <span class="ident">HasFragment</span>,
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Having a query parameters (i.e. `?query_param=value`) is not allowed&quot;</span>)]</span>
-    <span class="ident">HasQuery</span>,
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Parsing the url: {0}&quot;</span>)]</span>
-    <span class="ident">Parsing</span>(<span class="attribute">#[<span class="ident">from</span>]</span> <span class="ident">url::ParseError</span>),
+<span class="attribute">#[derive(Debug, Error, PartialEq, Eq)]</span>
+<span class="kw">pub enum </span>Error {
+    <span class="attribute">#[error(<span class="string">&quot;Invalid scheme &#39;{0}&#39;, only &#39;http&#39; &amp; &#39;https&#39; are allowed&quot;</span>)]</span>
+    InvalidScheme(String),
+    <span class="attribute">#[error(<span class="string">&quot;The Url has to be a base, i.e. `data:`, `mailto:` etc. are not allowed&quot;</span>)]</span>
+    ShouldBeABase,
+    <span class="attribute">#[error(<span class="string">&quot;Having a fragment (i.e. `#fragment`) is not allowed&quot;</span>)]</span>
+    HasFragment,
+    <span class="attribute">#[error(<span class="string">&quot;Having a query parameters (i.e. `?query_param=value`) is not allowed&quot;</span>)]</span>
+    HasQuery,
+    <span class="attribute">#[error(<span class="string">&quot;Parsing the url: {0}&quot;</span>)]</span>
+    Parsing(<span class="attribute">#[from]</span> url::ParseError),
 }
 
-<span class="doccomment">/// A safe Url to use in REST API calls.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// It makes sure to always end the Url with `/`,</span>
-<span class="doccomment">/// however it doesn&#39;t check for the existence of a file, e.g. `/path/a-file.html`</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Underneath it uses [`url::Url`], so all the validation from there is enforced,</span>
-<span class="doccomment">/// with additional validation which doesn&#39;t allow having:</span>
-<span class="doccomment">/// - `Scheme` different that `http` &amp; `https`</span>
-<span class="doccomment">/// - Non-base `url`s like `data:` &amp; `mailto:`</span>
-<span class="doccomment">/// - `Fragment`, e.g. `#fragment`</span>
-<span class="doccomment">/// - `Query`, e.g. `?query_param=value`, `?query_param`, `?query=value&amp;....`, etc.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// [`url::Url`]: url::Url</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Hash</span>, <span class="ident">Display</span>, <span class="ident">Ord</span>, <span class="ident">PartialOrd</span>, <span class="ident">Eq</span>, <span class="ident">PartialEq</span>, <span class="ident">Deserialize</span>, <span class="ident">Serialize</span>)]</span>
-<span class="attribute">#[<span class="ident">serde</span>(<span class="ident">try_from</span> <span class="op">=</span> <span class="string">&quot;Url&quot;</span>, <span class="ident">into</span> <span class="op">=</span> <span class="string">&quot;Url&quot;</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ApiUrl</span>(<span class="ident">Url</span>);
+<span class="doccomment">/// A safe Url to use in REST API calls.
+///
+/// It makes sure to always end the Url with `/`,
+/// however it doesn&#39;t check for the existence of a file, e.g. `/path/a-file.html`
+///
+/// Underneath it uses [`url::Url`], so all the validation from there is enforced,
+/// with additional validation which doesn&#39;t allow having:
+/// - `Scheme` different that `http` &amp; `https`
+/// - Non-base `url`s like `data:` &amp; `mailto:`
+/// - `Fragment`, e.g. `#fragment`
+/// - `Query`, e.g. `?query_param=value`, `?query_param`, `?query=value&amp;....`, etc.
+///
+/// [`url::Url`]: url::Url
+</span><span class="attribute">#[derive(Clone, Hash, Display, Ord, PartialOrd, Eq, PartialEq, Deserialize, Serialize)]</span>
+<span class="attribute">#[serde(try_from = <span class="string">&quot;Url&quot;</span>, into = <span class="string">&quot;Url&quot;</span>)]</span>
+<span class="kw">pub struct </span>ApiUrl(Url);
 
-<span class="kw">impl</span> <span class="ident">ApiUrl</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">parse</span>(<span class="ident">input</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
-        <span class="ident"><span class="self">Self</span>::from_str</span>(<span class="ident">input</span>)
+<span class="kw">impl </span>ApiUrl {
+    <span class="kw">pub fn </span>parse(input: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, Error&gt; {
+        <span class="self">Self</span>::from_str(input)
     }
 
-    <span class="doccomment">/// The Endpoint of which we want to get an url to (strips prefixed `/` from the endpoint),</span>
-    <span class="doccomment">/// which can can include:</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// - path</span>
-    <span class="doccomment">/// - query</span>
-    <span class="doccomment">/// - fragments - usually should not be used for requesting API resources from server</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// This method does **not** check if a file is present</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// This method strips the starting `/` of the endpoint, if there is one</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">join</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">endpoint</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Url</span>, <span class="ident">ParseError</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">stripped</span> <span class="op">=</span> <span class="ident">endpoint</span>.<span class="ident">strip_prefix</span>(<span class="string">&#39;/&#39;</span>).<span class="ident">unwrap_or</span>(<span class="ident">endpoint</span>);
-        <span class="comment">// this join is safe, since we always prefix the Url with `/`</span>
-        <span class="self">self</span>.<span class="number">0</span>.<span class="ident">join</span>(<span class="ident">stripped</span>)
+    <span class="doccomment">/// The Endpoint of which we want to get an url to (strips prefixed `/` from the endpoint),
+    /// which can can include:
+    ///
+    /// - path
+    /// - query
+    /// - fragments - usually should not be used for requesting API resources from server
+    ///
+    /// This method does **not** check if a file is present
+    ///
+    /// This method strips the starting `/` of the endpoint, if there is one
+    </span><span class="kw">pub fn </span>join(<span class="kw-2">&amp;</span><span class="self">self</span>, endpoint: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Result</span>&lt;Url, ParseError&gt; {
+        <span class="kw">let </span>stripped = endpoint.strip_prefix(<span class="string">&#39;/&#39;</span>).unwrap_or(endpoint);
+        <span class="comment">// this join is safe, since we always prefix the Url with `/`
+        </span><span class="self">self</span>.<span class="number">0</span>.join(stripped)
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">to_url</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Url</span> {
-        <span class="self">self</span>.<span class="number">0</span>.<span class="ident">clone</span>()
+    <span class="kw">pub fn </span>to_url(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Url {
+        <span class="self">self</span>.<span class="number">0</span>.clone()
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">as_str</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">str</span> {
-        <span class="self">self</span>.<span class="number">0</span>.<span class="ident">as_str</span>()
-    }
-}
-
-<span class="kw">impl</span> <span class="ident">fmt::Debug</span> <span class="kw">for</span> <span class="ident">ApiUrl</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="ident">fmt::Result</span> {
-        <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;Url({})&quot;</span>, <span class="self">self</span>)
+    <span class="kw">pub fn </span>as_str(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>str {
+        <span class="self">self</span>.<span class="number">0</span>.as_str()
     }
 }
 
-<span class="kw">impl</span> <span class="ident">TryFrom</span><span class="op">&lt;</span><span class="ident">Url</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">ApiUrl</span> {
-    <span class="kw">type</span> <span class="ident">Error</span> <span class="op">=</span> <span class="ident">Error</span>;
+<span class="kw">impl </span>fmt::Debug <span class="kw">for </span>ApiUrl {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; fmt::Result {
+        <span class="macro">write!</span>(f, <span class="string">&quot;Url({})&quot;</span>, <span class="self">self</span>)
+    }
+}
 
-    <span class="kw">fn</span> <span class="ident">try_from</span>(<span class="kw-2">mut</span> <span class="ident">url</span>: <span class="ident">Url</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident"><span class="self">Self</span>::Error</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="ident">url</span>.<span class="ident">cannot_be_a_base</span>() {
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error::ShouldBeABase</span>);
+<span class="kw">impl </span>TryFrom&lt;Url&gt; <span class="kw">for </span>ApiUrl {
+    <span class="kw">type </span>Error = Error;
+
+    <span class="kw">fn </span>try_from(<span class="kw-2">mut </span>url: Url) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, <span class="self">Self</span>::Error&gt; {
+        <span class="kw">if </span>url.cannot_be_a_base() {
+            <span class="kw">return </span><span class="prelude-val">Err</span>(Error::ShouldBeABase);
         }
 
-        <span class="kw">if</span> <span class="ident">url</span>.<span class="ident">fragment</span>().<span class="ident">is_some</span>() {
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error::HasFragment</span>);
+        <span class="kw">if </span>url.fragment().is_some() {
+            <span class="kw">return </span><span class="prelude-val">Err</span>(Error::HasFragment);
         }
 
-        <span class="kw">if</span> <span class="op">!</span><span class="ident">SCHEMES</span>.<span class="ident">contains</span>(<span class="kw-2">&amp;</span><span class="ident">url</span>.<span class="ident">scheme</span>()) {
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error::InvalidScheme</span>(<span class="ident">url</span>.<span class="ident">scheme</span>().<span class="ident">to_string</span>()));
+        <span class="kw">if </span>!SCHEMES.contains(<span class="kw-2">&amp;</span>url.scheme()) {
+            <span class="kw">return </span><span class="prelude-val">Err</span>(Error::InvalidScheme(url.scheme().to_string()));
         }
 
-        <span class="kw">if</span> <span class="ident">url</span>.<span class="ident">query</span>().<span class="ident">is_some</span>() {
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error::HasQuery</span>);
+        <span class="kw">if </span>url.query().is_some() {
+            <span class="kw">return </span><span class="prelude-val">Err</span>(Error::HasQuery);
         }
 
-        <span class="kw">let</span> <span class="ident">url_path</span> <span class="op">=</span> <span class="ident">url</span>.<span class="ident">path</span>();
+        <span class="kw">let </span>url_path = url.path();
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">stripped_path</span> <span class="op">=</span> <span class="ident">url_path</span>.<span class="ident">strip_suffix</span>(<span class="string">&#39;/&#39;</span>).<span class="ident">unwrap_or</span>(<span class="ident">url_path</span>).<span class="ident">to_string</span>();
-        <span class="comment">// Make sure to always end the path with `/`!</span>
-        <span class="ident">stripped_path</span>.<span class="ident">push</span>(<span class="string">&#39;/&#39;</span>);
+        <span class="kw">let </span><span class="kw-2">mut </span>stripped_path = url_path.strip_suffix(<span class="string">&#39;/&#39;</span>).unwrap_or(url_path).to_string();
+        <span class="comment">// Make sure to always end the path with `/`!
+        </span>stripped_path.push(<span class="string">&#39;/&#39;</span>);
 
-        <span class="ident">url</span>.<span class="ident">set_path</span>(<span class="kw-2">&amp;</span><span class="ident">stripped_path</span>);
+        url.set_path(<span class="kw-2">&amp;</span>stripped_path);
 
-        <span class="prelude-val">Ok</span>(<span class="self">Self</span>(<span class="ident">url</span>))
+        <span class="prelude-val">Ok</span>(<span class="self">Self</span>(url))
     }
 }
 
-<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">ApiUrl</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Url</span> {
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">api_url</span>: <span class="ident">ApiUrl</span>) -&gt; <span class="self">Self</span> {
-        <span class="ident">api_url</span>.<span class="number">0</span>
+<span class="kw">impl </span>From&lt;ApiUrl&gt; <span class="kw">for </span>Url {
+    <span class="kw">fn </span>from(api_url: ApiUrl) -&gt; <span class="self">Self </span>{
+        api_url.<span class="number">0
+    </span>}
+}
+
+<span class="kw">impl </span>FromStr <span class="kw">for </span>ApiUrl {
+    <span class="kw">type </span><span class="prelude-val">Err </span>= Error;
+
+    <span class="kw">fn </span>from_str(s: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, <span class="self">Self</span>::Err&gt; {
+        <span class="self">Self</span>::try_from(s.parse::&lt;Url&gt;()<span class="question-mark">?</span>)
     }
 }
 
-<span class="kw">impl</span> <span class="ident">FromStr</span> <span class="kw">for</span> <span class="ident">ApiUrl</span> {
-    <span class="kw">type</span> <span class="prelude-val">Err</span> <span class="op">=</span> <span class="ident">Error</span>;
+<span class="attribute">#[cfg(test)]</span>
+<span class="kw">mod </span>test {
+    <span class="kw">use </span>url::ParseError;
 
-    <span class="kw">fn</span> <span class="ident">from_str</span>(<span class="ident">s</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident"><span class="self">Self</span>::Err</span><span class="op">&gt;</span> {
-        <span class="ident"><span class="self">Self</span>::try_from</span>(<span class="ident">s</span>.<span class="ident">parse</span>::<span class="op">&lt;</span><span class="ident">Url</span><span class="op">&gt;</span>()<span class="question-mark">?</span>)
-    }
-}
+    <span class="kw">use super</span>::<span class="kw-2">*</span>;
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
-<span class="kw">mod</span> <span class="ident">test</span> {
-    <span class="kw">use</span> <span class="ident">url::ParseError</span>;
-
-    <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
-
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">api_url</span>() {
-        <span class="kw">let</span> <span class="ident">allowed</span> <span class="op">=</span> <span class="macro">vec!</span>[
-            <span class="comment">// Http</span>
-            (
+    <span class="attribute">#[test]</span>
+    <span class="kw">fn </span>api_url() {
+        <span class="kw">let </span>allowed = <span class="macro">vec!</span>[
+            <span class="comment">// Http
+            </span>(
                 <span class="string">&quot;http://127.0.0.1/&quot;</span>,
-                <span class="ident">ApiUrl::from_str</span>(<span class="string">&quot;http://127.0.0.1/&quot;</span>).<span class="ident">unwrap</span>(),
+                ApiUrl::from_str(<span class="string">&quot;http://127.0.0.1/&quot;</span>).unwrap(),
             ),
             (
                 <span class="string">&quot;http://127.0.0.1&quot;</span>,
-                <span class="ident">ApiUrl::from_str</span>(<span class="string">&quot;http://127.0.0.1/&quot;</span>).<span class="ident">unwrap</span>(),
+                ApiUrl::from_str(<span class="string">&quot;http://127.0.0.1/&quot;</span>).unwrap(),
             ),
-            <span class="comment">// Https</span>
-            (
+            <span class="comment">// Https
+            </span>(
                 <span class="string">&quot;https://127.0.0.1/&quot;</span>,
-                <span class="ident">ApiUrl::from_str</span>(<span class="string">&quot;https://127.0.0.1/&quot;</span>).<span class="ident">unwrap</span>(),
+                ApiUrl::from_str(<span class="string">&quot;https://127.0.0.1/&quot;</span>).unwrap(),
             ),
             (
                 <span class="string">&quot;https://127.0.0.1&quot;</span>,
-                <span class="ident">ApiUrl::from_str</span>(<span class="string">&quot;https://127.0.0.1/&quot;</span>).<span class="ident">unwrap</span>(),
+                ApiUrl::from_str(<span class="string">&quot;https://127.0.0.1/&quot;</span>).unwrap(),
             ),
-            <span class="comment">// Domain `/` suffixed</span>
-            (
+            <span class="comment">// Domain `/` suffixed
+            </span>(
                 <span class="string">&quot;https://jerry.adex.network/&quot;</span>,
-                <span class="ident">ApiUrl::from_str</span>(<span class="string">&quot;https://jerry.adex.network/&quot;</span>).<span class="ident">unwrap</span>(),
+                ApiUrl::from_str(<span class="string">&quot;https://jerry.adex.network/&quot;</span>).unwrap(),
             ),
             (
                 <span class="string">&quot;https://tom.adex.network&quot;</span>,
-                <span class="ident">ApiUrl::from_str</span>(<span class="string">&quot;https://tom.adex.network/&quot;</span>).<span class="ident">unwrap</span>(),
+                ApiUrl::from_str(<span class="string">&quot;https://tom.adex.network/&quot;</span>).unwrap(),
             ),
-            <span class="comment">// With Port</span>
-            (
+            <span class="comment">// With Port
+            </span>(
                 <span class="string">&quot;https://localhost:3335&quot;</span>,
-                <span class="ident">ApiUrl::from_str</span>(<span class="string">&quot;https://localhost:3335/&quot;</span>).<span class="ident">unwrap</span>(),
+                ApiUrl::from_str(<span class="string">&quot;https://localhost:3335/&quot;</span>).unwrap(),
             ),
-            <span class="comment">// With Path non `/` suffixed</span>
-            (
+            <span class="comment">// With Path non `/` suffixed
+            </span>(
                 <span class="string">&quot;https://localhost/leader&quot;</span>,
-                <span class="ident">ApiUrl::from_str</span>(<span class="string">&quot;https://localhost/leader/&quot;</span>).<span class="ident">unwrap</span>(),
+                ApiUrl::from_str(<span class="string">&quot;https://localhost/leader/&quot;</span>).unwrap(),
             ),
-            <span class="comment">// With Path `/` suffixed</span>
-            (
+            <span class="comment">// With Path `/` suffixed
+            </span>(
                 <span class="string">&quot;https://localhost/leader/&quot;</span>,
-                <span class="ident">ApiUrl::from_str</span>(<span class="string">&quot;https://localhost/leader/&quot;</span>).<span class="ident">unwrap</span>(),
+                ApiUrl::from_str(<span class="string">&quot;https://localhost/leader/&quot;</span>).unwrap(),
             ),
-            <span class="comment">// with authority</span>
-            (
+            <span class="comment">// with authority
+            </span>(
                 <span class="string">&quot;https://username:password@localhost&quot;</span>,
-                <span class="ident">ApiUrl::from_str</span>(<span class="string">&quot;https://username:password@localhost/&quot;</span>).<span class="ident">unwrap</span>(),
+                ApiUrl::from_str(<span class="string">&quot;https://username:password@localhost/&quot;</span>).unwrap(),
             ),
-            <span class="comment">// HTTPS, authority, domain, port and path</span>
-            (
+            <span class="comment">// HTTPS, authority, domain, port and path
+            </span>(
                 <span class="string">&quot;https://username:password@jerry.adex.network:3335/leader&quot;</span>,
-                <span class="ident">ApiUrl::from_str</span>(<span class="string">&quot;https://username:password@jerry.adex.network:3335/leader&quot;</span>)
-                    .<span class="ident">unwrap</span>(),
+                ApiUrl::from_str(<span class="string">&quot;https://username:password@jerry.adex.network:3335/leader&quot;</span>)
+                    .unwrap(),
             ),
         ];
 
-        <span class="kw">let</span> <span class="ident">failing</span> <span class="op">=</span> <span class="macro">vec!</span>[
-            <span class="comment">// Unix socket</span>
-            (
+        <span class="kw">let </span>failing = <span class="macro">vec!</span>[
+            <span class="comment">// Unix socket
+            </span>(
                 <span class="string">&quot;unix:/run/foo.socket&quot;</span>,
-                <span class="ident">Error::InvalidScheme</span>(<span class="string">&quot;unix&quot;</span>.<span class="ident">to_string</span>()),
+                Error::InvalidScheme(<span class="string">&quot;unix&quot;</span>.to_string()),
             ),
-            <span class="comment">// A file URL</span>
-            (
+            <span class="comment">// A file URL
+            </span>(
                 <span class="string">&quot;file://127.0.0.1/&quot;</span>,
-                <span class="ident">Error::InvalidScheme</span>(<span class="string">&quot;file&quot;</span>.<span class="ident">to_string</span>()),
+                Error::InvalidScheme(<span class="string">&quot;file&quot;</span>.to_string()),
             ),
-            <span class="comment">// relative path</span>
-            (
+            <span class="comment">// relative path
+            </span>(
                 <span class="string">&quot;/relative/path&quot;</span>,
-                <span class="ident">Error::Parsing</span>(<span class="ident">ParseError::RelativeUrlWithoutBase</span>),
+                Error::Parsing(ParseError::RelativeUrlWithoutBase),
             ),
             (
                 <span class="string">&quot;/relative/path/&quot;</span>,
-                <span class="ident">Error::Parsing</span>(<span class="ident">ParseError::RelativeUrlWithoutBase</span>),
+                Error::Parsing(ParseError::RelativeUrlWithoutBase),
             ),
-            <span class="comment">// blob</span>
-            (<span class="string">&quot;data:text/plain,Stuff&quot;</span>, <span class="ident">Error::ShouldBeABase</span>),
+            <span class="comment">// blob
+            </span>(<span class="string">&quot;data:text/plain,Stuff&quot;</span>, Error::ShouldBeABase),
         ];
 
-        <span class="kw">for</span> (<span class="ident">case</span>, <span class="ident">expected</span>) <span class="kw">in</span> <span class="ident">allowed</span> {
-            <span class="kw">let</span> <span class="ident">url</span> <span class="op">=</span> <span class="ident">case</span>.<span class="ident">parse</span>::<span class="op">&lt;</span><span class="ident">ApiUrl</span><span class="op">&gt;</span>();
-            <span class="macro">assert_eq!</span>(<span class="ident">url</span>, <span class="prelude-val">Ok</span>(<span class="ident">expected</span>))
+        <span class="kw">for </span>(case, expected) <span class="kw">in </span>allowed {
+            <span class="kw">let </span>url = case.parse::&lt;ApiUrl&gt;();
+            <span class="macro">assert_eq!</span>(url, <span class="prelude-val">Ok</span>(expected))
         }
 
-        <span class="kw">for</span> (<span class="ident">case</span>, <span class="ident">error</span>) <span class="kw">in</span> <span class="ident">failing</span> {
-            <span class="macro">assert_eq!</span>(<span class="ident">case</span>.<span class="ident">parse</span>::<span class="op">&lt;</span><span class="ident">ApiUrl</span><span class="op">&gt;</span>(), <span class="prelude-val">Err</span>(<span class="ident">error</span>))
+        <span class="kw">for </span>(case, error) <span class="kw">in </span>failing {
+            <span class="macro">assert_eq!</span>(case.parse::&lt;ApiUrl&gt;(), <span class="prelude-val">Err</span>(error))
         }
     }
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">api_endpoint</span>() {
-        <span class="kw">let</span> <span class="ident">api_url</span> <span class="op">=</span> <span class="ident">ApiUrl::parse</span>(<span class="string">&quot;http://127.0.0.1/leader&quot;</span>).<span class="ident">expect</span>(<span class="string">&quot;It is a valid API URL&quot;</span>);
+    <span class="attribute">#[test]</span>
+    <span class="kw">fn </span>api_endpoint() {
+        <span class="kw">let </span>api_url = ApiUrl::parse(<span class="string">&quot;http://127.0.0.1/leader&quot;</span>).expect(<span class="string">&quot;It is a valid API URL&quot;</span>);
 
-        <span class="kw">let</span> <span class="ident">expected</span> <span class="op">=</span> <span class="ident">url::Url::parse</span>(<span class="string">&quot;http://127.0.0.1/leader/endpoint?query=query value&quot;</span>)
-            .<span class="ident">expect</span>(<span class="string">&quot;it is a valid Url&quot;</span>);
-        <span class="kw">let</span> <span class="ident">expected_url_encoded</span> <span class="op">=</span> <span class="string">&quot;http://127.0.0.1/leader/endpoint?query=query%20value&quot;</span>;
+        <span class="kw">let </span>expected = url::Url::parse(<span class="string">&quot;http://127.0.0.1/leader/endpoint?query=query value&quot;</span>)
+            .expect(<span class="string">&quot;it is a valid Url&quot;</span>);
+        <span class="kw">let </span>expected_url_encoded = <span class="string">&quot;http://127.0.0.1/leader/endpoint?query=query%20value&quot;</span>;
 
-        <span class="kw">let</span> <span class="ident">actual</span> <span class="op">=</span> <span class="ident">api_url</span>
-            .<span class="ident">join</span>(<span class="string">&quot;endpoint?query=query value&quot;</span>)
-            .<span class="ident">expect</span>(<span class="string">&quot;Should join endpoint&quot;</span>);
-        <span class="kw">let</span> <span class="ident">actual_should_strip_suffix</span> <span class="op">=</span> <span class="ident">api_url</span>
-            .<span class="ident">join</span>(<span class="string">&quot;/endpoint?query=query value&quot;</span>)
-            .<span class="ident">expect</span>(<span class="string">&quot;Should join endpoint and strip `/` suffix and preserve the original ApiUrl&quot;</span>);
-        <span class="macro">assert_eq!</span>(<span class="kw-2">&amp;</span><span class="ident">expected</span>, <span class="kw-2">&amp;</span><span class="ident">actual</span>);
-        <span class="macro">assert_eq!</span>(<span class="kw-2">&amp;</span><span class="ident">expected</span>, <span class="kw-2">&amp;</span><span class="ident">actual_should_strip_suffix</span>);
+        <span class="kw">let </span>actual = api_url
+            .join(<span class="string">&quot;endpoint?query=query value&quot;</span>)
+            .expect(<span class="string">&quot;Should join endpoint&quot;</span>);
+        <span class="kw">let </span>actual_should_strip_suffix = api_url
+            .join(<span class="string">&quot;/endpoint?query=query value&quot;</span>)
+            .expect(<span class="string">&quot;Should join endpoint and strip `/` suffix and preserve the original ApiUrl&quot;</span>);
+        <span class="macro">assert_eq!</span>(<span class="kw-2">&amp;</span>expected, <span class="kw-2">&amp;</span>actual);
+        <span class="macro">assert_eq!</span>(<span class="kw-2">&amp;</span>expected, <span class="kw-2">&amp;</span>actual_should_strip_suffix);
 
-        <span class="macro">assert_eq!</span>(<span class="ident">expected_url_encoded</span>, <span class="kw-2">&amp;</span><span class="ident">actual</span>.<span class="ident">to_string</span>());
+        <span class="macro">assert_eq!</span>(expected_url_encoded, <span class="kw-2">&amp;</span>actual.to_string());
         <span class="macro">assert_eq!</span>(
-            <span class="ident">expected_url_encoded</span>,
-            <span class="kw-2">&amp;</span><span class="ident">actual_should_strip_suffix</span>.<span class="ident">to_string</span>()
+            expected_url_encoded,
+            <span class="kw-2">&amp;</span>actual_should_strip_suffix.to_string()
         );
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="primitives" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (20ffea693 2022-08-11)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="primitives" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>

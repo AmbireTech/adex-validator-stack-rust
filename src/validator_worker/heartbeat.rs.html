@@ -249,256 +249,256 @@
 <span id="249">249</span>
 <span id="250">250</span>
 <span id="251">251</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">chrono::Utc</span>;
+</pre><pre class="rust"><code><span class="kw">use </span>chrono::Utc;
 
-<span class="kw">use</span> <span class="ident">adapter</span>::{<span class="ident">prelude</span>::<span class="kw-2">*</span>, <span class="ident">util::get_signable_state_root</span>, <span class="ident">Error</span> <span class="kw">as</span> <span class="ident">AdapterError</span>};
-<span class="kw">use</span> <span class="ident">byteorder</span>::{<span class="ident">BigEndian</span>, <span class="ident">ByteOrder</span>};
-<span class="kw">use</span> <span class="ident">primitives</span>::{
-    <span class="ident">merkle_tree::MerkleTree</span>,
-    <span class="ident">validator</span>::{<span class="ident">Heartbeat</span>, <span class="ident">MessageTypes</span>},
-    <span class="ident">ChainOf</span>, <span class="ident">Channel</span>,
+<span class="kw">use </span>adapter::{prelude::<span class="kw-2">*</span>, util::get_signable_state_root, Error <span class="kw">as </span>AdapterError};
+<span class="kw">use </span>byteorder::{BigEndian, ByteOrder};
+<span class="kw">use </span>primitives::{
+    merkle_tree::MerkleTree,
+    validator::{Heartbeat, MessageTypes},
+    ChainOf, Channel,
 };
-<span class="kw">use</span> <span class="ident">thiserror::Error</span>;
+<span class="kw">use </span>thiserror::Error;
 
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::sentry_interface</span>::{<span class="ident">Error</span> <span class="kw">as</span> <span class="ident">SentryApiError</span>, <span class="ident">PropagationResult</span>, <span class="ident">SentryApi</span>};
+<span class="kw">use </span><span class="kw">crate</span>::sentry_interface::{Error <span class="kw">as </span>SentryApiError, PropagationResult, SentryApi};
 
-<span class="kw">pub</span> <span class="kw">type</span> <span class="ident">HeartbeatStatus</span> <span class="op">=</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">PropagationResult</span><span class="op">&gt;</span><span class="op">&gt;</span>;
+<span class="kw">pub type </span>HeartbeatStatus = <span class="prelude-ty">Option</span>&lt;Vec&lt;PropagationResult&gt;&gt;;
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Error</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">Error</span> {
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;MerkleTree: {0}&quot;</span>)]</span>
-    <span class="ident">MerkleTree</span>(<span class="attribute">#[<span class="ident">from</span>]</span> <span class="ident">primitives::merkle_tree::Error</span>),
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Adapter error: {0}&quot;</span>)]</span>
-    <span class="ident">Adapter</span>(<span class="attribute">#[<span class="ident">from</span>]</span> <span class="ident">AdapterError</span>),
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Sentry API: {0}&quot;</span>)]</span>
-    <span class="ident">SentryApi</span>(<span class="attribute">#[<span class="ident">from</span>]</span> <span class="ident">SentryApiError</span>),
+<span class="attribute">#[derive(Debug, Error)]</span>
+<span class="kw">pub enum </span>Error {
+    <span class="attribute">#[error(<span class="string">&quot;MerkleTree: {0}&quot;</span>)]</span>
+    MerkleTree(<span class="attribute">#[from]</span> primitives::merkle_tree::Error),
+    <span class="attribute">#[error(<span class="string">&quot;Adapter error: {0}&quot;</span>)]</span>
+    Adapter(<span class="attribute">#[from]</span> AdapterError),
+    <span class="attribute">#[error(<span class="string">&quot;Sentry API: {0}&quot;</span>)]</span>
+    SentryApi(<span class="attribute">#[from]</span> SentryApiError),
 }
 
-<span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">heartbeat</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">Unlocked</span> <span class="op">+</span> <span class="lifetime">&#39;static</span><span class="op">&gt;</span>(
-    <span class="ident">iface</span>: <span class="kw-2">&amp;</span><span class="ident">SentryApi</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span>,
-    <span class="ident">channel_context</span>: <span class="kw-2">&amp;</span><span class="ident">ChainOf</span><span class="op">&lt;</span><span class="ident">Channel</span><span class="op">&gt;</span>,
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">HeartbeatStatus</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">validator_message_response</span> <span class="op">=</span> <span class="ident">iface</span>
-        .<span class="ident">get_our_latest_msg</span>(<span class="ident">channel_context</span>.<span class="ident">context</span>.<span class="ident">id</span>(), <span class="kw-2">&amp;</span>[<span class="string">&quot;Heartbeat&quot;</span>])
+<span class="kw">pub async fn </span>heartbeat&lt;C: Unlocked + <span class="lifetime">&#39;static</span>&gt;(
+    iface: <span class="kw-2">&amp;</span>SentryApi&lt;C&gt;,
+    channel_context: <span class="kw-2">&amp;</span>ChainOf&lt;Channel&gt;,
+) -&gt; <span class="prelude-ty">Result</span>&lt;HeartbeatStatus, Error&gt; {
+    <span class="kw">let </span>validator_message_response = iface
+        .get_our_latest_msg(channel_context.context.id(), <span class="kw-2">&amp;</span>[<span class="string">&quot;Heartbeat&quot;</span>])
         .<span class="kw">await</span><span class="question-mark">?</span>;
-    <span class="kw">let</span> <span class="ident">heartbeat_msg</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">validator_message_response</span> {
-        <span class="prelude-val">Some</span>(<span class="ident">MessageTypes::Heartbeat</span>(<span class="ident">heartbeat</span>)) =&gt; <span class="prelude-val">Some</span>(<span class="ident">heartbeat</span>),
-        <span class="kw">_</span> =&gt; <span class="prelude-val">None</span>,
+    <span class="kw">let </span>heartbeat_msg = <span class="kw">match </span>validator_message_response {
+        <span class="prelude-val">Some</span>(MessageTypes::Heartbeat(heartbeat)) =&gt; <span class="prelude-val">Some</span>(heartbeat),
+        <span class="kw">_ </span>=&gt; <span class="prelude-val">None</span>,
     };
 
-    <span class="kw">let</span> <span class="ident">should_send</span> <span class="op">=</span> <span class="ident">heartbeat_msg</span>.<span class="ident">map_or</span>(<span class="bool-val">true</span>, <span class="op">|</span><span class="ident">heartbeat</span><span class="op">|</span> {
-        <span class="kw">let</span> <span class="ident">duration</span> <span class="op">=</span> (<span class="ident">Utc::now</span>() <span class="op">-</span> <span class="ident">heartbeat</span>.<span class="ident">timestamp</span>)
-            .<span class="ident">to_std</span>()
-            .<span class="ident">expect</span>(<span class="string">&quot;Should never panic because Now &gt; heartbeat.timestamp&quot;</span>);
+    <span class="kw">let </span>should_send = heartbeat_msg.map_or(<span class="bool-val">true</span>, |heartbeat| {
+        <span class="kw">let </span>duration = (Utc::now() - heartbeat.timestamp)
+            .to_std()
+            .expect(<span class="string">&quot;Should never panic because Now &gt; heartbeat.timestamp&quot;</span>);
 
-        <span class="ident">duration</span> <span class="op">&gt;</span> <span class="ident">iface</span>.<span class="ident">config</span>.<span class="ident">heartbeat_time</span>
+        duration &gt; iface.config.heartbeat_time
     });
 
-    <span class="kw">if</span> <span class="ident">should_send</span> {
-        <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">send_heartbeat</span>(<span class="ident">iface</span>, <span class="ident">channel_context</span>).<span class="kw">await</span><span class="question-mark">?</span>))
-    } <span class="kw">else</span> {
+    <span class="kw">if </span>should_send {
+        <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(send_heartbeat(iface, channel_context).<span class="kw">await</span><span class="question-mark">?</span>))
+    } <span class="kw">else </span>{
         <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>)
     }
 }
 
-<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">send_heartbeat</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">Unlocked</span> <span class="op">+</span> <span class="lifetime">&#39;static</span><span class="op">&gt;</span>(
-    <span class="ident">iface</span>: <span class="kw-2">&amp;</span><span class="ident">SentryApi</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span>,
-    <span class="ident">channel_context</span>: <span class="kw-2">&amp;</span><span class="ident">ChainOf</span><span class="op">&lt;</span><span class="ident">Channel</span><span class="op">&gt;</span>,
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">PropagationResult</span><span class="op">&gt;</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">timestamp</span> <span class="op">=</span> <span class="ident">Utc::now</span>();
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">timestamp_buf</span> <span class="op">=</span> [<span class="number">0_u8</span>; <span class="number">32</span>];
-    <span class="kw">let</span> <span class="ident">milliseconds</span>: <span class="ident">u64</span> <span class="op">=</span> <span class="ident">u64::try_from</span>(<span class="ident">timestamp</span>.<span class="ident">timestamp_millis</span>())
-        .<span class="ident">expect</span>(<span class="string">&quot;The timestamp should be able to be converted to u64&quot;</span>);
-    <span class="ident">BigEndian::write_uint</span>(<span class="kw-2">&amp;mut</span> <span class="ident">timestamp_buf</span>[<span class="number">26</span>..], <span class="ident">milliseconds</span>, <span class="number">6</span>);
+<span class="kw">async fn </span>send_heartbeat&lt;C: Unlocked + <span class="lifetime">&#39;static</span>&gt;(
+    iface: <span class="kw-2">&amp;</span>SentryApi&lt;C&gt;,
+    channel_context: <span class="kw-2">&amp;</span>ChainOf&lt;Channel&gt;,
+) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;PropagationResult&gt;, Error&gt; {
+    <span class="kw">let </span>timestamp = Utc::now();
+    <span class="kw">let </span><span class="kw-2">mut </span>timestamp_buf = [<span class="number">0_u8</span>; <span class="number">32</span>];
+    <span class="kw">let </span>milliseconds: u64 = u64::try_from(timestamp.timestamp_millis())
+        .expect(<span class="string">&quot;The timestamp should be able to be converted to u64&quot;</span>);
+    BigEndian::write_uint(<span class="kw-2">&amp;mut </span>timestamp_buf[<span class="number">26</span>..], milliseconds, <span class="number">6</span>);
 
-    <span class="kw">let</span> <span class="ident">merkle_tree</span> <span class="op">=</span> <span class="ident">MerkleTree::new</span>(<span class="kw-2">&amp;</span>[<span class="ident">timestamp_buf</span>])<span class="question-mark">?</span>;
+    <span class="kw">let </span>merkle_tree = MerkleTree::new(<span class="kw-2">&amp;</span>[timestamp_buf])<span class="question-mark">?</span>;
 
-    <span class="kw">let</span> <span class="ident">state_root_raw</span> <span class="op">=</span>
-        <span class="ident">get_signable_state_root</span>(<span class="ident">channel_context</span>.<span class="ident">context</span>.<span class="ident">id</span>().<span class="ident">as_ref</span>(), <span class="kw-2">&amp;</span><span class="ident">merkle_tree</span>.<span class="ident">root</span>());
-    <span class="kw">let</span> <span class="ident">state_root</span> <span class="op">=</span> <span class="ident">hex::encode</span>(<span class="ident">state_root_raw</span>);
+    <span class="kw">let </span>state_root_raw =
+        get_signable_state_root(channel_context.context.id().as_ref(), <span class="kw-2">&amp;</span>merkle_tree.root());
+    <span class="kw">let </span>state_root = hex::encode(state_root_raw);
 
-    <span class="kw">let</span> <span class="ident">signature</span> <span class="op">=</span> <span class="ident">iface</span>.<span class="ident">adapter</span>.<span class="ident">sign</span>(<span class="kw-2">&amp;</span><span class="ident">state_root</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span>signature = iface.adapter.sign(<span class="kw-2">&amp;</span>state_root)<span class="question-mark">?</span>;
 
-    <span class="kw">let</span> <span class="ident">message_types</span> <span class="op">=</span> <span class="ident">MessageTypes::Heartbeat</span>(<span class="ident">Heartbeat</span> {
-        <span class="ident">signature</span>,
-        <span class="ident">state_root</span>,
-        <span class="ident">timestamp</span>,
+    <span class="kw">let </span>message_types = MessageTypes::Heartbeat(Heartbeat {
+        signature,
+        state_root,
+        timestamp,
     });
 
-    <span class="prelude-val">Ok</span>(<span class="ident">iface</span>.<span class="ident">propagate</span>(<span class="ident">channel_context</span>, <span class="kw-2">&amp;</span>[<span class="ident">message_types</span>]).<span class="kw">await</span><span class="question-mark">?</span>)
+    <span class="prelude-val">Ok</span>(iface.propagate(channel_context, <span class="kw-2">&amp;</span>[message_types]).<span class="kw">await</span><span class="question-mark">?</span>)
 }
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
-<span class="kw">mod</span> <span class="ident">test</span> {
-    <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
-    <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::sentry_interface</span>::{<span class="ident">ChainsValidators</span>, <span class="ident">Validator</span>};
-    <span class="kw">use</span> <span class="ident">adapter::dummy</span>::{<span class="ident">Adapter</span>, <span class="ident">Dummy</span>, <span class="ident">Options</span>};
-    <span class="kw">use</span> <span class="ident">chrono</span>::{<span class="ident">Duration</span>, <span class="ident">Utc</span>};
-    <span class="kw">use</span> <span class="ident">primitives</span>::{
-        <span class="ident">config::GANACHE_CONFIG</span>,
-        <span class="ident">sentry</span>::{<span class="ident">SuccessResponse</span>, <span class="ident">ValidatorMessage</span>, <span class="ident">ValidatorMessagesListResponse</span>},
-        <span class="ident">test_util</span>::{
-            <span class="ident">discard_logger</span>, <span class="ident">DUMMY_AUTH</span>, <span class="ident">DUMMY_CAMPAIGN</span>, <span class="ident">DUMMY_VALIDATOR_FOLLOWER</span>,
-            <span class="ident">DUMMY_VALIDATOR_LEADER</span>, <span class="ident">FOLLOWER</span>, <span class="ident">IDS</span>, <span class="ident">LEADER</span>,
+<span class="attribute">#[cfg(test)]</span>
+<span class="kw">mod </span>test {
+    <span class="kw">use super</span>::<span class="kw-2">*</span>;
+    <span class="kw">use </span><span class="kw">crate</span>::sentry_interface::{ChainsValidators, Validator};
+    <span class="kw">use </span>adapter::dummy::{Adapter, Dummy, Options};
+    <span class="kw">use </span>chrono::{Duration, Utc};
+    <span class="kw">use </span>primitives::{
+        config::GANACHE_CONFIG,
+        sentry::{SuccessResponse, ValidatorMessage, ValidatorMessagesListResponse},
+        test_util::{
+            discard_logger, DUMMY_AUTH, DUMMY_CAMPAIGN, DUMMY_VALIDATOR_FOLLOWER,
+            DUMMY_VALIDATOR_LEADER, FOLLOWER, IDS, LEADER,
         },
-        <span class="ident">util::ApiUrl</span>,
-        <span class="ident">validator::messages::Heartbeat</span>,
-        <span class="ident">ChainId</span>, <span class="ident">Config</span>, <span class="ident">ValidatorId</span>,
+        util::ApiUrl,
+        validator::messages::Heartbeat,
+        ChainId, Config, ValidatorId,
     };
-    <span class="kw">use</span> <span class="ident">std</span>::{<span class="ident">collections::HashMap</span>, <span class="ident">str::FromStr</span>};
-    <span class="kw">use</span> <span class="ident">wiremock</span>::{
-        <span class="ident">matchers</span>::{<span class="ident">method</span>, <span class="ident">path</span>, <span class="ident">query_param</span>},
-        <span class="ident">Mock</span>, <span class="ident">MockGuard</span>, <span class="ident">MockServer</span>, <span class="ident">ResponseTemplate</span>,
+    <span class="kw">use </span>std::{collections::HashMap, str::FromStr};
+    <span class="kw">use </span>wiremock::{
+        matchers::{method, path, query_param},
+        Mock, MockGuard, MockServer, ResponseTemplate,
     };
 
-    <span class="comment">// Sets up wiremock server instance and responses which are shared for all test cases</span>
-    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">setup_mock_server</span>() -&gt; <span class="ident">MockServer</span> {
-        <span class="kw">let</span> <span class="ident">server</span> <span class="op">=</span> <span class="ident">MockServer::start</span>().<span class="kw">await</span>;
-        <span class="kw">let</span> <span class="ident">ok_response</span> <span class="op">=</span> <span class="ident">SuccessResponse</span> { <span class="ident">success</span>: <span class="bool-val">true</span> };
-        <span class="ident">Mock::given</span>(<span class="ident">method</span>(<span class="string">&quot;POST&quot;</span>))
-            .<span class="ident">and</span>(<span class="ident">path</span>(<span class="macro">format!</span>(
+    <span class="comment">// Sets up wiremock server instance and responses which are shared for all test cases
+    </span><span class="kw">async fn </span>setup_mock_server() -&gt; MockServer {
+        <span class="kw">let </span>server = MockServer::start().<span class="kw">await</span>;
+        <span class="kw">let </span>ok_response = SuccessResponse { success: <span class="bool-val">true </span>};
+        Mock::given(method(<span class="string">&quot;POST&quot;</span>))
+            .and(path(<span class="macro">format!</span>(
                 <span class="string">&quot;leader/v5/channel/{}/validator-messages&quot;</span>,
-                <span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">channel</span>.<span class="ident">id</span>()
+                DUMMY_CAMPAIGN.channel.id()
             )))
-            .<span class="ident">respond_with</span>(<span class="ident">ResponseTemplate::new</span>(<span class="number">200</span>).<span class="ident">set_body_json</span>(<span class="kw-2">&amp;</span><span class="ident">ok_response</span>))
-            .<span class="ident">mount</span>(<span class="kw-2">&amp;</span><span class="ident">server</span>)
+            .respond_with(ResponseTemplate::new(<span class="number">200</span>).set_body_json(<span class="kw-2">&amp;</span>ok_response))
+            .mount(<span class="kw-2">&amp;</span>server)
             .<span class="kw">await</span>;
 
-        <span class="ident">Mock::given</span>(<span class="ident">method</span>(<span class="string">&quot;POST&quot;</span>))
-            .<span class="ident">and</span>(<span class="ident">path</span>(<span class="macro">format!</span>(
+        Mock::given(method(<span class="string">&quot;POST&quot;</span>))
+            .and(path(<span class="macro">format!</span>(
                 <span class="string">&quot;follower/v5/channel/{}/validator-messages&quot;</span>,
-                <span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">channel</span>.<span class="ident">id</span>()
+                DUMMY_CAMPAIGN.channel.id()
             )))
-            .<span class="ident">respond_with</span>(<span class="ident">ResponseTemplate::new</span>(<span class="number">200</span>).<span class="ident">set_body_json</span>(<span class="kw-2">&amp;</span><span class="ident">ok_response</span>))
-            .<span class="ident">mount</span>(<span class="kw-2">&amp;</span><span class="ident">server</span>)
+            .respond_with(ResponseTemplate::new(<span class="number">200</span>).set_body_json(<span class="kw-2">&amp;</span>ok_response))
+            .mount(<span class="kw-2">&amp;</span>server)
             .<span class="kw">await</span>;
 
-        <span class="ident">server</span>
+        server
     }
 
-    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">setup_sentry</span>(<span class="ident">server</span>: <span class="kw-2">&amp;</span><span class="ident">MockServer</span>, <span class="ident">config</span>: <span class="kw-2">&amp;</span><span class="ident">Config</span>) -&gt; <span class="ident">SentryApi</span><span class="op">&lt;</span><span class="ident">Dummy</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">sentry_url</span> <span class="op">=</span> <span class="ident">ApiUrl::from_str</span>(<span class="kw-2">&amp;</span><span class="ident">server</span>.<span class="ident">uri</span>()).<span class="ident">expect</span>(<span class="string">&quot;Should parse&quot;</span>);
+    <span class="kw">async fn </span>setup_sentry(server: <span class="kw-2">&amp;</span>MockServer, config: <span class="kw-2">&amp;</span>Config) -&gt; SentryApi&lt;Dummy&gt; {
+        <span class="kw">let </span>sentry_url = ApiUrl::from_str(<span class="kw-2">&amp;</span>server.uri()).expect(<span class="string">&quot;Should parse&quot;</span>);
 
-        <span class="kw">let</span> <span class="ident">adapter</span> <span class="op">=</span> <span class="ident">Adapter::with_unlocked</span>(<span class="ident">Dummy::init</span>(<span class="ident">Options</span> {
-            <span class="ident">dummy_identity</span>: <span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="ident">LEADER</span>],
-            <span class="ident">dummy_auth_tokens</span>: <span class="ident">DUMMY_AUTH</span>.<span class="ident">clone</span>(),
-            <span class="ident">dummy_chains</span>: <span class="ident">config</span>.<span class="ident">chains</span>.<span class="ident">values</span>().<span class="ident">cloned</span>().<span class="ident">collect</span>(),
+        <span class="kw">let </span>adapter = Adapter::with_unlocked(Dummy::init(Options {
+            dummy_identity: IDS[<span class="kw-2">&amp;</span>LEADER],
+            dummy_auth_tokens: DUMMY_AUTH.clone(),
+            dummy_chains: config.chains.values().cloned().collect(),
         }));
-        <span class="kw">let</span> <span class="ident">logger</span> <span class="op">=</span> <span class="ident">discard_logger</span>();
+        <span class="kw">let </span>logger = discard_logger();
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">validators</span>: <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">ValidatorId</span>, <span class="ident">Validator</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">HashMap::new</span>();
-        <span class="kw">let</span> <span class="ident">leader</span> <span class="op">=</span> <span class="ident">Validator</span> {
-            <span class="ident">url</span>: <span class="ident">ApiUrl::from_str</span>(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;{}/leader&quot;</span>, <span class="ident">server</span>.<span class="ident">uri</span>())).<span class="ident">expect</span>(<span class="string">&quot;should be valid&quot;</span>),
-            <span class="ident">token</span>: <span class="ident">DUMMY_AUTH</span>
-                .<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">LEADER</span>)
-                .<span class="ident">expect</span>(<span class="string">&quot;should be valid&quot;</span>)
-                .<span class="ident">to_string</span>(),
+        <span class="kw">let </span><span class="kw-2">mut </span>validators: HashMap&lt;ValidatorId, Validator&gt; = HashMap::new();
+        <span class="kw">let </span>leader = Validator {
+            url: ApiUrl::from_str(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;{}/leader&quot;</span>, server.uri())).expect(<span class="string">&quot;should be valid&quot;</span>),
+            token: DUMMY_AUTH
+                .get(<span class="kw-2">&amp;*</span>LEADER)
+                .expect(<span class="string">&quot;should be valid&quot;</span>)
+                .to_string(),
         };
-        <span class="kw">let</span> <span class="ident">follower</span> <span class="op">=</span> <span class="ident">Validator</span> {
-            <span class="ident">url</span>: <span class="ident">ApiUrl::from_str</span>(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;{}/follower&quot;</span>, <span class="ident">server</span>.<span class="ident">uri</span>())).<span class="ident">expect</span>(<span class="string">&quot;should be valid&quot;</span>),
-            <span class="ident">token</span>: <span class="ident">DUMMY_AUTH</span>
-                .<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">FOLLOWER</span>)
-                .<span class="ident">expect</span>(<span class="string">&quot;should be valid&quot;</span>)
-                .<span class="ident">to_string</span>(),
+        <span class="kw">let </span>follower = Validator {
+            url: ApiUrl::from_str(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;{}/follower&quot;</span>, server.uri())).expect(<span class="string">&quot;should be valid&quot;</span>),
+            token: DUMMY_AUTH
+                .get(<span class="kw-2">&amp;*</span>FOLLOWER)
+                .expect(<span class="string">&quot;should be valid&quot;</span>)
+                .to_string(),
         };
-        <span class="ident">validators</span>.<span class="ident">insert</span>(<span class="ident">DUMMY_VALIDATOR_LEADER</span>.<span class="ident">id</span>, <span class="ident">leader</span>);
-        <span class="ident">validators</span>.<span class="ident">insert</span>(<span class="ident">DUMMY_VALIDATOR_FOLLOWER</span>.<span class="ident">id</span>, <span class="ident">follower</span>);
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">propagate_to</span>: <span class="ident">ChainsValidators</span> <span class="op">=</span> <span class="ident">HashMap::new</span>();
-        <span class="ident">propagate_to</span>.<span class="ident">insert</span>(<span class="ident">ChainId::from</span>(<span class="number">1337</span>), <span class="ident">validators</span>);
-        <span class="ident">SentryApi::new</span>(<span class="ident">adapter</span>, <span class="ident">logger</span>, <span class="ident">config</span>.<span class="ident">clone</span>(), <span class="ident">sentry_url</span>)
-            .<span class="ident">expect</span>(<span class="string">&quot;Should create instance&quot;</span>)
-            .<span class="ident">with_propagate</span>(<span class="ident">propagate_to</span>)
-            .<span class="ident">expect</span>(<span class="string">&quot;Should propagate&quot;</span>)
+        validators.insert(DUMMY_VALIDATOR_LEADER.id, leader);
+        validators.insert(DUMMY_VALIDATOR_FOLLOWER.id, follower);
+        <span class="kw">let </span><span class="kw-2">mut </span>propagate_to: ChainsValidators = HashMap::new();
+        propagate_to.insert(ChainId::from(<span class="number">1337</span>), validators);
+        SentryApi::new(adapter, logger, config.clone(), sentry_url)
+            .expect(<span class="string">&quot;Should create instance&quot;</span>)
+            .with_propagate(propagate_to)
+            .expect(<span class="string">&quot;Should propagate&quot;</span>)
     }
 
-    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">setup_heartbeat_res</span>(<span class="ident">server</span>: <span class="kw-2">&amp;</span><span class="ident">MockServer</span>, <span class="ident">heartbeat</span>: <span class="ident">Heartbeat</span>) -&gt; <span class="ident">MockGuard</span> {
-        <span class="kw">let</span> <span class="ident">heartbeat_res</span> <span class="op">=</span> <span class="ident">ValidatorMessagesListResponse</span> {
-            <span class="ident">messages</span>: <span class="macro">vec!</span>[<span class="ident">ValidatorMessage</span> {
-                <span class="ident">from</span>: <span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">channel</span>.<span class="ident">follower</span>,
-                <span class="ident">received</span>: <span class="ident">Utc::now</span>(),
-                <span class="ident">msg</span>: <span class="ident">MessageTypes::Heartbeat</span>(<span class="ident">heartbeat</span>),
+    <span class="kw">async fn </span>setup_heartbeat_res(server: <span class="kw-2">&amp;</span>MockServer, heartbeat: Heartbeat) -&gt; MockGuard {
+        <span class="kw">let </span>heartbeat_res = ValidatorMessagesListResponse {
+            messages: <span class="macro">vec!</span>[ValidatorMessage {
+                from: DUMMY_CAMPAIGN.channel.follower,
+                received: Utc::now(),
+                msg: MessageTypes::Heartbeat(heartbeat),
             }],
         };
-        <span class="ident">Mock::given</span>(<span class="ident">method</span>(<span class="string">&quot;GET&quot;</span>))
-            .<span class="ident">and</span>(<span class="ident">path</span>(<span class="macro">format!</span>(
+        Mock::given(method(<span class="string">&quot;GET&quot;</span>))
+            .and(path(<span class="macro">format!</span>(
                 <span class="string">&quot;/v5/channel/{}/validator-messages/{}/{}&quot;</span>,
-                <span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">channel</span>.<span class="ident">id</span>(),
-                <span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">channel</span>.<span class="ident">leader</span>,
+                DUMMY_CAMPAIGN.channel.id(),
+                DUMMY_CAMPAIGN.channel.leader,
                 <span class="string">&quot;Heartbeat&quot;</span>,
             )))
-            .<span class="ident">and</span>(<span class="ident">query_param</span>(<span class="string">&quot;limit&quot;</span>, <span class="string">&quot;1&quot;</span>))
-            .<span class="ident">respond_with</span>(<span class="ident">ResponseTemplate::new</span>(<span class="number">200</span>).<span class="ident">set_body_json</span>(<span class="kw-2">&amp;</span><span class="ident">heartbeat_res</span>))
-            .<span class="ident">expect</span>(<span class="number">1</span>)
-            .<span class="ident">mount_as_scoped</span>(<span class="ident">server</span>)
-            .<span class="kw">await</span>
-    }
+            .and(query_param(<span class="string">&quot;limit&quot;</span>, <span class="string">&quot;1&quot;</span>))
+            .respond_with(ResponseTemplate::new(<span class="number">200</span>).set_body_json(<span class="kw-2">&amp;</span>heartbeat_res))
+            .expect(<span class="number">1</span>)
+            .mount_as_scoped(server)
+            .<span class="kw">await
+    </span>}
 
-    <span class="attribute">#[<span class="ident">tokio::test</span>]</span>
-    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">test_heartbeats</span>() {
-        <span class="kw">let</span> <span class="ident">config</span> <span class="op">=</span> <span class="ident">GANACHE_CONFIG</span>.<span class="ident">clone</span>();
-        <span class="kw">let</span> <span class="ident">server</span> <span class="op">=</span> <span class="ident">setup_mock_server</span>().<span class="kw">await</span>;
-        <span class="kw">let</span> <span class="ident">sentry</span> <span class="op">=</span> <span class="ident">setup_sentry</span>(<span class="kw-2">&amp;</span><span class="ident">server</span>, <span class="kw-2">&amp;</span><span class="ident">config</span>).<span class="kw">await</span>;
+    <span class="attribute">#[tokio::test]</span>
+    <span class="kw">async fn </span>test_heartbeats() {
+        <span class="kw">let </span>config = GANACHE_CONFIG.clone();
+        <span class="kw">let </span>server = setup_mock_server().<span class="kw">await</span>;
+        <span class="kw">let </span>sentry = setup_sentry(<span class="kw-2">&amp;</span>server, <span class="kw-2">&amp;</span>config).<span class="kw">await</span>;
         {
-            <span class="kw">let</span> <span class="ident">heartbeat_msg</span> <span class="op">=</span> <span class="ident">Heartbeat</span> {
-                <span class="ident">signature</span>: <span class="ident">String::new</span>(),
-                <span class="ident">state_root</span>: <span class="ident">String::new</span>(),
-                <span class="ident">timestamp</span>: <span class="ident">Utc::now</span>(),
+            <span class="kw">let </span>heartbeat_msg = Heartbeat {
+                signature: String::new(),
+                state_root: String::new(),
+                timestamp: Utc::now(),
             };
-            <span class="kw">let</span> <span class="ident">_mock_guard</span> <span class="op">=</span> <span class="ident">setup_heartbeat_res</span>(<span class="kw-2">&amp;</span><span class="ident">server</span>, <span class="ident">heartbeat_msg</span>).<span class="kw">await</span>;
+            <span class="kw">let </span>_mock_guard = setup_heartbeat_res(<span class="kw-2">&amp;</span>server, heartbeat_msg).<span class="kw">await</span>;
 
-            <span class="kw">let</span> <span class="ident">channel_context</span> <span class="op">=</span> <span class="ident">config</span>
-                .<span class="ident">find_chain_of</span>(<span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">channel</span>.<span class="ident">token</span>)
-                .<span class="ident">expect</span>(<span class="string">&quot;Should find Dummy campaign token in config&quot;</span>)
-                .<span class="ident">with_channel</span>(<span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">channel</span>);
+            <span class="kw">let </span>channel_context = config
+                .find_chain_of(DUMMY_CAMPAIGN.channel.token)
+                .expect(<span class="string">&quot;Should find Dummy campaign token in config&quot;</span>)
+                .with_channel(DUMMY_CAMPAIGN.channel);
 
-            <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">heartbeat</span>(<span class="kw-2">&amp;</span><span class="ident">sentry</span>, <span class="kw-2">&amp;</span><span class="ident">channel_context</span>)
-                .<span class="kw">await</span>
-                .<span class="ident">expect</span>(<span class="string">&quot;shouldn&#39;t return an error&quot;</span>);
+            <span class="kw">let </span>res = heartbeat(<span class="kw-2">&amp;</span>sentry, <span class="kw-2">&amp;</span>channel_context)
+                .<span class="kw">await
+                </span>.expect(<span class="string">&quot;shouldn&#39;t return an error&quot;</span>);
 
-            <span class="macro">assert!</span>(<span class="ident">res</span>.<span class="ident">is_none</span>());
+            <span class="macro">assert!</span>(res.is_none());
         }
 
-        <span class="comment">// Old heartbeat</span>
-        {
-            <span class="comment">// Using sleep(config.heartbeat_time) would make our test freeze for 30 seconds so just modifying the timestamp is more efficient</span>
-            <span class="kw">let</span> <span class="ident">heartbeat_msg</span> <span class="op">=</span> <span class="ident">Heartbeat</span> {
-                <span class="ident">signature</span>: <span class="ident">String::new</span>(),
-                <span class="ident">state_root</span>: <span class="ident">String::new</span>(),
-                <span class="ident">timestamp</span>: <span class="ident">Utc::now</span>() <span class="op">-</span> <span class="ident">Duration::minutes</span>(<span class="number">10</span>),
+        <span class="comment">// Old heartbeat
+        </span>{
+            <span class="comment">// Using sleep(config.heartbeat_time) would make our test freeze for 30 seconds so just modifying the timestamp is more efficient
+            </span><span class="kw">let </span>heartbeat_msg = Heartbeat {
+                signature: String::new(),
+                state_root: String::new(),
+                timestamp: Utc::now() - Duration::minutes(<span class="number">10</span>),
             };
-            <span class="kw">let</span> <span class="ident">_mock_guard</span> <span class="op">=</span> <span class="ident">setup_heartbeat_res</span>(<span class="kw-2">&amp;</span><span class="ident">server</span>, <span class="ident">heartbeat_msg</span>).<span class="kw">await</span>;
+            <span class="kw">let </span>_mock_guard = setup_heartbeat_res(<span class="kw-2">&amp;</span>server, heartbeat_msg).<span class="kw">await</span>;
 
-            <span class="kw">let</span> <span class="ident">channel_context</span> <span class="op">=</span> <span class="ident">config</span>
-                .<span class="ident">find_chain_of</span>(<span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">channel</span>.<span class="ident">token</span>)
-                .<span class="ident">expect</span>(<span class="string">&quot;Should find Dummy campaign token in config&quot;</span>)
-                .<span class="ident">with_channel</span>(<span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">channel</span>);
+            <span class="kw">let </span>channel_context = config
+                .find_chain_of(DUMMY_CAMPAIGN.channel.token)
+                .expect(<span class="string">&quot;Should find Dummy campaign token in config&quot;</span>)
+                .with_channel(DUMMY_CAMPAIGN.channel);
 
-            <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">heartbeat</span>(<span class="kw-2">&amp;</span><span class="ident">sentry</span>, <span class="kw-2">&amp;</span><span class="ident">channel_context</span>)
-                .<span class="kw">await</span>
-                .<span class="ident">expect</span>(<span class="string">&quot;shouldn&#39;t return an error&quot;</span>);
+            <span class="kw">let </span>res = heartbeat(<span class="kw-2">&amp;</span>sentry, <span class="kw-2">&amp;</span>channel_context)
+                .<span class="kw">await
+                </span>.expect(<span class="string">&quot;shouldn&#39;t return an error&quot;</span>);
 
-            <span class="macro">assert!</span>(<span class="ident">res</span>.<span class="ident">is_some</span>());
+            <span class="macro">assert!</span>(res.is_some());
 
-            <span class="kw">let</span> <span class="ident">propagated_to</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">ValidatorId</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">res</span>
-                .<span class="ident">unwrap</span>()
-                .<span class="ident">into_iter</span>()
-                .<span class="ident">collect</span>::<span class="op">&lt;</span><span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span>, <span class="kw">_</span><span class="op">&gt;</span><span class="op">&gt;</span>()
-                .<span class="ident">expect</span>(<span class="string">&quot;Shouldn&#39;t return an error&quot;</span>);
+            <span class="kw">let </span>propagated_to: Vec&lt;ValidatorId&gt; = res
+                .unwrap()
+                .into_iter()
+                .collect::&lt;<span class="prelude-ty">Result</span>&lt;Vec&lt;<span class="kw">_</span>&gt;, <span class="kw">_</span>&gt;&gt;()
+                .expect(<span class="string">&quot;Shouldn&#39;t return an error&quot;</span>);
             <span class="macro">assert!</span>(
-                <span class="ident">propagated_to</span>.<span class="ident">contains</span>(<span class="kw-2">&amp;</span><span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">LEADER</span>]),
-                <span class="string">&quot;Heartbeat message is propagated to the leader validator&quot;</span>
-            );
+                propagated_to.contains(<span class="kw-2">&amp;</span>IDS[<span class="kw-2">&amp;*</span>LEADER]),
+                <span class="string">&quot;Heartbeat message is propagated to the leader validator&quot;
+            </span>);
             <span class="macro">assert!</span>(
-                <span class="ident">propagated_to</span>.<span class="ident">contains</span>(<span class="kw-2">&amp;</span><span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">FOLLOWER</span>]),
-                <span class="string">&quot;Heartbeat message is propagated to the follower validator&quot;</span>
-            );
+                propagated_to.contains(<span class="kw-2">&amp;</span>IDS[<span class="kw-2">&amp;*</span>FOLLOWER]),
+                <span class="string">&quot;Heartbeat message is propagated to the follower validator&quot;
+            </span>);
             <span class="macro">assert_eq!</span>(
-                <span class="ident">propagated_to</span>.<span class="ident">len</span>(),
+                propagated_to.len(),
                 <span class="number">2</span>,
-                <span class="string">&quot;Heartbeat message isn&#39;t propagated to any other validator&quot;</span>
-            );
+                <span class="string">&quot;Heartbeat message isn&#39;t propagated to any other validator&quot;
+            </span>);
         }
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="validator_worker" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (20ffea693 2022-08-11)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="validator_worker" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>

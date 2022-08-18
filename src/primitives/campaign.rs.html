@@ -490,497 +490,497 @@
 <span id="490">490</span>
 <span id="491">491</span>
 <span id="492">492</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="kw">crate</span>::{
-    <span class="ident">sentry::EventType</span>, <span class="ident">targeting::Rules</span>, <span class="ident">AdUnit</span>, <span class="ident">Address</span>, <span class="ident">Channel</span>, <span class="ident">EventSubmission</span>, <span class="ident">UnifiedNum</span>,
-    <span class="ident">Validator</span>, <span class="ident">ValidatorDesc</span>, <span class="ident">ValidatorId</span>,
+</pre><pre class="rust"><code><span class="kw">use crate</span>::{
+    sentry::EventType, targeting::Rules, AdUnit, Address, Channel, EventSubmission, UnifiedNum,
+    Validator, ValidatorDesc, ValidatorId,
 };
 
-<span class="kw">use</span> <span class="ident">chrono</span>::{
-    <span class="ident">serde</span>::{<span class="ident">ts_milliseconds</span>, <span class="ident">ts_milliseconds_option</span>},
-    <span class="ident">DateTime</span>, <span class="ident">Utc</span>,
+<span class="kw">use </span>chrono::{
+    serde::{ts_milliseconds, ts_milliseconds_option},
+    DateTime, Utc,
 };
-<span class="kw">use</span> <span class="ident">serde</span>::{<span class="ident">Deserialize</span>, <span class="ident">Serialize</span>};
+<span class="kw">use </span>serde::{Deserialize, Serialize};
 
-<span class="attribute">#[<span class="ident">doc</span>(<span class="ident">inline</span>)]</span>
-<span class="kw">pub</span> <span class="kw">use</span> {
-    <span class="ident">campaign_id::CampaignId</span>,
-    <span class="ident">pricing</span>::{<span class="ident">Pricing</span>, <span class="ident">PricingBounds</span>},
-    <span class="ident">validators::Validators</span>,
+<span class="attribute">#[doc(inline)]</span>
+<span class="kw">pub use </span>{
+    campaign_id::CampaignId,
+    pricing::{Pricing, PricingBounds},
+    validators::Validators,
 };
 
-<span class="kw">mod</span> <span class="ident">campaign_id</span> {
-    <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::ToHex</span>;
-    <span class="kw">use</span> <span class="ident">hex</span>::{<span class="ident">FromHex</span>, <span class="ident">FromHexError</span>};
-    <span class="kw">use</span> <span class="ident">serde</span>::{
-        <span class="ident">de</span>::{<span class="self">self</span>, <span class="ident">Visitor</span>},
-        <span class="ident">Deserialize</span>, <span class="ident">Deserializer</span>, <span class="ident">Serialize</span>, <span class="ident">Serializer</span>,
+<span class="kw">mod </span>campaign_id {
+    <span class="kw">use </span><span class="kw">crate</span>::ToHex;
+    <span class="kw">use </span>hex::{FromHex, FromHexError};
+    <span class="kw">use </span>serde::{
+        de::{<span class="self">self</span>, Visitor},
+        Deserialize, Deserializer, Serialize, Serializer,
     };
-    <span class="kw">use</span> <span class="ident">std</span>::{<span class="ident">fmt</span>, <span class="ident">str::FromStr</span>};
-    <span class="kw">use</span> <span class="ident">thiserror::Error</span>;
-    <span class="kw">use</span> <span class="ident">uuid::Uuid</span>;
+    <span class="kw">use </span>std::{fmt, str::FromStr};
+    <span class="kw">use </span>thiserror::Error;
+    <span class="kw">use </span>uuid::Uuid;
 
-    <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>, <span class="ident">Hash</span>)]</span>
-    <span class="doccomment">/// an Id of 16 bytes, (de)serialized as a `0x` prefixed hex</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// In this implementation of the `CampaignId` the value is generated from a `Uuid::new_v4().to_simple()`</span>
-    <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">CampaignId</span>([<span class="ident">u8</span>; <span class="number">16</span>]);
+    <span class="attribute">#[derive(Clone, Copy, PartialEq, Eq, Hash)]</span>
+    <span class="doccomment">/// an Id of 16 bytes, (de)serialized as a `0x` prefixed hex
+    ///
+    /// In this implementation of the `CampaignId` the value is generated from a `Uuid::new_v4().to_simple()`
+    </span><span class="kw">pub struct </span>CampaignId([u8; <span class="number">16</span>]);
 
-    <span class="kw">impl</span> <span class="ident">fmt::Debug</span> <span class="kw">for</span> <span class="ident">CampaignId</span> {
-        <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="ident">fmt::Result</span> {
-            <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;CampaignId({})&quot;</span>, <span class="self">self</span>)
+    <span class="kw">impl </span>fmt::Debug <span class="kw">for </span>CampaignId {
+        <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; fmt::Result {
+            <span class="macro">write!</span>(f, <span class="string">&quot;CampaignId({})&quot;</span>, <span class="self">self</span>)
         }
     }
 
-    <span class="kw">impl</span> <span class="ident">CampaignId</span> {
-        <span class="doccomment">/// Generates randomly a `CampaignId` using `Uuid::new_v4().to_simple()`</span>
-        <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>() -&gt; <span class="self">Self</span> {
-            <span class="ident"><span class="self">Self</span>::default</span>()
+    <span class="kw">impl </span>CampaignId {
+        <span class="doccomment">/// Generates randomly a `CampaignId` using `Uuid::new_v4().to_simple()`
+        </span><span class="kw">pub fn </span>new() -&gt; <span class="self">Self </span>{
+            <span class="self">Self</span>::default()
         }
 
-        <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">as_bytes</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>[<span class="ident">u8</span>; <span class="number">16</span>] {
-            <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>
-        }
+        <span class="kw">pub fn </span>as_bytes(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>[u8; <span class="number">16</span>] {
+            <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0
+        </span>}
 
-        <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">from_bytes</span>(<span class="ident">bytes</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>; <span class="number">16</span>]) -&gt; <span class="self">Self</span> {
-            <span class="self">Self</span>(<span class="kw-2">*</span><span class="ident">bytes</span>)
-        }
-    }
-
-    <span class="kw">impl</span> <span class="ident">Default</span> <span class="kw">for</span> <span class="ident">CampaignId</span> {
-        <span class="kw">fn</span> <span class="ident">default</span>() -&gt; <span class="self">Self</span> {
-            <span class="self">Self</span>(<span class="kw-2">*</span><span class="ident">Uuid::new_v4</span>().<span class="ident">as_bytes</span>())
+        <span class="kw">pub fn </span>from_bytes(bytes: <span class="kw-2">&amp;</span>[u8; <span class="number">16</span>]) -&gt; <span class="self">Self </span>{
+            <span class="self">Self</span>(<span class="kw-2">*</span>bytes)
         }
     }
 
-    <span class="kw">impl</span> <span class="ident">AsRef</span><span class="op">&lt;</span>[<span class="ident">u8</span>]<span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">CampaignId</span> {
-        <span class="kw">fn</span> <span class="ident">as_ref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>[<span class="ident">u8</span>] {
-            <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>
+    <span class="kw">impl </span>Default <span class="kw">for </span>CampaignId {
+        <span class="kw">fn </span>default() -&gt; <span class="self">Self </span>{
+            <span class="self">Self</span>(<span class="kw-2">*</span>Uuid::new_v4().as_bytes())
         }
     }
 
-    <span class="kw">impl</span> <span class="ident">AsRef</span><span class="op">&lt;</span>[<span class="ident">u8</span>; <span class="number">16</span>]<span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">CampaignId</span> {
-        <span class="kw">fn</span> <span class="ident">as_ref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>[<span class="ident">u8</span>; <span class="number">16</span>] {
-            <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>
-        }
+    <span class="kw">impl </span>AsRef&lt;[u8]&gt; <span class="kw">for </span>CampaignId {
+        <span class="kw">fn </span>as_ref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>[u8] {
+            <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0
+        </span>}
     }
 
-    <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Error</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">Error</span> {
-        <span class="doccomment">/// the `0x` prefix is missing</span>
-        <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Expected a `0x` prefix&quot;</span>)]</span>
-        <span class="ident">ExpectedPrefix</span>,
-        <span class="attribute">#[<span class="ident">error</span>(<span class="ident">transparent</span>)]</span>
-        <span class="ident">InvalidHex</span>(<span class="attribute">#[<span class="ident">from</span>]</span> <span class="ident">FromHexError</span>),
+    <span class="kw">impl </span>AsRef&lt;[u8; <span class="number">16</span>]&gt; <span class="kw">for </span>CampaignId {
+        <span class="kw">fn </span>as_ref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>[u8; <span class="number">16</span>] {
+            <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0
+        </span>}
     }
 
-    <span class="kw">impl</span> <span class="ident">FromStr</span> <span class="kw">for</span> <span class="ident">CampaignId</span> {
-        <span class="kw">type</span> <span class="prelude-val">Err</span> <span class="op">=</span> <span class="ident">Error</span>;
+    <span class="attribute">#[derive(Debug, Error)]</span>
+    <span class="kw">pub enum </span>Error {
+        <span class="doccomment">/// the `0x` prefix is missing
+        </span><span class="attribute">#[error(<span class="string">&quot;Expected a `0x` prefix&quot;</span>)]</span>
+        ExpectedPrefix,
+        <span class="attribute">#[error(transparent)]</span>
+        InvalidHex(<span class="attribute">#[from]</span> FromHexError),
+    }
 
-        <span class="kw">fn</span> <span class="ident">from_str</span>(<span class="ident">s</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident"><span class="self">Self</span>::Err</span><span class="op">&gt;</span> {
-            <span class="kw">match</span> <span class="ident">s</span>.<span class="ident">strip_prefix</span>(<span class="string">&quot;0x&quot;</span>) {
-                <span class="prelude-val">Some</span>(<span class="ident">hex</span>) =&gt; <span class="prelude-val">Ok</span>(<span class="self">Self</span>(<span class="op">&lt;</span>[<span class="ident">u8</span>; <span class="number">16</span>]<span class="op">&gt;</span><span class="ident">::from_hex</span>(<span class="ident">hex</span>)<span class="question-mark">?</span>)),
-                <span class="prelude-val">None</span> =&gt; <span class="prelude-val">Err</span>(<span class="ident">Error::ExpectedPrefix</span>),
+    <span class="kw">impl </span>FromStr <span class="kw">for </span>CampaignId {
+        <span class="kw">type </span><span class="prelude-val">Err </span>= Error;
+
+        <span class="kw">fn </span>from_str(s: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, <span class="self">Self</span>::Err&gt; {
+            <span class="kw">match </span>s.strip_prefix(<span class="string">&quot;0x&quot;</span>) {
+                <span class="prelude-val">Some</span>(hex) =&gt; <span class="prelude-val">Ok</span>(<span class="self">Self</span>(&lt;[u8; <span class="number">16</span>]&gt;::from_hex(hex)<span class="question-mark">?</span>)),
+                <span class="prelude-val">None </span>=&gt; <span class="prelude-val">Err</span>(Error::ExpectedPrefix),
             }
         }
     }
 
-    <span class="kw">impl</span> <span class="ident">fmt::Display</span> <span class="kw">for</span> <span class="ident">CampaignId</span> {
-        <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="ident">fmt::Result</span> {
-            <span class="ident">f</span>.<span class="ident">write_str</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>.<span class="ident">to_hex_prefixed</span>())
+    <span class="kw">impl </span>fmt::Display <span class="kw">for </span>CampaignId {
+        <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; fmt::Result {
+            f.write_str(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>.to_hex_prefixed())
         }
     }
 
-    <span class="kw">impl</span> <span class="ident">Serialize</span> <span class="kw">for</span> <span class="ident">CampaignId</span> {
-        <span class="kw">fn</span> <span class="ident">serialize</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">serializer</span>: <span class="ident">S</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">S::Ok</span>, <span class="ident">S::Error</span><span class="op">&gt;</span>
-        <span class="kw">where</span>
-            <span class="ident">S</span>: <span class="ident">Serializer</span>,
+    <span class="kw">impl </span>Serialize <span class="kw">for </span>CampaignId {
+        <span class="kw">fn </span>serialize&lt;S&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, serializer: S) -&gt; <span class="prelude-ty">Result</span>&lt;S::Ok, S::Error&gt;
+        <span class="kw">where
+            </span>S: Serializer,
         {
-            <span class="ident">serializer</span>.<span class="ident">serialize_str</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>.<span class="ident">to_hex_prefixed</span>())
+            serializer.serialize_str(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>.to_hex_prefixed())
         }
     }
 
-    <span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;de</span><span class="op">&gt;</span> <span class="ident">Deserialize</span><span class="op">&lt;</span><span class="lifetime">&#39;de</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">CampaignId</span> {
-        <span class="kw">fn</span> <span class="ident">deserialize</span><span class="op">&lt;</span><span class="ident">D</span><span class="op">&gt;</span>(<span class="ident">deserializer</span>: <span class="ident">D</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">D::Error</span><span class="op">&gt;</span>
-        <span class="kw">where</span>
-            <span class="ident">D</span>: <span class="ident">Deserializer</span><span class="op">&lt;</span><span class="lifetime">&#39;de</span><span class="op">&gt;</span>,
+    <span class="kw">impl</span>&lt;<span class="lifetime">&#39;de</span>&gt; Deserialize&lt;<span class="lifetime">&#39;de</span>&gt; <span class="kw">for </span>CampaignId {
+        <span class="kw">fn </span>deserialize&lt;D&gt;(deserializer: D) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, D::Error&gt;
+        <span class="kw">where
+            </span>D: Deserializer&lt;<span class="lifetime">&#39;de</span>&gt;,
         {
-            <span class="ident">deserializer</span>.<span class="ident">deserialize_str</span>(<span class="ident">StringIdVisitor</span>)
+            deserializer.deserialize_str(StringIdVisitor)
         }
     }
 
-    <span class="kw">struct</span> <span class="ident">StringIdVisitor</span>;
+    <span class="kw">struct </span>StringIdVisitor;
 
-    <span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;de</span><span class="op">&gt;</span> <span class="ident">Visitor</span><span class="op">&lt;</span><span class="lifetime">&#39;de</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">StringIdVisitor</span> {
-        <span class="kw">type</span> <span class="ident">Value</span> <span class="op">=</span> <span class="ident">CampaignId</span>;
+    <span class="kw">impl</span>&lt;<span class="lifetime">&#39;de</span>&gt; Visitor&lt;<span class="lifetime">&#39;de</span>&gt; <span class="kw">for </span>StringIdVisitor {
+        <span class="kw">type </span>Value = CampaignId;
 
-        <span class="kw">fn</span> <span class="ident">expecting</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">formatter</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="ident">fmt::Result</span> {
-            <span class="ident">formatter</span>.<span class="ident">write_str</span>(<span class="string">&quot;a string of a `0x` prefixed hex with 16 bytes&quot;</span>)
+        <span class="kw">fn </span>expecting(<span class="kw-2">&amp;</span><span class="self">self</span>, formatter: <span class="kw-2">&amp;mut </span>fmt::Formatter&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; fmt::Result {
+            formatter.write_str(<span class="string">&quot;a string of a `0x` prefixed hex with 16 bytes&quot;</span>)
         }
 
-        <span class="kw">fn</span> <span class="ident">visit_str</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>(<span class="self">self</span>, <span class="ident">value</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::Value</span>, <span class="ident">E</span><span class="op">&gt;</span>
-        <span class="kw">where</span>
-            <span class="ident">E</span>: <span class="ident">de::Error</span>,
+        <span class="kw">fn </span>visit_str&lt;E&gt;(<span class="self">self</span>, value: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>::Value, E&gt;
+        <span class="kw">where
+            </span>E: de::Error,
         {
-            <span class="ident">value</span>
-                .<span class="ident">parse</span>::<span class="op">&lt;</span><span class="ident">CampaignId</span><span class="op">&gt;</span>()
-                .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">err</span><span class="op">|</span> <span class="ident">E::custom</span>(<span class="ident">err</span>.<span class="ident">to_string</span>()))
+            value
+                .parse::&lt;CampaignId&gt;()
+                .map_err(|err| E::custom(err.to_string()))
         }
 
-        <span class="kw">fn</span> <span class="ident">visit_string</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>(<span class="self">self</span>, <span class="ident">value</span>: <span class="ident">String</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::Value</span>, <span class="ident">E</span><span class="op">&gt;</span>
-        <span class="kw">where</span>
-            <span class="ident">E</span>: <span class="ident">de::Error</span>,
+        <span class="kw">fn </span>visit_string&lt;E&gt;(<span class="self">self</span>, value: String) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>::Value, E&gt;
+        <span class="kw">where
+            </span>E: de::Error,
         {
-            <span class="self">self</span>.<span class="ident">visit_str</span>(<span class="kw-2">&amp;</span><span class="ident">value</span>)
+            <span class="self">self</span>.visit_str(<span class="kw-2">&amp;</span>value)
         }
     }
 
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
-    <span class="kw">mod</span> <span class="ident">test</span> {
-        <span class="kw">use</span> <span class="ident">serde_json</span>::{<span class="ident">to_value</span>, <span class="ident">Value</span>};
+    <span class="attribute">#[cfg(test)]</span>
+    <span class="kw">mod </span>test {
+        <span class="kw">use </span>serde_json::{to_value, Value};
 
-        <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
+        <span class="kw">use super</span>::<span class="kw-2">*</span>;
 
-        <span class="attribute">#[<span class="ident">test</span>]</span>
-        <span class="kw">fn</span> <span class="ident">parse_and_display_campaign_id</span>() {
-            <span class="kw">let</span> <span class="ident">str_id</span> <span class="op">=</span> <span class="string">&quot;0x936da01f9abd4d9d80c702af85c822a8&quot;</span>;
+        <span class="attribute">#[test]</span>
+        <span class="kw">fn </span>parse_and_display_campaign_id() {
+            <span class="kw">let </span>str_id = <span class="string">&quot;0x936da01f9abd4d9d80c702af85c822a8&quot;</span>;
 
-            <span class="kw">let</span> <span class="ident">campaign_id</span>: <span class="ident">CampaignId</span> <span class="op">=</span> <span class="ident">str_id</span>.<span class="ident">parse</span>().<span class="ident">expect</span>(<span class="string">&quot;Should parse&quot;</span>);
+            <span class="kw">let </span>campaign_id: CampaignId = str_id.parse().expect(<span class="string">&quot;Should parse&quot;</span>);
 
-            <span class="macro">assert_eq!</span>(<span class="ident">str_id</span>, <span class="kw-2">&amp;</span><span class="ident">campaign_id</span>.<span class="ident">to_string</span>())
+            <span class="macro">assert_eq!</span>(str_id, <span class="kw-2">&amp;</span>campaign_id.to_string())
         }
 
-        <span class="attribute">#[<span class="ident">test</span>]</span>
-        <span class="kw">fn</span> <span class="ident">de_serializes_campaign_id</span>() {
-            <span class="kw">let</span> <span class="ident">id</span> <span class="op">=</span> <span class="ident">CampaignId::new</span>();
+        <span class="attribute">#[test]</span>
+        <span class="kw">fn </span>de_serializes_campaign_id() {
+            <span class="kw">let </span>id = CampaignId::new();
 
             <span class="macro">assert_eq!</span>(
-                <span class="ident">Value::String</span>(<span class="ident">id</span>.<span class="number">0</span>.<span class="ident">to_hex_prefixed</span>()),
-                <span class="ident">to_value</span>(<span class="ident">id</span>).<span class="ident">expect</span>(<span class="string">&quot;Should serialize&quot;</span>)
+                Value::String(id.<span class="number">0</span>.to_hex_prefixed()),
+                to_value(id).expect(<span class="string">&quot;Should serialize&quot;</span>)
             );
         }
     }
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">PartialEq</span>)]</span>
-<span class="attribute">#[<span class="ident">serde</span>(<span class="ident">rename_all</span> <span class="op">=</span> <span class="string">&quot;camelCase&quot;</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Campaign</span> {
-    <span class="kw">pub</span> <span class="ident">id</span>: <span class="ident">CampaignId</span>,
-    <span class="kw">pub</span> <span class="ident">channel</span>: <span class="ident">Channel</span>,
-    <span class="kw">pub</span> <span class="ident">creator</span>: <span class="ident">Address</span>,
-    <span class="kw">pub</span> <span class="ident">budget</span>: <span class="ident">UnifiedNum</span>,
-    <span class="kw">pub</span> <span class="ident">validators</span>: <span class="ident">Validators</span>,
-    <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">default</span>, <span class="ident">skip_serializing_if</span> <span class="op">=</span> <span class="string">&quot;Option::is_none&quot;</span>)]</span>
-    <span class="kw">pub</span> <span class="ident">title</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// Events pricing bounds</span>
-    <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">default</span>, <span class="ident">skip_serializing_if</span> <span class="op">=</span> <span class="string">&quot;PricingBounds::is_empty&quot;</span>)]</span>
-    <span class="kw">pub</span> <span class="ident">pricing_bounds</span>: <span class="ident">PricingBounds</span>,
-    <span class="doccomment">/// EventSubmission object, applied to event submission</span>
-    <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">default</span>, <span class="ident">skip_serializing_if</span> <span class="op">=</span> <span class="string">&quot;Option::is_none&quot;</span>)]</span>
-    <span class="kw">pub</span> <span class="ident">event_submission</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">EventSubmission</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// An array of AdUnit (optional)</span>
-    <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">default</span>, <span class="ident">skip_serializing_if</span> <span class="op">=</span> <span class="string">&quot;Vec::is_empty&quot;</span>)]</span>
-    <span class="kw">pub</span> <span class="ident">ad_units</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">AdUnit</span><span class="op">&gt;</span>,
-    <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">default</span>)]</span>
-    <span class="kw">pub</span> <span class="ident">targeting_rules</span>: <span class="ident">Rules</span>,
-    <span class="doccomment">/// A millisecond timestamp of when the campaign was created</span>
-    <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">with</span> <span class="op">=</span> <span class="string">&quot;ts_milliseconds&quot;</span>)]</span>
-    <span class="kw">pub</span> <span class="ident">created</span>: <span class="ident">DateTime</span><span class="op">&lt;</span><span class="ident">Utc</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// Used by the AdViewManager &amp; Targeting AIP#31</span>
-    <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">flatten</span>)]</span>
-    <span class="kw">pub</span> <span class="ident">active</span>: <span class="ident">Active</span>,
+<span class="attribute">#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]</span>
+<span class="attribute">#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]</span>
+<span class="kw">pub struct </span>Campaign {
+    <span class="kw">pub </span>id: CampaignId,
+    <span class="kw">pub </span>channel: Channel,
+    <span class="kw">pub </span>creator: Address,
+    <span class="kw">pub </span>budget: UnifiedNum,
+    <span class="kw">pub </span>validators: Validators,
+    <span class="attribute">#[serde(default, skip_serializing_if = <span class="string">&quot;Option::is_none&quot;</span>)]</span>
+    <span class="kw">pub </span>title: <span class="prelude-ty">Option</span>&lt;String&gt;,
+    <span class="doccomment">/// Events pricing bounds
+    </span><span class="attribute">#[serde(default, skip_serializing_if = <span class="string">&quot;PricingBounds::is_empty&quot;</span>)]</span>
+    <span class="kw">pub </span>pricing_bounds: PricingBounds,
+    <span class="doccomment">/// EventSubmission object, applied to event submission
+    </span><span class="attribute">#[serde(default, skip_serializing_if = <span class="string">&quot;Option::is_none&quot;</span>)]</span>
+    <span class="kw">pub </span>event_submission: <span class="prelude-ty">Option</span>&lt;EventSubmission&gt;,
+    <span class="doccomment">/// An array of AdUnit (optional)
+    </span><span class="attribute">#[serde(default, skip_serializing_if = <span class="string">&quot;Vec::is_empty&quot;</span>)]</span>
+    <span class="kw">pub </span>ad_units: Vec&lt;AdUnit&gt;,
+    <span class="attribute">#[serde(default)]</span>
+    <span class="kw">pub </span>targeting_rules: Rules,
+    <span class="doccomment">/// A millisecond timestamp of when the campaign was created
+    </span><span class="attribute">#[serde(with = <span class="string">&quot;ts_milliseconds&quot;</span>)]</span>
+    <span class="kw">pub </span>created: DateTime&lt;Utc&gt;,
+    <span class="doccomment">/// Used by the AdViewManager &amp; Targeting AIP#31
+    </span><span class="attribute">#[serde(flatten)]</span>
+    <span class="kw">pub </span>active: Active,
 }
 
-<span class="kw">impl</span> <span class="ident">Campaign</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">find_validator</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">validator</span>: <span class="kw-2">&amp;</span><span class="ident">ValidatorId</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Validator</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">ValidatorDesc</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="kw">match</span> (<span class="self">self</span>.<span class="ident">leader</span>(), <span class="self">self</span>.<span class="ident">follower</span>()) {
-            (<span class="prelude-val">Some</span>(<span class="ident">leader</span>), <span class="kw">_</span>) <span class="kw">if</span> <span class="kw-2">&amp;</span><span class="ident">leader</span>.<span class="ident">id</span> <span class="op">==</span> <span class="ident">validator</span> =&gt; <span class="prelude-val">Some</span>(<span class="ident">Validator::Leader</span>(<span class="ident">leader</span>)),
-            (<span class="kw">_</span>, <span class="prelude-val">Some</span>(<span class="ident">follower</span>)) <span class="kw">if</span> <span class="kw-2">&amp;</span><span class="ident">follower</span>.<span class="ident">id</span> <span class="op">==</span> <span class="ident">validator</span> =&gt; <span class="prelude-val">Some</span>(<span class="ident">Validator::Follower</span>(<span class="ident">follower</span>)),
-            <span class="kw">_</span> =&gt; <span class="prelude-val">None</span>,
+<span class="kw">impl </span>Campaign {
+    <span class="kw">pub fn </span>find_validator(<span class="kw-2">&amp;</span><span class="self">self</span>, validator: <span class="kw-2">&amp;</span>ValidatorId) -&gt; <span class="prelude-ty">Option</span>&lt;Validator&lt;<span class="kw-2">&amp;</span>ValidatorDesc&gt;&gt; {
+        <span class="kw">match </span>(<span class="self">self</span>.leader(), <span class="self">self</span>.follower()) {
+            (<span class="prelude-val">Some</span>(leader), <span class="kw">_</span>) <span class="kw">if </span><span class="kw-2">&amp;</span>leader.id == validator =&gt; <span class="prelude-val">Some</span>(Validator::Leader(leader)),
+            (<span class="kw">_</span>, <span class="prelude-val">Some</span>(follower)) <span class="kw">if </span><span class="kw-2">&amp;</span>follower.id == validator =&gt; <span class="prelude-val">Some</span>(Validator::Follower(follower)),
+            <span class="kw">_ </span>=&gt; <span class="prelude-val">None</span>,
         }
     }
 
-    <span class="doccomment">/// Matches the Channel.leader to the Campaign.validators.leader</span>
-    <span class="doccomment">/// If they match it returns `Some`, otherwise, it returns `None`</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">leader</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;_</span> <span class="ident">ValidatorDesc</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">validators</span>.<span class="ident">find</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">channel</span>.<span class="ident">leader</span>)
+    <span class="doccomment">/// Matches the Channel.leader to the Campaign.validators.leader
+    /// If they match it returns `Some`, otherwise, it returns `None`
+    </span><span class="kw">pub fn </span>leader(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;_ </span>ValidatorDesc&gt; {
+        <span class="self">self</span>.validators.find(<span class="kw-2">&amp;</span><span class="self">self</span>.channel.leader)
     }
 
-    <span class="doccomment">/// Matches the Channel.follower to the Campaign.spec.follower</span>
-    <span class="doccomment">/// If they match it returns `Some`, otherwise, it returns `None`</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">follower</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;_</span> <span class="ident">ValidatorDesc</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">validators</span>.<span class="ident">find</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">channel</span>.<span class="ident">follower</span>)
+    <span class="doccomment">/// Matches the Channel.follower to the Campaign.spec.follower
+    /// If they match it returns `Some`, otherwise, it returns `None`
+    </span><span class="kw">pub fn </span>follower(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;_ </span>ValidatorDesc&gt; {
+        <span class="self">self</span>.validators.find(<span class="kw-2">&amp;</span><span class="self">self</span>.channel.follower)
     }
 
-    <span class="doccomment">/// Returns the pricing of a given event</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">pricing</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">event</span>: <span class="ident">EventType</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">Pricing</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">pricing_bounds</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">event</span>)
+    <span class="doccomment">/// Returns the pricing of a given event
+    </span><span class="kw">pub fn </span>pricing(<span class="kw-2">&amp;</span><span class="self">self</span>, event: EventType) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>Pricing&gt; {
+        <span class="self">self</span>.pricing_bounds.get(<span class="kw-2">&amp;</span>event)
     }
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Active</span> {
-    <span class="doccomment">/// Campaign active from in a milliseconds timestamp</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// The time at which you want this campaign to become active (optional)</span>
-    <span class="attribute">#[<span class="ident">serde</span>(
-        <span class="ident">default</span>,
-        <span class="ident">skip_serializing_if</span> <span class="op">=</span> <span class="string">&quot;Option::is_none&quot;</span>,
-        <span class="ident">with</span> <span class="op">=</span> <span class="string">&quot;ts_milliseconds_option&quot;</span>,
-        <span class="ident">rename</span> <span class="op">=</span> <span class="string">&quot;activeFrom&quot;</span>
-    )]</span>
-    <span class="kw">pub</span> <span class="ident">from</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">DateTime</span><span class="op">&lt;</span><span class="ident">Utc</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// Campaign active to in a milliseconds timestamp</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// The time at which you want this campaign to become inactive (mandatory)</span>
-    <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">with</span> <span class="op">=</span> <span class="string">&quot;ts_milliseconds&quot;</span>, <span class="ident">rename</span> <span class="op">=</span> <span class="string">&quot;activeTo&quot;</span>)]</span>
-    <span class="kw">pub</span> <span class="ident">to</span>: <span class="ident">DateTime</span><span class="op">&lt;</span><span class="ident">Utc</span><span class="op">&gt;</span>,
+<span class="attribute">#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]</span>
+<span class="kw">pub struct </span>Active {
+    <span class="doccomment">/// Campaign active from in a milliseconds timestamp
+    ///
+    /// The time at which you want this campaign to become active (optional)
+    </span><span class="attribute">#[serde(
+        default,
+        skip_serializing_if = <span class="string">&quot;Option::is_none&quot;</span>,
+        with = <span class="string">&quot;ts_milliseconds_option&quot;</span>,
+        rename = <span class="string">&quot;activeFrom&quot;
+    </span>)]</span>
+    <span class="kw">pub </span>from: <span class="prelude-ty">Option</span>&lt;DateTime&lt;Utc&gt;&gt;,
+    <span class="doccomment">/// Campaign active to in a milliseconds timestamp
+    ///
+    /// The time at which you want this campaign to become inactive (mandatory)
+    </span><span class="attribute">#[serde(with = <span class="string">&quot;ts_milliseconds&quot;</span>, rename = <span class="string">&quot;activeTo&quot;</span>)]</span>
+    <span class="kw">pub </span>to: DateTime&lt;Utc&gt;,
 }
 
-<span class="kw">mod</span> <span class="ident">pricing</span> {
-    <span class="kw">use</span> <span class="ident">std</span>::{
-        <span class="ident">collections::HashMap</span>,
-        <span class="ident">ops</span>::{<span class="ident">Deref</span>, <span class="ident">DerefMut</span>},
+<span class="kw">mod </span>pricing {
+    <span class="kw">use </span>std::{
+        collections::HashMap,
+        ops::{Deref, DerefMut},
     };
 
-    <span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">sentry::EventType</span>, <span class="ident">UnifiedNum</span>};
-    <span class="kw">use</span> <span class="ident">serde</span>::{<span class="ident">Deserialize</span>, <span class="ident">Serialize</span>};
+    <span class="kw">use crate</span>::{sentry::EventType, UnifiedNum};
+    <span class="kw">use </span>serde::{Deserialize, Serialize};
 
-    <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">Eq</span>, <span class="ident">PartialEq</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Pricing</span> {
-        <span class="kw">pub</span> <span class="ident">min</span>: <span class="ident">UnifiedNum</span>,
-        <span class="kw">pub</span> <span class="ident">max</span>: <span class="ident">UnifiedNum</span>,
+    <span class="attribute">#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]</span>
+    <span class="kw">pub struct </span>Pricing {
+        <span class="kw">pub </span>min: UnifiedNum,
+        <span class="kw">pub </span>max: UnifiedNum,
     }
 
-    <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Default</span>, <span class="ident">Debug</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>, <span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">Clone</span>)]</span>
-    <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">transparent</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">PricingBounds</span>(<span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">EventType</span>, <span class="ident">Pricing</span><span class="op">&gt;</span>);
+    <span class="attribute">#[derive(Default, Debug, PartialEq, Eq, Serialize, Deserialize, Clone)]</span>
+    <span class="attribute">#[serde(transparent)]</span>
+    <span class="kw">pub struct </span>PricingBounds(HashMap&lt;EventType, Pricing&gt;);
 
-    <span class="kw">impl</span> <span class="ident">PricingBounds</span> {
-        <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_empty</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-            <span class="self">self</span>.<span class="number">0</span>.<span class="ident">is_empty</span>()
+    <span class="kw">impl </span>PricingBounds {
+        <span class="kw">pub fn </span>is_empty(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+            <span class="self">self</span>.<span class="number">0</span>.is_empty()
         }
     }
 
-    <span class="kw">impl</span> <span class="ident">FromIterator</span><span class="op">&lt;</span>(<span class="ident">EventType</span>, <span class="ident">Pricing</span>)<span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">PricingBounds</span> {
-        <span class="kw">fn</span> <span class="ident">from_iter</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">IntoIterator</span><span class="op">&lt;</span><span class="ident">Item</span> <span class="op">=</span> (<span class="ident">EventType</span>, <span class="ident">Pricing</span>)<span class="op">&gt;</span><span class="op">&gt;</span>(<span class="ident">iter</span>: <span class="ident">T</span>) -&gt; <span class="self">Self</span> {
-            <span class="self">Self</span>(<span class="ident">iter</span>.<span class="ident">into_iter</span>().<span class="ident">collect</span>())
+    <span class="kw">impl </span>FromIterator&lt;(EventType, Pricing)&gt; <span class="kw">for </span>PricingBounds {
+        <span class="kw">fn </span>from_iter&lt;T: IntoIterator&lt;Item = (EventType, Pricing)&gt;&gt;(iter: T) -&gt; <span class="self">Self </span>{
+            <span class="self">Self</span>(iter.into_iter().collect())
         }
     }
 
-    <span class="kw">impl</span> <span class="ident">Deref</span> <span class="kw">for</span> <span class="ident">PricingBounds</span> {
-        <span class="kw">type</span> <span class="ident">Target</span> <span class="op">=</span> <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">EventType</span>, <span class="ident">Pricing</span><span class="op">&gt;</span>;
+    <span class="kw">impl </span>Deref <span class="kw">for </span>PricingBounds {
+        <span class="kw">type </span>Target = HashMap&lt;EventType, Pricing&gt;;
 
-        <span class="kw">fn</span> <span class="ident">deref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident"><span class="self">Self</span>::Target</span> {
-            <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>
-        }
+        <span class="kw">fn </span>deref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="self">Self</span>::Target {
+            <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0
+        </span>}
     }
 
-    <span class="kw">impl</span> <span class="ident">DerefMut</span> <span class="kw">for</span> <span class="ident">PricingBounds</span> {
-        <span class="kw">fn</span> <span class="ident">deref_mut</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut</span> <span class="ident"><span class="self">Self</span>::Target</span> {
-            <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="number">0</span>
-        }
+    <span class="kw">impl </span>DerefMut <span class="kw">for </span>PricingBounds {
+        <span class="kw">fn </span>deref_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span><span class="self">Self</span>::Target {
+            <span class="kw-2">&amp;mut </span><span class="self">self</span>.<span class="number">0
+        </span>}
     }
 }
 
-<span class="doccomment">/// Campaign Validators</span>
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">validators</span> {
-    <span class="kw">use</span> <span class="ident">std::ops::Index</span>;
+<span class="doccomment">/// Campaign Validators
+</span><span class="kw">pub mod </span>validators {
+    <span class="kw">use </span>std::ops::Index;
 
-    <span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">ValidatorDesc</span>, <span class="ident">ValidatorId</span>};
-    <span class="kw">use</span> <span class="ident">serde</span>::{<span class="ident">Deserialize</span>, <span class="ident">Serialize</span>};
+    <span class="kw">use crate</span>::{ValidatorDesc, ValidatorId};
+    <span class="kw">use </span>serde::{Deserialize, Serialize};
 
-    <span class="doccomment">/// Unordered list of the validators representing the leader &amp; follower</span>
-    <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">Eq</span>, <span class="ident">PartialEq</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Validators</span>(<span class="ident">ValidatorDesc</span>, <span class="ident">ValidatorDesc</span>);
+    <span class="doccomment">/// Unordered list of the validators representing the leader &amp; follower
+    </span><span class="attribute">#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]</span>
+    <span class="kw">pub struct </span>Validators(ValidatorDesc, ValidatorDesc);
 
-    <span class="kw">impl</span> <span class="ident">Validators</span> {
-        <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">validators</span>: (<span class="ident">ValidatorDesc</span>, <span class="ident">ValidatorDesc</span>)) -&gt; <span class="self">Self</span> {
-            <span class="self">Self</span>(<span class="ident">validators</span>.<span class="number">0</span>, <span class="ident">validators</span>.<span class="number">1</span>)
+    <span class="kw">impl </span>Validators {
+        <span class="kw">pub fn </span>new(validators: (ValidatorDesc, ValidatorDesc)) -&gt; <span class="self">Self </span>{
+            <span class="self">Self</span>(validators.<span class="number">0</span>, validators.<span class="number">1</span>)
         }
 
-        <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">find</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">validator_id</span>: <span class="kw-2">&amp;</span><span class="ident">ValidatorId</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">ValidatorDesc</span><span class="op">&gt;</span> {
-            <span class="kw">if</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>.<span class="ident">id</span> <span class="op">==</span> <span class="ident">validator_id</span> {
+        <span class="kw">pub fn </span>find(<span class="kw-2">&amp;</span><span class="self">self</span>, validator_id: <span class="kw-2">&amp;</span>ValidatorId) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>ValidatorDesc&gt; {
+            <span class="kw">if </span><span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>.id == validator_id {
                 <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>)
-            } <span class="kw">else</span> <span class="kw">if</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">1</span>.<span class="ident">id</span> <span class="op">==</span> <span class="ident">validator_id</span> {
+            } <span class="kw">else if </span><span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">1</span>.id == validator_id {
                 <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">1</span>)
-            } <span class="kw">else</span> {
-                <span class="prelude-val">None</span>
-            }
+            } <span class="kw">else </span>{
+                <span class="prelude-val">None
+            </span>}
         }
 
-        <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">iter</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Iter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span> {
-            <span class="ident">Iter::new</span>(<span class="self">self</span>)
-        }
-    }
-
-    <span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span>(<span class="ident">ValidatorDesc</span>, <span class="ident">ValidatorDesc</span>)<span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Validators</span> {
-        <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">validators</span>: (<span class="ident">ValidatorDesc</span>, <span class="ident">ValidatorDesc</span>)) -&gt; <span class="self">Self</span> {
-            <span class="self">Self</span>(<span class="ident">validators</span>.<span class="number">0</span>, <span class="ident">validators</span>.<span class="number">1</span>)
+        <span class="kw">pub fn </span>iter(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Iter&lt;<span class="lifetime">&#39;_</span>&gt; {
+            Iter::new(<span class="self">self</span>)
         }
     }
 
-    <span class="kw">impl</span> <span class="ident">Index</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Validators</span> {
-        <span class="kw">type</span> <span class="ident">Output</span> <span class="op">=</span> <span class="ident">ValidatorDesc</span>;
-        <span class="kw">fn</span> <span class="ident">index</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">index</span>: <span class="ident">usize</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident"><span class="self">Self</span>::Output</span> {
-            <span class="kw">match</span> <span class="ident">index</span> {
-                <span class="number">0</span> =&gt; <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>,
-                <span class="number">1</span> =&gt; <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">1</span>,
-                <span class="kw">_</span> =&gt; <span class="macro">panic!</span>(<span class="string">&quot;Validators index is out of bound&quot;</span>),
-            }
+    <span class="kw">impl </span>From&lt;(ValidatorDesc, ValidatorDesc)&gt; <span class="kw">for </span>Validators {
+        <span class="kw">fn </span>from(validators: (ValidatorDesc, ValidatorDesc)) -&gt; <span class="self">Self </span>{
+            <span class="self">Self</span>(validators.<span class="number">0</span>, validators.<span class="number">1</span>)
         }
     }
 
-    <span class="doccomment">/// Fixed size iterator of 2, as we need an iterator in couple of occasions</span>
-    <span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="ident">IntoIterator</span> <span class="kw">for</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">Validators</span> {
-        <span class="kw">type</span> <span class="ident">Item</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">ValidatorDesc</span>;
-        <span class="kw">type</span> <span class="ident">IntoIter</span> <span class="op">=</span> <span class="ident">Iter</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>;
-
-        <span class="kw">fn</span> <span class="ident">into_iter</span>(<span class="self">self</span>) -&gt; <span class="ident"><span class="self">Self</span>::IntoIter</span> {
-            <span class="self">self</span>.<span class="ident">iter</span>()
-        }
-    }
-
-    <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Iter</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
-        <span class="ident">validators</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">Validators</span>,
-        <span class="ident">index</span>: <span class="ident">u8</span>,
-    }
-
-    <span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="ident">Iter</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
-        <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">validators</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">Validators</span>) -&gt; <span class="self">Self</span> {
-            <span class="self">Self</span> {
-                <span class="ident">validators</span>,
-                <span class="ident">index</span>: <span class="number">0</span>,
+    <span class="kw">impl </span>Index&lt;usize&gt; <span class="kw">for </span>Validators {
+        <span class="kw">type </span>Output = ValidatorDesc;
+        <span class="kw">fn </span>index(<span class="kw-2">&amp;</span><span class="self">self</span>, index: usize) -&gt; <span class="kw-2">&amp;</span><span class="self">Self</span>::Output {
+            <span class="kw">match </span>index {
+                <span class="number">0 </span>=&gt; <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>,
+                <span class="number">1 </span>=&gt; <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">1</span>,
+                <span class="kw">_ </span>=&gt; <span class="macro">panic!</span>(<span class="string">&quot;Validators index is out of bound&quot;</span>),
             }
         }
     }
 
-    <span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="ident">Iterator</span> <span class="kw">for</span> <span class="ident">Iter</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
-        <span class="kw">type</span> <span class="ident">Item</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">ValidatorDesc</span>;
+    <span class="doccomment">/// Fixed size iterator of 2, as we need an iterator in couple of occasions
+    </span><span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; IntoIterator <span class="kw">for </span><span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>Validators {
+        <span class="kw">type </span>Item = <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>ValidatorDesc;
+        <span class="kw">type </span>IntoIter = Iter&lt;<span class="lifetime">&#39;a</span>&gt;;
 
-        <span class="kw">fn</span> <span class="ident">next</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::Item</span><span class="op">&gt;</span> {
-            <span class="kw">match</span> <span class="self">self</span>.<span class="ident">index</span> {
-                <span class="number">0</span> =&gt; {
-                    <span class="self">self</span>.<span class="ident">index</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+        <span class="kw">fn </span>into_iter(<span class="self">self</span>) -&gt; <span class="self">Self</span>::IntoIter {
+            <span class="self">self</span>.iter()
+        }
+    }
 
-                    <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">validators</span>.<span class="number">0</span>)
+    <span class="kw">pub struct </span>Iter&lt;<span class="lifetime">&#39;a</span>&gt; {
+        validators: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>Validators,
+        index: u8,
+    }
+
+    <span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; Iter&lt;<span class="lifetime">&#39;a</span>&gt; {
+        <span class="kw">fn </span>new(validators: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>Validators) -&gt; <span class="self">Self </span>{
+            <span class="self">Self </span>{
+                validators,
+                index: <span class="number">0</span>,
+            }
+        }
+    }
+
+    <span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; Iterator <span class="kw">for </span>Iter&lt;<span class="lifetime">&#39;a</span>&gt; {
+        <span class="kw">type </span>Item = <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>ValidatorDesc;
+
+        <span class="kw">fn </span>next(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="self">Self</span>::Item&gt; {
+            <span class="kw">match </span><span class="self">self</span>.index {
+                <span class="number">0 </span>=&gt; {
+                    <span class="self">self</span>.index += <span class="number">1</span>;
+
+                    <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.validators.<span class="number">0</span>)
                 }
-                <span class="number">1</span> =&gt; {
-                    <span class="self">self</span>.<span class="ident">index</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+                <span class="number">1 </span>=&gt; {
+                    <span class="self">self</span>.index += <span class="number">1</span>;
 
-                    <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">validators</span>.<span class="number">1</span>)
+                    <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.validators.<span class="number">1</span>)
                 }
-                <span class="kw">_</span> =&gt; <span class="prelude-val">None</span>,
+                <span class="kw">_ </span>=&gt; <span class="prelude-val">None</span>,
             }
         }
     }
 }
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;postgres&quot;</span>)]</span>
-<span class="kw">mod</span> <span class="ident">postgres</span> {
-    <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::Channel</span>;
+<span class="attribute">#[cfg(feature = <span class="string">&quot;postgres&quot;</span>)]</span>
+<span class="kw">mod </span>postgres {
+    <span class="kw">use </span><span class="kw">crate</span>::Channel;
 
-    <span class="kw">use</span> <span class="kw">super</span>::{<span class="ident">Active</span>, <span class="ident">Campaign</span>, <span class="ident">CampaignId</span>, <span class="ident">PricingBounds</span>, <span class="ident">Validators</span>};
-    <span class="kw">use</span> <span class="ident">bytes::BytesMut</span>;
-    <span class="kw">use</span> <span class="ident">std::error::Error</span>;
-    <span class="kw">use</span> <span class="ident">tokio_postgres::types</span>::{<span class="ident">accepts</span>, <span class="ident">to_sql_checked</span>, <span class="ident">FromSql</span>, <span class="ident">IsNull</span>, <span class="ident">Json</span>, <span class="ident">ToSql</span>, <span class="ident">Type</span>};
-    <span class="kw">use</span> <span class="ident">tokio_postgres::Row</span>;
+    <span class="kw">use super</span>::{Active, Campaign, CampaignId, PricingBounds, Validators};
+    <span class="kw">use </span>bytes::BytesMut;
+    <span class="kw">use </span>std::error::Error;
+    <span class="kw">use </span>tokio_postgres::types::{accepts, to_sql_checked, FromSql, IsNull, Json, ToSql, Type};
+    <span class="kw">use </span>tokio_postgres::Row;
 
-    <span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">Row</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Campaign</span> {
-        <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">row</span>: <span class="kw-2">&amp;</span><span class="ident">Row</span>) -&gt; <span class="self">Self</span> {
-            <span class="self">Self</span> {
-                <span class="ident">id</span>: <span class="ident">row</span>.<span class="ident">get</span>(<span class="string">&quot;id&quot;</span>),
-                <span class="ident">channel</span>: <span class="ident">Channel::from</span>(<span class="ident">row</span>),
-                <span class="ident">creator</span>: <span class="ident">row</span>.<span class="ident">get</span>(<span class="string">&quot;creator&quot;</span>),
-                <span class="ident">budget</span>: <span class="ident">row</span>.<span class="ident">get</span>(<span class="string">&quot;budget&quot;</span>),
-                <span class="ident">validators</span>: <span class="ident">row</span>.<span class="ident">get</span>(<span class="string">&quot;validators&quot;</span>),
-                <span class="ident">title</span>: <span class="ident">row</span>.<span class="ident">get</span>(<span class="string">&quot;title&quot;</span>),
-                <span class="ident">pricing_bounds</span>: <span class="ident">row</span>.<span class="ident">get</span>(<span class="string">&quot;pricing_bounds&quot;</span>),
-                <span class="ident">event_submission</span>: <span class="ident">row</span>.<span class="ident">get</span>(<span class="string">&quot;event_submission&quot;</span>),
-                <span class="ident">ad_units</span>: <span class="ident">row</span>.<span class="ident">get</span>::<span class="op">&lt;</span><span class="kw">_</span>, <span class="ident">Json</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span><span class="op">&gt;</span>(<span class="string">&quot;ad_units&quot;</span>).<span class="number">0</span>,
-                <span class="ident">targeting_rules</span>: <span class="ident">row</span>.<span class="ident">get</span>(<span class="string">&quot;targeting_rules&quot;</span>),
-                <span class="ident">created</span>: <span class="ident">row</span>.<span class="ident">get</span>(<span class="string">&quot;created&quot;</span>),
-                <span class="ident">active</span>: <span class="ident">Active</span> {
-                    <span class="ident">from</span>: <span class="ident">row</span>.<span class="ident">get</span>(<span class="string">&quot;active_from&quot;</span>),
-                    <span class="ident">to</span>: <span class="ident">row</span>.<span class="ident">get</span>(<span class="string">&quot;active_to&quot;</span>),
+    <span class="kw">impl </span>From&lt;<span class="kw-2">&amp;</span>Row&gt; <span class="kw">for </span>Campaign {
+        <span class="kw">fn </span>from(row: <span class="kw-2">&amp;</span>Row) -&gt; <span class="self">Self </span>{
+            <span class="self">Self </span>{
+                id: row.get(<span class="string">&quot;id&quot;</span>),
+                channel: Channel::from(row),
+                creator: row.get(<span class="string">&quot;creator&quot;</span>),
+                budget: row.get(<span class="string">&quot;budget&quot;</span>),
+                validators: row.get(<span class="string">&quot;validators&quot;</span>),
+                title: row.get(<span class="string">&quot;title&quot;</span>),
+                pricing_bounds: row.get(<span class="string">&quot;pricing_bounds&quot;</span>),
+                event_submission: row.get(<span class="string">&quot;event_submission&quot;</span>),
+                ad_units: row.get::&lt;<span class="kw">_</span>, Json&lt;<span class="kw">_</span>&gt;&gt;(<span class="string">&quot;ad_units&quot;</span>).<span class="number">0</span>,
+                targeting_rules: row.get(<span class="string">&quot;targeting_rules&quot;</span>),
+                created: row.get(<span class="string">&quot;created&quot;</span>),
+                active: Active {
+                    from: row.get(<span class="string">&quot;active_from&quot;</span>),
+                    to: row.get(<span class="string">&quot;active_to&quot;</span>),
                 },
             }
         }
     }
 
-    <span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="ident">FromSql</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">CampaignId</span> {
-        <span class="kw">fn</span> <span class="ident">from_sql</span>(<span class="ident">ty</span>: <span class="kw-2">&amp;</span><span class="ident">Type</span>, <span class="ident">raw</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> [<span class="ident">u8</span>]) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Error</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-            <span class="kw">let</span> <span class="ident">str_slice</span> <span class="op">=</span> <span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">str</span> <span class="kw">as</span> <span class="ident">FromSql</span><span class="op">&gt;</span><span class="ident">::from_sql</span>(<span class="ident">ty</span>, <span class="ident">raw</span>)<span class="question-mark">?</span>;
+    <span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; FromSql&lt;<span class="lifetime">&#39;a</span>&gt; <span class="kw">for </span>CampaignId {
+        <span class="kw">fn </span>from_sql(ty: <span class="kw-2">&amp;</span>Type, raw: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>[u8]) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, Box&lt;<span class="kw">dyn </span>Error + Sync + Send&gt;&gt; {
+            <span class="kw">let </span>str_slice = &lt;<span class="kw-2">&amp;</span>str <span class="kw">as </span>FromSql&gt;::from_sql(ty, raw)<span class="question-mark">?</span>;
 
-            <span class="prelude-val">Ok</span>(<span class="ident">str_slice</span>.<span class="ident">parse</span>()<span class="question-mark">?</span>)
+            <span class="prelude-val">Ok</span>(str_slice.parse()<span class="question-mark">?</span>)
         }
 
-        <span class="macro">accepts!</span>(<span class="ident">TEXT</span>, <span class="ident">VARCHAR</span>);
+        <span class="macro">accepts!</span>(TEXT, VARCHAR);
     }
 
-    <span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">Row</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">CampaignId</span> {
-        <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">row</span>: <span class="kw-2">&amp;</span><span class="ident">Row</span>) -&gt; <span class="self">Self</span> {
-            <span class="ident">row</span>.<span class="ident">get</span>(<span class="string">&quot;id&quot;</span>)
+    <span class="kw">impl </span>From&lt;<span class="kw-2">&amp;</span>Row&gt; <span class="kw">for </span>CampaignId {
+        <span class="kw">fn </span>from(row: <span class="kw-2">&amp;</span>Row) -&gt; <span class="self">Self </span>{
+            row.get(<span class="string">&quot;id&quot;</span>)
         }
     }
 
-    <span class="kw">impl</span> <span class="ident">ToSql</span> <span class="kw">for</span> <span class="ident">CampaignId</span> {
-        <span class="kw">fn</span> <span class="ident">to_sql</span>(
+    <span class="kw">impl </span>ToSql <span class="kw">for </span>CampaignId {
+        <span class="kw">fn </span>to_sql(
             <span class="kw-2">&amp;</span><span class="self">self</span>,
-            <span class="ident">ty</span>: <span class="kw-2">&amp;</span><span class="ident">Type</span>,
-            <span class="ident">w</span>: <span class="kw-2">&amp;mut</span> <span class="ident">BytesMut</span>,
-        ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">IsNull</span>, <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Error</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-            <span class="self">self</span>.<span class="ident">to_string</span>().<span class="ident">to_sql</span>(<span class="ident">ty</span>, <span class="ident">w</span>)
+            ty: <span class="kw-2">&amp;</span>Type,
+            w: <span class="kw-2">&amp;mut </span>BytesMut,
+        ) -&gt; <span class="prelude-ty">Result</span>&lt;IsNull, Box&lt;<span class="kw">dyn </span>Error + Sync + Send&gt;&gt; {
+            <span class="self">self</span>.to_string().to_sql(ty, w)
         }
 
-        <span class="macro">accepts!</span>(<span class="ident">TEXT</span>, <span class="ident">VARCHAR</span>);
+        <span class="macro">accepts!</span>(TEXT, VARCHAR);
         <span class="macro">to_sql_checked!</span>();
     }
 
-    <span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="ident">FromSql</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Validators</span> {
-        <span class="kw">fn</span> <span class="ident">from_sql</span>(<span class="ident">ty</span>: <span class="kw-2">&amp;</span><span class="ident">Type</span>, <span class="ident">raw</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> [<span class="ident">u8</span>]) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Error</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-            <span class="kw">let</span> <span class="ident">json</span> <span class="op">=</span> <span class="op">&lt;</span><span class="ident">Json</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span> <span class="kw">as</span> <span class="ident">FromSql</span><span class="op">&gt;</span><span class="ident">::from_sql</span>(<span class="ident">ty</span>, <span class="ident">raw</span>)<span class="question-mark">?</span>;
+    <span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; FromSql&lt;<span class="lifetime">&#39;a</span>&gt; <span class="kw">for </span>Validators {
+        <span class="kw">fn </span>from_sql(ty: <span class="kw-2">&amp;</span>Type, raw: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>[u8]) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, Box&lt;<span class="kw">dyn </span>Error + Sync + Send&gt;&gt; {
+            <span class="kw">let </span>json = &lt;Json&lt;<span class="self">Self</span>&gt; <span class="kw">as </span>FromSql&gt;::from_sql(ty, raw)<span class="question-mark">?</span>;
 
-            <span class="prelude-val">Ok</span>(<span class="ident">json</span>.<span class="number">0</span>)
+            <span class="prelude-val">Ok</span>(json.<span class="number">0</span>)
         }
 
-        <span class="macro">accepts!</span>(<span class="ident">JSONB</span>);
+        <span class="macro">accepts!</span>(JSONB);
     }
 
-    <span class="kw">impl</span> <span class="ident">ToSql</span> <span class="kw">for</span> <span class="ident">Validators</span> {
-        <span class="kw">fn</span> <span class="ident">to_sql</span>(
+    <span class="kw">impl </span>ToSql <span class="kw">for </span>Validators {
+        <span class="kw">fn </span>to_sql(
             <span class="kw-2">&amp;</span><span class="self">self</span>,
-            <span class="ident">ty</span>: <span class="kw-2">&amp;</span><span class="ident">Type</span>,
-            <span class="ident">w</span>: <span class="kw-2">&amp;mut</span> <span class="ident">BytesMut</span>,
-        ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">IsNull</span>, <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Error</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-            <span class="ident">Json</span>(<span class="self">self</span>).<span class="ident">to_sql</span>(<span class="ident">ty</span>, <span class="ident">w</span>)
+            ty: <span class="kw-2">&amp;</span>Type,
+            w: <span class="kw-2">&amp;mut </span>BytesMut,
+        ) -&gt; <span class="prelude-ty">Result</span>&lt;IsNull, Box&lt;<span class="kw">dyn </span>Error + Sync + Send&gt;&gt; {
+            Json(<span class="self">self</span>).to_sql(ty, w)
         }
 
-        <span class="macro">accepts!</span>(<span class="ident">JSONB</span>);
+        <span class="macro">accepts!</span>(JSONB);
         <span class="macro">to_sql_checked!</span>();
     }
 
-    <span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="ident">FromSql</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">PricingBounds</span> {
-        <span class="kw">fn</span> <span class="ident">from_sql</span>(<span class="ident">ty</span>: <span class="kw-2">&amp;</span><span class="ident">Type</span>, <span class="ident">raw</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> [<span class="ident">u8</span>]) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Error</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-            <span class="kw">let</span> <span class="ident">json</span> <span class="op">=</span> <span class="op">&lt;</span><span class="ident">Json</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span> <span class="kw">as</span> <span class="ident">FromSql</span><span class="op">&gt;</span><span class="ident">::from_sql</span>(<span class="ident">ty</span>, <span class="ident">raw</span>)<span class="question-mark">?</span>;
+    <span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; FromSql&lt;<span class="lifetime">&#39;a</span>&gt; <span class="kw">for </span>PricingBounds {
+        <span class="kw">fn </span>from_sql(ty: <span class="kw-2">&amp;</span>Type, raw: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>[u8]) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, Box&lt;<span class="kw">dyn </span>Error + Sync + Send&gt;&gt; {
+            <span class="kw">let </span>json = &lt;Json&lt;<span class="self">Self</span>&gt; <span class="kw">as </span>FromSql&gt;::from_sql(ty, raw)<span class="question-mark">?</span>;
 
-            <span class="prelude-val">Ok</span>(<span class="ident">json</span>.<span class="number">0</span>)
+            <span class="prelude-val">Ok</span>(json.<span class="number">0</span>)
         }
 
-        <span class="macro">accepts!</span>(<span class="ident">JSONB</span>);
+        <span class="macro">accepts!</span>(JSONB);
     }
 
-    <span class="kw">impl</span> <span class="ident">ToSql</span> <span class="kw">for</span> <span class="ident">PricingBounds</span> {
-        <span class="kw">fn</span> <span class="ident">to_sql</span>(
+    <span class="kw">impl </span>ToSql <span class="kw">for </span>PricingBounds {
+        <span class="kw">fn </span>to_sql(
             <span class="kw-2">&amp;</span><span class="self">self</span>,
-            <span class="ident">ty</span>: <span class="kw-2">&amp;</span><span class="ident">Type</span>,
-            <span class="ident">w</span>: <span class="kw-2">&amp;mut</span> <span class="ident">BytesMut</span>,
-        ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">IsNull</span>, <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Error</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-            <span class="ident">Json</span>(<span class="self">self</span>).<span class="ident">to_sql</span>(<span class="ident">ty</span>, <span class="ident">w</span>)
+            ty: <span class="kw-2">&amp;</span>Type,
+            w: <span class="kw-2">&amp;mut </span>BytesMut,
+        ) -&gt; <span class="prelude-ty">Result</span>&lt;IsNull, Box&lt;<span class="kw">dyn </span>Error + Sync + Send&gt;&gt; {
+            Json(<span class="self">self</span>).to_sql(ty, w)
         }
 
-        <span class="macro">accepts!</span>(<span class="ident">JSONB</span>);
+        <span class="macro">accepts!</span>(JSONB);
         <span class="macro">to_sql_checked!</span>();
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="primitives" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (20ffea693 2022-08-11)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="primitives" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>

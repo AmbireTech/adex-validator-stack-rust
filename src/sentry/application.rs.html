@@ -305,312 +305,350 @@
 <span id="305">305</span>
 <span id="306">306</span>
 <span id="307">307</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">std</span>::{
-    <span class="ident">net</span>::{<span class="ident">IpAddr</span>, <span class="ident">Ipv4Addr</span>, <span class="ident">SocketAddr</span>},
-    <span class="ident">path::Path</span>,
+<span id="308">308</span>
+<span id="309">309</span>
+<span id="310">310</span>
+<span id="311">311</span>
+<span id="312">312</span>
+<span id="313">313</span>
+<span id="314">314</span>
+<span id="315">315</span>
+<span id="316">316</span>
+<span id="317">317</span>
+<span id="318">318</span>
+<span id="319">319</span>
+<span id="320">320</span>
+<span id="321">321</span>
+<span id="322">322</span>
+<span id="323">323</span>
+<span id="324">324</span>
+<span id="325">325</span>
+<span id="326">326</span>
+</pre><pre class="rust"><code><span class="kw">use </span>std::{
+    net::{IpAddr, Ipv4Addr, SocketAddr},
+    path::Path,
+    sync::Arc,
 };
 
-<span class="kw">use</span> <span class="ident">adapter::client::Locked</span>;
-<span class="kw">use</span> <span class="ident">hyper</span>::{
-    <span class="ident">service</span>::{<span class="ident">make_service_fn</span>, <span class="ident">service_fn</span>},
-    <span class="ident">Error</span>, <span class="ident">Server</span>,
+<span class="kw">use </span>axum::{
+    extract::{FromRequest, RequestParts},
+    http::{Method, StatusCode},
+    middleware,
+    routing::get,
+    Extension, Router,
 };
-<span class="kw">use</span> <span class="ident">once_cell::sync::Lazy</span>;
-<span class="kw">use</span> <span class="ident">primitives</span>::{<span class="ident">config::Environment</span>, <span class="ident">ValidatorId</span>};
-<span class="kw">use</span> <span class="ident">redis::ConnectionInfo</span>;
-<span class="kw">use</span> <span class="ident">serde</span>::{<span class="ident">Deserialize</span>, <span class="ident">Deserializer</span>};
-<span class="kw">use</span> <span class="ident">simple_hyper_server_tls</span>::{<span class="ident">listener_from_pem_files</span>, <span class="ident">Protocols</span>, <span class="ident">TlsListener</span>};
-<span class="kw">use</span> <span class="ident">slog</span>::{<span class="ident">error</span>, <span class="ident">info</span>};
+<span class="kw">use </span>axum_server::{tls_rustls::RustlsConfig, Handle};
+<span class="kw">use </span>once_cell::sync::Lazy;
+<span class="kw">use </span>redis::{aio::MultiplexedConnection, ConnectionInfo};
+<span class="kw">use </span>serde::{Deserialize, Deserializer};
+<span class="kw">use </span>slog::{error, info, Logger};
+<span class="kw">use </span>tower::ServiceBuilder;
+<span class="kw">use </span>tower_http::cors::CorsLayer;
 
-<span class="kw">use</span> <span class="kw">crate</span>::{
-    <span class="ident">db</span>::{<span class="ident">CampaignRemaining</span>, <span class="ident">DbPool</span>},
-    <span class="ident">middleware</span>::{
-        <span class="ident">auth::Authenticate</span>,
-        <span class="ident">cors</span>::{<span class="ident">cors</span>, <span class="ident">Cors</span>},
-        <span class="ident">Middleware</span>,
+<span class="kw">use </span>adapter::{client::Locked, Adapter};
+<span class="kw">use </span>primitives::{config::Environment, ValidatorId};
+
+<span class="kw">use crate</span>::{
+    db::{CampaignRemaining, DbPool},
+    middleware::auth::authenticate,
+    platform::PlatformApi,
+    routes::{
+        get_cfg,
+        routers::{analytics_router, campaigns_router, channels_router, units_for_slot_router},
     },
-    <span class="ident">platform::PlatformApi</span>,
-    <span class="ident">response</span>::{<span class="ident">map_response_error</span>, <span class="ident">ResponseError</span>},
-    <span class="ident">routes</span>::{
-        <span class="ident">get_cfg</span>,
-        <span class="ident">routers</span>::{<span class="ident">analytics_router</span>, <span class="ident">campaigns_router</span>, <span class="ident">channels_router</span>},
-    },
 };
-<span class="kw">use</span> <span class="ident">adapter::Adapter</span>;
-<span class="kw">use</span> <span class="ident">hyper</span>::{<span class="ident">Body</span>, <span class="ident">Method</span>, <span class="ident">Request</span>, <span class="ident">Response</span>};
-<span class="kw">use</span> <span class="ident">redis::aio::MultiplexedConnection</span>;
-<span class="kw">use</span> <span class="ident">slog::Logger</span>;
 
-<span class="doccomment">/// an error used when deserializing a [`EnvConfig`] instance from environment variables</span>
-<span class="doccomment">/// see [`EnvConfig::from_env()`]</span>
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">envy::Error</span> <span class="kw">as</span> <span class="ident">EnvError</span>;
+<span class="doccomment">/// an error used when deserializing a [`EnvConfig`] instance from environment variables
+/// see [`EnvConfig::from_env()`]
+</span><span class="kw">pub use </span>envy::Error <span class="kw">as </span>EnvError;
 
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">DEFAULT_PORT</span>: <span class="ident">u16</span> <span class="op">=</span> <span class="number">8005</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">DEFAULT_IP_ADDR</span>: <span class="ident">IpAddr</span> <span class="op">=</span> <span class="ident">IpAddr::V4</span>(<span class="ident">Ipv4Addr::new</span>(<span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>));
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">DEFAULT_REDIS_URL</span>: <span class="ident">Lazy</span><span class="op">&lt;</span><span class="ident">ConnectionInfo</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Lazy::new</span>(<span class="op">|</span><span class="op">|</span> {
-    <span class="string">&quot;redis://127.0.0.1:6379&quot;</span>
-        .<span class="ident">parse</span>::<span class="op">&lt;</span><span class="ident">ConnectionInfo</span><span class="op">&gt;</span>()
-        .<span class="ident">expect</span>(<span class="string">&quot;Valid URL&quot;</span>)
+<span class="kw">pub const </span>DEFAULT_PORT: u16 = <span class="number">8005</span>;
+<span class="kw">pub const </span>DEFAULT_IP_ADDR: IpAddr = IpAddr::V4(Ipv4Addr::new(<span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>));
+<span class="kw">pub static </span>DEFAULT_REDIS_URL: Lazy&lt;ConnectionInfo&gt; = Lazy::new(|| {
+    <span class="string">&quot;redis://127.0.0.1:6379&quot;
+        </span>.parse::&lt;ConnectionInfo&gt;()
+        .expect(<span class="string">&quot;Valid URL&quot;</span>)
 });
-<span class="doccomment">/// Sentry Application config set by environment variables</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Deserialize</span>, <span class="ident">Clone</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">EnvConfig</span> {
-    <span class="doccomment">/// Defaults to `Development`: [`Environment::default()`]</span>
-    <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">default</span>)]</span>
-    <span class="kw">pub</span> <span class="ident">env</span>: <span class="ident">Environment</span>,
-    <span class="doccomment">/// The port on which the Sentry REST API will be accessible.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Defaults to `8005`: [`DEFAULT_PORT`]</span>
-    <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">default</span> <span class="op">=</span> <span class="string">&quot;default_port&quot;</span>)]</span>
-    <span class="kw">pub</span> <span class="ident">port</span>: <span class="ident">u16</span>,
-    <span class="doccomment">/// The address on which the Sentry REST API will be accessible.</span>
-    <span class="doccomment">/// `0.0.0.0` can be used for Docker.</span>
-    <span class="doccomment">/// `127.0.0.1` can be used for locally running servers.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Defaults to `0.0.0.0`: [`DEFAULT_IP_ADDR`]</span>
-    <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">default</span> <span class="op">=</span> <span class="string">&quot;default_ip_addr&quot;</span>)]</span>
-    <span class="kw">pub</span> <span class="ident">ip_addr</span>: <span class="ident">IpAddr</span>,
-    <span class="doccomment">/// Defaults to locally running Redis server: [`DEFAULT_REDIS_URL`]</span>
-    <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">deserialize_with</span> <span class="op">=</span> <span class="string">&quot;redis_url&quot;</span>, <span class="ident">default</span> <span class="op">=</span> <span class="string">&quot;default_redis_url&quot;</span>)]</span>
-    <span class="kw">pub</span> <span class="ident">redis_url</span>: <span class="ident">ConnectionInfo</span>,
+<span class="doccomment">/// Sentry Application config set by environment variables
+</span><span class="attribute">#[derive(Debug, Deserialize, Clone)]</span>
+<span class="kw">pub struct </span>EnvConfig {
+    <span class="doccomment">/// Defaults to `Development`: [`Environment::default()`]
+    </span><span class="attribute">#[serde(default)]</span>
+    <span class="kw">pub </span>env: Environment,
+    <span class="doccomment">/// The port on which the Sentry REST API will be accessible.
+    ///
+    /// Defaults to `8005`: [`DEFAULT_PORT`]
+    </span><span class="attribute">#[serde(default = <span class="string">&quot;default_port&quot;</span>)]</span>
+    <span class="kw">pub </span>port: u16,
+    <span class="doccomment">/// The address on which the Sentry REST API will be accessible.
+    /// `0.0.0.0` can be used for Docker.
+    /// `127.0.0.1` can be used for locally running servers.
+    ///
+    /// Defaults to `0.0.0.0`: [`DEFAULT_IP_ADDR`]
+    </span><span class="attribute">#[serde(default = <span class="string">&quot;default_ip_addr&quot;</span>)]</span>
+    <span class="kw">pub </span>ip_addr: IpAddr,
+    <span class="doccomment">/// Defaults to locally running Redis server: [`DEFAULT_REDIS_URL`]
+    </span><span class="attribute">#[serde(deserialize_with = <span class="string">&quot;redis_url&quot;</span>, default = <span class="string">&quot;default_redis_url&quot;</span>)]</span>
+    <span class="kw">pub </span>redis_url: ConnectionInfo,
 }
 
-<span class="kw">impl</span> <span class="ident">EnvConfig</span> {
-    <span class="doccomment">/// Deserialize the application [`EnvConfig`] from Environment variables.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">from_env</span>() -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">EnvError</span><span class="op">&gt;</span> {
-        <span class="ident">envy::from_env</span>()
+<span class="kw">impl </span>EnvConfig {
+    <span class="doccomment">/// Deserialize the application [`EnvConfig`] from Environment variables.
+    </span><span class="kw">pub fn </span>from_env() -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, EnvError&gt; {
+        envy::from_env()
     }
 }
 
-<span class="kw">fn</span> <span class="ident">redis_url</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="lifetime">&#39;de</span>: <span class="lifetime">&#39;a</span>, <span class="ident">D</span><span class="op">&gt;</span>(<span class="ident">deserializer</span>: <span class="ident">D</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">ConnectionInfo</span>, <span class="ident">D::Error</span><span class="op">&gt;</span>
-<span class="kw">where</span>
-    <span class="ident">D</span>: <span class="ident">Deserializer</span><span class="op">&lt;</span><span class="lifetime">&#39;de</span><span class="op">&gt;</span>,
+<span class="kw">fn </span>redis_url&lt;<span class="lifetime">&#39;a</span>, <span class="lifetime">&#39;de</span>: <span class="lifetime">&#39;a</span>, D&gt;(deserializer: D) -&gt; <span class="prelude-ty">Result</span>&lt;ConnectionInfo, D::Error&gt;
+<span class="kw">where
+    </span>D: Deserializer&lt;<span class="lifetime">&#39;de</span>&gt;,
 {
-    <span class="kw">let</span> <span class="ident">url_string</span> <span class="op">=</span> <span class="ident">String::deserialize</span>(<span class="ident">deserializer</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span>url_string = String::deserialize(deserializer)<span class="question-mark">?</span>;
 
-    <span class="ident">url_string</span>.<span class="ident">parse</span>().<span class="ident">map_err</span>(<span class="ident">serde::de::Error::custom</span>)
-}
-
-<span class="kw">fn</span> <span class="ident">default_port</span>() -&gt; <span class="ident">u16</span> {
-    <span class="ident">DEFAULT_PORT</span>
-}
-<span class="kw">fn</span> <span class="ident">default_ip_addr</span>() -&gt; <span class="ident">IpAddr</span> {
-    <span class="ident">DEFAULT_IP_ADDR</span>
-}
-<span class="kw">fn</span> <span class="ident">default_redis_url</span>() -&gt; <span class="ident">ConnectionInfo</span> {
-    <span class="ident">DEFAULT_REDIS_URL</span>.<span class="ident">clone</span>()
+    url_string.parse().map_err(serde::de::Error::custom)
 }
 
-<span class="doccomment">/// The Sentry REST web application</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Application</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">Locked</span> <span class="op">+</span> <span class="lifetime">&#39;static</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// For sentry to work properly, we need an [`adapter::Adapter`] in a [`adapter::LockedState`] state.</span>
-    <span class="kw">pub</span> <span class="ident">adapter</span>: <span class="ident">Adapter</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span>,
-    <span class="kw">pub</span> <span class="ident">config</span>: <span class="ident">primitives::Config</span>,
-    <span class="kw">pub</span> <span class="ident">logger</span>: <span class="ident">Logger</span>,
-    <span class="kw">pub</span> <span class="ident">redis</span>: <span class="ident">MultiplexedConnection</span>,
-    <span class="kw">pub</span> <span class="ident">pool</span>: <span class="ident">DbPool</span>,
-    <span class="kw">pub</span> <span class="ident">campaign_remaining</span>: <span class="ident">CampaignRemaining</span>,
-    <span class="kw">pub</span> <span class="ident">platform_api</span>: <span class="ident">PlatformApi</span>,
+<span class="kw">fn </span>default_port() -&gt; u16 {
+    DEFAULT_PORT
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span> <span class="ident">Application</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span>
-<span class="kw">where</span>
-    <span class="ident">C</span>: <span class="ident">Locked</span>,
+<span class="kw">fn </span>default_ip_addr() -&gt; IpAddr {
+    DEFAULT_IP_ADDR
+}
+
+<span class="kw">fn </span>default_redis_url() -&gt; ConnectionInfo {
+    DEFAULT_REDIS_URL.clone()
+}
+
+<span class="doccomment">/// The Sentry REST web application
+</span><span class="kw">pub struct </span>Application&lt;C: Locked + <span class="lifetime">&#39;static</span>&gt; {
+    <span class="doccomment">/// For sentry to work properly, we need an [`adapter::Adapter`] in a [`adapter::LockedState`] state.
+    </span><span class="kw">pub </span>adapter: Adapter&lt;C&gt;,
+    <span class="kw">pub </span>config: primitives::Config,
+    <span class="kw">pub </span>logger: Logger,
+    <span class="kw">pub </span>redis: MultiplexedConnection,
+    <span class="kw">pub </span>pool: DbPool,
+    <span class="kw">pub </span>campaign_remaining: CampaignRemaining,
+    <span class="kw">pub </span>platform_api: PlatformApi,
+}
+
+<span class="kw">impl</span>&lt;C&gt; Application&lt;C&gt;
+<span class="kw">where
+    </span>C: Locked,
 {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(
-        <span class="ident">adapter</span>: <span class="ident">Adapter</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span>,
-        <span class="ident">config</span>: <span class="ident">primitives::Config</span>,
-        <span class="ident">logger</span>: <span class="ident">Logger</span>,
-        <span class="ident">redis</span>: <span class="ident">MultiplexedConnection</span>,
-        <span class="ident">pool</span>: <span class="ident">DbPool</span>,
-        <span class="ident">campaign_remaining</span>: <span class="ident">CampaignRemaining</span>,
-        <span class="ident">platform_api</span>: <span class="ident">PlatformApi</span>,
-    ) -&gt; <span class="self">Self</span> {
-        <span class="self">Self</span> {
-            <span class="ident">adapter</span>,
-            <span class="ident">config</span>,
-            <span class="ident">logger</span>,
-            <span class="ident">redis</span>,
-            <span class="ident">pool</span>,
-            <span class="ident">campaign_remaining</span>,
-            <span class="ident">platform_api</span>,
+    <span class="kw">pub fn </span>new(
+        adapter: Adapter&lt;C&gt;,
+        config: primitives::Config,
+        logger: Logger,
+        redis: MultiplexedConnection,
+        pool: DbPool,
+        campaign_remaining: CampaignRemaining,
+        platform_api: PlatformApi,
+    ) -&gt; <span class="self">Self </span>{
+        <span class="self">Self </span>{
+            adapter,
+            config,
+            logger,
+            redis,
+            pool,
+            campaign_remaining,
+            platform_api,
         }
     }
 
-    <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">handle_routing</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">req</span>: <span class="ident">Request</span><span class="op">&lt;</span><span class="ident">Body</span><span class="op">&gt;</span>) -&gt; <span class="ident">Response</span><span class="op">&lt;</span><span class="ident">Body</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">headers</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">cors</span>(<span class="kw-2">&amp;</span><span class="ident">req</span>) {
-            <span class="prelude-val">Some</span>(<span class="ident">Cors::Simple</span>(<span class="ident">headers</span>)) =&gt; <span class="ident">headers</span>,
-            <span class="comment">// if we have a Preflight, just return the response directly</span>
-            <span class="prelude-val">Some</span>(<span class="ident">Cors::Preflight</span>(<span class="ident">response</span>)) =&gt; <span class="kw">return</span> <span class="ident">response</span>,
-            <span class="prelude-val">None</span> =&gt; <span class="ident">Default::default</span>(),
-        };
+    <span class="kw">pub async fn </span>routing(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Router {
+        <span class="kw">let </span>cors = CorsLayer::new()
+            <span class="comment">// &quot;GET,HEAD,PUT,PATCH,POST,DELETE&quot;
+            </span>.allow_methods([
+                Method::GET,
+                Method::HEAD,
+                Method::PUT,
+                Method::PATCH,
+                Method::POST,
+                Method::DELETE,
+            ])
+            <span class="comment">// allow requests from any origin
+            // &quot;*&quot;
+            </span>.allow_origin(tower_http::cors::Any);
 
-        <span class="kw">let</span> <span class="ident">req</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">Authenticate</span>.<span class="ident">call</span>(<span class="ident">req</span>, <span class="self">self</span>).<span class="kw">await</span> {
-            <span class="prelude-val">Ok</span>(<span class="ident">req</span>) =&gt; <span class="ident">req</span>,
-            <span class="prelude-val">Err</span>(<span class="ident">error</span>) =&gt; <span class="kw">return</span> <span class="ident">map_response_error</span>(<span class="ident">error</span>),
-        };
+        <span class="kw">let </span>router = Router::new()
+            .nest(<span class="string">&quot;/channel&quot;</span>, channels_router::&lt;C&gt;())
+            .nest(<span class="string">&quot;/campaign&quot;</span>, campaigns_router::&lt;C&gt;())
+            .nest(<span class="string">&quot;/analytics&quot;</span>, analytics_router::&lt;C&gt;())
+            .nest(<span class="string">&quot;/units-for-slot&quot;</span>, units_for_slot_router::&lt;C&gt;());
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">response</span> <span class="op">=</span> <span class="kw">match</span> (<span class="ident">req</span>.<span class="ident">uri</span>().<span class="ident">path</span>(), <span class="ident">req</span>.<span class="ident">method</span>()) {
-            (<span class="string">&quot;/cfg&quot;</span>, <span class="kw-2">&amp;</span><span class="ident">Method::GET</span>) =&gt; <span class="ident">get_cfg</span>(<span class="ident">req</span>, <span class="self">self</span>).<span class="kw">await</span>,
-            (<span class="ident">route</span>, <span class="kw">_</span>) <span class="kw">if</span> <span class="ident">route</span>.<span class="ident">starts_with</span>(<span class="string">&quot;/v5/analytics&quot;</span>) =&gt; <span class="ident">analytics_router</span>(<span class="ident">req</span>, <span class="self">self</span>).<span class="kw">await</span>,
-            <span class="comment">// This is important because it prevents us from doing</span>
-            <span class="comment">// expensive regex matching for routes without /channel</span>
-            (<span class="ident">path</span>, <span class="kw">_</span>) <span class="kw">if</span> <span class="ident">path</span>.<span class="ident">starts_with</span>(<span class="string">&quot;/v5/channel&quot;</span>) =&gt; <span class="ident">channels_router</span>(<span class="ident">req</span>, <span class="self">self</span>).<span class="kw">await</span>,
-            (<span class="ident">path</span>, <span class="kw">_</span>) <span class="kw">if</span> <span class="ident">path</span>.<span class="ident">starts_with</span>(<span class="string">&quot;/v5/campaign&quot;</span>) =&gt; <span class="ident">campaigns_router</span>(<span class="ident">req</span>, <span class="self">self</span>).<span class="kw">await</span>,
-            <span class="kw">_</span> =&gt; <span class="prelude-val">Err</span>(<span class="ident">ResponseError::NotFound</span>),
-        }
-        .<span class="ident">unwrap_or_else</span>(<span class="ident">map_response_error</span>);
-
-        <span class="comment">// extend the headers with the initial headers we have from CORS (if there are some)</span>
-        <span class="ident">response</span>.<span class="ident">headers_mut</span>().<span class="ident">extend</span>(<span class="ident">headers</span>);
-        <span class="ident">response</span>
+        Router::new()
+            .nest(<span class="string">&quot;/v5&quot;</span>, router)
+            .route(<span class="string">&quot;/cfg&quot;</span>, get(get_cfg::&lt;C&gt;))
+            .layer(
+                <span class="comment">// keeps the order from top to bottom!
+                </span>ServiceBuilder::new()
+                    .layer(cors)
+                    .layer(middleware::from_fn(authenticate::&lt;C, <span class="kw">_</span>&gt;)),
+            )
+            .layer(Extension(Arc::new(<span class="self">self</span>.clone())))
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">Locked</span> <span class="op">+</span> <span class="lifetime">&#39;static</span><span class="op">&gt;</span> <span class="ident">Application</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// Starts the `hyper` `Server`.</span>
-    <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">run</span>(<span class="self">self</span>, <span class="ident">enable_tls</span>: <span class="ident">EnableTls</span>) {
-        <span class="kw">let</span> <span class="ident">logger</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">logger</span>.<span class="ident">clone</span>();
-        <span class="kw">let</span> <span class="ident">socket_addr</span> <span class="op">=</span> <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="ident">enable_tls</span> {
-            <span class="ident">EnableTls::NoTls</span>(<span class="ident">socket_addr</span>) =&gt; <span class="ident">socket_addr</span>,
-            <span class="ident">EnableTls::Tls</span> { <span class="ident">socket_addr</span>, .. } =&gt; <span class="ident">socket_addr</span>,
+<span class="kw">impl</span>&lt;C: Locked + <span class="lifetime">&#39;static</span>&gt; Application&lt;C&gt; {
+    <span class="kw">pub async fn </span>run(<span class="self">self</span>, enable_tls: EnableTls) {
+        <span class="kw">let </span>logger = <span class="self">self</span>.logger.clone();
+        <span class="kw">let </span>socket_addr = <span class="kw">match </span><span class="kw-2">&amp;</span>enable_tls {
+            EnableTls::NoTls(socket_addr) =&gt; socket_addr,
+            EnableTls::Tls { socket_addr, .. } =&gt; socket_addr,
         };
 
-        <span class="macro">info!</span>(<span class="kw-2">&amp;</span><span class="ident">logger</span>, <span class="string">&quot;Listening on socket address: {}!&quot;</span>, <span class="ident">socket_addr</span>);
+        <span class="macro">info!</span>(<span class="kw-2">&amp;</span>logger, <span class="string">&quot;Listening on socket address: {}!&quot;</span>, socket_addr);
+        <span class="kw">let </span>router = <span class="self">self</span>.routing().<span class="kw">await</span>;
 
-        <span class="kw">match</span> <span class="ident">enable_tls</span> {
-            <span class="ident">EnableTls::NoTls</span>(<span class="ident">socket_addr</span>) =&gt; {
-                <span class="kw">let</span> <span class="ident">make_service</span> <span class="op">=</span> <span class="ident">make_service_fn</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> {
-                    <span class="kw">let</span> <span class="ident">server</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">clone</span>();
-                    <span class="kw">async</span> <span class="kw">move</span> {
-                        <span class="prelude-val">Ok</span>::<span class="op">&lt;</span><span class="kw">_</span>, <span class="ident">Error</span><span class="op">&gt;</span>(<span class="ident">service_fn</span>(<span class="kw">move</span> <span class="op">|</span><span class="ident">req</span><span class="op">|</span> {
-                            <span class="kw">let</span> <span class="ident">server</span> <span class="op">=</span> <span class="ident">server</span>.<span class="ident">clone</span>();
-                            <span class="kw">async</span> <span class="kw">move</span> { <span class="prelude-val">Ok</span>::<span class="op">&lt;</span><span class="kw">_</span>, <span class="ident">Error</span><span class="op">&gt;</span>(<span class="ident">server</span>.<span class="ident">handle_routing</span>(<span class="ident">req</span>).<span class="kw">await</span>) }
-                        }))
-                    }
-                });
+        <span class="kw">let </span>handle = Handle::new();
 
-                <span class="kw">let</span> <span class="ident">server</span> <span class="op">=</span> <span class="ident">Server::bind</span>(<span class="kw-2">&amp;</span><span class="ident">socket_addr</span>)
-                    .<span class="ident">serve</span>(<span class="ident">make_service</span>)
-                    .<span class="ident">with_graceful_shutdown</span>(<span class="ident">shutdown_signal</span>(<span class="ident">logger</span>.<span class="ident">clone</span>()));
+        <span class="comment">// Spawn a task to shutdown server.
+        </span>tokio::spawn(shutdown_signal(logger.clone(), handle.clone()));
 
-                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">server</span>.<span class="kw">await</span> {
-                    <span class="macro">error!</span>(<span class="kw-2">&amp;</span><span class="ident">logger</span>, <span class="string">&quot;server error: {}&quot;</span>, <span class="ident">e</span>; <span class="string">&quot;main&quot;</span> =&gt; <span class="string">&quot;run&quot;</span>);
+        <span class="kw">match </span>enable_tls {
+            EnableTls::NoTls(socket_addr) =&gt; {
+                <span class="kw">let </span>server = axum_server::bind(socket_addr)
+                    .handle(handle)
+                    .serve(router.into_make_service());
+
+                <span class="macro">tokio::pin!</span>(server);
+
+                <span class="kw">while let </span><span class="prelude-val">Err</span>(e) = (<span class="kw-2">&amp;mut </span>server).<span class="kw">await </span>{
+                    <span class="comment">// This is usually caused by trying to connect on HTTP instead of HTTPS
+                    </span><span class="macro">error!</span>(<span class="kw-2">&amp;</span>logger, <span class="string">&quot;server error: {}&quot;</span>, e; <span class="string">&quot;main&quot; </span>=&gt; <span class="string">&quot;run&quot;</span>);
                 }
             }
-            <span class="ident">EnableTls::Tls</span> { <span class="ident">listener</span>, .. } =&gt; {
-                <span class="kw">let</span> <span class="ident">make_service</span> <span class="op">=</span> <span class="ident">make_service_fn</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> {
-                    <span class="kw">let</span> <span class="ident">server</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">clone</span>();
-                    <span class="kw">async</span> <span class="kw">move</span> {
-                        <span class="prelude-val">Ok</span>::<span class="op">&lt;</span><span class="kw">_</span>, <span class="ident">Error</span><span class="op">&gt;</span>(<span class="ident">service_fn</span>(<span class="kw">move</span> <span class="op">|</span><span class="ident">req</span><span class="op">|</span> {
-                            <span class="kw">let</span> <span class="ident">server</span> <span class="op">=</span> <span class="ident">server</span>.<span class="ident">clone</span>();
-                            <span class="kw">async</span> <span class="kw">move</span> { <span class="prelude-val">Ok</span>::<span class="op">&lt;</span><span class="kw">_</span>, <span class="ident">Error</span><span class="op">&gt;</span>(<span class="ident">server</span>.<span class="ident">handle_routing</span>(<span class="ident">req</span>).<span class="kw">await</span>) }
-                        }))
-                    }
-                });
 
-                <span class="comment">// TODO: Find a way to redirect to HTTPS</span>
-                <span class="kw">let</span> <span class="ident">server</span> <span class="op">=</span> <span class="ident">Server::builder</span>(<span class="ident">listener</span>)
-                    .<span class="ident">serve</span>(<span class="ident">make_service</span>)
-                    .<span class="ident">with_graceful_shutdown</span>(<span class="ident">shutdown_signal</span>(<span class="ident">logger</span>.<span class="ident">clone</span>()));
-                <span class="macro">tokio::pin!</span>(<span class="ident">server</span>);
+            EnableTls::Tls {
+                config,
+                socket_addr,
+            } =&gt; {
+                <span class="kw">let </span>server = axum_server::bind_rustls(socket_addr, config)
+                    .handle(handle)
+                    .serve(router.into_make_service());
 
-                <span class="kw">while</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> (<span class="kw-2">&amp;mut</span> <span class="ident">server</span>).<span class="kw">await</span> {
-                    <span class="comment">// This is usually caused by trying to connect on HTTP instead of HTTPS</span>
-                    <span class="macro">error!</span>(<span class="kw-2">&amp;</span><span class="ident">logger</span>, <span class="string">&quot;server error: {}&quot;</span>, <span class="ident">e</span>; <span class="string">&quot;main&quot;</span> =&gt; <span class="string">&quot;run&quot;</span>);
+                <span class="macro">tokio::pin!</span>(server);
+
+                <span class="kw">while let </span><span class="prelude-val">Err</span>(e) = (<span class="kw-2">&amp;mut </span>server).<span class="kw">await </span>{
+                    <span class="comment">// This is usually caused by trying to connect on HTTP instead of HTTPS
+                    </span><span class="macro">error!</span>(<span class="kw-2">&amp;</span>logger, <span class="string">&quot;server error: {}&quot;</span>, e; <span class="string">&quot;main&quot; </span>=&gt; <span class="string">&quot;run&quot;</span>);
                 }
             }
         }
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">Locked</span><span class="op">&gt;</span> <span class="ident">Clone</span> <span class="kw">for</span> <span class="ident">Application</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">clone</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="self">Self</span> {
-        <span class="self">Self</span> {
-            <span class="ident">adapter</span>: <span class="self">self</span>.<span class="ident">adapter</span>.<span class="ident">clone</span>(),
-            <span class="ident">config</span>: <span class="self">self</span>.<span class="ident">config</span>.<span class="ident">clone</span>(),
-            <span class="ident">logger</span>: <span class="self">self</span>.<span class="ident">logger</span>.<span class="ident">clone</span>(),
-            <span class="ident">redis</span>: <span class="self">self</span>.<span class="ident">redis</span>.<span class="ident">clone</span>(),
-            <span class="ident">pool</span>: <span class="self">self</span>.<span class="ident">pool</span>.<span class="ident">clone</span>(),
-            <span class="ident">campaign_remaining</span>: <span class="self">self</span>.<span class="ident">campaign_remaining</span>.<span class="ident">clone</span>(),
-            <span class="ident">platform_api</span>: <span class="self">self</span>.<span class="ident">platform_api</span>.<span class="ident">clone</span>(),
+<span class="kw">impl</span>&lt;C: Locked&gt; Clone <span class="kw">for </span>Application&lt;C&gt; {
+    <span class="kw">fn </span>clone(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="self">Self </span>{
+        <span class="self">Self </span>{
+            adapter: <span class="self">self</span>.adapter.clone(),
+            config: <span class="self">self</span>.config.clone(),
+            logger: <span class="self">self</span>.logger.clone(),
+            redis: <span class="self">self</span>.redis.clone(),
+            pool: <span class="self">self</span>.pool.clone(),
+            campaign_remaining: <span class="self">self</span>.campaign_remaining.clone(),
+            platform_api: <span class="self">self</span>.platform_api.clone(),
         }
     }
 }
 
-<span class="doccomment">/// Either enable or do not the Tls support.</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">EnableTls</span> {
-    <span class="ident">NoTls</span>(<span class="ident">SocketAddr</span>),
-    <span class="ident">Tls</span> {
-        <span class="ident">socket_addr</span>: <span class="ident">SocketAddr</span>,
-        <span class="ident">listener</span>: <span class="ident">TlsListener</span>,
+<span class="doccomment">/// Either enable or do not the Tls support.
+</span><span class="kw">pub enum </span>EnableTls {
+    NoTls(SocketAddr),
+    Tls {
+        socket_addr: SocketAddr,
+        config: RustlsConfig,
     },
 }
 
-<span class="kw">impl</span> <span class="ident">EnableTls</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new_tls</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">AsRef</span><span class="op">&lt;</span><span class="ident">Path</span><span class="op">&gt;</span>, <span class="ident">K</span>: <span class="ident">AsRef</span><span class="op">&lt;</span><span class="ident">Path</span><span class="op">&gt;</span><span class="op">&gt;</span>(
-        <span class="ident">certificates</span>: <span class="ident">C</span>,
-        <span class="ident">private_keys</span>: <span class="ident">K</span>,
-        <span class="ident">socket_addr</span>: <span class="ident">SocketAddr</span>,
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">std::error::Error</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">listener</span> <span class="op">=</span>
-            <span class="ident">listener_from_pem_files</span>(<span class="ident">certificates</span>, <span class="ident">private_keys</span>, <span class="ident">Protocols::ALL</span>, <span class="kw-2">&amp;</span><span class="ident">socket_addr</span>)<span class="question-mark">?</span>;
+<span class="kw">impl </span>EnableTls {
+    <span class="kw">pub async fn </span>new_tls&lt;C: AsRef&lt;Path&gt;, K: AsRef&lt;Path&gt;&gt;(
+        certificates: C,
+        private_keys: K,
+        socket_addr: SocketAddr,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, Box&lt;<span class="kw">dyn </span>std::error::Error&gt;&gt; {
+        <span class="kw">let </span>config = RustlsConfig::from_pem_file(certificates, private_keys).<span class="kw">await</span><span class="question-mark">?</span>;
 
-        <span class="prelude-val">Ok</span>(<span class="ident"><span class="self">Self</span>::Tls</span> {
-            <span class="ident">listener</span>,
-            <span class="ident">socket_addr</span>,
+        <span class="prelude-val">Ok</span>(<span class="self">Self</span>::Tls {
+            config,
+            socket_addr,
         })
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">no_tls</span>(<span class="ident">socket_addr</span>: <span class="ident">SocketAddr</span>) -&gt; <span class="self">Self</span> {
-        <span class="ident"><span class="self">Self</span>::NoTls</span>(<span class="ident">socket_addr</span>)
+    <span class="kw">pub fn </span>no_tls(socket_addr: SocketAddr) -&gt; <span class="self">Self </span>{
+        <span class="self">Self</span>::NoTls(socket_addr)
     }
 }
 
-<span class="doccomment">/// Sentry [`Application`] Session</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Session</span> {
-    <span class="kw">pub</span> <span class="ident">ip</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>,
-    <span class="kw">pub</span> <span class="ident">country</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>,
-    <span class="kw">pub</span> <span class="ident">referrer_header</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>,
-    <span class="kw">pub</span> <span class="ident">os</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>,
+<span class="doccomment">/// Sentry [`Application`] Session
+</span><span class="attribute">#[derive(Debug, Clone)]</span>
+<span class="kw">pub struct </span>Session {
+    <span class="kw">pub </span>ip: <span class="prelude-ty">Option</span>&lt;String&gt;,
+    <span class="kw">pub </span>country: <span class="prelude-ty">Option</span>&lt;String&gt;,
+    <span class="kw">pub </span>referrer_header: <span class="prelude-ty">Option</span>&lt;String&gt;,
+    <span class="kw">pub </span>os: <span class="prelude-ty">Option</span>&lt;String&gt;,
 }
 
-<span class="doccomment">/// Validated Authentication for the Sentry [`Application`].</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Auth</span> {
-    <span class="kw">pub</span> <span class="ident">era</span>: <span class="ident">i64</span>,
-    <span class="kw">pub</span> <span class="ident">uid</span>: <span class="ident">ValidatorId</span>,
-    <span class="doccomment">/// The Chain for which this authentication was validated</span>
-    <span class="kw">pub</span> <span class="ident">chain</span>: <span class="ident">primitives::Chain</span>,
+<span class="doccomment">/// Validated Authentication for the Sentry [`Application`].
+</span><span class="attribute">#[derive(Debug, Clone)]</span>
+<span class="kw">pub struct </span>Auth {
+    <span class="kw">pub </span>era: i64,
+    <span class="kw">pub </span>uid: ValidatorId,
+    <span class="doccomment">/// The Chain for which this authentication was validated
+    </span><span class="kw">pub </span>chain: primitives::Chain,
 }
 
-<span class="doccomment">/// A Ctrl+C signal to gracefully shutdown the server</span>
-<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">shutdown_signal</span>(<span class="ident">logger</span>: <span class="ident">Logger</span>) {
-    <span class="comment">// Wait for the Ctrl+C signal</span>
-    <span class="ident">tokio::signal::ctrl_c</span>()
-        .<span class="kw">await</span>
-        .<span class="ident">expect</span>(<span class="string">&quot;failed to install CTRL+C signal handler&quot;</span>);
+<span class="doccomment">/// A query string deserialized using `serde_qs` instead of axum&#39;s `serde_urlencoded`
+</span><span class="kw">pub struct </span>Qs&lt;T&gt;(<span class="kw">pub </span>T);
 
-    <span class="macro">info!</span>(<span class="kw-2">&amp;</span><span class="ident">logger</span>, <span class="string">&quot;Received Ctrl+C signal. Shutting down..&quot;</span>)
+<span class="attribute">#[axum::async_trait]</span>
+<span class="kw">impl</span>&lt;T, B&gt; FromRequest&lt;B&gt; <span class="kw">for </span>Qs&lt;T&gt;
+<span class="kw">where
+    </span>T: serde::de::DeserializeOwned,
+    B: Send,
+{
+    <span class="kw">type </span>Rejection = (StatusCode, String);
+
+    <span class="kw">async fn </span>from_request(req: <span class="kw-2">&amp;mut </span>RequestParts&lt;B&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, <span class="self">Self</span>::Rejection&gt; {
+        <span class="kw">let </span>query = req.uri().query().unwrap_or_default();
+
+        <span class="kw">match </span>serde_qs::from_str(query) {
+            <span class="prelude-val">Ok</span>(query) =&gt; <span class="prelude-val">Ok</span>(<span class="self">Self</span>(query)),
+            <span class="prelude-val">Err</span>(err) =&gt; <span class="prelude-val">Err</span>((StatusCode::BAD_REQUEST, err.to_string())),
+        }
+    }
 }
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
-<span class="kw">mod</span> <span class="ident">test</span> {
-    <span class="kw">use</span> <span class="ident">serde_json::json</span>;
+<span class="doccomment">/// A Ctrl+C signal to gracefully shutdown the server
+</span><span class="kw">async fn </span>shutdown_signal(logger: Logger, handle: Handle) {
+    <span class="comment">// Wait for the Ctrl+C signal
+    </span>tokio::signal::ctrl_c()
+        .<span class="kw">await
+        </span>.expect(<span class="string">&quot;failed to install CTRL+C signal handler&quot;</span>);
 
-    <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
+    <span class="comment">// Signal the server to shutdown using Handle.
+    </span>handle.shutdown();
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">environment</span>() {
-        <span class="kw">let</span> <span class="ident">development</span> <span class="op">=</span> <span class="ident">serde_json::from_value</span>::<span class="op">&lt;</span><span class="ident">Environment</span><span class="op">&gt;</span>(<span class="macro">json!</span>(<span class="string">&quot;development&quot;</span>))
-            .<span class="ident">expect</span>(<span class="string">&quot;Should deserialize&quot;</span>);
-        <span class="kw">let</span> <span class="ident">production</span> <span class="op">=</span>
-            <span class="ident">serde_json::from_value</span>::<span class="op">&lt;</span><span class="ident">Environment</span><span class="op">&gt;</span>(<span class="macro">json!</span>(<span class="string">&quot;production&quot;</span>)).<span class="ident">expect</span>(<span class="string">&quot;Should deserialize&quot;</span>);
+    <span class="macro">info!</span>(<span class="kw-2">&amp;</span>logger, <span class="string">&quot;Received Ctrl+C signal. Shutting down..&quot;</span>)
+}
 
-        <span class="macro">assert_eq!</span>(<span class="ident">Environment::Development</span>, <span class="ident">development</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">Environment::Production</span>, <span class="ident">production</span>);
+<span class="attribute">#[cfg(test)]</span>
+<span class="kw">mod </span>test {
+    <span class="kw">use </span>serde_json::json;
+
+    <span class="kw">use super</span>::<span class="kw-2">*</span>;
+
+    <span class="attribute">#[test]</span>
+    <span class="kw">fn </span>environment() {
+        <span class="kw">let </span>development = serde_json::from_value::&lt;Environment&gt;(<span class="macro">json!</span>(<span class="string">&quot;development&quot;</span>))
+            .expect(<span class="string">&quot;Should deserialize&quot;</span>);
+        <span class="kw">let </span>production =
+            serde_json::from_value::&lt;Environment&gt;(<span class="macro">json!</span>(<span class="string">&quot;production&quot;</span>)).expect(<span class="string">&quot;Should deserialize&quot;</span>);
+
+        <span class="macro">assert_eq!</span>(Environment::Development, development);
+        <span class="macro">assert_eq!</span>(Environment::Production, production);
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (20ffea693 2022-08-11)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>

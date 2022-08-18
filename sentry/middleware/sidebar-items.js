@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"mod":[["auth",""],["campaign",""],["channel",""],["cors",""]],"struct":[["Chain","`Chain` allows chaining multiple middleware to be applied on the Request of the application Chained middlewares are applied in the order they were chained"]],"trait":[["Middleware",""]]};
+window.SIDEBAR_ITEMS = {"mod":[["auth",""],["campaign",""],["channel",""]]};

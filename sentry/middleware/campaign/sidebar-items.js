@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":[["CalledByCreator",""],["CampaignLoad",""]]};
+window.SIDEBAR_ITEMS = {"fn":[["called_by_creator",""],["campaign_load",""]]};

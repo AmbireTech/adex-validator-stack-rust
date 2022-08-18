@@ -1045,1052 +1045,1052 @@
 <span id="1045">1045</span>
 <span id="1046">1046</span>
 <span id="1047">1047</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">std</span>::{
-    <span class="ident">collections</span>::{<span class="ident">hash_map::Entry</span>, <span class="ident">HashMap</span>, <span class="ident">HashSet</span>},
-    <span class="ident">time::Duration</span>,
+</pre><pre class="rust"><code><span class="kw">use </span>std::{
+    collections::{hash_map::Entry, HashMap, HashSet},
+    time::Duration,
 };
 
-<span class="kw">use</span> <span class="ident">futures::future</span>::{<span class="ident">join_all</span>, <span class="ident">try_join_all</span>, <span class="ident">TryFutureExt</span>};
-<span class="kw">use</span> <span class="ident">reqwest</span>::{<span class="ident">Client</span>, <span class="ident">Method</span>};
-<span class="kw">use</span> <span class="ident">slog::Logger</span>;
+<span class="kw">use </span>futures::future::{join_all, try_join_all, TryFutureExt};
+<span class="kw">use </span>reqwest::{Client, Method};
+<span class="kw">use </span>slog::Logger;
 
-<span class="kw">use</span> <span class="ident">adapter</span>::{<span class="ident">prelude</span>::<span class="kw-2">*</span>, <span class="ident">Adapter</span>};
-<span class="kw">use</span> <span class="ident">primitives</span>::{
-    <span class="ident">balances</span>::{<span class="ident">CheckedState</span>, <span class="ident">UncheckedState</span>},
-    <span class="ident">sentry</span>::{
-        <span class="ident">AccountingResponse</span>, <span class="ident">AllSpendersResponse</span>, <span class="ident">LastApprovedResponse</span>, <span class="ident">SuccessResponse</span>,
-        <span class="ident">ValidatorMessagesCreateRequest</span>, <span class="ident">ValidatorMessagesListResponse</span>,
+<span class="kw">use </span>adapter::{prelude::<span class="kw-2">*</span>, Adapter};
+<span class="kw">use </span>primitives::{
+    balances::{CheckedState, UncheckedState},
+    sentry::{
+        AccountingResponse, AllSpendersResponse, LastApprovedResponse, SuccessResponse,
+        ValidatorMessagesCreateRequest, ValidatorMessagesListResponse,
     },
-    <span class="ident">spender::Spender</span>,
-    <span class="ident">util::ApiUrl</span>,
-    <span class="ident">validator::MessageTypes</span>,
-    <span class="ident">Address</span>, <span class="ident">ChainId</span>, <span class="ident">ChainOf</span>, <span class="ident">Channel</span>, <span class="ident">ChannelId</span>, <span class="ident">Config</span>, <span class="ident">ValidatorId</span>,
+    spender::Spender,
+    util::ApiUrl,
+    validator::MessageTypes,
+    Address, ChainId, ChainOf, Channel, ChannelId, Config, ValidatorId,
 };
-<span class="kw">use</span> <span class="ident">thiserror::Error</span>;
+<span class="kw">use </span>thiserror::Error;
 
-<span class="kw">pub</span> <span class="kw">type</span> <span class="ident">PropagationResult</span> <span class="op">=</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">ValidatorId</span>, (<span class="ident">ValidatorId</span>, <span class="ident">Error</span>)<span class="op">&gt;</span>;
-<span class="kw">pub</span> <span class="kw">type</span> <span class="ident">ChainsValidators</span> <span class="op">=</span> <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">ChainId</span>, <span class="ident">Validators</span><span class="op">&gt;</span>;
-<span class="doccomment">/// Propagate the Validator messages to these `Validator`s</span>
-<span class="doccomment">/// This map contains the Validator Auth token &amp; Url for a specific Chain</span>
-<span class="kw">pub</span> <span class="kw">type</span> <span class="ident">Validators</span> <span class="op">=</span> <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">ValidatorId</span>, <span class="ident">Validator</span><span class="op">&gt;</span>;
-<span class="kw">pub</span> <span class="kw">type</span> <span class="ident">AuthToken</span> <span class="op">=</span> <span class="ident">String</span>;
+<span class="kw">pub type </span>PropagationResult = <span class="prelude-ty">Result</span>&lt;ValidatorId, (ValidatorId, Error)&gt;;
+<span class="kw">pub type </span>ChainsValidators = HashMap&lt;ChainId, Validators&gt;;
+<span class="doccomment">/// Propagate the Validator messages to these `Validator`s
+/// This map contains the Validator Auth token &amp; Url for a specific Chain
+</span><span class="kw">pub type </span>Validators = HashMap&lt;ValidatorId, Validator&gt;;
+<span class="kw">pub type </span>AuthToken = String;
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Validator</span> {
-    <span class="doccomment">/// Sentry API url</span>
-    <span class="kw">pub</span> <span class="ident">url</span>: <span class="ident">ApiUrl</span>,
-    <span class="doccomment">/// Authentication token</span>
-    <span class="kw">pub</span> <span class="ident">token</span>: <span class="ident">AuthToken</span>,
+<span class="attribute">#[derive(Debug, Clone, PartialEq, Eq)]</span>
+<span class="kw">pub struct </span>Validator {
+    <span class="doccomment">/// Sentry API url
+    </span><span class="kw">pub </span>url: ApiUrl,
+    <span class="doccomment">/// Authentication token
+    </span><span class="kw">pub </span>token: AuthToken,
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Error</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">Error</span> {
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Building client: {0}&quot;</span>)]</span>
-    <span class="ident">BuildingClient</span>(<span class="ident">reqwest::Error</span>),
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Making a request: {0}&quot;</span>)]</span>
-    <span class="ident">Request</span>(<span class="attribute">#[<span class="ident">from</span>]</span> <span class="ident">reqwest::Error</span>),
-    <span class="doccomment">/// Error returned when the passed [`Validators`] to [`SentryApi::init()`] do not contain</span>
-    <span class="doccomment">/// the _Who am I_ a record of the [`Adapter::whoami()`]</span>
-    <span class="attribute">#[<span class="ident">error</span>(
-        <span class="string">&quot;Missing validator URL &amp; Auth token entry for whoami {whoami:#?} on chain {chain_id:#?} in the propagation list&quot;</span>
-    )]</span>
-    <span class="ident">WhoamiMissing</span> {
-        <span class="ident">whoami</span>: <span class="ident">ValidatorId</span>,
-        <span class="ident">chain_id</span>: <span class="ident">ChainId</span>,
+<span class="attribute">#[derive(Debug, Error)]</span>
+<span class="kw">pub enum </span>Error {
+    <span class="attribute">#[error(<span class="string">&quot;Building client: {0}&quot;</span>)]</span>
+    BuildingClient(reqwest::Error),
+    <span class="attribute">#[error(<span class="string">&quot;Making a request: {0}&quot;</span>)]</span>
+    Request(<span class="attribute">#[from]</span> reqwest::Error),
+    <span class="doccomment">/// Error returned when the passed [`Validators`] to [`SentryApi::init()`] do not contain
+    /// the _Who am I_ a record of the [`Adapter::whoami()`]
+    </span><span class="attribute">#[error(
+        <span class="string">&quot;Missing validator URL &amp; Auth token entry for whoami {whoami:#?} on chain {chain_id:#?} in the propagation list&quot;
+    </span>)]</span>
+    WhoamiMissing {
+        whoami: ValidatorId,
+        chain_id: ChainId,
     },
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;We can propagate only to Chains which are whiteslisted for this validator.&quot;</span>)]</span>
-    <span class="ident">ChainNotWhitelisted</span> { <span class="ident">chain_id</span>: <span class="ident">ChainId</span> },
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Failed to generate authentication token using the Adapter for {for_chain:?}&quot;</span>)]</span>
-    <span class="ident">AuthenticationToken</span> { <span class="ident">for_chain</span>: <span class="ident">ChainId</span> },
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Not all channel validators were found in the propagation list&quot;</span>)]</span>
-    <span class="ident">PropagationValidatorsNotFound</span> {
-        <span class="ident">channel</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">ValidatorId</span><span class="op">&gt;</span>,
-        <span class="ident">found</span>: <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">ValidatorId</span>, <span class="ident">Validator</span><span class="op">&gt;</span>,
+    <span class="attribute">#[error(<span class="string">&quot;We can propagate only to Chains which are whiteslisted for this validator.&quot;</span>)]</span>
+    ChainNotWhitelisted { chain_id: ChainId },
+    <span class="attribute">#[error(<span class="string">&quot;Failed to generate authentication token using the Adapter for {for_chain:?}&quot;</span>)]</span>
+    AuthenticationToken { for_chain: ChainId },
+    <span class="attribute">#[error(<span class="string">&quot;Not all channel validators were found in the propagation list&quot;</span>)]</span>
+    PropagationValidatorsNotFound {
+        channel: Vec&lt;ValidatorId&gt;,
+        found: HashMap&lt;ValidatorId, Validator&gt;,
     },
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">SentryApi</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">Unlocked</span>, <span class="ident">P</span> <span class="op">=</span> <span class="ident">ChainsValidators</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span> <span class="ident">adapter</span>: <span class="ident">Adapter</span><span class="op">&lt;</span><span class="ident">C</span>, <span class="ident">UnlockedState</span><span class="op">&gt;</span>,
-    <span class="kw">pub</span> <span class="ident">client</span>: <span class="ident">Client</span>,
-    <span class="kw">pub</span> <span class="ident">logger</span>: <span class="ident">Logger</span>,
-    <span class="kw">pub</span> <span class="ident">config</span>: <span class="ident">Config</span>,
-    <span class="doccomment">/// For all the calls that do not have information about the Chains</span>
-    <span class="kw">pub</span> <span class="ident">sentry_url</span>: <span class="ident">ApiUrl</span>,
-    <span class="doccomment">/// Whilelisted chains for which this validator (_Who Am I_) can operate on.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Since the validator might have different urls for old vs new Campaigns,</span>
-    <span class="doccomment">/// we can override the URL based on the campaign, see [`crate::Worker`].</span>
-    <span class="doccomment">/// Auth token for this validator is generated for each Chain on [`SentryApi::new`]</span>
-    <span class="kw">pub</span> <span class="ident">whoami</span>: <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">ChainId</span>, <span class="ident">Validator</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// If set with [`Validators`], `propagate_to` should contain the `whoami` [`Validator`] in each Chain!</span>
-    <span class="doccomment">/// use [`SentryApi::init`] or [`SentryApi::with_propagate`] instead</span>
-    <span class="kw">pub</span> <span class="ident">propagate_to</span>: <span class="ident">P</span>,
+<span class="attribute">#[derive(Debug)]</span>
+<span class="kw">pub struct </span>SentryApi&lt;C: Unlocked, P = ChainsValidators&gt; {
+    <span class="kw">pub </span>adapter: Adapter&lt;C, UnlockedState&gt;,
+    <span class="kw">pub </span>client: Client,
+    <span class="kw">pub </span>logger: Logger,
+    <span class="kw">pub </span>config: Config,
+    <span class="doccomment">/// For all the calls that do not have information about the Chains
+    </span><span class="kw">pub </span>sentry_url: ApiUrl,
+    <span class="doccomment">/// Whilelisted chains for which this validator (_Who Am I_) can operate on.
+    ///
+    /// Since the validator might have different urls for old vs new Campaigns,
+    /// we can override the URL based on the campaign, see [`crate::Worker`].
+    /// Auth token for this validator is generated for each Chain on [`SentryApi::new`]
+    </span><span class="kw">pub </span>whoami: HashMap&lt;ChainId, Validator&gt;,
+    <span class="doccomment">/// If set with [`Validators`], `propagate_to` should contain the `whoami` [`Validator`] in each Chain!
+    /// use [`SentryApi::init`] or [`SentryApi::with_propagate`] instead
+    </span><span class="kw">pub </span>propagate_to: P,
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">Unlocked</span>, <span class="ident">P</span>: <span class="ident">Clone</span><span class="op">&gt;</span> <span class="ident">Clone</span> <span class="kw">for</span> <span class="ident">SentryApi</span><span class="op">&lt;</span><span class="ident">C</span>, <span class="ident">P</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">clone</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="self">Self</span> {
-        <span class="self">Self</span> {
-            <span class="ident">adapter</span>: <span class="self">self</span>.<span class="ident">adapter</span>.<span class="ident">clone</span>(),
-            <span class="ident">client</span>: <span class="self">self</span>.<span class="ident">client</span>.<span class="ident">clone</span>(),
-            <span class="ident">logger</span>: <span class="self">self</span>.<span class="ident">logger</span>.<span class="ident">clone</span>(),
-            <span class="ident">config</span>: <span class="self">self</span>.<span class="ident">config</span>.<span class="ident">clone</span>(),
-            <span class="ident">sentry_url</span>: <span class="self">self</span>.<span class="ident">sentry_url</span>.<span class="ident">clone</span>(),
-            <span class="ident">whoami</span>: <span class="self">self</span>.<span class="ident">whoami</span>.<span class="ident">clone</span>(),
-            <span class="ident">propagate_to</span>: <span class="self">self</span>.<span class="ident">propagate_to</span>.<span class="ident">clone</span>(),
+<span class="kw">impl</span>&lt;C: Unlocked, P: Clone&gt; Clone <span class="kw">for </span>SentryApi&lt;C, P&gt; {
+    <span class="kw">fn </span>clone(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="self">Self </span>{
+        <span class="self">Self </span>{
+            adapter: <span class="self">self</span>.adapter.clone(),
+            client: <span class="self">self</span>.client.clone(),
+            logger: <span class="self">self</span>.logger.clone(),
+            config: <span class="self">self</span>.config.clone(),
+            sentry_url: <span class="self">self</span>.sentry_url.clone(),
+            whoami: <span class="self">self</span>.whoami.clone(),
+            propagate_to: <span class="self">self</span>.propagate_to.clone(),
         }
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">Unlocked</span> <span class="op">+</span> <span class="lifetime">&#39;static</span><span class="op">&gt;</span> <span class="ident">SentryApi</span><span class="op">&lt;</span><span class="ident">C</span>, ()<span class="op">&gt;</span> {
-    <span class="doccomment">/// `sentry_url` is the default URL to which the current _Who am I_ validator should make requests.</span>
-    <span class="doccomment">/// It is used to populate the config Chains with Authentication Token &amp; [`ApiUrl`].</span>
-    <span class="doccomment">/// This value can be overwritten using `propagate_to`,</span>
-    <span class="doccomment">/// if any of the passed validators has the same [`ValidatorId`].</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(
-        <span class="ident">adapter</span>: <span class="ident">Adapter</span><span class="op">&lt;</span><span class="ident">C</span>, <span class="ident">UnlockedState</span><span class="op">&gt;</span>,
-        <span class="ident">logger</span>: <span class="ident">Logger</span>,
-        <span class="ident">config</span>: <span class="ident">Config</span>,
-        <span class="ident">sentry_url</span>: <span class="ident">ApiUrl</span>,
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">SentryApi</span><span class="op">&lt;</span><span class="ident">C</span>, ()<span class="op">&gt;</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">client</span> <span class="op">=</span> <span class="ident">Client::builder</span>()
-            .<span class="ident">timeout</span>(<span class="ident">config</span>.<span class="ident">fetch_timeout</span>)
-            .<span class="ident">build</span>()
-            .<span class="ident">map_err</span>(<span class="ident">Error::BuildingClient</span>)<span class="question-mark">?</span>;
+<span class="kw">impl</span>&lt;C: Unlocked + <span class="lifetime">&#39;static</span>&gt; SentryApi&lt;C, ()&gt; {
+    <span class="doccomment">/// `sentry_url` is the default URL to which the current _Who am I_ validator should make requests.
+    /// It is used to populate the config Chains with Authentication Token &amp; [`ApiUrl`].
+    /// This value can be overwritten using `propagate_to`,
+    /// if any of the passed validators has the same [`ValidatorId`].
+    </span><span class="kw">pub fn </span>new(
+        adapter: Adapter&lt;C, UnlockedState&gt;,
+        logger: Logger,
+        config: Config,
+        sentry_url: ApiUrl,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;SentryApi&lt;C, ()&gt;, Error&gt; {
+        <span class="kw">let </span>client = Client::builder()
+            .timeout(config.fetch_timeout)
+            .build()
+            .map_err(Error::BuildingClient)<span class="question-mark">?</span>;
 
-        <span class="kw">let</span> <span class="ident">whoami</span> <span class="op">=</span> <span class="ident">config</span>
-            .<span class="ident">chains</span>
-            .<span class="ident">values</span>()
-            .<span class="ident">map</span>(
-                <span class="op">|</span><span class="ident">chain_info</span><span class="op">|</span> <span class="kw">match</span> <span class="ident">adapter</span>.<span class="ident">get_auth</span>(<span class="ident">chain_info</span>.<span class="ident">chain</span>.<span class="ident">chain_id</span>, <span class="ident">adapter</span>.<span class="ident">whoami</span>()) {
-                    <span class="prelude-val">Ok</span>(<span class="ident">auth_token</span>) =&gt; {
-                        <span class="kw">let</span> <span class="ident">validator</span> <span class="op">=</span> <span class="ident">Validator</span> {
-                            <span class="ident">url</span>: <span class="ident">sentry_url</span>.<span class="ident">clone</span>(),
-                            <span class="ident">token</span>: <span class="ident">auth_token</span>,
+        <span class="kw">let </span>whoami = config
+            .chains
+            .values()
+            .map(
+                |chain_info| <span class="kw">match </span>adapter.get_auth(chain_info.chain.chain_id, adapter.whoami()) {
+                    <span class="prelude-val">Ok</span>(auth_token) =&gt; {
+                        <span class="kw">let </span>validator = Validator {
+                            url: sentry_url.clone(),
+                            token: auth_token,
                         };
 
-                        <span class="prelude-val">Ok</span>((<span class="ident">chain_info</span>.<span class="ident">chain</span>.<span class="ident">chain_id</span>, <span class="ident">validator</span>))
+                        <span class="prelude-val">Ok</span>((chain_info.chain.chain_id, validator))
                     }
-                    <span class="prelude-val">Err</span>(<span class="ident">_adapter_err</span>) =&gt; <span class="prelude-val">Err</span>(<span class="ident">Error::AuthenticationToken</span> {
-                        <span class="ident">for_chain</span>: <span class="ident">chain_info</span>.<span class="ident">chain</span>.<span class="ident">chain_id</span>,
+                    <span class="prelude-val">Err</span>(_adapter_err) =&gt; <span class="prelude-val">Err</span>(Error::AuthenticationToken {
+                        for_chain: chain_info.chain.chain_id,
                     }),
                 },
             )
-            .<span class="ident">collect</span>::<span class="op">&lt;</span><span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">HashMap</span><span class="op">&lt;</span><span class="kw">_</span>, <span class="kw">_</span><span class="op">&gt;</span>, <span class="kw">_</span><span class="op">&gt;</span><span class="op">&gt;</span>()<span class="question-mark">?</span>;
+            .collect::&lt;<span class="prelude-ty">Result</span>&lt;HashMap&lt;<span class="kw">_</span>, <span class="kw">_</span>&gt;, <span class="kw">_</span>&gt;&gt;()<span class="question-mark">?</span>;
 
-        <span class="prelude-val">Ok</span>(<span class="ident">SentryApi</span> {
-            <span class="ident">adapter</span>,
-            <span class="ident">client</span>,
-            <span class="ident">logger</span>,
-            <span class="ident">config</span>,
-            <span class="ident">sentry_url</span>,
-            <span class="ident">whoami</span>,
-            <span class="ident">propagate_to</span>: (),
+        <span class="prelude-val">Ok</span>(SentryApi {
+            adapter,
+            client,
+            logger,
+            config,
+            sentry_url,
+            whoami,
+            propagate_to: (),
         })
     }
 
-    <span class="doccomment">/// Initialize the [`SentryApi`] and makes sure that [`Adapter::whoami()`] is present in each chain [`Validators`].</span>
-    <span class="doccomment">/// Sets the _Who am I_ [`ApiUrl`] and the Authentication Token for a specific Chain for calls that require authentication.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>(
-        <span class="ident">adapter</span>: <span class="ident">Adapter</span><span class="op">&lt;</span><span class="ident">C</span>, <span class="ident">UnlockedState</span><span class="op">&gt;</span>,
-        <span class="ident">logger</span>: <span class="ident">Logger</span>,
-        <span class="ident">config</span>: <span class="ident">Config</span>,
-        <span class="ident">sentry_url</span>: <span class="ident">ApiUrl</span>,
-        <span class="ident">propagate_to</span>: <span class="ident">ChainsValidators</span>,
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">SentryApi</span><span class="op">&lt;</span><span class="ident">C</span>, <span class="ident">ChainsValidators</span><span class="op">&gt;</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">sentry_api</span> <span class="op">=</span> <span class="ident">SentryApi::new</span>(<span class="ident">adapter</span>, <span class="ident">logger</span>, <span class="ident">config</span>, <span class="ident">sentry_url</span>)<span class="question-mark">?</span>;
+    <span class="doccomment">/// Initialize the [`SentryApi`] and makes sure that [`Adapter::whoami()`] is present in each chain [`Validators`].
+    /// Sets the _Who am I_ [`ApiUrl`] and the Authentication Token for a specific Chain for calls that require authentication.
+    </span><span class="kw">pub fn </span>init(
+        adapter: Adapter&lt;C, UnlockedState&gt;,
+        logger: Logger,
+        config: Config,
+        sentry_url: ApiUrl,
+        propagate_to: ChainsValidators,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;SentryApi&lt;C, ChainsValidators&gt;, Error&gt; {
+        <span class="kw">let </span>sentry_api = SentryApi::new(adapter, logger, config, sentry_url)<span class="question-mark">?</span>;
 
-        <span class="ident">sentry_api</span>.<span class="ident">with_propagate</span>(<span class="ident">propagate_to</span>)
+        sentry_api.with_propagate(propagate_to)
     }
 
-    <span class="doccomment">/// If the _Who am I_ Validator is not found in `propagate_to` it will be added.</span>
-    <span class="doccomment">/// Propagation should happen to all validators Sentry instances including _Who am I_</span>
-    <span class="doccomment">/// i.e. the current validator.</span>
-    <span class="doccomment">/// If a Chain in propagate_to is not setup ([`SentryApi::whoami`]) for this instance, an error is returned.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">with_propagate</span>(
+    <span class="doccomment">/// If the _Who am I_ Validator is not found in `propagate_to` it will be added.
+    /// Propagation should happen to all validators Sentry instances including _Who am I_
+    /// i.e. the current validator.
+    /// If a Chain in propagate_to is not setup ([`SentryApi::whoami`]) for this instance, an error is returned.
+    </span><span class="kw">pub fn </span>with_propagate(
         <span class="self">self</span>,
-        <span class="kw-2">mut</span> <span class="ident">propagate_to</span>: <span class="ident">ChainsValidators</span>,
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">SentryApi</span><span class="op">&lt;</span><span class="ident">C</span>, <span class="ident">ChainsValidators</span><span class="op">&gt;</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
-        <span class="kw">for</span> (<span class="ident">chain_id</span>, <span class="ident">validators</span>) <span class="kw">in</span> <span class="ident">propagate_to</span>.<span class="ident">iter_mut</span>() {
-            <span class="comment">// validate that the chain is whiteslited</span>
-            <span class="kw">let</span> <span class="ident">whoami_validator</span> <span class="op">=</span> <span class="self">self</span>
-                .<span class="ident">whoami</span>
-                .<span class="ident">get</span>(<span class="ident">chain_id</span>)
-                .<span class="ident">ok_or</span>(<span class="ident">Error::ChainNotWhitelisted</span> {
-                    <span class="ident">chain_id</span>: <span class="kw-2">*</span><span class="ident">chain_id</span>,
+        <span class="kw-2">mut </span>propagate_to: ChainsValidators,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;SentryApi&lt;C, ChainsValidators&gt;, Error&gt; {
+        <span class="kw">for </span>(chain_id, validators) <span class="kw">in </span>propagate_to.iter_mut() {
+            <span class="comment">// validate that the chain is whiteslited
+            </span><span class="kw">let </span>whoami_validator = <span class="self">self
+                </span>.whoami
+                .get(chain_id)
+                .ok_or(Error::ChainNotWhitelisted {
+                    chain_id: <span class="kw-2">*</span>chain_id,
                 })<span class="question-mark">?</span>;
 
-            <span class="comment">// if _Who Am I_ is not found, insert from the setup Chains whoami</span>
-            <span class="ident">validators</span>
-                .<span class="ident">entry</span>(<span class="self">self</span>.<span class="ident">adapter</span>.<span class="ident">whoami</span>())
-                .<span class="ident">or_insert_with</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">whoami_validator</span>.<span class="ident">clone</span>());
+            <span class="comment">// if _Who Am I_ is not found, insert from the setup Chains whoami
+            </span>validators
+                .entry(<span class="self">self</span>.adapter.whoami())
+                .or_insert_with(|| whoami_validator.clone());
         }
 
-        <span class="prelude-val">Ok</span>(<span class="ident">SentryApi</span> {
-            <span class="ident">adapter</span>: <span class="self">self</span>.<span class="ident">adapter</span>,
-            <span class="ident">client</span>: <span class="self">self</span>.<span class="ident">client</span>,
-            <span class="ident">logger</span>: <span class="self">self</span>.<span class="ident">logger</span>,
-            <span class="ident">config</span>: <span class="self">self</span>.<span class="ident">config</span>,
-            <span class="ident">sentry_url</span>: <span class="self">self</span>.<span class="ident">sentry_url</span>,
-            <span class="ident">whoami</span>: <span class="self">self</span>.<span class="ident">whoami</span>,
-            <span class="ident">propagate_to</span>,
+        <span class="prelude-val">Ok</span>(SentryApi {
+            adapter: <span class="self">self</span>.adapter,
+            client: <span class="self">self</span>.client,
+            logger: <span class="self">self</span>.logger,
+            config: <span class="self">self</span>.config,
+            sentry_url: <span class="self">self</span>.sentry_url,
+            whoami: <span class="self">self</span>.whoami,
+            propagate_to,
         })
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">Unlocked</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>, <span class="ident">P</span><span class="op">&gt;</span> <span class="ident">SentryApi</span><span class="op">&lt;</span><span class="ident">C</span>, <span class="ident">P</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">get_latest_msg</span>(
+<span class="kw">impl</span>&lt;C: Unlocked + <span class="lifetime">&#39;static</span>, P&gt; SentryApi&lt;C, P&gt; {
+    <span class="kw">pub async fn </span>get_latest_msg(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">channel</span>: <span class="ident">ChannelId</span>,
-        <span class="ident">from</span>: <span class="ident">ValidatorId</span>,
-        <span class="ident">message_types</span>: <span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">str</span>],
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">MessageTypes</span><span class="op">&gt;</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">message_type</span> <span class="op">=</span> <span class="ident">message_types</span>.<span class="ident">join</span>(<span class="string">&quot;+&quot;</span>);
+        channel: ChannelId,
+        from: ValidatorId,
+        message_types: <span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span>str],
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;MessageTypes&gt;, Error&gt; {
+        <span class="kw">let </span>message_type = message_types.join(<span class="string">&quot;+&quot;</span>);
 
-        <span class="kw">let</span> <span class="ident">endpoint</span> <span class="op">=</span> <span class="self">self</span>
-            .<span class="ident">sentry_url</span>
-            .<span class="ident">join</span>(<span class="kw-2">&amp;</span><span class="macro">format!</span>(
+        <span class="kw">let </span>endpoint = <span class="self">self
+            </span>.sentry_url
+            .join(<span class="kw-2">&amp;</span><span class="macro">format!</span>(
                 <span class="string">&quot;v5/channel/{}/validator-messages/{}/{}?limit=1&quot;</span>,
-                <span class="ident">channel</span>, <span class="ident">from</span>, <span class="ident">message_type</span>
+                channel, from, message_type
             ))
-            .<span class="ident">expect</span>(<span class="string">&quot;Should not error when creating endpoint url&quot;</span>);
+            .expect(<span class="string">&quot;Should not error when creating endpoint url&quot;</span>);
 
-        <span class="kw">let</span> <span class="ident">response</span> <span class="op">=</span> <span class="self">self</span>
-            .<span class="ident">client</span>
-            .<span class="ident">get</span>(<span class="ident">endpoint</span>)
-            .<span class="ident">send</span>()
-            .<span class="kw">await</span><span class="question-mark">?</span>
-            .<span class="ident">json</span>::<span class="op">&lt;</span><span class="ident">ValidatorMessagesListResponse</span><span class="op">&gt;</span>()
+        <span class="kw">let </span>response = <span class="self">self
+            </span>.client
+            .get(endpoint)
+            .send()
+            .<span class="kw">await</span><span class="question-mark">?
+            </span>.json::&lt;ValidatorMessagesListResponse&gt;()
             .<span class="kw">await</span><span class="question-mark">?</span>;
 
-        <span class="prelude-val">Ok</span>(<span class="ident">response</span>.<span class="ident">messages</span>.<span class="ident">into_iter</span>().<span class="ident">next</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">m</span><span class="op">|</span> <span class="ident">m</span>.<span class="ident">msg</span>))
+        <span class="prelude-val">Ok</span>(response.messages.into_iter().next().map(|m| m.msg))
     }
 
-    <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">get_our_latest_msg</span>(
+    <span class="kw">pub async fn </span>get_our_latest_msg(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">channel</span>: <span class="ident">ChannelId</span>,
-        <span class="ident">message_types</span>: <span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">str</span>],
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">MessageTypes</span><span class="op">&gt;</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">get_latest_msg</span>(<span class="ident">channel</span>, <span class="self">self</span>.<span class="ident">adapter</span>.<span class="ident">whoami</span>(), <span class="ident">message_types</span>)
-            .<span class="kw">await</span>
-    }
+        channel: ChannelId,
+        message_types: <span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span>str],
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;MessageTypes&gt;, Error&gt; {
+        <span class="self">self</span>.get_latest_msg(channel, <span class="self">self</span>.adapter.whoami(), message_types)
+            .<span class="kw">await
+    </span>}
 
-    <span class="doccomment">/// Get&#39;s the last approved state and requesting a [`primitives::validator::Heartbeat`], see [`LastApprovedResponse`]</span>
-    <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">get_last_approved</span>(
+    <span class="doccomment">/// Get&#39;s the last approved state and requesting a [`primitives::validator::Heartbeat`], see [`LastApprovedResponse`]
+    </span><span class="kw">pub async fn </span>get_last_approved(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">channel</span>: <span class="ident">ChannelId</span>,
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">LastApprovedResponse</span><span class="op">&lt;</span><span class="ident">UncheckedState</span><span class="op">&gt;</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">client</span>
-            .<span class="ident">get</span>(
-                <span class="self">self</span>.<span class="ident">sentry_url</span>
-                    .<span class="ident">join</span>(<span class="kw-2">&amp;</span><span class="macro">format!</span>(
+        channel: ChannelId,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;LastApprovedResponse&lt;UncheckedState&gt;, Error&gt; {
+        <span class="self">self</span>.client
+            .get(
+                <span class="self">self</span>.sentry_url
+                    .join(<span class="kw-2">&amp;</span><span class="macro">format!</span>(
                         <span class="string">&quot;v5/channel/{}/last-approved?withHeartbeat=true&quot;</span>,
-                        <span class="ident">channel</span>
+                        channel
                     ))
-                    .<span class="ident">expect</span>(<span class="string">&quot;Should not error while creating endpoint&quot;</span>),
+                    .expect(<span class="string">&quot;Should not error while creating endpoint&quot;</span>),
             )
-            .<span class="ident">send</span>()
-            .<span class="kw">await</span><span class="question-mark">?</span>
-            .<span class="ident">json</span>()
-            .<span class="kw">await</span>
-            .<span class="ident">map_err</span>(<span class="ident">Error::Request</span>)
+            .send()
+            .<span class="kw">await</span><span class="question-mark">?
+            </span>.json()
+            .<span class="kw">await
+            </span>.map_err(Error::Request)
     }
 
-    <span class="doccomment">/// page always starts from 0</span>
-    <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">get_spenders_page</span>(
+    <span class="doccomment">/// page always starts from 0
+    </span><span class="kw">pub async fn </span>get_spenders_page(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">channel_context</span>: <span class="kw-2">&amp;</span><span class="ident">ChainOf</span><span class="op">&lt;</span><span class="ident">Channel</span><span class="op">&gt;</span>,
-        <span class="ident">page</span>: <span class="ident">u64</span>,
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">AllSpendersResponse</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">channel_id</span> <span class="op">=</span> <span class="ident">channel_context</span>.<span class="ident">context</span>.<span class="ident">id</span>();
-        <span class="kw">let</span> <span class="ident">url</span> <span class="op">=</span> <span class="self">self</span>
-            .<span class="ident">sentry_url</span>
-            .<span class="ident">join</span>(<span class="kw-2">&amp;</span><span class="macro">format!</span>(
+        channel_context: <span class="kw-2">&amp;</span>ChainOf&lt;Channel&gt;,
+        page: u64,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;AllSpendersResponse, Error&gt; {
+        <span class="kw">let </span>channel_id = channel_context.context.id();
+        <span class="kw">let </span>url = <span class="self">self
+            </span>.sentry_url
+            .join(<span class="kw-2">&amp;</span><span class="macro">format!</span>(
                 <span class="string">&quot;v5/channel/{}/spender/all?page={}&quot;</span>,
-                <span class="ident">channel_id</span>, <span class="ident">page</span>
+                channel_id, page
             ))
-            .<span class="ident">expect</span>(<span class="string">&quot;Should not error when creating endpoint&quot;</span>);
+            .expect(<span class="string">&quot;Should not error when creating endpoint&quot;</span>);
 
-        <span class="kw">let</span> <span class="ident">auth_token</span> <span class="op">=</span> <span class="self">self</span>
-            .<span class="ident">adapter</span>
-            .<span class="ident">get_auth</span>(<span class="ident">channel_context</span>.<span class="ident">chain</span>.<span class="ident">chain_id</span>, <span class="self">self</span>.<span class="ident">adapter</span>.<span class="ident">whoami</span>())
-            .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">_adapter_err</span><span class="op">|</span> <span class="ident">Error::AuthenticationToken</span> {
-                <span class="ident">for_chain</span>: <span class="ident">channel_context</span>.<span class="ident">chain</span>.<span class="ident">chain_id</span>,
+        <span class="kw">let </span>auth_token = <span class="self">self
+            </span>.adapter
+            .get_auth(channel_context.chain.chain_id, <span class="self">self</span>.adapter.whoami())
+            .map_err(|_adapter_err| Error::AuthenticationToken {
+                for_chain: channel_context.chain.chain_id,
             })<span class="question-mark">?</span>;
 
-        <span class="self">self</span>.<span class="ident">client</span>
-            .<span class="ident">get</span>(<span class="ident">url</span>)
-            .<span class="ident">bearer_auth</span>(<span class="kw-2">&amp;</span><span class="ident">auth_token</span>)
-            .<span class="ident">send</span>()
-            .<span class="kw">await</span><span class="question-mark">?</span>
-            .<span class="ident">json</span>()
-            .<span class="ident">map_err</span>(<span class="ident">Error::Request</span>)
-            .<span class="kw">await</span>
-    }
+        <span class="self">self</span>.client
+            .get(url)
+            .bearer_auth(<span class="kw-2">&amp;</span>auth_token)
+            .send()
+            .<span class="kw">await</span><span class="question-mark">?
+            </span>.json()
+            .map_err(Error::Request)
+            .<span class="kw">await
+    </span>}
 
-    <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">get_all_spenders</span>(
+    <span class="kw">pub async fn </span>get_all_spenders(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">channel_context</span>: <span class="kw-2">&amp;</span><span class="ident">ChainOf</span><span class="op">&lt;</span><span class="ident">Channel</span><span class="op">&gt;</span>,
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">Address</span>, <span class="ident">Spender</span><span class="op">&gt;</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">first_page</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">get_spenders_page</span>(<span class="ident">channel_context</span>, <span class="number">0</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+        channel_context: <span class="kw-2">&amp;</span>ChainOf&lt;Channel&gt;,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;HashMap&lt;Address, Spender&gt;, Error&gt; {
+        <span class="kw">let </span>first_page = <span class="self">self</span>.get_spenders_page(channel_context, <span class="number">0</span>).<span class="kw">await</span><span class="question-mark">?</span>;
 
-        <span class="kw">if</span> <span class="ident">first_page</span>.<span class="ident">pagination</span>.<span class="ident">total_pages</span> <span class="op">&lt;</span> <span class="number">2</span> {
-            <span class="prelude-val">Ok</span>(<span class="ident">first_page</span>.<span class="ident">spenders</span>)
-        } <span class="kw">else</span> {
-            <span class="kw">let</span> <span class="ident">all</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">AllSpendersResponse</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">try_join_all</span>(
-                (<span class="number">1</span>..<span class="ident">first_page</span>.<span class="ident">pagination</span>.<span class="ident">total_pages</span>)
-                    .<span class="ident">map</span>(<span class="op">|</span><span class="ident">i</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">get_spenders_page</span>(<span class="ident">channel_context</span>, <span class="ident">i</span>)),
+        <span class="kw">if </span>first_page.pagination.total_pages &lt; <span class="number">2 </span>{
+            <span class="prelude-val">Ok</span>(first_page.spenders)
+        } <span class="kw">else </span>{
+            <span class="kw">let </span>all: Vec&lt;AllSpendersResponse&gt; = try_join_all(
+                (<span class="number">1</span>..first_page.pagination.total_pages)
+                    .map(|i| <span class="self">self</span>.get_spenders_page(channel_context, i)),
             )
             .<span class="kw">await</span><span class="question-mark">?</span>;
 
-            <span class="kw">let</span> <span class="ident">result_all</span>: <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">Address</span>, <span class="ident">Spender</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">std::iter::once</span>(<span class="ident">first_page</span>)
-                .<span class="ident">chain</span>(<span class="ident">all</span>.<span class="ident">into_iter</span>())
-                .<span class="ident">flat_map</span>(<span class="op">|</span><span class="ident">p</span><span class="op">|</span> <span class="ident">p</span>.<span class="ident">spenders</span>)
-                .<span class="ident">collect</span>();
+            <span class="kw">let </span>result_all: HashMap&lt;Address, Spender&gt; = std::iter::once(first_page)
+                .chain(all.into_iter())
+                .flat_map(|p| p.spenders)
+                .collect();
 
-            <span class="prelude-val">Ok</span>(<span class="ident">result_all</span>)
+            <span class="prelude-val">Ok</span>(result_all)
         }
     }
 
-    <span class="doccomment">/// Get the accounting from Sentry</span>
-    <span class="doccomment">/// `Balances` should always be in `CheckedState`</span>
-    <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">get_accounting</span>(
+    <span class="doccomment">/// Get the accounting from Sentry
+    /// `Balances` should always be in `CheckedState`
+    </span><span class="kw">pub async fn </span>get_accounting(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">channel_context</span>: <span class="kw-2">&amp;</span><span class="ident">ChainOf</span><span class="op">&lt;</span><span class="ident">Channel</span><span class="op">&gt;</span>,
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">AccountingResponse</span><span class="op">&lt;</span><span class="ident">CheckedState</span><span class="op">&gt;</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">url</span> <span class="op">=</span> <span class="self">self</span>
-            .<span class="ident">sentry_url</span>
-            .<span class="ident">join</span>(<span class="kw-2">&amp;</span><span class="macro">format!</span>(
+        channel_context: <span class="kw-2">&amp;</span>ChainOf&lt;Channel&gt;,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;AccountingResponse&lt;CheckedState&gt;, Error&gt; {
+        <span class="kw">let </span>url = <span class="self">self
+            </span>.sentry_url
+            .join(<span class="kw-2">&amp;</span><span class="macro">format!</span>(
                 <span class="string">&quot;v5/channel/{}/accounting&quot;</span>,
-                <span class="ident">channel_context</span>.<span class="ident">context</span>.<span class="ident">id</span>()
+                channel_context.context.id()
             ))
-            .<span class="ident">expect</span>(<span class="string">&quot;Should not error when creating endpoint&quot;</span>);
+            .expect(<span class="string">&quot;Should not error when creating endpoint&quot;</span>);
 
-        <span class="kw">let</span> <span class="ident">auth_token</span> <span class="op">=</span> <span class="self">self</span>
-            .<span class="ident">adapter</span>
-            .<span class="ident">get_auth</span>(<span class="ident">channel_context</span>.<span class="ident">chain</span>.<span class="ident">chain_id</span>, <span class="self">self</span>.<span class="ident">adapter</span>.<span class="ident">whoami</span>())
-            .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">_adapter_err</span><span class="op">|</span> <span class="ident">Error::AuthenticationToken</span> {
-                <span class="ident">for_chain</span>: <span class="ident">channel_context</span>.<span class="ident">chain</span>.<span class="ident">chain_id</span>,
+        <span class="kw">let </span>auth_token = <span class="self">self
+            </span>.adapter
+            .get_auth(channel_context.chain.chain_id, <span class="self">self</span>.adapter.whoami())
+            .map_err(|_adapter_err| Error::AuthenticationToken {
+                for_chain: channel_context.chain.chain_id,
             })<span class="question-mark">?</span>;
 
-        <span class="kw">let</span> <span class="ident">response</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">client</span>.<span class="ident">get</span>(<span class="ident">url</span>).<span class="ident">bearer_auth</span>(<span class="ident">auth_token</span>).<span class="ident">send</span>().<span class="kw">await</span><span class="question-mark">?</span>;
+        <span class="kw">let </span>response = <span class="self">self</span>.client.get(url).bearer_auth(auth_token).send().<span class="kw">await</span><span class="question-mark">?</span>;
 
-        <span class="macro">assert_eq!</span>(<span class="ident">reqwest::StatusCode::OK</span>, <span class="ident">response</span>.<span class="ident">status</span>());
+        <span class="macro">assert_eq!</span>(reqwest::StatusCode::OK, response.status());
 
-        <span class="ident">response</span>
-            .<span class="ident">json</span>::<span class="op">&lt;</span><span class="ident">AccountingResponse</span><span class="op">&lt;</span><span class="ident">CheckedState</span><span class="op">&gt;</span><span class="op">&gt;</span>()
-            .<span class="ident">map_err</span>(<span class="ident">Error::Request</span>)
-            .<span class="kw">await</span>
-    }
+        response
+            .json::&lt;AccountingResponse&lt;CheckedState&gt;&gt;()
+            .map_err(Error::Request)
+            .<span class="kw">await
+    </span>}
 
-    <span class="doccomment">/// Fetches all `Campaign`s from the _Who am I_ Sentry.</span>
-    <span class="doccomment">/// It builds the `Channel`s to be processed alongside all the `Validator`s&#39; url &amp; auth token.</span>
-    <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">collect_channels</span>(
+    <span class="doccomment">/// Fetches all `Campaign`s from the _Who am I_ Sentry.
+    /// It builds the `Channel`s to be processed alongside all the `Validator`s&#39; url &amp; auth token.
+    </span><span class="kw">pub async fn </span>collect_channels(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="ident">HashSet</span><span class="op">&lt;</span><span class="ident">ChainOf</span><span class="op">&lt;</span><span class="ident">Channel</span><span class="op">&gt;</span><span class="op">&gt;</span>, <span class="ident">ChainsValidators</span>), <span class="ident">Error</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">client</span> <span class="op">=</span> <span class="ident">reqwest::Client::builder</span>()
-            .<span class="ident">timeout</span>(<span class="self">self</span>.<span class="ident">config</span>.<span class="ident">all_campaigns_timeout</span>)
-            .<span class="ident">build</span>()<span class="question-mark">?</span>;
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;(HashSet&lt;ChainOf&lt;Channel&gt;&gt;, ChainsValidators), Error&gt; {
+        <span class="kw">let </span>client = reqwest::Client::builder()
+            .timeout(<span class="self">self</span>.config.all_campaigns_timeout)
+            .build()<span class="question-mark">?</span>;
 
-        <span class="kw">let</span> <span class="ident">campaigns</span> <span class="op">=</span>
-            <span class="ident">campaigns::all_campaigns</span>(<span class="ident">client</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">sentry_url</span>, <span class="prelude-val">Some</span>(<span class="self">self</span>.<span class="ident">adapter</span>.<span class="ident">whoami</span>())).<span class="kw">await</span><span class="question-mark">?</span>;
+        <span class="kw">let </span>campaigns =
+            campaigns::all_campaigns(client, <span class="kw-2">&amp;</span><span class="self">self</span>.sentry_url, <span class="prelude-val">Some</span>(<span class="self">self</span>.adapter.whoami())).<span class="kw">await</span><span class="question-mark">?</span>;
 
-        <span class="kw">let</span> (<span class="ident">validators</span>, <span class="ident">channels</span>) <span class="op">=</span> <span class="ident">campaigns</span>.<span class="ident">into_iter</span>().<span class="ident">fold</span>(
-            (<span class="ident">ChainsValidators::new</span>(), <span class="ident">HashSet</span>::<span class="op">&lt;</span><span class="ident">ChainOf</span><span class="op">&lt;</span><span class="ident">Channel</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="ident">::new</span>()),
-            <span class="op">|</span>(<span class="kw-2">mut</span> <span class="ident">validators</span>, <span class="kw-2">mut</span> <span class="ident">channels</span>), <span class="ident">campaign</span><span class="op">|</span> {
-                <span class="kw">let</span> <span class="ident">channel_context</span> <span class="op">=</span> <span class="kw">match</span> <span class="self">self</span>.<span class="ident">config</span>.<span class="ident">find_chain_of</span>(<span class="ident">campaign</span>.<span class="ident">channel</span>.<span class="ident">token</span>) {
-                    <span class="prelude-val">Some</span>(<span class="ident">chain_of</span>) =&gt; <span class="ident">chain_of</span>.<span class="ident">with_channel</span>(<span class="ident">campaign</span>.<span class="ident">channel</span>),
-                    <span class="comment">// Skip the current Channel as the Chain/Token is not configured</span>
-                    <span class="prelude-val">None</span> =&gt; <span class="kw">return</span> (<span class="ident">validators</span>, <span class="ident">channels</span>),
+        <span class="kw">let </span>(validators, channels) = campaigns.into_iter().fold(
+            (ChainsValidators::new(), HashSet::&lt;ChainOf&lt;Channel&gt;&gt;::new()),
+            |(<span class="kw-2">mut </span>validators, <span class="kw-2">mut </span>channels), campaign| {
+                <span class="kw">let </span>channel_context = <span class="kw">match </span><span class="self">self</span>.config.find_chain_of(campaign.channel.token) {
+                    <span class="prelude-val">Some</span>(chain_of) =&gt; chain_of.with_channel(campaign.channel),
+                    <span class="comment">// Skip the current Channel as the Chain/Token is not configured
+                    </span><span class="prelude-val">None </span>=&gt; <span class="kw">return </span>(validators, channels),
                 };
 
-                <span class="comment">// prepare to populate the chain of the Campaign validators</span>
-                <span class="kw">let</span> <span class="ident">chain_validators</span> <span class="op">=</span> <span class="ident">validators</span>
-                    .<span class="ident">entry</span>(<span class="ident">channel_context</span>.<span class="ident">chain</span>.<span class="ident">chain_id</span>)
-                    .<span class="ident">or_default</span>();
+                <span class="comment">// prepare to populate the chain of the Campaign validators
+                </span><span class="kw">let </span>chain_validators = validators
+                    .entry(channel_context.chain.chain_id)
+                    .or_default();
 
-                <span class="kw">for</span> <span class="ident">validator_desc</span> <span class="kw">in</span> <span class="ident">campaign</span>.<span class="ident">validators</span>.<span class="ident">iter</span>() {
-                    <span class="comment">// if Validator is already there, we can just skip it</span>
-                    <span class="comment">// remember, the campaigns are ordered by `created DESC`</span>
-                    <span class="comment">// so we will always get the latest Validator url first</span>
-                    <span class="kw">match</span> <span class="ident">chain_validators</span>.<span class="ident">entry</span>(<span class="ident">validator_desc</span>.<span class="ident">id</span>) {
-                        <span class="ident">Entry::Occupied</span>(<span class="kw">_</span>) =&gt; <span class="kw">continue</span>,
-                        <span class="ident">Entry::Vacant</span>(<span class="ident">entry</span>) =&gt; {
-                            <span class="comment">// try to parse the url of the Validator Desc</span>
-                            <span class="kw">let</span> <span class="ident">validator_url</span> <span class="op">=</span> <span class="ident">validator_desc</span>.<span class="ident">url</span>.<span class="ident">parse</span>::<span class="op">&lt;</span><span class="ident">ApiUrl</span><span class="op">&gt;</span>();
-                            <span class="comment">// and also try to find the Auth token in the config</span>
+                <span class="kw">for </span>validator_desc <span class="kw">in </span>campaign.validators.iter() {
+                    <span class="comment">// if Validator is already there, we can just skip it
+                    // remember, the campaigns are ordered by `created DESC`
+                    // so we will always get the latest Validator url first
+                    </span><span class="kw">match </span>chain_validators.entry(validator_desc.id) {
+                        Entry::Occupied(<span class="kw">_</span>) =&gt; <span class="kw">continue</span>,
+                        Entry::Vacant(entry) =&gt; {
+                            <span class="comment">// try to parse the url of the Validator Desc
+                            </span><span class="kw">let </span>validator_url = validator_desc.url.parse::&lt;ApiUrl&gt;();
+                            <span class="comment">// and also try to find the Auth token in the config
 
-                            <span class="comment">// if there was an error with any of the operations, skip this `ValidatorDesc`</span>
-                            <span class="kw">let</span> <span class="ident">auth_token</span> <span class="op">=</span> <span class="self">self</span>
-                                .<span class="ident">adapter</span>
-                                .<span class="ident">get_auth</span>(<span class="ident">channel_context</span>.<span class="ident">chain</span>.<span class="ident">chain_id</span>, <span class="ident">validator_desc</span>.<span class="ident">id</span>);
+                            // if there was an error with any of the operations, skip this `ValidatorDesc`
+                            </span><span class="kw">let </span>auth_token = <span class="self">self
+                                </span>.adapter
+                                .get_auth(channel_context.chain.chain_id, validator_desc.id);
 
-                            <span class="comment">// only if `ApiUrl` parsing is `Ok` &amp; Auth Token is found in the `Adapter`</span>
-                            <span class="kw">if</span> <span class="kw">let</span> (<span class="prelude-val">Ok</span>(<span class="ident">url</span>), <span class="prelude-val">Ok</span>(<span class="ident">auth_token</span>)) <span class="op">=</span> (<span class="ident">validator_url</span>, <span class="ident">auth_token</span>) {
-                                <span class="comment">// add an entry for propagation</span>
-                                <span class="ident">entry</span>.<span class="ident">insert</span>(<span class="ident">Validator</span> {
-                                    <span class="ident">url</span>,
-                                    <span class="ident">token</span>: <span class="ident">auth_token</span>,
+                            <span class="comment">// only if `ApiUrl` parsing is `Ok` &amp; Auth Token is found in the `Adapter`
+                            </span><span class="kw">if let </span>(<span class="prelude-val">Ok</span>(url), <span class="prelude-val">Ok</span>(auth_token)) = (validator_url, auth_token) {
+                                <span class="comment">// add an entry for propagation
+                                </span>entry.insert(Validator {
+                                    url,
+                                    token: auth_token,
                                 });
                             }
-                            <span class="comment">// otherwise it will try to do the same things on the next encounter of this</span>
-                            <span class="comment">// `ValidatorId` for the particular `Chain`</span>
-                        }
+                            <span class="comment">// otherwise it will try to do the same things on the next encounter of this
+                            // `ValidatorId` for the particular `Chain`
+                        </span>}
                     }
                 }
 
-                <span class="comment">// last but not least insert the channel!</span>
-                <span class="ident">channels</span>.<span class="ident">insert</span>(<span class="ident">channel_context</span>);
+                <span class="comment">// last but not least insert the channel!
+                </span>channels.insert(channel_context);
 
-                (<span class="ident">validators</span>, <span class="ident">channels</span>)
+                (validators, channels)
             },
         );
 
-        <span class="prelude-val">Ok</span>((<span class="ident">channels</span>, <span class="ident">validators</span>))
+        <span class="prelude-val">Ok</span>((channels, validators))
     }
 }
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">assert_result</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>(<span class="ident">assert</span>: <span class="ident">bool</span>, <span class="ident">or_error</span>: <span class="ident">E</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">E</span><span class="op">&gt;</span> {
-    <span class="kw">if</span> <span class="ident">assert</span> {
+<span class="kw">pub fn </span>assert_result&lt;E&gt;(assert: bool, or_error: E) -&gt; <span class="prelude-ty">Result</span>&lt;(), E&gt; {
+    <span class="kw">if </span>assert {
         <span class="prelude-val">Ok</span>(())
-    } <span class="kw">else</span> {
-        <span class="prelude-val">Err</span>(<span class="ident">or_error</span>)
+    } <span class="kw">else </span>{
+        <span class="prelude-val">Err</span>(or_error)
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">Unlocked</span> <span class="op">+</span> <span class="lifetime">&#39;static</span><span class="op">&gt;</span> <span class="ident">SentryApi</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">propagate</span>(
+<span class="kw">impl</span>&lt;C: Unlocked + <span class="lifetime">&#39;static</span>&gt; SentryApi&lt;C&gt; {
+    <span class="kw">pub async fn </span>propagate(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">channel_context</span>: <span class="kw-2">&amp;</span><span class="ident">ChainOf</span><span class="op">&lt;</span><span class="ident">Channel</span><span class="op">&gt;</span>,
-        <span class="ident">messages</span>: <span class="kw-2">&amp;</span>[<span class="ident">MessageTypes</span>],
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">PropagationResult</span><span class="op">&gt;</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">chain_validators</span> <span class="op">=</span> <span class="self">self</span>
-            .<span class="ident">propagate_to</span>
-            .<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">channel_context</span>.<span class="ident">chain</span>.<span class="ident">chain_id</span>)
-            .<span class="ident">ok_or</span>(<span class="ident">Error::ChainNotWhitelisted</span> {
-                <span class="ident">chain_id</span>: <span class="ident">channel_context</span>.<span class="ident">chain</span>.<span class="ident">chain_id</span>,
+        channel_context: <span class="kw-2">&amp;</span>ChainOf&lt;Channel&gt;,
+        messages: <span class="kw-2">&amp;</span>[MessageTypes],
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;PropagationResult&gt;, Error&gt; {
+        <span class="kw">let </span>chain_validators = <span class="self">self
+            </span>.propagate_to
+            .get(<span class="kw-2">&amp;</span>channel_context.chain.chain_id)
+            .ok_or(Error::ChainNotWhitelisted {
+                chain_id: channel_context.chain.chain_id,
             })<span class="question-mark">?</span>;
 
-        <span class="kw">let</span> <span class="ident">channel_validators</span> <span class="op">=</span> [
-            <span class="ident">channel_context</span>.<span class="ident">context</span>.<span class="ident">leader</span>,
-            <span class="ident">channel_context</span>.<span class="ident">context</span>.<span class="ident">follower</span>,
+        <span class="kw">let </span>channel_validators = [
+            channel_context.context.leader,
+            channel_context.context.follower,
         ];
 
-        <span class="kw">let</span> <span class="ident">propagate_to_validators</span> <span class="op">=</span> <span class="ident">channel_validators</span>
-            .<span class="ident">iter</span>()
-            .<span class="ident">filter_map</span>(<span class="op">|</span><span class="ident">channel_validator</span><span class="op">|</span> {
-                <span class="ident">chain_validators</span>
-                    .<span class="ident">get</span>(<span class="ident">channel_validator</span>)
-                    .<span class="ident">cloned</span>()
-                    .<span class="ident">map</span>(<span class="op">|</span><span class="ident">validator</span><span class="op">|</span> (<span class="kw-2">*</span><span class="ident">channel_validator</span>, <span class="ident">validator</span>))
+        <span class="kw">let </span>propagate_to_validators = channel_validators
+            .iter()
+            .filter_map(|channel_validator| {
+                chain_validators
+                    .get(channel_validator)
+                    .cloned()
+                    .map(|validator| (<span class="kw-2">*</span>channel_validator, validator))
             })
-            .<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">HashMap</span><span class="op">&lt;</span><span class="kw">_</span>, <span class="kw">_</span><span class="op">&gt;</span><span class="op">&gt;</span>();
+            .collect::&lt;HashMap&lt;<span class="kw">_</span>, <span class="kw">_</span>&gt;&gt;();
 
-        <span class="comment">// check if we found all the channel validators in the propagation list</span>
-        <span class="kw">if</span> <span class="ident">propagate_to_validators</span>.<span class="ident">len</span>() <span class="op">!</span><span class="op">=</span> <span class="ident">channel_validators</span>.<span class="ident">len</span>() {
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error::PropagationValidatorsNotFound</span> {
-                <span class="ident">channel</span>: <span class="ident">channel_validators</span>.<span class="ident">to_vec</span>(),
-                <span class="ident">found</span>: <span class="ident">propagate_to_validators</span>,
+        <span class="comment">// check if we found all the channel validators in the propagation list
+        </span><span class="kw">if </span>propagate_to_validators.len() != channel_validators.len() {
+            <span class="kw">return </span><span class="prelude-val">Err</span>(Error::PropagationValidatorsNotFound {
+                channel: channel_validators.to_vec(),
+                found: propagate_to_validators,
             });
         }
 
-        <span class="kw">let</span> <span class="ident">propagation_results</span> <span class="op">=</span> <span class="ident">join_all</span>(<span class="ident">propagate_to_validators</span>.<span class="ident">iter</span>().<span class="ident">map</span>(
-            <span class="op">|</span>(<span class="ident">validator_id</span>, <span class="ident">validator</span>)<span class="op">|</span> {
-                <span class="ident">propagate_to</span>::<span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span>(
-                    <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">client</span>,
-                    <span class="self">self</span>.<span class="ident">config</span>.<span class="ident">propagation_timeout</span>,
-                    <span class="ident">channel_context</span>.<span class="ident">context</span>.<span class="ident">id</span>(),
-                    (<span class="kw-2">*</span><span class="ident">validator_id</span>, <span class="ident">validator</span>),
-                    <span class="ident">messages</span>,
+        <span class="kw">let </span>propagation_results = join_all(propagate_to_validators.iter().map(
+            |(validator_id, validator)| {
+                propagate_to::&lt;C&gt;(
+                    <span class="kw-2">&amp;</span><span class="self">self</span>.client,
+                    <span class="self">self</span>.config.propagation_timeout,
+                    channel_context.context.id(),
+                    (<span class="kw-2">*</span>validator_id, validator),
+                    messages,
                 )
             },
         ))
         .<span class="kw">await</span>;
 
-        <span class="prelude-val">Ok</span>(<span class="ident">propagation_results</span>)
+        <span class="prelude-val">Ok</span>(propagation_results)
     }
 }
 
-<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">propagate_to</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">Unlocked</span><span class="op">&gt;</span>(
-    <span class="ident">client</span>: <span class="kw-2">&amp;</span><span class="ident">Client</span>,
-    <span class="ident">timeout</span>: <span class="ident">Duration</span>,
-    <span class="ident">channel_id</span>: <span class="ident">ChannelId</span>,
-    (<span class="ident">validator_id</span>, <span class="ident">validator</span>): (<span class="ident">ValidatorId</span>, <span class="kw-2">&amp;</span><span class="ident">Validator</span>),
-    <span class="ident">messages</span>: <span class="kw-2">&amp;</span>[<span class="ident">MessageTypes</span>],
-) -&gt; <span class="ident">PropagationResult</span> {
-    <span class="kw">let</span> <span class="ident">endpoint</span> <span class="op">=</span> <span class="ident">validator</span>
-        .<span class="ident">url</span>
-        .<span class="ident">join</span>(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;v5/channel/{}/validator-messages&quot;</span>, <span class="ident">channel_id</span>))
-        .<span class="ident">expect</span>(<span class="string">&quot;Should not error when creating endpoint url&quot;</span>);
+<span class="kw">async fn </span>propagate_to&lt;C: Unlocked&gt;(
+    client: <span class="kw-2">&amp;</span>Client,
+    timeout: Duration,
+    channel_id: ChannelId,
+    (validator_id, validator): (ValidatorId, <span class="kw-2">&amp;</span>Validator),
+    messages: <span class="kw-2">&amp;</span>[MessageTypes],
+) -&gt; PropagationResult {
+    <span class="kw">let </span>endpoint = validator
+        .url
+        .join(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;v5/channel/{}/validator-messages&quot;</span>, channel_id))
+        .expect(<span class="string">&quot;Should not error when creating endpoint url&quot;</span>);
 
-    <span class="kw">let</span> <span class="ident">request_body</span> <span class="op">=</span> <span class="ident">ValidatorMessagesCreateRequest</span> {
-        <span class="ident">messages</span>: <span class="ident">messages</span>.<span class="ident">to_vec</span>(),
+    <span class="kw">let </span>request_body = ValidatorMessagesCreateRequest {
+        messages: messages.to_vec(),
     };
 
-    <span class="kw">let</span> <span class="ident">_response</span>: <span class="ident">SuccessResponse</span> <span class="op">=</span> <span class="ident">client</span>
-        .<span class="ident">request</span>(<span class="ident">Method::POST</span>, <span class="ident">endpoint</span>)
-        .<span class="ident">timeout</span>(<span class="ident">timeout</span>)
-        .<span class="ident">bearer_auth</span>(<span class="kw-2">&amp;</span><span class="ident">validator</span>.<span class="ident">token</span>)
-        .<span class="ident">json</span>(<span class="kw-2">&amp;</span><span class="ident">request_body</span>)
-        .<span class="ident">send</span>()
-        .<span class="kw">await</span>
-        .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> (<span class="ident">validator_id</span>, <span class="ident">Error::Request</span>(<span class="ident">e</span>)))<span class="question-mark">?</span>
-        .<span class="ident">json</span>()
-        .<span class="kw">await</span>
-        .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> (<span class="ident">validator_id</span>, <span class="ident">Error::Request</span>(<span class="ident">e</span>)))<span class="question-mark">?</span>;
+    <span class="kw">let </span>_response: SuccessResponse = client
+        .request(Method::POST, endpoint)
+        .timeout(timeout)
+        .bearer_auth(<span class="kw-2">&amp;</span>validator.token)
+        .json(<span class="kw-2">&amp;</span>request_body)
+        .send()
+        .<span class="kw">await
+        </span>.map_err(|e| (validator_id, Error::Request(e)))<span class="question-mark">?
+        </span>.json()
+        .<span class="kw">await
+        </span>.map_err(|e| (validator_id, Error::Request(e)))<span class="question-mark">?</span>;
 
-    <span class="prelude-val">Ok</span>(<span class="ident">validator_id</span>)
+    <span class="prelude-val">Ok</span>(validator_id)
 }
 
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">channels</span> {
-    <span class="kw">use</span> <span class="ident">futures</span>::{<span class="ident">future::try_join_all</span>, <span class="ident">TryFutureExt</span>};
-    <span class="kw">use</span> <span class="ident">primitives</span>::{
-        <span class="ident">sentry::channel_list</span>::{<span class="ident">ChannelListQuery</span>, <span class="ident">ChannelListResponse</span>},
-        <span class="ident">util::ApiUrl</span>,
-        <span class="ident">Channel</span>, <span class="ident">ValidatorId</span>,
+<span class="kw">pub mod </span>channels {
+    <span class="kw">use </span>futures::{future::try_join_all, TryFutureExt};
+    <span class="kw">use </span>primitives::{
+        sentry::channel_list::{ChannelListQuery, ChannelListResponse},
+        util::ApiUrl,
+        Channel, ValidatorId,
     };
-    <span class="kw">use</span> <span class="ident">reqwest</span>::{<span class="ident">Client</span>, <span class="ident">Response</span>};
+    <span class="kw">use </span>reqwest::{Client, Response};
 
-    <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">all_channels</span>(
-        <span class="ident">client</span>: <span class="ident">Client</span>,
-        <span class="ident">sentry_url</span>: <span class="kw-2">&amp;</span><span class="ident">ApiUrl</span>,
-        <span class="ident">whoami</span>: <span class="ident">ValidatorId</span>,
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Channel</span><span class="op">&gt;</span>, <span class="ident">reqwest::Error</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">first_page</span> <span class="op">=</span> <span class="ident">fetch_page</span>(<span class="kw-2">&amp;</span><span class="ident">client</span>, <span class="ident">sentry_url</span>, <span class="number">0</span>, <span class="ident">whoami</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+    <span class="kw">pub async fn </span>all_channels(
+        client: Client,
+        sentry_url: <span class="kw-2">&amp;</span>ApiUrl,
+        whoami: ValidatorId,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;Channel&gt;, reqwest::Error&gt; {
+        <span class="kw">let </span>first_page = fetch_page(<span class="kw-2">&amp;</span>client, sentry_url, <span class="number">0</span>, whoami).<span class="kw">await</span><span class="question-mark">?</span>;
 
-        <span class="kw">if</span> <span class="ident">first_page</span>.<span class="ident">pagination</span>.<span class="ident">total_pages</span> <span class="op">&lt;</span> <span class="number">2</span> {
-            <span class="prelude-val">Ok</span>(<span class="ident">first_page</span>.<span class="ident">channels</span>)
-        } <span class="kw">else</span> {
-            <span class="kw">let</span> <span class="ident">all</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">ChannelListResponse</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">try_join_all</span>(
-                (<span class="number">1</span>..<span class="ident">first_page</span>.<span class="ident">pagination</span>.<span class="ident">total_pages</span>)
-                    .<span class="ident">map</span>(<span class="op">|</span><span class="ident">i</span><span class="op">|</span> <span class="ident">fetch_page</span>(<span class="kw-2">&amp;</span><span class="ident">client</span>, <span class="ident">sentry_url</span>, <span class="ident">i</span>, <span class="ident">whoami</span>)),
+        <span class="kw">if </span>first_page.pagination.total_pages &lt; <span class="number">2 </span>{
+            <span class="prelude-val">Ok</span>(first_page.channels)
+        } <span class="kw">else </span>{
+            <span class="kw">let </span>all: Vec&lt;ChannelListResponse&gt; = try_join_all(
+                (<span class="number">1</span>..first_page.pagination.total_pages)
+                    .map(|i| fetch_page(<span class="kw-2">&amp;</span>client, sentry_url, i, whoami)),
             )
             .<span class="kw">await</span><span class="question-mark">?</span>;
 
-            <span class="kw">let</span> <span class="ident">result_all</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Channel</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">std::iter::once</span>(<span class="ident">first_page</span>)
-                .<span class="ident">chain</span>(<span class="ident">all</span>.<span class="ident">into_iter</span>())
-                .<span class="ident">flat_map</span>(<span class="op">|</span><span class="ident">ch</span><span class="op">|</span> <span class="ident">ch</span>.<span class="ident">channels</span>.<span class="ident">into_iter</span>())
-                .<span class="ident">collect</span>();
-            <span class="prelude-val">Ok</span>(<span class="ident">result_all</span>)
+            <span class="kw">let </span>result_all: Vec&lt;Channel&gt; = std::iter::once(first_page)
+                .chain(all.into_iter())
+                .flat_map(|ch| ch.channels.into_iter())
+                .collect();
+            <span class="prelude-val">Ok</span>(result_all)
         }
     }
 
-    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">fetch_page</span>(
-        <span class="ident">client</span>: <span class="kw-2">&amp;</span><span class="ident">Client</span>,
-        <span class="ident">sentry_url</span>: <span class="kw-2">&amp;</span><span class="ident">ApiUrl</span>,
-        <span class="ident">page</span>: <span class="ident">u64</span>,
-        <span class="ident">validator</span>: <span class="ident">ValidatorId</span>,
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">ChannelListResponse</span>, <span class="ident">reqwest::Error</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">query</span> <span class="op">=</span> <span class="ident">ChannelListQuery</span> {
-            <span class="ident">page</span>,
-            <span class="ident">validator</span>: <span class="prelude-val">Some</span>(<span class="ident">validator</span>),
-            <span class="ident">chains</span>: <span class="macro">vec!</span>[],
+    <span class="kw">async fn </span>fetch_page(
+        client: <span class="kw-2">&amp;</span>Client,
+        sentry_url: <span class="kw-2">&amp;</span>ApiUrl,
+        page: u64,
+        validator: ValidatorId,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;ChannelListResponse, reqwest::Error&gt; {
+        <span class="kw">let </span>query = ChannelListQuery {
+            page,
+            validator: <span class="prelude-val">Some</span>(validator),
+            chains: <span class="macro">vec!</span>[],
         };
 
-        <span class="kw">let</span> <span class="ident">endpoint</span> <span class="op">=</span> <span class="ident">sentry_url</span>
-            .<span class="ident">join</span>(<span class="kw-2">&amp;</span><span class="macro">format!</span>(
+        <span class="kw">let </span>endpoint = sentry_url
+            .join(<span class="kw-2">&amp;</span><span class="macro">format!</span>(
                 <span class="string">&quot;v5/channel/list?{}&quot;</span>,
-                <span class="ident">serde_qs::to_string</span>(<span class="kw-2">&amp;</span><span class="ident">query</span>).<span class="ident">expect</span>(<span class="string">&quot;Should not fail to serialize&quot;</span>)
+                serde_qs::to_string(<span class="kw-2">&amp;</span>query).expect(<span class="string">&quot;Should not fail to serialize&quot;</span>)
             ))
-            .<span class="ident">expect</span>(<span class="string">&quot;Should not fail to create endpoint URL&quot;</span>);
+            .expect(<span class="string">&quot;Should not fail to create endpoint URL&quot;</span>);
 
-        <span class="ident">client</span>
-            .<span class="ident">get</span>(<span class="ident">endpoint</span>)
-            .<span class="ident">send</span>()
-            .<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">res</span>: <span class="ident">Response</span><span class="op">|</span> <span class="ident">res</span>.<span class="ident">json</span>::<span class="op">&lt;</span><span class="ident">ChannelListResponse</span><span class="op">&gt;</span>())
-            .<span class="kw">await</span>
-    }
+        client
+            .get(endpoint)
+            .send()
+            .and_then(|res: Response| res.json::&lt;ChannelListResponse&gt;())
+            .<span class="kw">await
+    </span>}
 }
 
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">campaigns</span> {
-    <span class="kw">use</span> <span class="ident">chrono::Utc</span>;
-    <span class="kw">use</span> <span class="ident">futures::future::try_join_all</span>;
-    <span class="kw">use</span> <span class="ident">primitives</span>::{
-        <span class="ident">sentry::campaign_list</span>::{<span class="ident">CampaignListQuery</span>, <span class="ident">CampaignListResponse</span>, <span class="ident">ValidatorParam</span>},
-        <span class="ident">util::ApiUrl</span>,
-        <span class="ident">Campaign</span>, <span class="ident">ValidatorId</span>,
+<span class="kw">pub mod </span>campaigns {
+    <span class="kw">use </span>chrono::Utc;
+    <span class="kw">use </span>futures::future::try_join_all;
+    <span class="kw">use </span>primitives::{
+        sentry::campaign_list::{CampaignListQuery, CampaignListResponse, ValidatorParam},
+        util::ApiUrl,
+        Campaign, ValidatorId,
     };
-    <span class="kw">use</span> <span class="ident">reqwest::Client</span>;
+    <span class="kw">use </span>reqwest::Client;
 
-    <span class="doccomment">/// Fetches all `Campaign`s from `sentry` by going through all pages and collecting the `Campaign`s into a single `Vec`</span>
-    <span class="doccomment">/// You can filter by `&amp;validator=0x...` when passing `for_validator`.</span>
-    <span class="doccomment">/// This will return campaigns that include the provided `for_validator` validator.</span>
-    <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">all_campaigns</span>(
-        <span class="ident">client</span>: <span class="ident">Client</span>,
-        <span class="ident">sentry_url</span>: <span class="kw-2">&amp;</span><span class="ident">ApiUrl</span>,
-        <span class="ident">for_validator</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ValidatorId</span><span class="op">&gt;</span>,
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Campaign</span><span class="op">&gt;</span>, <span class="ident">reqwest::Error</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">first_page</span> <span class="op">=</span> <span class="ident">fetch_page</span>(<span class="kw-2">&amp;</span><span class="ident">client</span>, <span class="ident">sentry_url</span>, <span class="number">0</span>, <span class="ident">for_validator</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+    <span class="doccomment">/// Fetches all `Campaign`s from `sentry` by going through all pages and collecting the `Campaign`s into a single `Vec`
+    /// You can filter by `&amp;validator=0x...` when passing `for_validator`.
+    /// This will return campaigns that include the provided `for_validator` validator.
+    </span><span class="kw">pub async fn </span>all_campaigns(
+        client: Client,
+        sentry_url: <span class="kw-2">&amp;</span>ApiUrl,
+        for_validator: <span class="prelude-ty">Option</span>&lt;ValidatorId&gt;,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;Campaign&gt;, reqwest::Error&gt; {
+        <span class="kw">let </span>first_page = fetch_page(<span class="kw-2">&amp;</span>client, sentry_url, <span class="number">0</span>, for_validator).<span class="kw">await</span><span class="question-mark">?</span>;
 
-        <span class="kw">if</span> <span class="ident">first_page</span>.<span class="ident">pagination</span>.<span class="ident">total_pages</span> <span class="op">&lt;</span> <span class="number">2</span> {
-            <span class="prelude-val">Ok</span>(<span class="ident">first_page</span>.<span class="ident">campaigns</span>)
-        } <span class="kw">else</span> {
-            <span class="kw">let</span> <span class="ident">all</span> <span class="op">=</span> <span class="ident">try_join_all</span>(
-                (<span class="number">1</span>..<span class="ident">first_page</span>.<span class="ident">pagination</span>.<span class="ident">total_pages</span>)
-                    .<span class="ident">map</span>(<span class="op">|</span><span class="ident">i</span><span class="op">|</span> <span class="ident">fetch_page</span>(<span class="kw-2">&amp;</span><span class="ident">client</span>, <span class="ident">sentry_url</span>, <span class="ident">i</span>, <span class="ident">for_validator</span>)),
+        <span class="kw">if </span>first_page.pagination.total_pages &lt; <span class="number">2 </span>{
+            <span class="prelude-val">Ok</span>(first_page.campaigns)
+        } <span class="kw">else </span>{
+            <span class="kw">let </span>all = try_join_all(
+                (<span class="number">1</span>..first_page.pagination.total_pages)
+                    .map(|i| fetch_page(<span class="kw-2">&amp;</span>client, sentry_url, i, for_validator)),
             )
             .<span class="kw">await</span><span class="question-mark">?</span>;
 
-            <span class="kw">let</span> <span class="ident">result_all</span> <span class="op">=</span> <span class="ident">std::iter::once</span>(<span class="ident">first_page</span>)
-                .<span class="ident">chain</span>(<span class="ident">all</span>.<span class="ident">into_iter</span>())
-                .<span class="ident">flat_map</span>(<span class="op">|</span><span class="ident">response</span><span class="op">|</span> <span class="ident">response</span>.<span class="ident">campaigns</span>.<span class="ident">into_iter</span>())
-                .<span class="ident">collect</span>();
-            <span class="prelude-val">Ok</span>(<span class="ident">result_all</span>)
+            <span class="kw">let </span>result_all = std::iter::once(first_page)
+                .chain(all.into_iter())
+                .flat_map(|response| response.campaigns.into_iter())
+                .collect();
+            <span class="prelude-val">Ok</span>(result_all)
         }
     }
 
-    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">fetch_page</span>(
-        <span class="ident">client</span>: <span class="kw-2">&amp;</span><span class="ident">Client</span>,
-        <span class="ident">sentry_url</span>: <span class="kw-2">&amp;</span><span class="ident">ApiUrl</span>,
-        <span class="ident">page</span>: <span class="ident">u64</span>,
-        <span class="ident">for_validator</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ValidatorId</span><span class="op">&gt;</span>,
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">CampaignListResponse</span>, <span class="ident">reqwest::Error</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">query</span> <span class="op">=</span> <span class="ident">CampaignListQuery</span> {
-            <span class="ident">page</span>,
-            <span class="ident">active_to_ge</span>: <span class="ident">Utc::now</span>(),
-            <span class="ident">creator</span>: <span class="prelude-val">None</span>,
-            <span class="ident">validator</span>: <span class="ident">for_validator</span>.<span class="ident">map</span>(<span class="ident">ValidatorParam::Validator</span>),
+    <span class="kw">async fn </span>fetch_page(
+        client: <span class="kw-2">&amp;</span>Client,
+        sentry_url: <span class="kw-2">&amp;</span>ApiUrl,
+        page: u64,
+        for_validator: <span class="prelude-ty">Option</span>&lt;ValidatorId&gt;,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;CampaignListResponse, reqwest::Error&gt; {
+        <span class="kw">let </span>query = CampaignListQuery {
+            page,
+            active_to_ge: Utc::now(),
+            creator: <span class="prelude-val">None</span>,
+            validator: for_validator.map(ValidatorParam::Validator),
         };
 
-        <span class="kw">let</span> <span class="ident">endpoint</span> <span class="op">=</span> <span class="ident">sentry_url</span>
-            .<span class="ident">join</span>(<span class="kw-2">&amp;</span><span class="macro">format!</span>(
+        <span class="kw">let </span>endpoint = sentry_url
+            .join(<span class="kw-2">&amp;</span><span class="macro">format!</span>(
                 <span class="string">&quot;v5/campaign/list?{}&quot;</span>,
-                <span class="ident">serde_qs::to_string</span>(<span class="kw-2">&amp;</span><span class="ident">query</span>).<span class="ident">expect</span>(<span class="string">&quot;Should not fail to serialize&quot;</span>)
+                serde_qs::to_string(<span class="kw-2">&amp;</span>query).expect(<span class="string">&quot;Should not fail to serialize&quot;</span>)
             ))
-            .<span class="ident">expect</span>(<span class="string">&quot;Should not fail to create endpoint URL&quot;</span>);
+            .expect(<span class="string">&quot;Should not fail to create endpoint URL&quot;</span>);
 
-        <span class="ident">client</span>.<span class="ident">get</span>(<span class="ident">endpoint</span>).<span class="ident">send</span>().<span class="kw">await</span><span class="question-mark">?</span>.<span class="ident">json</span>().<span class="kw">await</span>
-    }
+        client.get(endpoint).send().<span class="kw">await</span><span class="question-mark">?</span>.json().<span class="kw">await
+    </span>}
 }
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
-<span class="kw">mod</span> <span class="ident">test</span> {
-    <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
-    <span class="kw">use</span> <span class="ident">adapter</span>::{
-        <span class="ident">dummy</span>::{<span class="ident">Adapter</span>, <span class="ident">Dummy</span>, <span class="ident">Options</span>},
-        <span class="ident">ethereum::test_util::GANACHE_INFO_1</span>,
+<span class="attribute">#[cfg(test)]</span>
+<span class="kw">mod </span>test {
+    <span class="kw">use super</span>::<span class="kw-2">*</span>;
+    <span class="kw">use </span>adapter::{
+        dummy::{Adapter, Dummy, Options},
+        ethereum::test_util::GANACHE_INFO_1,
     };
-    <span class="kw">use</span> <span class="ident">primitives</span>::{
-        <span class="ident">campaign::validators::Validators</span> <span class="kw">as</span> <span class="ident">CampaignValidators</span>,
-        <span class="ident">config</span>::{<span class="ident">configuration</span>, <span class="ident">Environment</span>, <span class="ident">GANACHE_CONFIG</span>},
-        <span class="ident">sentry</span>::{
-            <span class="ident">campaign_list::CampaignListResponse</span>, <span class="ident">channel_list::ChannelListResponse</span>, <span class="ident">Pagination</span>,
+    <span class="kw">use </span>primitives::{
+        campaign::validators::Validators <span class="kw">as </span>CampaignValidators,
+        config::{configuration, Environment, GANACHE_CONFIG},
+        sentry::{
+            campaign_list::CampaignListResponse, channel_list::ChannelListResponse, Pagination,
         },
-        <span class="ident">test_util</span>::{
-            <span class="ident">discard_logger</span>, <span class="ident">ADVERTISER</span>, <span class="ident">ADVERTISER_2</span>, <span class="ident">CREATOR</span>, <span class="ident">DUMMY_AUTH</span>, <span class="ident">DUMMY_CAMPAIGN</span>,
-            <span class="ident">DUMMY_VALIDATOR_FOLLOWER</span>, <span class="ident">DUMMY_VALIDATOR_LEADER</span>, <span class="ident">FOLLOWER</span>, <span class="ident">GUARDIAN</span>, <span class="ident">IDS</span>, <span class="ident">LEADER</span>,
-            <span class="ident">LEADER_2</span>, <span class="ident">PUBLISHER</span>, <span class="ident">PUBLISHER_2</span>,
+        test_util::{
+            discard_logger, ADVERTISER, ADVERTISER_2, CREATOR, DUMMY_AUTH, DUMMY_CAMPAIGN,
+            DUMMY_VALIDATOR_FOLLOWER, DUMMY_VALIDATOR_LEADER, FOLLOWER, GUARDIAN, IDS, LEADER,
+            LEADER_2, PUBLISHER, PUBLISHER_2,
         },
-        <span class="ident">CampaignId</span>, <span class="ident">UnifiedNum</span>, <span class="ident">ValidatorDesc</span>,
+        CampaignId, UnifiedNum, ValidatorDesc,
     };
-    <span class="kw">use</span> <span class="ident">std::str::FromStr</span>;
-    <span class="kw">use</span> <span class="ident">wiremock</span>::{
-        <span class="ident">matchers</span>::{<span class="ident">method</span>, <span class="ident">path</span>, <span class="ident">query_param</span>},
-        <span class="ident">Mock</span>, <span class="ident">MockServer</span>, <span class="ident">ResponseTemplate</span>,
+    <span class="kw">use </span>std::str::FromStr;
+    <span class="kw">use </span>wiremock::{
+        matchers::{method, path, query_param},
+        Mock, MockServer, ResponseTemplate,
     };
 
-    <span class="doccomment">/// Uses the [`Dummy`] adapter with [`DUMMY_AUTH`] as the authentication tokens.</span>
-    <span class="doccomment">/// Sentry url can be provided, for `wiremock` to be able to mock the calls in [`SentryApi`].</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">setup_dummy_sentry</span>(
-        <span class="ident">whoami</span>: <span class="ident">ValidatorId</span>,
-        <span class="ident">config</span>: <span class="ident">Config</span>,
-        <span class="ident">sentry_url</span>: <span class="ident">ApiUrl</span>,
-    ) -&gt; <span class="ident">SentryApi</span><span class="op">&lt;</span><span class="ident">Dummy</span>, ()<span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">adapter</span> <span class="op">=</span> <span class="ident">Adapter::with_unlocked</span>(<span class="ident">Dummy::init</span>(<span class="ident">Options</span> {
-            <span class="ident">dummy_identity</span>: <span class="ident">whoami</span>,
-            <span class="ident">dummy_auth_tokens</span>: <span class="ident">DUMMY_AUTH</span>.<span class="ident">clone</span>(),
-            <span class="ident">dummy_chains</span>: <span class="ident">config</span>.<span class="ident">chains</span>.<span class="ident">values</span>().<span class="ident">cloned</span>().<span class="ident">collect</span>(),
+    <span class="doccomment">/// Uses the [`Dummy`] adapter with [`DUMMY_AUTH`] as the authentication tokens.
+    /// Sentry url can be provided, for `wiremock` to be able to mock the calls in [`SentryApi`].
+    </span><span class="kw">pub fn </span>setup_dummy_sentry(
+        whoami: ValidatorId,
+        config: Config,
+        sentry_url: ApiUrl,
+    ) -&gt; SentryApi&lt;Dummy, ()&gt; {
+        <span class="kw">let </span>adapter = Adapter::with_unlocked(Dummy::init(Options {
+            dummy_identity: whoami,
+            dummy_auth_tokens: DUMMY_AUTH.clone(),
+            dummy_chains: config.chains.values().cloned().collect(),
         }));
-        <span class="kw">let</span> <span class="ident">logger</span> <span class="op">=</span> <span class="ident">discard_logger</span>();
+        <span class="kw">let </span>logger = discard_logger();
 
-        <span class="ident">SentryApi::new</span>(<span class="ident">adapter</span>, <span class="ident">logger</span>, <span class="ident">config</span>, <span class="ident">sentry_url</span>).<span class="ident">expect</span>(<span class="string">&quot;Should build sentry&quot;</span>)
+        SentryApi::new(adapter, logger, config, sentry_url).expect(<span class="string">&quot;Should build sentry&quot;</span>)
     }
 
-    <span class="attribute">#[<span class="ident">tokio::test</span>]</span>
-    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">test_get_all_spenders</span>() {
-        <span class="kw">let</span> <span class="ident">server</span> <span class="op">=</span> <span class="ident">MockServer::start</span>().<span class="kw">await</span>;
-        <span class="kw">let</span> <span class="ident">test_spender</span> <span class="op">=</span> <span class="ident">Spender</span> {
-            <span class="ident">total_deposited</span>: <span class="ident">UnifiedNum::from</span>(<span class="number">100_000_000</span>),
-            <span class="ident">total_spent</span>: <span class="prelude-val">None</span>,
+    <span class="attribute">#[tokio::test]</span>
+    <span class="kw">async fn </span>test_get_all_spenders() {
+        <span class="kw">let </span>server = MockServer::start().<span class="kw">await</span>;
+        <span class="kw">let </span>test_spender = Spender {
+            total_deposited: UnifiedNum::from(<span class="number">100_000_000</span>),
+            total_spent: <span class="prelude-val">None</span>,
         };
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">all_spenders</span> <span class="op">=</span> <span class="ident">HashMap::new</span>();
-        <span class="ident">all_spenders</span>.<span class="ident">insert</span>(<span class="kw-2">*</span><span class="ident">ADVERTISER</span>, <span class="ident">test_spender</span>.<span class="ident">clone</span>());
-        <span class="ident">all_spenders</span>.<span class="ident">insert</span>(<span class="kw-2">*</span><span class="ident">PUBLISHER</span>, <span class="ident">test_spender</span>.<span class="ident">clone</span>());
-        <span class="ident">all_spenders</span>.<span class="ident">insert</span>(<span class="kw-2">*</span><span class="ident">PUBLISHER_2</span>, <span class="ident">test_spender</span>.<span class="ident">clone</span>());
-        <span class="ident">all_spenders</span>.<span class="ident">insert</span>(<span class="kw-2">*</span><span class="ident">ADVERTISER_2</span>, <span class="ident">test_spender</span>.<span class="ident">clone</span>());
-        <span class="ident">all_spenders</span>.<span class="ident">insert</span>(<span class="kw-2">*</span><span class="ident">CREATOR</span>, <span class="ident">test_spender</span>.<span class="ident">clone</span>());
+        <span class="kw">let </span><span class="kw-2">mut </span>all_spenders = HashMap::new();
+        all_spenders.insert(<span class="kw-2">*</span>ADVERTISER, test_spender.clone());
+        all_spenders.insert(<span class="kw-2">*</span>PUBLISHER, test_spender.clone());
+        all_spenders.insert(<span class="kw-2">*</span>PUBLISHER_2, test_spender.clone());
+        all_spenders.insert(<span class="kw-2">*</span>ADVERTISER_2, test_spender.clone());
+        all_spenders.insert(<span class="kw-2">*</span>CREATOR, test_spender.clone());
 
-        <span class="kw">let</span> <span class="ident">first_page_response</span> <span class="op">=</span> <span class="ident">AllSpendersResponse</span> {
-            <span class="ident">spenders</span>: <span class="macro">vec!</span>[
+        <span class="kw">let </span>first_page_response = AllSpendersResponse {
+            spenders: <span class="macro">vec!</span>[
                 (
-                    <span class="kw-2">*</span><span class="ident">ADVERTISER</span>,
-                    <span class="ident">all_spenders</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">ADVERTISER</span>).<span class="ident">unwrap</span>().<span class="ident">to_owned</span>(),
+                    <span class="kw-2">*</span>ADVERTISER,
+                    all_spenders.get(<span class="kw-2">&amp;</span>ADVERTISER).unwrap().to_owned(),
                 ),
                 (
-                    <span class="kw-2">*</span><span class="ident">PUBLISHER</span>,
-                    <span class="ident">all_spenders</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">PUBLISHER</span>).<span class="ident">unwrap</span>().<span class="ident">to_owned</span>(),
-                ),
-            ]
-            .<span class="ident">into_iter</span>()
-            .<span class="ident">collect</span>(),
-            <span class="ident">pagination</span>: <span class="ident">Pagination</span> {
-                <span class="ident">page</span>: <span class="number">0</span>,
-                <span class="ident">total_pages</span>: <span class="number">3</span>,
-            },
-        };
-
-        <span class="kw">let</span> <span class="ident">second_page_response</span> <span class="op">=</span> <span class="ident">AllSpendersResponse</span> {
-            <span class="ident">spenders</span>: <span class="macro">vec!</span>[
-                (
-                    <span class="kw-2">*</span><span class="ident">PUBLISHER_2</span>,
-                    <span class="ident">all_spenders</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">PUBLISHER_2</span>).<span class="ident">unwrap</span>().<span class="ident">to_owned</span>(),
-                ),
-                (
-                    <span class="kw-2">*</span><span class="ident">ADVERTISER_2</span>,
-                    <span class="ident">all_spenders</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">ADVERTISER_2</span>).<span class="ident">unwrap</span>().<span class="ident">to_owned</span>(),
+                    <span class="kw-2">*</span>PUBLISHER,
+                    all_spenders.get(<span class="kw-2">&amp;*</span>PUBLISHER).unwrap().to_owned(),
                 ),
             ]
-            .<span class="ident">into_iter</span>()
-            .<span class="ident">collect</span>(),
-            <span class="ident">pagination</span>: <span class="ident">Pagination</span> {
-                <span class="ident">page</span>: <span class="number">1</span>,
-                <span class="ident">total_pages</span>: <span class="number">3</span>,
+            .into_iter()
+            .collect(),
+            pagination: Pagination {
+                page: <span class="number">0</span>,
+                total_pages: <span class="number">3</span>,
             },
         };
 
-        <span class="kw">let</span> <span class="ident">third_page_response</span> <span class="op">=</span> <span class="ident">AllSpendersResponse</span> {
-            <span class="ident">spenders</span>: <span class="macro">vec!</span>[(<span class="kw-2">*</span><span class="ident">CREATOR</span>, <span class="ident">all_spenders</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">CREATOR</span>).<span class="ident">unwrap</span>().<span class="ident">to_owned</span>())]
-                .<span class="ident">into_iter</span>()
-                .<span class="ident">collect</span>(),
-            <span class="ident">pagination</span>: <span class="ident">Pagination</span> {
-                <span class="ident">page</span>: <span class="number">2</span>,
-                <span class="ident">total_pages</span>: <span class="number">3</span>,
+        <span class="kw">let </span>second_page_response = AllSpendersResponse {
+            spenders: <span class="macro">vec!</span>[
+                (
+                    <span class="kw-2">*</span>PUBLISHER_2,
+                    all_spenders.get(<span class="kw-2">&amp;</span>PUBLISHER_2).unwrap().to_owned(),
+                ),
+                (
+                    <span class="kw-2">*</span>ADVERTISER_2,
+                    all_spenders.get(<span class="kw-2">&amp;</span>ADVERTISER_2).unwrap().to_owned(),
+                ),
+            ]
+            .into_iter()
+            .collect(),
+            pagination: Pagination {
+                page: <span class="number">1</span>,
+                total_pages: <span class="number">3</span>,
             },
         };
 
-        <span class="ident">Mock::given</span>(<span class="ident">method</span>(<span class="string">&quot;GET&quot;</span>))
-            .<span class="ident">and</span>(<span class="ident">path</span>(<span class="macro">format!</span>(
+        <span class="kw">let </span>third_page_response = AllSpendersResponse {
+            spenders: <span class="macro">vec!</span>[(<span class="kw-2">*</span>CREATOR, all_spenders.get(<span class="kw-2">&amp;*</span>CREATOR).unwrap().to_owned())]
+                .into_iter()
+                .collect(),
+            pagination: Pagination {
+                page: <span class="number">2</span>,
+                total_pages: <span class="number">3</span>,
+            },
+        };
+
+        Mock::given(method(<span class="string">&quot;GET&quot;</span>))
+            .and(path(<span class="macro">format!</span>(
                 <span class="string">&quot;/v5/channel/{}/spender/all&quot;</span>,
-                <span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">channel</span>.<span class="ident">id</span>()
+                DUMMY_CAMPAIGN.channel.id()
             )))
-            .<span class="ident">and</span>(<span class="ident">query_param</span>(<span class="string">&quot;page&quot;</span>, <span class="string">&quot;0&quot;</span>))
-            .<span class="ident">respond_with</span>(<span class="ident">ResponseTemplate::new</span>(<span class="number">200</span>).<span class="ident">set_body_json</span>(<span class="kw-2">&amp;</span><span class="ident">first_page_response</span>))
-            .<span class="ident">mount</span>(<span class="kw-2">&amp;</span><span class="ident">server</span>)
+            .and(query_param(<span class="string">&quot;page&quot;</span>, <span class="string">&quot;0&quot;</span>))
+            .respond_with(ResponseTemplate::new(<span class="number">200</span>).set_body_json(<span class="kw-2">&amp;</span>first_page_response))
+            .mount(<span class="kw-2">&amp;</span>server)
             .<span class="kw">await</span>;
 
-        <span class="ident">Mock::given</span>(<span class="ident">method</span>(<span class="string">&quot;GET&quot;</span>))
-            .<span class="ident">and</span>(<span class="ident">path</span>(<span class="macro">format!</span>(
+        Mock::given(method(<span class="string">&quot;GET&quot;</span>))
+            .and(path(<span class="macro">format!</span>(
                 <span class="string">&quot;/v5/channel/{}/spender/all&quot;</span>,
-                <span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">channel</span>.<span class="ident">id</span>()
+                DUMMY_CAMPAIGN.channel.id()
             )))
-            .<span class="ident">and</span>(<span class="ident">query_param</span>(<span class="string">&quot;page&quot;</span>, <span class="string">&quot;1&quot;</span>))
-            .<span class="ident">respond_with</span>(<span class="ident">ResponseTemplate::new</span>(<span class="number">200</span>).<span class="ident">set_body_json</span>(<span class="kw-2">&amp;</span><span class="ident">second_page_response</span>))
-            .<span class="ident">mount</span>(<span class="kw-2">&amp;</span><span class="ident">server</span>)
+            .and(query_param(<span class="string">&quot;page&quot;</span>, <span class="string">&quot;1&quot;</span>))
+            .respond_with(ResponseTemplate::new(<span class="number">200</span>).set_body_json(<span class="kw-2">&amp;</span>second_page_response))
+            .mount(<span class="kw-2">&amp;</span>server)
             .<span class="kw">await</span>;
 
-        <span class="ident">Mock::given</span>(<span class="ident">method</span>(<span class="string">&quot;GET&quot;</span>))
-            .<span class="ident">and</span>(<span class="ident">path</span>(<span class="macro">format!</span>(
+        Mock::given(method(<span class="string">&quot;GET&quot;</span>))
+            .and(path(<span class="macro">format!</span>(
                 <span class="string">&quot;/v5/channel/{}/spender/all&quot;</span>,
-                <span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">channel</span>.<span class="ident">id</span>()
+                DUMMY_CAMPAIGN.channel.id()
             )))
-            .<span class="ident">and</span>(<span class="ident">query_param</span>(<span class="string">&quot;page&quot;</span>, <span class="string">&quot;2&quot;</span>))
-            .<span class="ident">respond_with</span>(<span class="ident">ResponseTemplate::new</span>(<span class="number">200</span>).<span class="ident">set_body_json</span>(<span class="kw-2">&amp;</span><span class="ident">third_page_response</span>))
-            .<span class="ident">mount</span>(<span class="kw-2">&amp;</span><span class="ident">server</span>)
+            .and(query_param(<span class="string">&quot;page&quot;</span>, <span class="string">&quot;2&quot;</span>))
+            .respond_with(ResponseTemplate::new(<span class="number">200</span>).set_body_json(<span class="kw-2">&amp;</span>third_page_response))
+            .mount(<span class="kw-2">&amp;</span>server)
             .<span class="kw">await</span>;
 
-        <span class="kw">let</span> <span class="ident">sentry_url</span> <span class="op">=</span> <span class="ident">ApiUrl::from_str</span>(<span class="kw-2">&amp;</span><span class="ident">server</span>.<span class="ident">uri</span>()).<span class="ident">expect</span>(<span class="string">&quot;Should parse&quot;</span>);
+        <span class="kw">let </span>sentry_url = ApiUrl::from_str(<span class="kw-2">&amp;</span>server.uri()).expect(<span class="string">&quot;Should parse&quot;</span>);
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">validators</span> <span class="op">=</span> <span class="ident">Validators::new</span>();
-        <span class="ident">validators</span>.<span class="ident">insert</span>(
-            <span class="ident">DUMMY_VALIDATOR_LEADER</span>.<span class="ident">id</span>,
-            <span class="ident">Validator</span> {
-                <span class="ident">url</span>: <span class="ident">sentry_url</span>.<span class="ident">clone</span>(),
-                <span class="ident">token</span>: <span class="ident">AuthToken::default</span>(),
+        <span class="kw">let </span><span class="kw-2">mut </span>validators = Validators::new();
+        validators.insert(
+            DUMMY_VALIDATOR_LEADER.id,
+            Validator {
+                url: sentry_url.clone(),
+                token: AuthToken::default(),
             },
         );
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">config</span> <span class="op">=</span> <span class="ident">configuration</span>(<span class="ident">Environment::Development</span>, <span class="prelude-val">None</span>).<span class="ident">expect</span>(<span class="string">&quot;Should get Config&quot;</span>);
-        <span class="ident">config</span>.<span class="ident">spendable_find_limit</span> <span class="op">=</span> <span class="number">2</span>;
+        <span class="kw">let </span><span class="kw-2">mut </span>config = configuration(Environment::Development, <span class="prelude-val">None</span>).expect(<span class="string">&quot;Should get Config&quot;</span>);
+        config.spendable_find_limit = <span class="number">2</span>;
 
-        <span class="kw">let</span> <span class="ident">leader_adapter</span> <span class="op">=</span> <span class="ident">Adapter::with_unlocked</span>(<span class="ident">Dummy::init</span>(<span class="ident">Options</span> {
-            <span class="ident">dummy_identity</span>: <span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="ident">LEADER</span>],
-            <span class="ident">dummy_auth_tokens</span>: <span class="ident">DUMMY_AUTH</span>.<span class="ident">clone</span>(),
-            <span class="ident">dummy_chains</span>: <span class="ident">config</span>.<span class="ident">chains</span>.<span class="ident">values</span>().<span class="ident">cloned</span>().<span class="ident">collect</span>(),
+        <span class="kw">let </span>leader_adapter = Adapter::with_unlocked(Dummy::init(Options {
+            dummy_identity: IDS[<span class="kw-2">&amp;</span>LEADER],
+            dummy_auth_tokens: DUMMY_AUTH.clone(),
+            dummy_chains: config.chains.values().cloned().collect(),
         }));
-        <span class="kw">let</span> <span class="ident">logger</span> <span class="op">=</span> <span class="ident">discard_logger</span>();
+        <span class="kw">let </span>logger = discard_logger();
 
-        <span class="kw">let</span> <span class="ident">channel_context</span> <span class="op">=</span> <span class="ident">config</span>
-            .<span class="ident">find_chain_of</span>(<span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">channel</span>.<span class="ident">token</span>)
-            .<span class="ident">expect</span>(<span class="string">&quot;Should find Dummy campaign token in config&quot;</span>)
-            .<span class="ident">with_channel</span>(<span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">channel</span>);
+        <span class="kw">let </span>channel_context = config
+            .find_chain_of(DUMMY_CAMPAIGN.channel.token)
+            .expect(<span class="string">&quot;Should find Dummy campaign token in config&quot;</span>)
+            .with_channel(DUMMY_CAMPAIGN.channel);
 
-        <span class="kw">let</span> <span class="ident">sentry</span> <span class="op">=</span> <span class="ident">SentryApi::new</span>(<span class="ident">leader_adapter</span>, <span class="ident">logger</span>, <span class="ident">config</span>, <span class="ident">sentry_url</span>)
-            .<span class="ident">expect</span>(<span class="string">&quot;Should build sentry&quot;</span>);
+        <span class="kw">let </span>sentry = SentryApi::new(leader_adapter, logger, config, sentry_url)
+            .expect(<span class="string">&quot;Should build sentry&quot;</span>);
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">sentry</span>
-            .<span class="ident">get_all_spenders</span>(<span class="kw-2">&amp;</span><span class="ident">channel_context</span>)
-            .<span class="kw">await</span>
-            .<span class="ident">expect</span>(<span class="string">&quot;should get response&quot;</span>);
+        <span class="kw">let </span><span class="kw-2">mut </span>res = sentry
+            .get_all_spenders(<span class="kw-2">&amp;</span>channel_context)
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;should get response&quot;</span>);
 
-        <span class="comment">// Checks for page 1</span>
-        <span class="kw">let</span> <span class="ident">res_advertiser</span> <span class="op">=</span> <span class="ident">res</span>.<span class="ident">remove</span>(<span class="kw-2">&amp;</span><span class="ident">ADVERTISER</span>);
-        <span class="kw">let</span> <span class="ident">res_publisher</span> <span class="op">=</span> <span class="ident">res</span>.<span class="ident">remove</span>(<span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">PUBLISHER</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">res_advertiser</span>.<span class="ident">expect</span>(<span class="string">&quot;Should have value&quot;</span>), <span class="ident">test_spender</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">res_publisher</span>.<span class="ident">expect</span>(<span class="string">&quot;Should have value&quot;</span>), <span class="ident">test_spender</span>);
+        <span class="comment">// Checks for page 1
+        </span><span class="kw">let </span>res_advertiser = res.remove(<span class="kw-2">&amp;</span>ADVERTISER);
+        <span class="kw">let </span>res_publisher = res.remove(<span class="kw-2">&amp;*</span>PUBLISHER);
+        <span class="macro">assert_eq!</span>(res_advertiser.expect(<span class="string">&quot;Should have value&quot;</span>), test_spender);
+        <span class="macro">assert_eq!</span>(res_publisher.expect(<span class="string">&quot;Should have value&quot;</span>), test_spender);
 
-        <span class="comment">// Checks for page 2</span>
-        <span class="kw">let</span> <span class="ident">res_publisher2</span> <span class="op">=</span> <span class="ident">res</span>.<span class="ident">remove</span>(<span class="kw-2">&amp;</span><span class="ident">PUBLISHER_2</span>);
-        <span class="kw">let</span> <span class="ident">res_advertiser_2</span> <span class="op">=</span> <span class="ident">res</span>.<span class="ident">remove</span>(<span class="kw-2">&amp;</span><span class="ident">ADVERTISER_2</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">res_publisher2</span>.<span class="ident">expect</span>(<span class="string">&quot;Should have value&quot;</span>), <span class="ident">test_spender</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">res_advertiser_2</span>.<span class="ident">expect</span>(<span class="string">&quot;Should have value&quot;</span>), <span class="ident">test_spender</span>);
+        <span class="comment">// Checks for page 2
+        </span><span class="kw">let </span>res_publisher2 = res.remove(<span class="kw-2">&amp;</span>PUBLISHER_2);
+        <span class="kw">let </span>res_advertiser_2 = res.remove(<span class="kw-2">&amp;</span>ADVERTISER_2);
+        <span class="macro">assert_eq!</span>(res_publisher2.expect(<span class="string">&quot;Should have value&quot;</span>), test_spender);
+        <span class="macro">assert_eq!</span>(res_advertiser_2.expect(<span class="string">&quot;Should have value&quot;</span>), test_spender);
 
-        <span class="comment">// Checks for page 3</span>
-        <span class="kw">let</span> <span class="ident">res_creator</span> <span class="op">=</span> <span class="ident">res</span>.<span class="ident">remove</span>(<span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">CREATOR</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">res_creator</span>.<span class="ident">expect</span>(<span class="string">&quot;Should have value&quot;</span>), <span class="ident">test_spender</span>);
+        <span class="comment">// Checks for page 3
+        </span><span class="kw">let </span>res_creator = res.remove(<span class="kw-2">&amp;*</span>CREATOR);
+        <span class="macro">assert_eq!</span>(res_creator.expect(<span class="string">&quot;Should have value&quot;</span>), test_spender);
 
-        <span class="comment">// There should be no remaining elements</span>
-        <span class="macro">assert_eq!</span>(<span class="ident">res</span>.<span class="ident">len</span>(), <span class="number">0</span>)
+        <span class="comment">// There should be no remaining elements
+        </span><span class="macro">assert_eq!</span>(res.len(), <span class="number">0</span>)
     }
 
-    <span class="attribute">#[<span class="ident">tokio::test</span>]</span>
-    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">test_collecting_and_channels_and_campaigns</span>() {
-        <span class="kw">let</span> <span class="ident">server</span> <span class="op">=</span> <span class="ident">MockServer::start</span>().<span class="kw">await</span>;
-        <span class="kw">let</span> <span class="ident">chain_1_token</span> <span class="op">=</span> <span class="ident">GANACHE_INFO_1</span>.<span class="ident">tokens</span>[<span class="string">&quot;Mocked TOKEN 1&quot;</span>].<span class="ident">address</span>;
+    <span class="attribute">#[tokio::test]</span>
+    <span class="kw">async fn </span>test_collecting_and_channels_and_campaigns() {
+        <span class="kw">let </span>server = MockServer::start().<span class="kw">await</span>;
+        <span class="kw">let </span>chain_1_token = GANACHE_INFO_1.tokens[<span class="string">&quot;Mocked TOKEN 1&quot;</span>].address;
 
-        <span class="comment">// Setting up new leader and a channel and campaign which use it on Ganache #1337</span>
-        <span class="kw">let</span> <span class="ident">dummy_leader_2</span> <span class="op">=</span> <span class="ident">ValidatorDesc</span> {
-            <span class="ident">id</span>: <span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="ident">LEADER_2</span>],
-            <span class="ident">url</span>: <span class="string">&quot;http://tom.adex.network&quot;</span>.<span class="ident">to_string</span>(),
-            <span class="ident">fee</span>: <span class="number">200</span>.<span class="ident">into</span>(),
-            <span class="ident">fee_addr</span>: <span class="prelude-val">None</span>,
+        <span class="comment">// Setting up new leader and a channel and campaign which use it on Ganache #1337
+        </span><span class="kw">let </span>dummy_leader_2 = ValidatorDesc {
+            id: IDS[<span class="kw-2">&amp;</span>LEADER_2],
+            url: <span class="string">&quot;http://tom.adex.network&quot;</span>.to_string(),
+            fee: <span class="number">200</span>.into(),
+            fee_addr: <span class="prelude-val">None</span>,
         };
-        <span class="kw">let</span> <span class="ident">channel_new_leader</span> <span class="op">=</span> <span class="ident">Channel</span> {
-            <span class="ident">leader</span>: <span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">LEADER_2</span>],
-            <span class="ident">follower</span>: <span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">FOLLOWER</span>],
-            <span class="ident">guardian</span>: <span class="kw-2">*</span><span class="ident">GUARDIAN</span>,
-            <span class="ident">token</span>: <span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">channel</span>.<span class="ident">token</span>,
-            <span class="ident">nonce</span>: <span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">channel</span>.<span class="ident">nonce</span>,
+        <span class="kw">let </span>channel_new_leader = Channel {
+            leader: IDS[<span class="kw-2">&amp;*</span>LEADER_2],
+            follower: IDS[<span class="kw-2">&amp;*</span>FOLLOWER],
+            guardian: <span class="kw-2">*</span>GUARDIAN,
+            token: DUMMY_CAMPAIGN.channel.token,
+            nonce: DUMMY_CAMPAIGN.channel.nonce,
         };
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">campaign_new_leader</span> <span class="op">=</span> <span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">clone</span>();
-        <span class="ident">campaign_new_leader</span>.<span class="ident">id</span> <span class="op">=</span> <span class="ident">CampaignId::new</span>();
-        <span class="ident">campaign_new_leader</span>.<span class="ident">channel</span> <span class="op">=</span> <span class="ident">channel_new_leader</span>;
-        <span class="ident">campaign_new_leader</span>.<span class="ident">validators</span> <span class="op">=</span>
-            <span class="ident">CampaignValidators::new</span>((<span class="ident">dummy_leader_2</span>.<span class="ident">clone</span>(), <span class="ident">DUMMY_VALIDATOR_FOLLOWER</span>.<span class="ident">clone</span>()));
+        <span class="kw">let </span><span class="kw-2">mut </span>campaign_new_leader = DUMMY_CAMPAIGN.clone();
+        campaign_new_leader.id = CampaignId::new();
+        campaign_new_leader.channel = channel_new_leader;
+        campaign_new_leader.validators =
+            CampaignValidators::new((dummy_leader_2.clone(), DUMMY_VALIDATOR_FOLLOWER.clone()));
 
-        <span class="comment">// Setting up new follower and a channel and campaign which use it on Ganache #1</span>
-        <span class="kw">let</span> <span class="ident">dummy_follower_2</span> <span class="op">=</span> <span class="ident">ValidatorDesc</span> {
-            <span class="ident">id</span>: <span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="ident">GUARDIAN</span>],
-            <span class="ident">url</span>: <span class="string">&quot;http://jerry.adex.network&quot;</span>.<span class="ident">to_string</span>(),
-            <span class="ident">fee</span>: <span class="number">300</span>.<span class="ident">into</span>(),
-            <span class="ident">fee_addr</span>: <span class="prelude-val">None</span>,
+        <span class="comment">// Setting up new follower and a channel and campaign which use it on Ganache #1
+        </span><span class="kw">let </span>dummy_follower_2 = ValidatorDesc {
+            id: IDS[<span class="kw-2">&amp;</span>GUARDIAN],
+            url: <span class="string">&quot;http://jerry.adex.network&quot;</span>.to_string(),
+            fee: <span class="number">300</span>.into(),
+            fee_addr: <span class="prelude-val">None</span>,
         };
-        <span class="kw">let</span> <span class="ident">channel_new_follower</span> <span class="op">=</span> <span class="ident">Channel</span> {
-            <span class="ident">leader</span>: <span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">LEADER</span>],
-            <span class="ident">follower</span>: <span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">GUARDIAN</span>],
-            <span class="ident">guardian</span>: <span class="kw-2">*</span><span class="ident">GUARDIAN</span>,
-            <span class="ident">token</span>: <span class="ident">chain_1_token</span>,
-            <span class="ident">nonce</span>: <span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">channel</span>.<span class="ident">nonce</span>,
+        <span class="kw">let </span>channel_new_follower = Channel {
+            leader: IDS[<span class="kw-2">&amp;*</span>LEADER],
+            follower: IDS[<span class="kw-2">&amp;*</span>GUARDIAN],
+            guardian: <span class="kw-2">*</span>GUARDIAN,
+            token: chain_1_token,
+            nonce: DUMMY_CAMPAIGN.channel.nonce,
         };
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">campaign_new_follower</span> <span class="op">=</span> <span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">clone</span>();
-        <span class="ident">campaign_new_follower</span>.<span class="ident">id</span> <span class="op">=</span> <span class="ident">CampaignId::new</span>();
-        <span class="ident">campaign_new_follower</span>.<span class="ident">channel</span> <span class="op">=</span> <span class="ident">channel_new_follower</span>;
-        <span class="ident">campaign_new_follower</span>.<span class="ident">validators</span> <span class="op">=</span>
-            <span class="ident">CampaignValidators::new</span>((<span class="ident">DUMMY_VALIDATOR_LEADER</span>.<span class="ident">clone</span>(), <span class="ident">dummy_follower_2</span>.<span class="ident">clone</span>()));
+        <span class="kw">let </span><span class="kw-2">mut </span>campaign_new_follower = DUMMY_CAMPAIGN.clone();
+        campaign_new_follower.id = CampaignId::new();
+        campaign_new_follower.channel = channel_new_follower;
+        campaign_new_follower.validators =
+            CampaignValidators::new((DUMMY_VALIDATOR_LEADER.clone(), dummy_follower_2.clone()));
 
-        <span class="comment">// Setting up a channel and campaign which use the new leader and follower on Ganache #1</span>
-        <span class="kw">let</span> <span class="ident">channel_new_leader_and_follower</span> <span class="op">=</span> <span class="ident">Channel</span> {
-            <span class="ident">leader</span>: <span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">LEADER_2</span>],
-            <span class="ident">follower</span>: <span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">GUARDIAN</span>],
-            <span class="ident">guardian</span>: <span class="kw-2">*</span><span class="ident">GUARDIAN</span>,
-            <span class="ident">token</span>: <span class="ident">chain_1_token</span>,
-            <span class="ident">nonce</span>: <span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">channel</span>.<span class="ident">nonce</span>,
+        <span class="comment">// Setting up a channel and campaign which use the new leader and follower on Ganache #1
+        </span><span class="kw">let </span>channel_new_leader_and_follower = Channel {
+            leader: IDS[<span class="kw-2">&amp;*</span>LEADER_2],
+            follower: IDS[<span class="kw-2">&amp;*</span>GUARDIAN],
+            guardian: <span class="kw-2">*</span>GUARDIAN,
+            token: chain_1_token,
+            nonce: DUMMY_CAMPAIGN.channel.nonce,
         };
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">campaign_new_leader_and_follower</span> <span class="op">=</span> <span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">clone</span>();
-        <span class="ident">campaign_new_leader_and_follower</span>.<span class="ident">id</span> <span class="op">=</span> <span class="ident">CampaignId::new</span>();
-        <span class="ident">campaign_new_leader_and_follower</span>.<span class="ident">channel</span> <span class="op">=</span> <span class="ident">channel_new_leader_and_follower</span>;
-        <span class="ident">campaign_new_leader_and_follower</span>.<span class="ident">validators</span> <span class="op">=</span>
-            <span class="ident">CampaignValidators::new</span>((<span class="ident">dummy_leader_2</span>.<span class="ident">clone</span>(), <span class="ident">dummy_follower_2</span>.<span class="ident">clone</span>()));
+        <span class="kw">let </span><span class="kw-2">mut </span>campaign_new_leader_and_follower = DUMMY_CAMPAIGN.clone();
+        campaign_new_leader_and_follower.id = CampaignId::new();
+        campaign_new_leader_and_follower.channel = channel_new_leader_and_follower;
+        campaign_new_leader_and_follower.validators =
+            CampaignValidators::new((dummy_leader_2.clone(), dummy_follower_2.clone()));
 
-        <span class="kw">let</span> <span class="ident">sentry_url</span> <span class="op">=</span> <span class="ident">ApiUrl::from_str</span>(<span class="kw-2">&amp;</span><span class="ident">server</span>.<span class="ident">uri</span>()).<span class="ident">expect</span>(<span class="string">&quot;Should parse&quot;</span>);
+        <span class="kw">let </span>sentry_url = ApiUrl::from_str(<span class="kw-2">&amp;</span>server.uri()).expect(<span class="string">&quot;Should parse&quot;</span>);
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">config</span> <span class="op">=</span> <span class="ident">GANACHE_CONFIG</span>.<span class="ident">clone</span>();
-        <span class="ident">config</span>.<span class="ident">campaigns_find_limit</span> <span class="op">=</span> <span class="number">2</span>;
+        <span class="kw">let </span><span class="kw-2">mut </span>config = GANACHE_CONFIG.clone();
+        config.campaigns_find_limit = <span class="number">2</span>;
 
-        <span class="comment">// Initializing SentryApi instance</span>
-        <span class="kw">let</span> <span class="ident">leader_sentry</span> <span class="op">=</span> <span class="ident">setup_dummy_sentry</span>(<span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="ident">LEADER</span>], <span class="ident">config</span>.<span class="ident">clone</span>(), <span class="ident">sentry_url</span>.<span class="ident">clone</span>());
+        <span class="comment">// Initializing SentryApi instance
+        </span><span class="kw">let </span>leader_sentry = setup_dummy_sentry(IDS[<span class="kw-2">&amp;</span>LEADER], config.clone(), sentry_url.clone());
 
-        <span class="comment">// Getting Wiremock to return the campaigns when called</span>
-        <span class="kw">let</span> <span class="ident">first_page_response</span> <span class="op">=</span> <span class="ident">CampaignListResponse</span> {
-            <span class="ident">campaigns</span>: <span class="macro">vec!</span>[<span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">clone</span>(), <span class="ident">campaign_new_leader</span>.<span class="ident">clone</span>()],
-            <span class="ident">pagination</span>: <span class="ident">Pagination</span> {
-                <span class="ident">page</span>: <span class="number">0</span>,
-                <span class="ident">total_pages</span>: <span class="number">2</span>,
+        <span class="comment">// Getting Wiremock to return the campaigns when called
+        </span><span class="kw">let </span>first_page_response = CampaignListResponse {
+            campaigns: <span class="macro">vec!</span>[DUMMY_CAMPAIGN.clone(), campaign_new_leader.clone()],
+            pagination: Pagination {
+                page: <span class="number">0</span>,
+                total_pages: <span class="number">2</span>,
             },
         };
 
-        <span class="kw">let</span> <span class="ident">second_page_response</span> <span class="op">=</span> <span class="ident">CampaignListResponse</span> {
-            <span class="ident">campaigns</span>: <span class="macro">vec!</span>[
-                <span class="ident">campaign_new_follower</span>.<span class="ident">clone</span>(),
-                <span class="ident">campaign_new_leader_and_follower</span>.<span class="ident">clone</span>(),
+        <span class="kw">let </span>second_page_response = CampaignListResponse {
+            campaigns: <span class="macro">vec!</span>[
+                campaign_new_follower.clone(),
+                campaign_new_leader_and_follower.clone(),
             ],
-            <span class="ident">pagination</span>: <span class="ident">Pagination</span> {
-                <span class="ident">page</span>: <span class="number">1</span>,
-                <span class="ident">total_pages</span>: <span class="number">2</span>,
+            pagination: Pagination {
+                page: <span class="number">1</span>,
+                total_pages: <span class="number">2</span>,
             },
         };
 
-        <span class="ident">Mock::given</span>(<span class="ident">method</span>(<span class="string">&quot;GET&quot;</span>))
-            .<span class="ident">and</span>(<span class="ident">path</span>(<span class="string">&quot;/v5/campaign/list&quot;</span>))
-            .<span class="ident">and</span>(<span class="ident">query_param</span>(<span class="string">&quot;page&quot;</span>, <span class="string">&quot;0&quot;</span>))
-            .<span class="ident">respond_with</span>(<span class="ident">ResponseTemplate::new</span>(<span class="number">200</span>).<span class="ident">set_body_json</span>(<span class="kw-2">&amp;</span><span class="ident">first_page_response</span>))
-            .<span class="ident">mount</span>(<span class="kw-2">&amp;</span><span class="ident">server</span>)
+        Mock::given(method(<span class="string">&quot;GET&quot;</span>))
+            .and(path(<span class="string">&quot;/v5/campaign/list&quot;</span>))
+            .and(query_param(<span class="string">&quot;page&quot;</span>, <span class="string">&quot;0&quot;</span>))
+            .respond_with(ResponseTemplate::new(<span class="number">200</span>).set_body_json(<span class="kw-2">&amp;</span>first_page_response))
+            .mount(<span class="kw-2">&amp;</span>server)
             .<span class="kw">await</span>;
 
-        <span class="ident">Mock::given</span>(<span class="ident">method</span>(<span class="string">&quot;GET&quot;</span>))
-            .<span class="ident">and</span>(<span class="ident">path</span>(<span class="string">&quot;/v5/campaign/list&quot;</span>))
-            .<span class="ident">and</span>(<span class="ident">query_param</span>(<span class="string">&quot;page&quot;</span>, <span class="string">&quot;1&quot;</span>))
-            .<span class="ident">respond_with</span>(<span class="ident">ResponseTemplate::new</span>(<span class="number">200</span>).<span class="ident">set_body_json</span>(<span class="kw-2">&amp;</span><span class="ident">second_page_response</span>))
-            .<span class="ident">mount</span>(<span class="kw-2">&amp;</span><span class="ident">server</span>)
+        Mock::given(method(<span class="string">&quot;GET&quot;</span>))
+            .and(path(<span class="string">&quot;/v5/campaign/list&quot;</span>))
+            .and(query_param(<span class="string">&quot;page&quot;</span>, <span class="string">&quot;1&quot;</span>))
+            .respond_with(ResponseTemplate::new(<span class="number">200</span>).set_body_json(<span class="kw-2">&amp;</span>second_page_response))
+            .mount(<span class="kw-2">&amp;</span>server)
             .<span class="kw">await</span>;
 
-        <span class="comment">// Testing collect_channels()</span>
-        {
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">expected_channels</span>: <span class="ident">HashSet</span><span class="op">&lt;</span><span class="ident">ChainOf</span><span class="op">&lt;</span><span class="ident">Channel</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">HashSet::new</span>();
-            <span class="ident">expected_channels</span>.<span class="ident">insert</span>(
-                <span class="ident">config</span>
-                    .<span class="ident">find_chain_of</span>(<span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">channel</span>.<span class="ident">token</span>)
-                    .<span class="ident">expect</span>(<span class="string">&quot;Should find channel token in config&quot;</span>)
-                    .<span class="ident">with_channel</span>(<span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">channel</span>),
+        <span class="comment">// Testing collect_channels()
+        </span>{
+            <span class="kw">let </span><span class="kw-2">mut </span>expected_channels: HashSet&lt;ChainOf&lt;Channel&gt;&gt; = HashSet::new();
+            expected_channels.insert(
+                config
+                    .find_chain_of(DUMMY_CAMPAIGN.channel.token)
+                    .expect(<span class="string">&quot;Should find channel token in config&quot;</span>)
+                    .with_channel(DUMMY_CAMPAIGN.channel),
             );
-            <span class="ident">expected_channels</span>.<span class="ident">insert</span>(
-                <span class="ident">config</span>
-                    .<span class="ident">find_chain_of</span>(<span class="ident">channel_new_leader</span>.<span class="ident">token</span>)
-                    .<span class="ident">expect</span>(<span class="string">&quot;Should find channel token in config&quot;</span>)
-                    .<span class="ident">with_channel</span>(<span class="ident">channel_new_leader</span>),
+            expected_channels.insert(
+                config
+                    .find_chain_of(channel_new_leader.token)
+                    .expect(<span class="string">&quot;Should find channel token in config&quot;</span>)
+                    .with_channel(channel_new_leader),
             );
-            <span class="ident">expected_channels</span>.<span class="ident">insert</span>(
-                <span class="ident">config</span>
-                    .<span class="ident">find_chain_of</span>(<span class="ident">channel_new_follower</span>.<span class="ident">token</span>)
-                    .<span class="ident">expect</span>(<span class="string">&quot;Should find channel token in config&quot;</span>)
-                    .<span class="ident">with_channel</span>(<span class="ident">channel_new_follower</span>),
+            expected_channels.insert(
+                config
+                    .find_chain_of(channel_new_follower.token)
+                    .expect(<span class="string">&quot;Should find channel token in config&quot;</span>)
+                    .with_channel(channel_new_follower),
             );
-            <span class="ident">expected_channels</span>.<span class="ident">insert</span>(
-                <span class="ident">config</span>
-                    .<span class="ident">find_chain_of</span>(<span class="ident">channel_new_leader_and_follower</span>.<span class="ident">token</span>)
-                    .<span class="ident">expect</span>(<span class="string">&quot;Should find channel token in config&quot;</span>)
-                    .<span class="ident">with_channel</span>(<span class="ident">channel_new_leader_and_follower</span>),
+            expected_channels.insert(
+                config
+                    .find_chain_of(channel_new_leader_and_follower.token)
+                    .expect(<span class="string">&quot;Should find channel token in config&quot;</span>)
+                    .with_channel(channel_new_leader_and_follower),
             );
 
-            <span class="kw">let</span> (<span class="ident">channels</span>, <span class="ident">chains_validators</span>) <span class="op">=</span> <span class="ident">leader_sentry</span>
-                .<span class="ident">collect_channels</span>()
-                .<span class="kw">await</span>
-                .<span class="ident">expect</span>(<span class="string">&quot;Should collect channels&quot;</span>);
-            <span class="macro">assert_eq!</span>(<span class="ident">channels</span>, <span class="ident">expected_channels</span>, <span class="string">&quot;Correct channels are returned&quot;</span>);
+            <span class="kw">let </span>(channels, chains_validators) = leader_sentry
+                .collect_channels()
+                .<span class="kw">await
+                </span>.expect(<span class="string">&quot;Should collect channels&quot;</span>);
+            <span class="macro">assert_eq!</span>(channels, expected_channels, <span class="string">&quot;Correct channels are returned&quot;</span>);
 
-            <span class="kw">let</span> <span class="ident">chains_validators_1337</span> <span class="op">=</span> <span class="ident">chains_validators</span>
-                .<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">ChainId::from</span>(<span class="number">1337</span>))
-                .<span class="ident">expect</span>(<span class="string">&quot;There should be validators for #1337 chain&quot;</span>);
+            <span class="kw">let </span>chains_validators_1337 = chains_validators
+                .get(<span class="kw-2">&amp;</span>ChainId::from(<span class="number">1337</span>))
+                .expect(<span class="string">&quot;There should be validators for #1337 chain&quot;</span>);
             <span class="macro">assert!</span>(
-                <span class="ident">chains_validators_1337</span>.<span class="ident">contains_key</span>(<span class="kw-2">&amp;</span><span class="ident">DUMMY_VALIDATOR_LEADER</span>.<span class="ident">id</span>),
-                <span class="string">&quot;Dummy leader is included&quot;</span>
-            );
+                chains_validators_1337.contains_key(<span class="kw-2">&amp;</span>DUMMY_VALIDATOR_LEADER.id),
+                <span class="string">&quot;Dummy leader is included&quot;
+            </span>);
             <span class="macro">assert!</span>(
-                <span class="ident">chains_validators_1337</span>.<span class="ident">contains_key</span>(<span class="kw-2">&amp;</span><span class="ident">DUMMY_VALIDATOR_FOLLOWER</span>.<span class="ident">id</span>),
-                <span class="string">&quot;Dummy follower is included&quot;</span>
-            );
+                chains_validators_1337.contains_key(<span class="kw-2">&amp;</span>DUMMY_VALIDATOR_FOLLOWER.id),
+                <span class="string">&quot;Dummy follower is included&quot;
+            </span>);
             <span class="macro">assert!</span>(
-                <span class="ident">chains_validators_1337</span>.<span class="ident">contains_key</span>(<span class="kw-2">&amp;</span><span class="ident">dummy_leader_2</span>.<span class="ident">id</span>),
-                <span class="string">&quot;Dummy leader 2 is included&quot;</span>
-            );
+                chains_validators_1337.contains_key(<span class="kw-2">&amp;</span>dummy_leader_2.id),
+                <span class="string">&quot;Dummy leader 2 is included&quot;
+            </span>);
             <span class="macro">assert_eq!</span>(
-                <span class="ident">chains_validators_1337</span>.<span class="ident">keys</span>().<span class="ident">len</span>(),
+                chains_validators_1337.keys().len(),
                 <span class="number">3</span>,
-                <span class="string">&quot;There are no extra validators returned&quot;</span>
-            );
+                <span class="string">&quot;There are no extra validators returned&quot;
+            </span>);
 
-            <span class="kw">let</span> <span class="ident">chains_validators_1</span> <span class="op">=</span> <span class="ident">chains_validators</span>
-                .<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">ChainId::from</span>(<span class="number">1</span>))
-                .<span class="ident">expect</span>(<span class="string">&quot;There should be validators for #1 chain&quot;</span>);
+            <span class="kw">let </span>chains_validators_1 = chains_validators
+                .get(<span class="kw-2">&amp;</span>ChainId::from(<span class="number">1</span>))
+                .expect(<span class="string">&quot;There should be validators for #1 chain&quot;</span>);
             <span class="macro">assert!</span>(
-                <span class="ident">chains_validators_1</span>.<span class="ident">contains_key</span>(<span class="kw-2">&amp;</span><span class="ident">DUMMY_VALIDATOR_LEADER</span>.<span class="ident">id</span>),
-                <span class="string">&quot;Dummy leader is returned&quot;</span>
-            );
+                chains_validators_1.contains_key(<span class="kw-2">&amp;</span>DUMMY_VALIDATOR_LEADER.id),
+                <span class="string">&quot;Dummy leader is returned&quot;
+            </span>);
             <span class="macro">assert!</span>(
-                <span class="ident">chains_validators_1</span>.<span class="ident">contains_key</span>(<span class="kw-2">&amp;</span><span class="ident">dummy_follower_2</span>.<span class="ident">id</span>),
-                <span class="string">&quot;Dummy follower 2 is returned&quot;</span>
-            );
+                chains_validators_1.contains_key(<span class="kw-2">&amp;</span>dummy_follower_2.id),
+                <span class="string">&quot;Dummy follower 2 is returned&quot;
+            </span>);
             <span class="macro">assert!</span>(
-                <span class="ident">chains_validators_1</span>.<span class="ident">contains_key</span>(<span class="kw-2">&amp;</span><span class="ident">dummy_leader_2</span>.<span class="ident">id</span>),
-                <span class="string">&quot;Dummy leader 2 is returned&quot;</span>
-            );
+                chains_validators_1.contains_key(<span class="kw-2">&amp;</span>dummy_leader_2.id),
+                <span class="string">&quot;Dummy leader 2 is returned&quot;
+            </span>);
             <span class="macro">assert_eq!</span>(
-                <span class="ident">chains_validators_1</span>.<span class="ident">keys</span>().<span class="ident">len</span>(),
+                chains_validators_1.keys().len(),
                 <span class="number">3</span>,
-                <span class="string">&quot;There are no extra validators returned&quot;</span>
-            );
+                <span class="string">&quot;There are no extra validators returned&quot;
+            </span>);
         }
-        <span class="comment">// Calls all_campaigns() to see if all campaigns are returned</span>
-        <span class="comment">// We test for query parameters in campaign_list() tests</span>
-        {
-            <span class="kw">let</span> <span class="ident">all_campaigns</span> <span class="op">=</span> <span class="macro">vec!</span>[
-                <span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">clone</span>(),
-                <span class="ident">campaign_new_leader</span>.<span class="ident">clone</span>(),
-                <span class="ident">campaign_new_follower</span>.<span class="ident">clone</span>(),
-                <span class="ident">campaign_new_leader_and_follower</span>.<span class="ident">clone</span>(),
+        <span class="comment">// Calls all_campaigns() to see if all campaigns are returned
+        // We test for query parameters in campaign_list() tests
+        </span>{
+            <span class="kw">let </span>all_campaigns = <span class="macro">vec!</span>[
+                DUMMY_CAMPAIGN.clone(),
+                campaign_new_leader.clone(),
+                campaign_new_follower.clone(),
+                campaign_new_leader_and_follower.clone(),
             ];
-            <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span>
-                <span class="ident">campaigns::all_campaigns</span>(<span class="ident">leader_sentry</span>.<span class="ident">client</span>.<span class="ident">clone</span>(), <span class="kw-2">&amp;</span><span class="ident">sentry_url</span>.<span class="ident">clone</span>(), <span class="prelude-val">None</span>)
-                    .<span class="kw">await</span>
-                    .<span class="ident">expect</span>(<span class="string">&quot;Should get all campaigns&quot;</span>);
-            <span class="macro">assert_eq!</span>(<span class="ident">res</span>, <span class="ident">all_campaigns</span>, <span class="string">&quot;All campaigns are present&quot;</span>);
+            <span class="kw">let </span>res =
+                campaigns::all_campaigns(leader_sentry.client.clone(), <span class="kw-2">&amp;</span>sentry_url.clone(), <span class="prelude-val">None</span>)
+                    .<span class="kw">await
+                    </span>.expect(<span class="string">&quot;Should get all campaigns&quot;</span>);
+            <span class="macro">assert_eq!</span>(res, all_campaigns, <span class="string">&quot;All campaigns are present&quot;</span>);
         }
-        <span class="comment">// test all_channels</span>
-        {
-            <span class="comment">// Get Wiremock to return the channels</span>
-            <span class="kw">let</span> <span class="ident">first_page_response</span> <span class="op">=</span> <span class="ident">ChannelListResponse</span> {
-                <span class="ident">channels</span>: <span class="macro">vec!</span>[<span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">channel</span>, <span class="ident">channel_new_leader</span>],
-                <span class="ident">pagination</span>: <span class="ident">Pagination</span> {
-                    <span class="ident">page</span>: <span class="number">0</span>,
-                    <span class="ident">total_pages</span>: <span class="number">2</span>,
+        <span class="comment">// test all_channels
+        </span>{
+            <span class="comment">// Get Wiremock to return the channels
+            </span><span class="kw">let </span>first_page_response = ChannelListResponse {
+                channels: <span class="macro">vec!</span>[DUMMY_CAMPAIGN.channel, channel_new_leader],
+                pagination: Pagination {
+                    page: <span class="number">0</span>,
+                    total_pages: <span class="number">2</span>,
                 },
             };
 
-            <span class="kw">let</span> <span class="ident">second_page_response</span> <span class="op">=</span> <span class="ident">ChannelListResponse</span> {
-                <span class="ident">channels</span>: <span class="macro">vec!</span>[<span class="ident">channel_new_follower</span>, <span class="ident">channel_new_leader_and_follower</span>],
-                <span class="ident">pagination</span>: <span class="ident">Pagination</span> {
-                    <span class="ident">page</span>: <span class="number">1</span>,
-                    <span class="ident">total_pages</span>: <span class="number">2</span>,
+            <span class="kw">let </span>second_page_response = ChannelListResponse {
+                channels: <span class="macro">vec!</span>[channel_new_follower, channel_new_leader_and_follower],
+                pagination: Pagination {
+                    page: <span class="number">1</span>,
+                    total_pages: <span class="number">2</span>,
                 },
             };
 
-            <span class="ident">Mock::given</span>(<span class="ident">method</span>(<span class="string">&quot;GET&quot;</span>))
-                .<span class="ident">and</span>(<span class="ident">path</span>(<span class="string">&quot;/v5/channel/list&quot;</span>))
-                .<span class="ident">and</span>(<span class="ident">query_param</span>(<span class="string">&quot;page&quot;</span>, <span class="string">&quot;0&quot;</span>))
-                .<span class="ident">respond_with</span>(<span class="ident">ResponseTemplate::new</span>(<span class="number">200</span>).<span class="ident">set_body_json</span>(<span class="kw-2">&amp;</span><span class="ident">first_page_response</span>))
-                .<span class="ident">mount</span>(<span class="kw-2">&amp;</span><span class="ident">server</span>)
+            Mock::given(method(<span class="string">&quot;GET&quot;</span>))
+                .and(path(<span class="string">&quot;/v5/channel/list&quot;</span>))
+                .and(query_param(<span class="string">&quot;page&quot;</span>, <span class="string">&quot;0&quot;</span>))
+                .respond_with(ResponseTemplate::new(<span class="number">200</span>).set_body_json(<span class="kw-2">&amp;</span>first_page_response))
+                .mount(<span class="kw-2">&amp;</span>server)
                 .<span class="kw">await</span>;
 
-            <span class="ident">Mock::given</span>(<span class="ident">method</span>(<span class="string">&quot;GET&quot;</span>))
-                .<span class="ident">and</span>(<span class="ident">path</span>(<span class="string">&quot;/v5/channel/list&quot;</span>))
-                .<span class="ident">and</span>(<span class="ident">query_param</span>(<span class="string">&quot;page&quot;</span>, <span class="string">&quot;1&quot;</span>))
-                .<span class="ident">respond_with</span>(<span class="ident">ResponseTemplate::new</span>(<span class="number">200</span>).<span class="ident">set_body_json</span>(<span class="kw-2">&amp;</span><span class="ident">second_page_response</span>))
-                .<span class="ident">mount</span>(<span class="kw-2">&amp;</span><span class="ident">server</span>)
+            Mock::given(method(<span class="string">&quot;GET&quot;</span>))
+                .and(path(<span class="string">&quot;/v5/channel/list&quot;</span>))
+                .and(query_param(<span class="string">&quot;page&quot;</span>, <span class="string">&quot;1&quot;</span>))
+                .respond_with(ResponseTemplate::new(<span class="number">200</span>).set_body_json(<span class="kw-2">&amp;</span>second_page_response))
+                .mount(<span class="kw-2">&amp;</span>server)
                 .<span class="kw">await</span>;
-            <span class="kw">let</span> <span class="ident">all_channels</span> <span class="op">=</span> <span class="macro">vec!</span>[
-                <span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">channel</span>,
-                <span class="ident">channel_new_leader</span>,
-                <span class="ident">channel_new_follower</span>,
-                <span class="ident">channel_new_leader_and_follower</span>,
+            <span class="kw">let </span>all_channels = <span class="macro">vec!</span>[
+                DUMMY_CAMPAIGN.channel,
+                channel_new_leader,
+                channel_new_follower,
+                channel_new_leader_and_follower,
             ];
-            <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">channels::all_channels</span>(
-                <span class="ident">leader_sentry</span>.<span class="ident">client</span>.<span class="ident">clone</span>(),
-                <span class="kw-2">&amp;</span><span class="ident">sentry_url</span>.<span class="ident">clone</span>(),
-                <span class="ident">DUMMY_VALIDATOR_LEADER</span>.<span class="ident">id</span>,
+            <span class="kw">let </span>res = channels::all_channels(
+                leader_sentry.client.clone(),
+                <span class="kw-2">&amp;</span>sentry_url.clone(),
+                DUMMY_VALIDATOR_LEADER.id,
             )
-            .<span class="kw">await</span>
-            .<span class="ident">expect</span>(<span class="string">&quot;Should get channels&quot;</span>);
-            <span class="macro">assert_eq!</span>(<span class="ident">all_channels</span>, <span class="ident">res</span>, <span class="string">&quot;All channels are present&quot;</span>);
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;Should get channels&quot;</span>);
+            <span class="macro">assert_eq!</span>(all_channels, res, <span class="string">&quot;All channels are present&quot;</span>);
         }
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="validator_worker" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (20ffea693 2022-08-11)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="validator_worker" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>

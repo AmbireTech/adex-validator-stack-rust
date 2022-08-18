@@ -76,83 +76,83 @@
 <span id="76">76</span>
 <span id="77">77</span>
 <span id="78">78</span>
-</pre><pre class="rust"><code><span class="doccomment">//! The Client traits that define the actions for each state.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! - [`Locked`]</span>
-<span class="doccomment">//! - [`Unlocked`]</span>
-<span class="doccomment">//! - [`Unlockable`]</span>
+</pre><pre class="rust"><code><span class="doccomment">//! The Client traits that define the actions for each state.
+//!
+//! - [`Locked`]
+//! - [`Unlocked`]
+//! - [`Unlockable`]
 
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::primitives</span>::{<span class="ident">Deposit</span>, <span class="ident">Session</span>};
-<span class="kw">use</span> <span class="ident">async_trait::async_trait</span>;
-<span class="kw">use</span> <span class="ident">primitives</span>::{<span class="ident">Address</span>, <span class="ident">ChainId</span>, <span class="ident">ChainOf</span>, <span class="ident">Channel</span>, <span class="ident">ValidatorId</span>};
+</span><span class="kw">use </span><span class="kw">crate</span>::primitives::{Deposit, Session};
+<span class="kw">use </span>async_trait::async_trait;
+<span class="kw">use </span>primitives::{Address, ChainId, ChainOf, Channel, ValidatorId};
 
-<span class="attribute">#[<span class="ident">async_trait</span>]</span>
-<span class="doccomment">/// Available methods for Locked clients.</span>
-<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">Locked</span>: <span class="ident">Sync</span> <span class="op">+</span> <span class="ident">Send</span> {
-    <span class="kw">type</span> <span class="ident">Error</span>: <span class="ident">std::error::Error</span> <span class="op">+</span> <span class="ident">Into</span><span class="op">&lt;</span><span class="ident"><span class="kw">crate</span>::Error</span><span class="op">&gt;</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>;
+<span class="attribute">#[async_trait]</span>
+<span class="doccomment">/// Available methods for Locked clients.
+</span><span class="kw">pub trait </span>Locked: Sync + Send {
+    <span class="kw">type </span>Error: std::error::Error + Into&lt;<span class="kw">crate</span>::Error&gt; + <span class="lifetime">&#39;static</span>;
 
-    <span class="doccomment">/// Get Adapter whoami</span>
-    <span class="kw">fn</span> <span class="ident">whoami</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">ValidatorId</span>;
+    <span class="doccomment">/// Get Adapter whoami
+    </span><span class="kw">fn </span>whoami(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; ValidatorId;
 
-    <span class="doccomment">/// Verify, based on the `signature` &amp; `state_root`, that the `signer` is the same.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// `signature` should be a `0x` prefixed hex string.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// `state_root` should be a hex string, with no `0x` prefix.</span>
-    <span class="kw">fn</span> <span class="ident">verify</span>(
+    <span class="doccomment">/// Verify, based on the `signature` &amp; `state_root`, that the `signer` is the same.
+    ///
+    /// `signature` should be a `0x` prefixed hex string.
+    ///
+    /// `state_root` should be a hex string, with no `0x` prefix.
+    </span><span class="kw">fn </span>verify(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">signer</span>: <span class="ident">ValidatorId</span>,
-        <span class="ident">state_root</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>,
-        <span class="ident">signature</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>,
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">bool</span>, <span class="ident"><span class="self">Self</span>::Error</span><span class="op">&gt;</span>;
+        signer: ValidatorId,
+        state_root: <span class="kw-2">&amp;</span>str,
+        signature: <span class="kw-2">&amp;</span>str,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;bool, <span class="self">Self</span>::Error&gt;;
 
-    <span class="doccomment">/// Creates a `Session` from a provided Token by calling the Contract.</span>
-    <span class="doccomment">/// Does **not** cache the (`Token`, `Session`) pair.</span>
-    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">session_from_token</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">token</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Session</span>, <span class="ident"><span class="self">Self</span>::Error</span><span class="op">&gt;</span>;
+    <span class="doccomment">/// Creates a `Session` from a provided Token by calling the Contract.
+    /// Does **not** cache the (`Token`, `Session`) pair.
+    </span><span class="kw">async fn </span>session_from_token(<span class="kw-2">&amp;</span><span class="self">self</span>, token: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Result</span>&lt;Session, <span class="self">Self</span>::Error&gt;;
 
-    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">get_deposit</span>(
+    <span class="kw">async fn </span>get_deposit(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">channel_context</span>: <span class="kw-2">&amp;</span><span class="ident">ChainOf</span><span class="op">&lt;</span><span class="ident">Channel</span><span class="op">&gt;</span>,
-        <span class="ident">depositor_address</span>: <span class="ident">Address</span>,
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Deposit</span>, <span class="ident"><span class="self">Self</span>::Error</span><span class="op">&gt;</span>;
+        channel_context: <span class="kw-2">&amp;</span>ChainOf&lt;Channel&gt;,
+        depositor_address: Address,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;Deposit, <span class="self">Self</span>::Error&gt;;
 
-    <span class="comment">// fn unlock(</span>
-    <span class="comment">//     &amp;self,</span>
-    <span class="comment">// ) -&gt; Result&lt;</span>
-    <span class="comment">//     &lt;Self as Unlockable&gt;::Unlocked,</span>
-    <span class="comment">//     &lt;&lt;Self as Unlockable&gt;::Unlocked as Locked&gt;::Error,</span>
-    <span class="comment">// &gt;</span>
-    <span class="comment">// where</span>
-    <span class="comment">//     Self: Unlockable,</span>
-    <span class="comment">// {</span>
-    <span class="comment">//     &lt;Self as Unlockable&gt;::unlock(self)</span>
-    <span class="comment">// }</span>
+    <span class="comment">// fn unlock(
+    //     &amp;self,
+    // ) -&gt; Result&lt;
+    //     &lt;Self as Unlockable&gt;::Unlocked,
+    //     &lt;&lt;Self as Unlockable&gt;::Unlocked as Locked&gt;::Error,
+    // &gt;
+    // where
+    //     Self: Unlockable,
+    // {
+    //     &lt;Self as Unlockable&gt;::unlock(self)
+    // }
+</span>}
+
+<span class="doccomment">/// Available methods for Unlocked clients.
+///
+/// Unlocked clients should also implement [`Locked`].
+</span><span class="attribute">#[async_trait]</span>
+<span class="kw">pub trait </span>Unlocked: Locked {
+    <span class="comment">// requires Unlocked
+    </span><span class="kw">fn </span>sign(<span class="kw-2">&amp;</span><span class="self">self</span>, state_root: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Result</span>&lt;String, <span class="self">Self</span>::Error&gt;;
+
+    <span class="comment">// requires Unlocked
+    </span><span class="kw">fn </span>get_auth(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        for_chain: ChainId,
+        intended_for: ValidatorId,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;String, <span class="self">Self</span>::Error&gt;;
 }
 
-<span class="doccomment">/// Available methods for Unlocked clients.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Unlocked clients should also implement [`Locked`].</span>
-<span class="attribute">#[<span class="ident">async_trait</span>]</span>
-<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">Unlocked</span>: <span class="ident">Locked</span> {
-    <span class="comment">// requires Unlocked</span>
-    <span class="kw">fn</span> <span class="ident">sign</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">state_root</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">String</span>, <span class="ident"><span class="self">Self</span>::Error</span><span class="op">&gt;</span>;
+<span class="doccomment">/// A client that can be `unlock()`ed
+/// and implements both [`Locked`] &amp; [`Unlocked`].
+///
+/// **Note:** A possibly expensive operation as it might result in cloning
+</span><span class="kw">pub trait </span>Unlockable {
+    <span class="kw">type </span>Unlocked: Unlocked;
 
-    <span class="comment">// requires Unlocked</span>
-    <span class="kw">fn</span> <span class="ident">get_auth</span>(
-        <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">for_chain</span>: <span class="ident">ChainId</span>,
-        <span class="ident">intended_for</span>: <span class="ident">ValidatorId</span>,
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">String</span>, <span class="ident"><span class="self">Self</span>::Error</span><span class="op">&gt;</span>;
-}
-
-<span class="doccomment">/// A client that can be `unlock()`ed</span>
-<span class="doccomment">/// and implements both [`Locked`] &amp; [`Unlocked`].</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// **Note:** A possibly expensive operation as it might result in cloning</span>
-<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">Unlockable</span> {
-    <span class="kw">type</span> <span class="ident">Unlocked</span>: <span class="ident">Unlocked</span>;
-
-    <span class="kw">fn</span> <span class="ident">unlock</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::Unlocked</span>, <span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::Unlocked</span> <span class="kw">as</span> <span class="ident">Locked</span><span class="op">&gt;</span><span class="ident">::Error</span><span class="op">&gt;</span>;
+    <span class="kw">fn </span>unlock(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>::Unlocked, &lt;<span class="self">Self</span>::Unlocked <span class="kw">as </span>Locked&gt;::Error&gt;;
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="adapter" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (20ffea693 2022-08-11)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="adapter" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>

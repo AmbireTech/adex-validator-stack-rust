@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":[["ChannelLoad",""]]};
+window.SIDEBAR_ITEMS = {"fn":[["channel_load",""]]};

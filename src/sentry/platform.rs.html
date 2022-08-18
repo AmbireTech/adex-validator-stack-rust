@@ -127,134 +127,134 @@
 <span id="127">127</span>
 <span id="128">128</span>
 <span id="129">129</span>
-</pre><pre class="rust"><code><span class="comment">// previously fetched from the market (in the supermarket) it should now be fetched from the Platform!</span>
-<span class="kw">use</span> <span class="ident">primitives</span>::{
-    <span class="ident">platform</span>::{<span class="ident">AdUnitResponse</span>, <span class="ident">AdUnitsResponse</span>},
-    <span class="ident">util::ApiUrl</span>,
-    <span class="ident">AdUnit</span>, <span class="ident">IPFS</span>,
+</pre><pre class="rust"><code><span class="comment">// previously fetched from the market (in the supermarket) it should now be fetched from the Platform!
+</span><span class="kw">use </span>primitives::{
+    platform::{AdUnitResponse, AdUnitsResponse},
+    util::ApiUrl,
+    AdUnit, IPFS,
 };
-<span class="kw">use</span> <span class="ident">reqwest</span>::{<span class="ident">Client</span>, <span class="ident">Error</span>, <span class="ident">StatusCode</span>};
-<span class="kw">use</span> <span class="ident">std</span>::{<span class="ident">sync::Arc</span>, <span class="ident">time::Duration</span>};
+<span class="kw">use </span>reqwest::{Client, Error, StatusCode};
+<span class="kw">use </span>std::{sync::Arc, time::Duration};
 
-<span class="kw">pub</span> <span class="kw">type</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">std::result::Result</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">Error</span><span class="op">&gt;</span>;
+<span class="kw">pub type </span><span class="prelude-ty">Result</span>&lt;T&gt; = std::result::Result&lt;T, Error&gt;;
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
-<span class="doccomment">/// The `PlatformApi` is cheap to clone as it already wraps the real client `PlatformApiInner` in an `Arc`</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">PlatformApi</span> {
-    <span class="ident">inner</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">PlatformApiInner</span><span class="op">&gt;</span>,
+<span class="attribute">#[derive(Debug, Clone)]</span>
+<span class="doccomment">/// The `PlatformApi` is cheap to clone as it already wraps the real client `PlatformApiInner` in an `Arc`
+</span><span class="kw">pub struct </span>PlatformApi {
+    inner: Arc&lt;PlatformApiInner&gt;,
 }
 
-<span class="kw">impl</span> <span class="ident">PlatformApi</span> {
-    <span class="doccomment">/// The Market url that was is used for communication with the API</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">url</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">ApiUrl</span> {
-        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">platform_url</span>
+<span class="kw">impl </span>PlatformApi {
+    <span class="doccomment">/// The Market url that was is used for communication with the API
+    </span><span class="kw">pub fn </span>url(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>ApiUrl {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.inner.platform_url
     }
 
-    <span class="comment">// todo: Instead of associate function, use a builder</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">platform_url</span>: <span class="ident">ApiUrl</span>, <span class="ident">keep_alive_interval</span>: <span class="ident">Duration</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span> {
-        <span class="prelude-val">Ok</span>(<span class="self">Self</span> {
-            <span class="ident">inner</span>: <span class="ident">Arc::new</span>(<span class="ident">PlatformApiInner::new</span>(<span class="ident">platform_url</span>, <span class="ident">keep_alive_interval</span>)<span class="question-mark">?</span>),
+    <span class="comment">// todo: Instead of associate function, use a builder
+    </span><span class="kw">pub fn </span>new(platform_url: ApiUrl, keep_alive_interval: Duration) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>&gt; {
+        <span class="prelude-val">Ok</span>(<span class="self">Self </span>{
+            inner: Arc::new(PlatformApiInner::new(platform_url, keep_alive_interval)<span class="question-mark">?</span>),
         })
     }
 
-    <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">fetch_unit</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">ipfs</span>: <span class="ident">IPFS</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">AdUnitResponse</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">fetch_unit</span>(<span class="ident">ipfs</span>).<span class="kw">await</span>
-    }
+    <span class="kw">pub async fn </span>fetch_unit(<span class="kw-2">&amp;</span><span class="self">self</span>, ipfs: IPFS) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;AdUnitResponse&gt;&gt; {
+        <span class="self">self</span>.inner.fetch_unit(ipfs).<span class="kw">await
+    </span>}
 
-    <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">fetch_units</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">ad_type</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">AdUnit</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">fetch_units</span>(<span class="ident">ad_type</span>).<span class="kw">await</span>
-    }
+    <span class="kw">pub async fn </span>fetch_units(<span class="kw-2">&amp;</span><span class="self">self</span>, ad_type: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;AdUnit&gt;&gt; {
+        <span class="self">self</span>.inner.fetch_units(ad_type).<span class="kw">await
+    </span>}
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
-<span class="kw">struct</span> <span class="ident">PlatformApiInner</span> {
-    <span class="ident">platform_url</span>: <span class="ident">ApiUrl</span>,
-    <span class="ident">client</span>: <span class="ident">Client</span>,
+<span class="attribute">#[derive(Debug, Clone)]</span>
+<span class="kw">struct </span>PlatformApiInner {
+    platform_url: ApiUrl,
+    client: Client,
 }
 
-<span class="kw">impl</span> <span class="ident">PlatformApiInner</span> {
-    <span class="doccomment">/// The limit of AdUnits per page when fetching</span>
-    <span class="doccomment">/// It should always be &gt; 1</span>
-    <span class="kw">const</span> <span class="ident">MARKET_AD_UNITS_LIMIT</span>: <span class="ident">u64</span> <span class="op">=</span> <span class="number">1_000</span>;
+<span class="kw">impl </span>PlatformApiInner {
+    <span class="doccomment">/// The limit of AdUnits per page when fetching
+    /// It should always be &gt; 1
+    </span><span class="kw">const </span>MARKET_AD_UNITS_LIMIT: u64 = <span class="number">1_000</span>;
 
-    <span class="doccomment">/// Duration specified will be the time to remain idle before sending a TCP keepalive probe.</span>
-    <span class="doccomment">/// Sets [`reqwest::Client`]&#39;s [`reqwest::ClientBuilder::tcp_keepalive`](reqwest::ClientBuilder::tcp_keepalive))</span>
-    <span class="comment">// @TODO: maybe add timeout too?</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">platform_url</span>: <span class="ident">ApiUrl</span>, <span class="ident">keep_alive_interval</span>: <span class="ident">Duration</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">client</span> <span class="op">=</span> <span class="ident">Client::builder</span>()
-            .<span class="ident">tcp_keepalive</span>(<span class="ident">keep_alive_interval</span>)
-            .<span class="ident">cookie_store</span>(<span class="bool-val">true</span>)
-            .<span class="ident">build</span>()<span class="question-mark">?</span>;
+    <span class="doccomment">/// Duration specified will be the time to remain idle before sending a TCP keepalive probe.
+    /// Sets [`reqwest::Client`]&#39;s [`reqwest::ClientBuilder::tcp_keepalive`](reqwest::ClientBuilder::tcp_keepalive))
+    </span><span class="comment">// @TODO: maybe add timeout too?
+    </span><span class="kw">pub fn </span>new(platform_url: ApiUrl, keep_alive_interval: Duration) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>&gt; {
+        <span class="kw">let </span>client = Client::builder()
+            .tcp_keepalive(keep_alive_interval)
+            .cookie_store(<span class="bool-val">true</span>)
+            .build()<span class="question-mark">?</span>;
 
-        <span class="prelude-val">Ok</span>(<span class="self">Self</span> {
-            <span class="ident">platform_url</span>,
-            <span class="ident">client</span>,
+        <span class="prelude-val">Ok</span>(<span class="self">Self </span>{
+            platform_url,
+            client,
         })
     }
 
-    <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">fetch_unit</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">ipfs</span>: <span class="ident">IPFS</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">AdUnitResponse</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">url</span> <span class="op">=</span> <span class="self">self</span>
-            .<span class="ident">platform_url</span>
-            .<span class="ident">join</span>(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;units/{}&quot;</span>, <span class="ident">ipfs</span>))
-            .<span class="ident">expect</span>(<span class="string">&quot;Wrong Platform Url for /units/{IPFS} endpoint&quot;</span>);
+    <span class="kw">pub async fn </span>fetch_unit(<span class="kw-2">&amp;</span><span class="self">self</span>, ipfs: IPFS) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;AdUnitResponse&gt;&gt; {
+        <span class="kw">let </span>url = <span class="self">self
+            </span>.platform_url
+            .join(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;units/{}&quot;</span>, ipfs))
+            .expect(<span class="string">&quot;Wrong Platform Url for /units/{IPFS} endpoint&quot;</span>);
 
-        <span class="kw">match</span> <span class="self">self</span>.<span class="ident">client</span>.<span class="ident">get</span>(<span class="ident">url</span>).<span class="ident">send</span>().<span class="kw">await</span><span class="question-mark">?</span>.<span class="ident">error_for_status</span>() {
-            <span class="prelude-val">Ok</span>(<span class="ident">response</span>) =&gt; {
-                <span class="kw">let</span> <span class="ident">ad_unit_response</span> <span class="op">=</span> <span class="ident">response</span>.<span class="ident">json</span>::<span class="op">&lt;</span><span class="ident">AdUnitResponse</span><span class="op">&gt;</span>().<span class="kw">await</span><span class="question-mark">?</span>;
+        <span class="kw">match </span><span class="self">self</span>.client.get(url).send().<span class="kw">await</span><span class="question-mark">?</span>.error_for_status() {
+            <span class="prelude-val">Ok</span>(response) =&gt; {
+                <span class="kw">let </span>ad_unit_response = response.json::&lt;AdUnitResponse&gt;().<span class="kw">await</span><span class="question-mark">?</span>;
 
-                <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">ad_unit_response</span>))
+                <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(ad_unit_response))
             }
-            <span class="comment">// if we have a `404 Not Found` error, return None</span>
-            <span class="prelude-val">Err</span>(<span class="ident">err</span>) <span class="kw">if</span> <span class="ident">err</span>.<span class="ident">status</span>() <span class="op">==</span> <span class="prelude-val">Some</span>(<span class="ident">StatusCode::NOT_FOUND</span>) =&gt; <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>),
-            <span class="prelude-val">Err</span>(<span class="ident">err</span>) =&gt; <span class="prelude-val">Err</span>(<span class="ident">err</span>),
+            <span class="comment">// if we have a `404 Not Found` error, return None
+            </span><span class="prelude-val">Err</span>(err) <span class="kw">if </span>err.status() == <span class="prelude-val">Some</span>(StatusCode::NOT_FOUND) =&gt; <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>),
+            <span class="prelude-val">Err</span>(err) =&gt; <span class="prelude-val">Err</span>(err),
         }
     }
 
-    <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">fetch_units</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">ad_type</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">AdUnit</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">units</span> <span class="op">=</span> <span class="ident">Vec::new</span>();
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">skip</span>: <span class="ident">u64</span> <span class="op">=</span> <span class="number">0</span>;
-        <span class="kw">let</span> <span class="ident">limit</span> <span class="op">=</span> <span class="ident"><span class="self">Self</span>::MARKET_AD_UNITS_LIMIT</span>;
+    <span class="kw">pub async fn </span>fetch_units(<span class="kw-2">&amp;</span><span class="self">self</span>, ad_type: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;AdUnit&gt;&gt; {
+        <span class="kw">let </span><span class="kw-2">mut </span>units = Vec::new();
+        <span class="kw">let </span><span class="kw-2">mut </span>skip: u64 = <span class="number">0</span>;
+        <span class="kw">let </span>limit = <span class="self">Self</span>::MARKET_AD_UNITS_LIMIT;
 
-        <span class="kw">loop</span> {
-            <span class="comment">// if one page fail, simply return the error for now</span>
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">page_results</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">fetch_units_page</span>(<span class="ident">ad_type</span>, <span class="ident">skip</span>).<span class="kw">await</span><span class="question-mark">?</span>;
-            <span class="comment">// get the count before appending the page results to all</span>
-            <span class="kw">let</span> <span class="ident">count</span> <span class="op">=</span> <span class="ident">page_results</span>.<span class="ident">len</span>() <span class="kw">as</span> <span class="ident">u64</span>;
+        <span class="kw">loop </span>{
+            <span class="comment">// if one page fail, simply return the error for now
+            </span><span class="kw">let </span><span class="kw-2">mut </span>page_results = <span class="self">self</span>.fetch_units_page(ad_type, skip).<span class="kw">await</span><span class="question-mark">?</span>;
+            <span class="comment">// get the count before appending the page results to all
+            </span><span class="kw">let </span>count = page_results.len() <span class="kw">as </span>u64;
 
-            <span class="comment">// append all received units</span>
-            <span class="ident">units</span>.<span class="ident">append</span>(<span class="kw-2">&amp;mut</span> <span class="ident">page_results</span>);
-            <span class="comment">// add the number of results we need to skip in the next iteration</span>
-            <span class="ident">skip</span> <span class="op">+</span><span class="op">=</span> <span class="ident">count</span>;
+            <span class="comment">// append all received units
+            </span>units.append(<span class="kw-2">&amp;mut </span>page_results);
+            <span class="comment">// add the number of results we need to skip in the next iteration
+            </span>skip += count;
 
-            <span class="comment">// if the Market returns &lt; market fetch limit</span>
-            <span class="comment">// we&#39;ve got all AdSlots from all pages!</span>
-            <span class="kw">if</span> <span class="ident">count</span> <span class="op">&lt;</span> <span class="ident">limit</span> {
-                <span class="comment">// so break out of the loop</span>
-                <span class="kw">break</span>;
+            <span class="comment">// if the Market returns &lt; market fetch limit
+            // we&#39;ve got all AdSlots from all pages!
+            </span><span class="kw">if </span>count &lt; limit {
+                <span class="comment">// so break out of the loop
+                </span><span class="kw">break</span>;
             }
         }
 
-        <span class="prelude-val">Ok</span>(<span class="ident">units</span>)
+        <span class="prelude-val">Ok</span>(units)
     }
 
-    <span class="doccomment">/// `skip` - how many records it should skip (pagination)</span>
-    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">fetch_units_page</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">ad_type</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">skip</span>: <span class="ident">u64</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">AdUnit</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">url</span> <span class="op">=</span> <span class="self">self</span>
-            .<span class="ident">platform_url</span>
-            .<span class="ident">join</span>(<span class="kw-2">&amp;</span><span class="macro">format!</span>(
+    <span class="doccomment">/// `skip` - how many records it should skip (pagination)
+    </span><span class="kw">async fn </span>fetch_units_page(<span class="kw-2">&amp;</span><span class="self">self</span>, ad_type: <span class="kw-2">&amp;</span>str, skip: u64) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;AdUnit&gt;&gt; {
+        <span class="kw">let </span>url = <span class="self">self
+            </span>.platform_url
+            .join(<span class="kw-2">&amp;</span><span class="macro">format!</span>(
                 <span class="string">&quot;units?limit={}&amp;skip={}&amp;type={}&quot;</span>,
-                <span class="ident"><span class="self">Self</span>::MARKET_AD_UNITS_LIMIT</span>,
-                <span class="ident">skip</span>,
-                <span class="ident">ad_type</span>,
+                <span class="self">Self</span>::MARKET_AD_UNITS_LIMIT,
+                skip,
+                ad_type,
             ))
-            .<span class="ident">expect</span>(<span class="string">&quot;Wrong Market Url for /units endpoint&quot;</span>);
+            .expect(<span class="string">&quot;Wrong Market Url for /units endpoint&quot;</span>);
 
-        <span class="kw">let</span> <span class="ident">response</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">client</span>.<span class="ident">get</span>(<span class="ident">url</span>).<span class="ident">send</span>().<span class="kw">await</span><span class="question-mark">?</span>;
+        <span class="kw">let </span>response = <span class="self">self</span>.client.get(url).send().<span class="kw">await</span><span class="question-mark">?</span>;
 
-        <span class="kw">let</span> <span class="ident">ad_units</span>: <span class="ident">AdUnitsResponse</span> <span class="op">=</span> <span class="ident">response</span>.<span class="ident">json</span>().<span class="kw">await</span><span class="question-mark">?</span>;
+        <span class="kw">let </span>ad_units: AdUnitsResponse = response.json().<span class="kw">await</span><span class="question-mark">?</span>;
 
-        <span class="prelude-val">Ok</span>(<span class="ident">ad_units</span>.<span class="number">0</span>)
+        <span class="prelude-val">Ok</span>(ad_units.<span class="number">0</span>)
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (20ffea693 2022-08-11)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>

@@ -896,903 +896,903 @@
 <span id="896">896</span>
 <span id="897">897</span>
 <span id="898">898</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">std::collections::HashSet</span>;
+</pre><pre class="rust"><code><span class="kw">use </span>std::collections::HashSet;
 
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::db</span>::{<span class="ident">DbPool</span>, <span class="ident">PoolError</span>, <span class="ident">TotalCount</span>};
-<span class="kw">use</span> <span class="ident">chrono</span>::{<span class="ident">DateTime</span>, <span class="ident">Utc</span>};
-<span class="kw">use</span> <span class="ident">futures::TryStreamExt</span>;
-<span class="kw">use</span> <span class="ident">primitives</span>::{
-    <span class="ident">sentry</span>::{
-        <span class="ident">campaign_list</span>::{<span class="ident">CampaignListResponse</span>, <span class="ident">ValidatorParam</span>},
-        <span class="ident">Pagination</span>,
+<span class="kw">use </span><span class="kw">crate</span>::db::{DbPool, PoolError, TotalCount};
+<span class="kw">use </span>chrono::{DateTime, Utc};
+<span class="kw">use </span>futures::TryStreamExt;
+<span class="kw">use </span>primitives::{
+    sentry::{
+        campaign_list::{CampaignListResponse, ValidatorParam},
+        Pagination,
     },
-    <span class="ident">Address</span>, <span class="ident">Campaign</span>, <span class="ident">CampaignId</span>, <span class="ident">ChannelId</span>,
+    Address, Campaign, CampaignId, ChannelId,
 };
-<span class="kw">use</span> <span class="ident">tokio_postgres</span>::{
-    <span class="ident">types</span>::{<span class="ident">Json</span>, <span class="ident">ToSql</span>},
-    <span class="ident">Row</span>,
+<span class="kw">use </span>tokio_postgres::{
+    types::{Json, ToSql},
+    Row,
 };
 
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">campaign_remaining::CampaignRemaining</span>;
+<span class="kw">pub use </span>campaign_remaining::CampaignRemaining;
 
-<span class="doccomment">/// ```text</span>
-<span class="doccomment">/// INSERT INTO campaigns (id, channel_id, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, created, active_from, active_to)</span>
-<span class="doccomment">/// VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)</span>
-<span class="doccomment">/// ```</span>
-<span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">insert_campaign</span>(<span class="ident">pool</span>: <span class="kw-2">&amp;</span><span class="ident">DbPool</span>, <span class="ident">campaign</span>: <span class="kw-2">&amp;</span><span class="ident">Campaign</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">bool</span>, <span class="ident">PoolError</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">client</span> <span class="op">=</span> <span class="ident">pool</span>.<span class="ident">get</span>().<span class="kw">await</span><span class="question-mark">?</span>;
-    <span class="kw">let</span> <span class="ident">ad_units</span> <span class="op">=</span> <span class="ident">Json</span>(<span class="ident">campaign</span>.<span class="ident">ad_units</span>.<span class="ident">clone</span>());
-    <span class="kw">let</span> <span class="ident">stmt</span> <span class="op">=</span> <span class="ident">client</span>.<span class="ident">prepare</span>(<span class="string">&quot;INSERT INTO campaigns (id, channel_id, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, created, active_from, active_to) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)&quot;</span>).<span class="kw">await</span><span class="question-mark">?</span>;
-    <span class="kw">let</span> <span class="ident">inserted</span> <span class="op">=</span> <span class="ident">client</span>
-        .<span class="ident">execute</span>(
-            <span class="kw-2">&amp;</span><span class="ident">stmt</span>,
+<span class="doccomment">/// ```text
+/// INSERT INTO campaigns (id, channel_id, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, created, active_from, active_to)
+/// VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+/// ```
+</span><span class="kw">pub async fn </span>insert_campaign(pool: <span class="kw-2">&amp;</span>DbPool, campaign: <span class="kw-2">&amp;</span>Campaign) -&gt; <span class="prelude-ty">Result</span>&lt;bool, PoolError&gt; {
+    <span class="kw">let </span>client = pool.get().<span class="kw">await</span><span class="question-mark">?</span>;
+    <span class="kw">let </span>ad_units = Json(campaign.ad_units.clone());
+    <span class="kw">let </span>stmt = client.prepare(<span class="string">&quot;INSERT INTO campaigns (id, channel_id, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, created, active_from, active_to) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)&quot;</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+    <span class="kw">let </span>inserted = client
+        .execute(
+            <span class="kw-2">&amp;</span>stmt,
             <span class="kw-2">&amp;</span>[
-                <span class="kw-2">&amp;</span><span class="ident">campaign</span>.<span class="ident">id</span>,
-                <span class="kw-2">&amp;</span><span class="ident">campaign</span>.<span class="ident">channel</span>.<span class="ident">id</span>(),
-                <span class="kw-2">&amp;</span><span class="ident">campaign</span>.<span class="ident">creator</span>,
-                <span class="kw-2">&amp;</span><span class="ident">campaign</span>.<span class="ident">budget</span>,
-                <span class="kw-2">&amp;</span><span class="ident">campaign</span>.<span class="ident">validators</span>,
-                <span class="kw-2">&amp;</span><span class="ident">campaign</span>.<span class="ident">title</span>,
-                <span class="kw-2">&amp;</span><span class="ident">campaign</span>.<span class="ident">pricing_bounds</span>,
-                <span class="kw-2">&amp;</span><span class="ident">campaign</span>.<span class="ident">event_submission</span>,
-                <span class="kw-2">&amp;</span><span class="ident">ad_units</span>,
-                <span class="kw-2">&amp;</span><span class="ident">campaign</span>.<span class="ident">targeting_rules</span>,
-                <span class="kw-2">&amp;</span><span class="ident">campaign</span>.<span class="ident">created</span>,
-                <span class="kw-2">&amp;</span><span class="ident">campaign</span>.<span class="ident">active</span>.<span class="ident">from</span>,
-                <span class="kw-2">&amp;</span><span class="ident">campaign</span>.<span class="ident">active</span>.<span class="ident">to</span>,
+                <span class="kw-2">&amp;</span>campaign.id,
+                <span class="kw-2">&amp;</span>campaign.channel.id(),
+                <span class="kw-2">&amp;</span>campaign.creator,
+                <span class="kw-2">&amp;</span>campaign.budget,
+                <span class="kw-2">&amp;</span>campaign.validators,
+                <span class="kw-2">&amp;</span>campaign.title,
+                <span class="kw-2">&amp;</span>campaign.pricing_bounds,
+                <span class="kw-2">&amp;</span>campaign.event_submission,
+                <span class="kw-2">&amp;</span>ad_units,
+                <span class="kw-2">&amp;</span>campaign.targeting_rules,
+                <span class="kw-2">&amp;</span>campaign.created,
+                <span class="kw-2">&amp;</span>campaign.active.from,
+                <span class="kw-2">&amp;</span>campaign.active.to,
             ],
         )
         .<span class="kw">await</span><span class="question-mark">?</span>;
 
-    <span class="kw">let</span> <span class="ident">inserted</span> <span class="op">=</span> <span class="ident">inserted</span> <span class="op">==</span> <span class="number">1</span>;
-    <span class="prelude-val">Ok</span>(<span class="ident">inserted</span>)
+    <span class="kw">let </span>inserted = inserted == <span class="number">1</span>;
+    <span class="prelude-val">Ok</span>(inserted)
 }
 
-<span class="doccomment">/// ```text</span>
-<span class="doccomment">/// SELECT campaigns.id, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, campaigns.created, active_from, active_to,</span>
-<span class="doccomment">/// channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce</span>
-<span class="doccomment">/// FROM campaigns INNER JOIN channels</span>
-<span class="doccomment">/// ON campaigns.channel_id=channels.id</span>
-<span class="doccomment">/// WHERE campaigns.id = $1</span>
-<span class="doccomment">/// ```</span>
-<span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">fetch_campaign</span>(
-    <span class="ident">pool</span>: <span class="ident">DbPool</span>,
-    <span class="ident">campaign</span>: <span class="kw-2">&amp;</span><span class="ident">CampaignId</span>,
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Campaign</span><span class="op">&gt;</span>, <span class="ident">PoolError</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">client</span> <span class="op">=</span> <span class="ident">pool</span>.<span class="ident">get</span>().<span class="kw">await</span><span class="question-mark">?</span>;
-    <span class="comment">// TODO: Check and update</span>
-    <span class="kw">let</span> <span class="ident">statement</span> <span class="op">=</span> <span class="ident">client</span>.<span class="ident">prepare</span>(<span class="string">&quot;SELECT campaigns.id, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, campaigns.created, active_from, active_to, channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce FROM campaigns INNER JOIN channels
+<span class="doccomment">/// ```text
+/// SELECT campaigns.id, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, campaigns.created, active_from, active_to,
+/// channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce
+/// FROM campaigns INNER JOIN channels
+/// ON campaigns.channel_id=channels.id
+/// WHERE campaigns.id = $1
+/// ```
+</span><span class="kw">pub async fn </span>fetch_campaign(
+    pool: DbPool,
+    campaign: <span class="kw-2">&amp;</span>CampaignId,
+) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;Campaign&gt;, PoolError&gt; {
+    <span class="kw">let </span>client = pool.get().<span class="kw">await</span><span class="question-mark">?</span>;
+    <span class="comment">// TODO: Check and update
+    </span><span class="kw">let </span>statement = client.prepare(<span class="string">&quot;SELECT campaigns.id, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, campaigns.created, active_from, active_to, channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce FROM campaigns INNER JOIN channels
     ON campaigns.channel_id=channels.id WHERE campaigns.id = $1&quot;</span>).<span class="kw">await</span><span class="question-mark">?</span>;
 
-    <span class="kw">let</span> <span class="ident">row</span> <span class="op">=</span> <span class="ident">client</span>.<span class="ident">query_opt</span>(<span class="kw-2">&amp;</span><span class="ident">statement</span>, <span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">campaign</span>]).<span class="kw">await</span><span class="question-mark">?</span>;
+    <span class="kw">let </span>row = client.query_opt(<span class="kw-2">&amp;</span>statement, <span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span>campaign]).<span class="kw">await</span><span class="question-mark">?</span>;
 
-    <span class="prelude-val">Ok</span>(<span class="ident">row</span>.<span class="ident">as_ref</span>().<span class="ident">map</span>(<span class="ident">Campaign::from</span>))
+    <span class="prelude-val">Ok</span>(row.as_ref().map(Campaign::from))
 }
 
-<span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">list_campaigns</span>(
-    <span class="ident">pool</span>: <span class="kw-2">&amp;</span><span class="ident">DbPool</span>,
-    <span class="ident">skip</span>: <span class="ident">u64</span>,
-    <span class="ident">limit</span>: <span class="ident">u32</span>,
-    <span class="ident">creator</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span>,
-    <span class="ident">validator</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ValidatorParam</span><span class="op">&gt;</span>,
-    <span class="ident">active_to_ge</span>: <span class="kw-2">&amp;</span><span class="ident">DateTime</span><span class="op">&lt;</span><span class="ident">Utc</span><span class="op">&gt;</span>,
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">CampaignListResponse</span>, <span class="ident">PoolError</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">client</span> <span class="op">=</span> <span class="ident">pool</span>.<span class="ident">get</span>().<span class="kw">await</span><span class="question-mark">?</span>;
+<span class="kw">pub async fn </span>list_campaigns(
+    pool: <span class="kw-2">&amp;</span>DbPool,
+    skip: u64,
+    limit: u32,
+    creator: <span class="prelude-ty">Option</span>&lt;Address&gt;,
+    validator: <span class="prelude-ty">Option</span>&lt;ValidatorParam&gt;,
+    active_to_ge: <span class="kw-2">&amp;</span>DateTime&lt;Utc&gt;,
+) -&gt; <span class="prelude-ty">Result</span>&lt;CampaignListResponse, PoolError&gt; {
+    <span class="kw">let </span>client = pool.get().<span class="kw">await</span><span class="question-mark">?</span>;
 
-    <span class="kw">let</span> (<span class="ident">where_clauses</span>, <span class="ident">params</span>) <span class="op">=</span> <span class="ident">campaign_list_query_params</span>(<span class="kw-2">&amp;</span><span class="ident">creator</span>, <span class="kw-2">&amp;</span><span class="ident">validator</span>, <span class="ident">active_to_ge</span>);
-    <span class="kw">let</span> <span class="ident">total_count_params</span> <span class="op">=</span> (<span class="ident">where_clauses</span>.<span class="ident">clone</span>(), <span class="ident">params</span>.<span class="ident">clone</span>());
+    <span class="kw">let </span>(where_clauses, params) = campaign_list_query_params(<span class="kw-2">&amp;</span>creator, <span class="kw-2">&amp;</span>validator, active_to_ge);
+    <span class="kw">let </span>total_count_params = (where_clauses.clone(), params.clone());
 
-    <span class="comment">// To understand why we use Order by, see Postgres Documentation: https://www.postgresql.org/docs/8.1/queries-limit.html</span>
-    <span class="kw">let</span> <span class="ident">statement</span> <span class="op">=</span> <span class="macro">format!</span>(<span class="string">&quot;SELECT campaigns.id, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, campaigns.created, active_from, active_to, channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce FROM campaigns INNER JOIN channels ON campaigns.channel_id=channels.id WHERE {} ORDER BY campaigns.created ASC LIMIT {} OFFSET {}&quot;</span>, <span class="ident">where_clauses</span>.<span class="ident">join</span>(<span class="string">&quot; AND &quot;</span>), <span class="ident">limit</span>, <span class="ident">skip</span>);
-    <span class="kw">let</span> <span class="ident">stmt</span> <span class="op">=</span> <span class="ident">client</span>.<span class="ident">prepare</span>(<span class="kw-2">&amp;</span><span class="ident">statement</span>).<span class="kw">await</span><span class="question-mark">?</span>;
-    <span class="kw">let</span> <span class="ident">rows</span> <span class="op">=</span> <span class="ident">client</span>.<span class="ident">query</span>(<span class="kw-2">&amp;</span><span class="ident">stmt</span>, <span class="ident">params</span>.<span class="ident">as_slice</span>()).<span class="kw">await</span><span class="question-mark">?</span>;
-    <span class="kw">let</span> <span class="ident">campaigns</span> <span class="op">=</span> <span class="ident">rows</span>.<span class="ident">iter</span>().<span class="ident">map</span>(<span class="ident">Campaign::from</span>).<span class="ident">collect</span>();
+    <span class="comment">// To understand why we use Order by, see Postgres Documentation: https://www.postgresql.org/docs/8.1/queries-limit.html
+    </span><span class="kw">let </span>statement = <span class="macro">format!</span>(<span class="string">&quot;SELECT campaigns.id, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, campaigns.created, active_from, active_to, channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce FROM campaigns INNER JOIN channels ON campaigns.channel_id=channels.id WHERE {} ORDER BY campaigns.created ASC LIMIT {} OFFSET {}&quot;</span>, where_clauses.join(<span class="string">&quot; AND &quot;</span>), limit, skip);
+    <span class="kw">let </span>stmt = client.prepare(<span class="kw-2">&amp;</span>statement).<span class="kw">await</span><span class="question-mark">?</span>;
+    <span class="kw">let </span>rows = client.query(<span class="kw-2">&amp;</span>stmt, params.as_slice()).<span class="kw">await</span><span class="question-mark">?</span>;
+    <span class="kw">let </span>campaigns = rows.iter().map(Campaign::from).collect();
 
-    <span class="kw">let</span> <span class="ident">total_count</span> <span class="op">=</span>
-        <span class="ident">list_campaigns_total_count</span>(<span class="ident">pool</span>, (<span class="kw-2">&amp;</span><span class="ident">total_count_params</span>.<span class="number">0</span>, <span class="ident">total_count_params</span>.<span class="number">1</span>)).<span class="kw">await</span><span class="question-mark">?</span>;
+    <span class="kw">let </span>total_count =
+        list_campaigns_total_count(pool, (<span class="kw-2">&amp;</span>total_count_params.<span class="number">0</span>, total_count_params.<span class="number">1</span>)).<span class="kw">await</span><span class="question-mark">?</span>;
 
-    <span class="comment">// fast ceil for total_pages</span>
-    <span class="kw">let</span> <span class="ident">total_pages</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">total_count</span> <span class="op">==</span> <span class="number">0</span> {
-        <span class="number">1</span>
-    } <span class="kw">else</span> {
-        <span class="number">1</span> <span class="op">+</span> ((<span class="ident">total_count</span> <span class="op">-</span> <span class="number">1</span>) <span class="op">/</span> <span class="ident">limit</span> <span class="kw">as</span> <span class="ident">u64</span>)
+    <span class="comment">// fast ceil for total_pages
+    </span><span class="kw">let </span>total_pages = <span class="kw">if </span>total_count == <span class="number">0 </span>{
+        <span class="number">1
+    </span>} <span class="kw">else </span>{
+        <span class="number">1 </span>+ ((total_count - <span class="number">1</span>) / limit <span class="kw">as </span>u64)
     };
 
-    <span class="kw">let</span> <span class="ident">pagination</span> <span class="op">=</span> <span class="ident">Pagination</span> {
-        <span class="ident">total_pages</span>,
-        <span class="ident">page</span>: <span class="ident">skip</span> <span class="op">/</span> <span class="ident">limit</span> <span class="kw">as</span> <span class="ident">u64</span>,
+    <span class="kw">let </span>pagination = Pagination {
+        total_pages,
+        page: skip / limit <span class="kw">as </span>u64,
     };
 
-    <span class="prelude-val">Ok</span>(<span class="ident">CampaignListResponse</span> {
-        <span class="ident">pagination</span>,
-        <span class="ident">campaigns</span>,
+    <span class="prelude-val">Ok</span>(CampaignListResponse {
+        pagination,
+        campaigns,
     })
 }
 
-<span class="kw">fn</span> <span class="ident">campaign_list_query_params</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>(
-    <span class="ident">creator</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span>,
-    <span class="ident">validator</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ValidatorParam</span><span class="op">&gt;</span>,
-    <span class="ident">active_to_ge</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">DateTime</span><span class="op">&lt;</span><span class="ident">Utc</span><span class="op">&gt;</span>,
-) -&gt; (<span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>, <span class="ident">Vec</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> (<span class="kw">dyn</span> <span class="ident">ToSql</span> <span class="op">+</span> <span class="ident">Sync</span>)<span class="op">&gt;</span>) {
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">where_clauses</span> <span class="op">=</span> <span class="macro">vec!</span>[<span class="string">&quot;active_to &gt;= $1&quot;</span>.<span class="ident">to_string</span>()];
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">params</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="kw-2">&amp;</span>(<span class="kw">dyn</span> <span class="ident">ToSql</span> <span class="op">+</span> <span class="ident">Sync</span>)<span class="op">&gt;</span> <span class="op">=</span> <span class="macro">vec!</span>[<span class="ident">active_to_ge</span>];
+<span class="kw">fn </span>campaign_list_query_params&lt;<span class="lifetime">&#39;a</span>&gt;(
+    creator: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="prelude-ty">Option</span>&lt;Address&gt;,
+    validator: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="prelude-ty">Option</span>&lt;ValidatorParam&gt;,
+    active_to_ge: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>DateTime&lt;Utc&gt;,
+) -&gt; (Vec&lt;String&gt;, Vec&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>(<span class="kw">dyn </span>ToSql + Sync)&gt;) {
+    <span class="kw">let </span><span class="kw-2">mut </span>where_clauses = <span class="macro">vec!</span>[<span class="string">&quot;active_to &gt;= $1&quot;</span>.to_string()];
+    <span class="kw">let </span><span class="kw-2">mut </span>params: Vec&lt;<span class="kw-2">&amp;</span>(<span class="kw">dyn </span>ToSql + Sync)&gt; = <span class="macro">vec!</span>[active_to_ge];
 
-    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">creator</span>) <span class="op">=</span> <span class="ident">creator</span> {
-        <span class="ident">where_clauses</span>.<span class="ident">push</span>(<span class="macro">format!</span>(<span class="string">&quot;creator = ${}&quot;</span>, <span class="ident">params</span>.<span class="ident">len</span>() <span class="op">+</span> <span class="number">1</span>));
-        <span class="ident">params</span>.<span class="ident">push</span>(<span class="ident">creator</span>);
+    <span class="kw">if let </span><span class="prelude-val">Some</span>(creator) = creator {
+        where_clauses.push(<span class="macro">format!</span>(<span class="string">&quot;creator = ${}&quot;</span>, params.len() + <span class="number">1</span>));
+        params.push(creator);
     }
 
-    <span class="comment">// if clause for is_leader is true, the other clause is also always true</span>
-    <span class="kw">match</span> <span class="ident">validator</span> {
-        <span class="prelude-val">Some</span>(<span class="ident">ValidatorParam::Leader</span>(<span class="ident">validator_id</span>)) =&gt; {
-            <span class="ident">where_clauses</span>.<span class="ident">push</span>(<span class="macro">format!</span>(<span class="string">&quot;channels.leader = ${}&quot;</span>, <span class="ident">params</span>.<span class="ident">len</span>() <span class="op">+</span> <span class="number">1</span>));
-            <span class="ident">params</span>.<span class="ident">push</span>(<span class="ident">validator_id</span>);
+    <span class="comment">// if clause for is_leader is true, the other clause is also always true
+    </span><span class="kw">match </span>validator {
+        <span class="prelude-val">Some</span>(ValidatorParam::Leader(validator_id)) =&gt; {
+            where_clauses.push(<span class="macro">format!</span>(<span class="string">&quot;channels.leader = ${}&quot;</span>, params.len() + <span class="number">1</span>));
+            params.push(validator_id);
         }
-        <span class="prelude-val">Some</span>(<span class="ident">ValidatorParam::Validator</span>(<span class="ident">validator_id</span>)) =&gt; {
-            <span class="ident">where_clauses</span>.<span class="ident">push</span>(<span class="macro">format!</span>(
+        <span class="prelude-val">Some</span>(ValidatorParam::Validator(validator_id)) =&gt; {
+            where_clauses.push(<span class="macro">format!</span>(
                 <span class="string">&quot;(channels.leader = ${x} OR channels.follower = ${x})&quot;</span>,
-                <span class="ident">x</span> <span class="op">=</span> <span class="ident">params</span>.<span class="ident">len</span>() <span class="op">+</span> <span class="number">1</span>,
+                x = params.len() + <span class="number">1</span>,
             ));
-            <span class="ident">params</span>.<span class="ident">push</span>(<span class="ident">validator_id</span>);
+            params.push(validator_id);
         }
-        <span class="kw">_</span> =&gt; (),
+        <span class="kw">_ </span>=&gt; (),
     }
 
-    (<span class="ident">where_clauses</span>, <span class="ident">params</span>)
+    (where_clauses, params)
 }
 
-<span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">list_campaigns_total_count</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>(
-    <span class="ident">pool</span>: <span class="kw-2">&amp;</span><span class="ident">DbPool</span>,
-    (<span class="ident">where_clauses</span>, <span class="ident">params</span>): (<span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> [<span class="ident">String</span>], <span class="ident">Vec</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> (<span class="kw">dyn</span> <span class="ident">ToSql</span> <span class="op">+</span> <span class="ident">Sync</span>)<span class="op">&gt;</span>),
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">u64</span>, <span class="ident">PoolError</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">client</span> <span class="op">=</span> <span class="ident">pool</span>.<span class="ident">get</span>().<span class="kw">await</span><span class="question-mark">?</span>;
+<span class="kw">pub async fn </span>list_campaigns_total_count&lt;<span class="lifetime">&#39;a</span>&gt;(
+    pool: <span class="kw-2">&amp;</span>DbPool,
+    (where_clauses, params): (<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>[String], Vec&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>(<span class="kw">dyn </span>ToSql + Sync)&gt;),
+) -&gt; <span class="prelude-ty">Result</span>&lt;u64, PoolError&gt; {
+    <span class="kw">let </span>client = pool.get().<span class="kw">await</span><span class="question-mark">?</span>;
 
-    <span class="kw">let</span> <span class="ident">statement</span> <span class="op">=</span> <span class="macro">format!</span>(
+    <span class="kw">let </span>statement = <span class="macro">format!</span>(
         <span class="string">&quot;SELECT COUNT(campaigns.id)::varchar FROM campaigns INNER JOIN channels ON campaigns.channel_id=channels.id WHERE {}&quot;</span>,
-        <span class="ident">where_clauses</span>.<span class="ident">join</span>(<span class="string">&quot; AND &quot;</span>)
+        where_clauses.join(<span class="string">&quot; AND &quot;</span>)
     );
-    <span class="kw">let</span> <span class="ident">stmt</span> <span class="op">=</span> <span class="ident">client</span>.<span class="ident">prepare</span>(<span class="kw-2">&amp;</span><span class="ident">statement</span>).<span class="kw">await</span><span class="question-mark">?</span>;
-    <span class="kw">let</span> <span class="ident">row</span> <span class="op">=</span> <span class="ident">client</span>.<span class="ident">query_one</span>(<span class="kw-2">&amp;</span><span class="ident">stmt</span>, <span class="ident">params</span>.<span class="ident">as_slice</span>()).<span class="kw">await</span><span class="question-mark">?</span>;
+    <span class="kw">let </span>stmt = client.prepare(<span class="kw-2">&amp;</span>statement).<span class="kw">await</span><span class="question-mark">?</span>;
+    <span class="kw">let </span>row = client.query_one(<span class="kw-2">&amp;</span>stmt, params.as_slice()).<span class="kw">await</span><span class="question-mark">?</span>;
 
-    <span class="prelude-val">Ok</span>(<span class="ident">row</span>.<span class="ident">get</span>::<span class="op">&lt;</span><span class="kw">_</span>, <span class="ident">TotalCount</span><span class="op">&gt;</span>(<span class="number">0</span>).<span class="number">0</span>)
+    <span class="prelude-val">Ok</span>(row.get::&lt;<span class="kw">_</span>, TotalCount&gt;(<span class="number">0</span>).<span class="number">0</span>)
 }
 
-<span class="doccomment">/// ```text</span>
-<span class="doccomment">/// SELECT id FROM campaigns WHERE channel_id = $1 ORDER BY created ASC LIMIT {} OFFSET {}</span>
-<span class="doccomment">/// ```</span>
-<span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">get_campaign_ids_by_channel</span>(
-    <span class="ident">pool</span>: <span class="kw-2">&amp;</span><span class="ident">DbPool</span>,
-    <span class="ident">channel_id</span>: <span class="kw-2">&amp;</span><span class="ident">ChannelId</span>,
-    <span class="ident">limit</span>: <span class="ident">u64</span>,
-    <span class="ident">skip</span>: <span class="ident">u64</span>,
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">CampaignId</span><span class="op">&gt;</span>, <span class="ident">PoolError</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">client</span> <span class="op">=</span> <span class="ident">pool</span>.<span class="ident">get</span>().<span class="kw">await</span><span class="question-mark">?</span>;
+<span class="doccomment">/// ```text
+/// SELECT id FROM campaigns WHERE channel_id = $1 ORDER BY created ASC LIMIT {} OFFSET {}
+/// ```
+</span><span class="kw">pub async fn </span>get_campaign_ids_by_channel(
+    pool: <span class="kw-2">&amp;</span>DbPool,
+    channel_id: <span class="kw-2">&amp;</span>ChannelId,
+    limit: u64,
+    skip: u64,
+) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;CampaignId&gt;, PoolError&gt; {
+    <span class="kw">let </span>client = pool.get().<span class="kw">await</span><span class="question-mark">?</span>;
 
-    <span class="kw">let</span> <span class="ident">query</span> <span class="op">=</span> <span class="macro">format!</span>(
+    <span class="kw">let </span>query = <span class="macro">format!</span>(
         <span class="string">&quot;SELECT id FROM campaigns WHERE channel_id = $1 ORDER BY created ASC LIMIT {} OFFSET {}&quot;</span>,
-        <span class="ident">limit</span>, <span class="ident">skip</span>
+        limit, skip
     );
 
-    <span class="kw">let</span> <span class="ident">statement</span> <span class="op">=</span> <span class="ident">client</span>.<span class="ident">prepare</span>(<span class="kw-2">&amp;</span><span class="ident">query</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+    <span class="kw">let </span>statement = client.prepare(<span class="kw-2">&amp;</span>query).<span class="kw">await</span><span class="question-mark">?</span>;
 
-    <span class="kw">let</span> <span class="ident">rows</span> <span class="op">=</span> <span class="ident">client</span>.<span class="ident">query</span>(<span class="kw-2">&amp;</span><span class="ident">statement</span>, <span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">channel_id</span>]).<span class="kw">await</span><span class="question-mark">?</span>;
-    <span class="kw">let</span> <span class="ident">campaign_ids</span> <span class="op">=</span> <span class="ident">rows</span>.<span class="ident">iter</span>().<span class="ident">map</span>(<span class="ident">CampaignId::from</span>).<span class="ident">collect</span>();
+    <span class="kw">let </span>rows = client.query(<span class="kw-2">&amp;</span>statement, <span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span>channel_id]).<span class="kw">await</span><span class="question-mark">?</span>;
+    <span class="kw">let </span>campaign_ids = rows.iter().map(CampaignId::from).collect();
 
-    <span class="prelude-val">Ok</span>(<span class="ident">campaign_ids</span>)
+    <span class="prelude-val">Ok</span>(campaign_ids)
 }
 
-<span class="doccomment">/// ```text</span>
-<span class="doccomment">/// UPDATE campaigns SET budget = $1, validators = $2, title = $3, pricing_bounds = $4, event_submission = $5, ad_units = $6, targeting_rules = $7</span>
-<span class="doccomment">/// FROM channels WHERE campaigns.id = $8 AND campaigns.channel_id=channels.id</span>
-<span class="doccomment">/// RETURNING campaigns.id, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, campaigns.created, active_from, active_to,</span>
-<span class="doccomment">/// channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce</span>
-<span class="doccomment">/// ```</span>
-<span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">update_campaign</span>(<span class="ident">pool</span>: <span class="kw-2">&amp;</span><span class="ident">DbPool</span>, <span class="ident">campaign</span>: <span class="kw-2">&amp;</span><span class="ident">Campaign</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Campaign</span>, <span class="ident">PoolError</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">client</span> <span class="op">=</span> <span class="ident">pool</span>.<span class="ident">get</span>().<span class="kw">await</span><span class="question-mark">?</span>;
-    <span class="kw">let</span> <span class="ident">statement</span> <span class="op">=</span> <span class="ident">client</span>
-        .<span class="ident">prepare</span>(<span class="string">&quot;UPDATE campaigns SET budget = $1, validators = $2, title = $3, pricing_bounds = $4, event_submission = $5, ad_units = $6, targeting_rules = $7 FROM channels WHERE campaigns.id = $8 AND campaigns.channel_id=channels.id RETURNING campaigns.id, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, campaigns.created, active_from, active_to, channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce&quot;</span>)
+<span class="doccomment">/// ```text
+/// UPDATE campaigns SET budget = $1, validators = $2, title = $3, pricing_bounds = $4, event_submission = $5, ad_units = $6, targeting_rules = $7
+/// FROM channels WHERE campaigns.id = $8 AND campaigns.channel_id=channels.id
+/// RETURNING campaigns.id, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, campaigns.created, active_from, active_to,
+/// channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce
+/// ```
+</span><span class="kw">pub async fn </span>update_campaign(pool: <span class="kw-2">&amp;</span>DbPool, campaign: <span class="kw-2">&amp;</span>Campaign) -&gt; <span class="prelude-ty">Result</span>&lt;Campaign, PoolError&gt; {
+    <span class="kw">let </span>client = pool.get().<span class="kw">await</span><span class="question-mark">?</span>;
+    <span class="kw">let </span>statement = client
+        .prepare(<span class="string">&quot;UPDATE campaigns SET budget = $1, validators = $2, title = $3, pricing_bounds = $4, event_submission = $5, ad_units = $6, targeting_rules = $7 FROM channels WHERE campaigns.id = $8 AND campaigns.channel_id=channels.id RETURNING campaigns.id, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, campaigns.created, active_from, active_to, channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce&quot;</span>)
         .<span class="kw">await</span><span class="question-mark">?</span>;
 
-    <span class="kw">let</span> <span class="ident">ad_units</span> <span class="op">=</span> <span class="ident">Json</span>(<span class="kw-2">&amp;</span><span class="ident">campaign</span>.<span class="ident">ad_units</span>);
+    <span class="kw">let </span>ad_units = Json(<span class="kw-2">&amp;</span>campaign.ad_units);
 
-    <span class="kw">let</span> <span class="ident">updated_row</span> <span class="op">=</span> <span class="ident">client</span>
-        .<span class="ident">query_one</span>(
-            <span class="kw-2">&amp;</span><span class="ident">statement</span>,
+    <span class="kw">let </span>updated_row = client
+        .query_one(
+            <span class="kw-2">&amp;</span>statement,
             <span class="kw-2">&amp;</span>[
-                <span class="kw-2">&amp;</span><span class="ident">campaign</span>.<span class="ident">budget</span>,
-                <span class="kw-2">&amp;</span><span class="ident">campaign</span>.<span class="ident">validators</span>,
-                <span class="kw-2">&amp;</span><span class="ident">campaign</span>.<span class="ident">title</span>,
-                <span class="kw-2">&amp;</span><span class="ident">campaign</span>.<span class="ident">pricing_bounds</span>,
-                <span class="kw-2">&amp;</span><span class="ident">campaign</span>.<span class="ident">event_submission</span>,
-                <span class="kw-2">&amp;</span><span class="ident">ad_units</span>,
-                <span class="kw-2">&amp;</span><span class="ident">campaign</span>.<span class="ident">targeting_rules</span>,
-                <span class="kw-2">&amp;</span><span class="ident">campaign</span>.<span class="ident">id</span>,
+                <span class="kw-2">&amp;</span>campaign.budget,
+                <span class="kw-2">&amp;</span>campaign.validators,
+                <span class="kw-2">&amp;</span>campaign.title,
+                <span class="kw-2">&amp;</span>campaign.pricing_bounds,
+                <span class="kw-2">&amp;</span>campaign.event_submission,
+                <span class="kw-2">&amp;</span>ad_units,
+                <span class="kw-2">&amp;</span>campaign.targeting_rules,
+                <span class="kw-2">&amp;</span>campaign.id,
             ],
         )
         .<span class="kw">await</span><span class="question-mark">?</span>;
 
-    <span class="prelude-val">Ok</span>(<span class="ident">Campaign::from</span>(<span class="kw-2">&amp;</span><span class="ident">updated_row</span>))
+    <span class="prelude-val">Ok</span>(Campaign::from(<span class="kw-2">&amp;</span>updated_row))
 }
 
-<span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">units_for_slot_get_campaigns</span>(
-    <span class="ident">pool</span>: <span class="kw-2">&amp;</span><span class="ident">DbPool</span>,
-    <span class="ident">deposit_assets</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">HashSet</span><span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">creator</span>: <span class="ident">Address</span>,
-    <span class="ident">active_to_ge</span>: <span class="ident">DateTime</span><span class="op">&lt;</span><span class="ident">Utc</span><span class="op">&gt;</span>,
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Campaign</span><span class="op">&gt;</span>, <span class="ident">PoolError</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">client</span> <span class="op">=</span> <span class="ident">pool</span>.<span class="ident">get</span>().<span class="kw">await</span><span class="question-mark">?</span>;
+<span class="kw">pub async fn </span>units_for_slot_get_campaigns(
+    pool: <span class="kw-2">&amp;</span>DbPool,
+    deposit_assets: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>HashSet&lt;Address&gt;&gt;,
+    creator: Address,
+    active_to_ge: DateTime&lt;Utc&gt;,
+) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;Campaign&gt;, PoolError&gt; {
+    <span class="kw">let </span>client = pool.get().<span class="kw">await</span><span class="question-mark">?</span>;
 
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">where_clauses</span> <span class="op">=</span> <span class="macro">vec!</span>[
-        <span class="comment">// Campaign.active.to</span>
-        <span class="string">&quot;active_to &gt;= $1&quot;</span>.<span class="ident">to_string</span>(),
-        <span class="comment">// Campaign.creator</span>
-        <span class="string">&quot;creator = $2&quot;</span>.<span class="ident">into</span>(),
+    <span class="kw">let </span><span class="kw-2">mut </span>where_clauses = <span class="macro">vec!</span>[
+        <span class="comment">// Campaign.active.to
+        </span><span class="string">&quot;active_to &gt;= $1&quot;</span>.to_string(),
+        <span class="comment">// Campaign.creator
+        </span><span class="string">&quot;creator = $2&quot;</span>.into(),
     ];
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">params</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Box</span><span class="op">&lt;</span>(<span class="kw">dyn</span> <span class="ident">ToSql</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="ident">Send</span>)<span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span>
-        <span class="macro">vec!</span>[<span class="ident">Box::new</span>(<span class="ident">active_to_ge</span>), <span class="ident">Box::new</span>(<span class="ident">creator</span>)];
+    <span class="kw">let </span><span class="kw-2">mut </span>params: Vec&lt;Box&lt;(<span class="kw">dyn </span>ToSql + Sync + Send)&gt;&gt; =
+        <span class="macro">vec!</span>[Box::new(active_to_ge), Box::new(creator)];
 
-    <span class="comment">// Deposit assets</span>
-    <span class="kw">match</span> <span class="ident">deposit_assets</span> {
-        <span class="prelude-val">Some</span>(<span class="ident">assets</span>) <span class="kw">if</span> <span class="op">!</span><span class="ident">assets</span>.<span class="ident">is_empty</span>() =&gt; {
-            <span class="kw">let</span> <span class="ident">assets_vec</span> <span class="op">=</span> <span class="ident">assets</span>.<span class="ident">iter</span>().<span class="ident">copied</span>().<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span><span class="op">&gt;</span>();
+    <span class="comment">// Deposit assets
+    </span><span class="kw">match </span>deposit_assets {
+        <span class="prelude-val">Some</span>(assets) <span class="kw">if </span>!assets.is_empty() =&gt; {
+            <span class="kw">let </span>assets_vec = assets.iter().copied().collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
 
-            <span class="ident">where_clauses</span>.<span class="ident">push</span>(<span class="string">&quot;channels.token IN ($3)&quot;</span>.<span class="ident">into</span>());
-            <span class="ident">params</span>.<span class="ident">push</span>(<span class="ident">Box::new</span>(<span class="ident">assets_vec</span>))
+            where_clauses.push(<span class="string">&quot;channels.token IN ($3)&quot;</span>.into());
+            params.push(Box::new(assets_vec))
         }
-        <span class="kw">_</span> =&gt; {}
+        <span class="kw">_ </span>=&gt; {}
     };
 
-    <span class="comment">// To understand why we use Order by, see Postgres Documentation: https://www.postgresql.org/docs/8.1/queries-limit.html</span>
-    <span class="kw">let</span> <span class="ident">statement</span> <span class="op">=</span> <span class="macro">format!</span>(<span class="string">&quot;SELECT campaigns.id, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, campaigns.created, active_from, active_to, channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce FROM campaigns INNER JOIN channels ON campaigns.channel_id=channels.id WHERE {} ORDER BY campaigns.created ASC&quot;</span>, <span class="ident">where_clauses</span>.<span class="ident">join</span>(<span class="string">&quot; AND &quot;</span>));
-    <span class="kw">let</span> <span class="ident">stmt</span> <span class="op">=</span> <span class="ident">client</span>.<span class="ident">prepare</span>(<span class="kw-2">&amp;</span><span class="ident">statement</span>).<span class="kw">await</span><span class="question-mark">?</span>;
-    <span class="kw">let</span> <span class="ident">rows</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Row</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">client</span>.<span class="ident">query_raw</span>(<span class="kw-2">&amp;</span><span class="ident">stmt</span>, <span class="ident">params</span>).<span class="kw">await</span><span class="question-mark">?</span>.<span class="ident">try_collect</span>().<span class="kw">await</span><span class="question-mark">?</span>;
+    <span class="comment">// To understand why we use Order by, see Postgres Documentation: https://www.postgresql.org/docs/8.1/queries-limit.html
+    </span><span class="kw">let </span>statement = <span class="macro">format!</span>(<span class="string">&quot;SELECT campaigns.id, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, campaigns.created, active_from, active_to, channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce FROM campaigns INNER JOIN channels ON campaigns.channel_id=channels.id WHERE {} ORDER BY campaigns.created ASC&quot;</span>, where_clauses.join(<span class="string">&quot; AND &quot;</span>));
+    <span class="kw">let </span>stmt = client.prepare(<span class="kw-2">&amp;</span>statement).<span class="kw">await</span><span class="question-mark">?</span>;
+    <span class="kw">let </span>rows: Vec&lt;Row&gt; = client.query_raw(<span class="kw-2">&amp;</span>stmt, params).<span class="kw">await</span><span class="question-mark">?</span>.try_collect().<span class="kw">await</span><span class="question-mark">?</span>;
 
-    <span class="prelude-val">Ok</span>(<span class="ident">rows</span>.<span class="ident">iter</span>().<span class="ident">map</span>(<span class="ident">Campaign::from</span>).<span class="ident">collect</span>())
+    <span class="prelude-val">Ok</span>(rows.iter().map(Campaign::from).collect())
 }
 
-<span class="doccomment">/// struct that handles redis calls for the Campaign Remaining Budget</span>
-<span class="kw">mod</span> <span class="ident">campaign_remaining</span> {
-    <span class="kw">use</span> <span class="ident">std::collections::HashMap</span>;
+<span class="doccomment">/// struct that handles redis calls for the Campaign Remaining Budget
+</span><span class="kw">mod </span>campaign_remaining {
+    <span class="kw">use </span>std::collections::HashMap;
 
-    <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::db::RedisError</span>;
-    <span class="kw">use</span> <span class="ident">primitives</span>::{<span class="ident">CampaignId</span>, <span class="ident">UnifiedNum</span>};
-    <span class="kw">use</span> <span class="ident">redis::aio::MultiplexedConnection</span>;
+    <span class="kw">use </span><span class="kw">crate</span>::db::RedisError;
+    <span class="kw">use </span>primitives::{CampaignId, UnifiedNum};
+    <span class="kw">use </span>redis::aio::MultiplexedConnection;
 
-    <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">CampaignRemaining</span> {
-        <span class="ident">redis</span>: <span class="ident">MultiplexedConnection</span>,
+    <span class="attribute">#[derive(Clone)]</span>
+    <span class="kw">pub struct </span>CampaignRemaining {
+        redis: MultiplexedConnection,
     }
 
-    <span class="kw">impl</span> <span class="ident">CampaignRemaining</span> {
-        <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">CAMPAIGN_REMAINING_KEY</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;campaignRemaining&quot;</span>;
+    <span class="kw">impl </span>CampaignRemaining {
+        <span class="kw">pub const </span>CAMPAIGN_REMAINING_KEY: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str = <span class="string">&quot;campaignRemaining&quot;</span>;
 
-        <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_key</span>(<span class="ident">campaign</span>: <span class="ident">CampaignId</span>) -&gt; <span class="ident">String</span> {
-            <span class="macro">format!</span>(<span class="string">&quot;{}:{}&quot;</span>, <span class="ident"><span class="self">Self</span>::CAMPAIGN_REMAINING_KEY</span>, <span class="ident">campaign</span>)
+        <span class="kw">pub fn </span>get_key(campaign: CampaignId) -&gt; String {
+            <span class="macro">format!</span>(<span class="string">&quot;{}:{}&quot;</span>, <span class="self">Self</span>::CAMPAIGN_REMAINING_KEY, campaign)
         }
 
-        <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">redis</span>: <span class="ident">MultiplexedConnection</span>) -&gt; <span class="self">Self</span> {
-            <span class="self">Self</span> { <span class="ident">redis</span> }
+        <span class="kw">pub fn </span>new(redis: MultiplexedConnection) -&gt; <span class="self">Self </span>{
+            <span class="self">Self </span>{ redis }
         }
 
-        <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">set_initial</span>(
+        <span class="kw">pub async fn </span>set_initial(
             <span class="kw-2">&amp;</span><span class="self">self</span>,
-            <span class="ident">campaign</span>: <span class="ident">CampaignId</span>,
-            <span class="ident">amount</span>: <span class="ident">UnifiedNum</span>,
-        ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">bool</span>, <span class="ident">RedisError</span><span class="op">&gt;</span> {
-            <span class="ident">redis::cmd</span>(<span class="string">&quot;SETNX&quot;</span>)
-                .<span class="ident">arg</span>(<span class="kw-2">&amp;</span><span class="ident"><span class="self">Self</span>::get_key</span>(<span class="ident">campaign</span>))
-                .<span class="ident">arg</span>(<span class="ident">amount</span>.<span class="ident">to_u64</span>())
-                .<span class="ident">query_async</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">redis</span>.<span class="ident">clone</span>())
-                .<span class="kw">await</span>
-        }
+            campaign: CampaignId,
+            amount: UnifiedNum,
+        ) -&gt; <span class="prelude-ty">Result</span>&lt;bool, RedisError&gt; {
+            redis::cmd(<span class="string">&quot;SETNX&quot;</span>)
+                .arg(<span class="kw-2">&amp;</span><span class="self">Self</span>::get_key(campaign))
+                .arg(amount.to_u64())
+                .query_async(<span class="kw-2">&amp;mut </span><span class="self">self</span>.redis.clone())
+                .<span class="kw">await
+        </span>}
 
-        <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">get_remaining_opt</span>(
+        <span class="kw">pub async fn </span>get_remaining_opt(
             <span class="kw-2">&amp;</span><span class="self">self</span>,
-            <span class="ident">campaign</span>: <span class="ident">CampaignId</span>,
-        ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">i64</span><span class="op">&gt;</span>, <span class="ident">RedisError</span><span class="op">&gt;</span> {
-            <span class="ident">redis::cmd</span>(<span class="string">&quot;GET&quot;</span>)
-                .<span class="ident">arg</span>(<span class="kw-2">&amp;</span><span class="ident"><span class="self">Self</span>::get_key</span>(<span class="ident">campaign</span>))
-                .<span class="ident">query_async</span>::<span class="op">&lt;</span><span class="kw">_</span>, <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">i64</span><span class="op">&gt;</span><span class="op">&gt;</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">redis</span>.<span class="ident">clone</span>())
-                .<span class="kw">await</span>
-        }
+            campaign: CampaignId,
+        ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;i64&gt;, RedisError&gt; {
+            redis::cmd(<span class="string">&quot;GET&quot;</span>)
+                .arg(<span class="kw-2">&amp;</span><span class="self">Self</span>::get_key(campaign))
+                .query_async::&lt;<span class="kw">_</span>, <span class="prelude-ty">Option</span>&lt;i64&gt;&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>.redis.clone())
+                .<span class="kw">await
+        </span>}
 
-        <span class="doccomment">/// This method uses `max(0, value)` to clamp the value of a campaign, which can be negative and uses `i64`.</span>
-        <span class="doccomment">/// In addition, it defaults the campaign keys that were not found to `0`.</span>
-        <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">get_multiple</span>(
+        <span class="doccomment">/// This method uses `max(0, value)` to clamp the value of a campaign, which can be negative and uses `i64`.
+        /// In addition, it defaults the campaign keys that were not found to `0`.
+        </span><span class="kw">pub async fn </span>get_multiple(
             <span class="kw-2">&amp;</span><span class="self">self</span>,
-            <span class="ident">campaigns</span>: <span class="kw-2">&amp;</span>[<span class="ident">CampaignId</span>],
-        ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">UnifiedNum</span><span class="op">&gt;</span>, <span class="ident">RedisError</span><span class="op">&gt;</span> {
-            <span class="comment">// `MGET` fails on empty keys</span>
-            <span class="kw">if</span> <span class="ident">campaigns</span>.<span class="ident">is_empty</span>() {
-                <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="macro">vec!</span>[]);
+            campaigns: <span class="kw-2">&amp;</span>[CampaignId],
+        ) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;UnifiedNum&gt;, RedisError&gt; {
+            <span class="comment">// `MGET` fails on empty keys
+            </span><span class="kw">if </span>campaigns.is_empty() {
+                <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="macro">vec!</span>[]);
             }
 
-            <span class="kw">let</span> <span class="ident">keys</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">campaigns</span>
-                .<span class="ident">iter</span>()
-                .<span class="ident">map</span>(<span class="op">|</span><span class="ident">campaign</span><span class="op">|</span> <span class="ident"><span class="self">Self</span>::get_key</span>(<span class="kw-2">*</span><span class="ident">campaign</span>))
-                .<span class="ident">collect</span>();
+            <span class="kw">let </span>keys: Vec&lt;String&gt; = campaigns
+                .iter()
+                .map(|campaign| <span class="self">Self</span>::get_key(<span class="kw-2">*</span>campaign))
+                .collect();
 
-            <span class="kw">let</span> <span class="ident">campaigns_remaining</span> <span class="op">=</span> <span class="ident">redis::cmd</span>(<span class="string">&quot;MGET&quot;</span>)
-                .<span class="ident">arg</span>(<span class="ident">keys</span>)
-                .<span class="ident">query_async</span>::<span class="op">&lt;</span><span class="kw">_</span>, <span class="ident">Vec</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">i64</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">redis</span>.<span class="ident">clone</span>())
-                .<span class="kw">await</span><span class="question-mark">?</span>
-                .<span class="ident">into_iter</span>()
-                .<span class="ident">map</span>(<span class="op">|</span><span class="ident">remaining</span><span class="op">|</span> <span class="kw">match</span> <span class="ident">remaining</span> {
-                    <span class="prelude-val">Some</span>(<span class="ident">remaining</span>) =&gt; <span class="ident">UnifiedNum::from_u64</span>(<span class="ident">remaining</span>.<span class="ident">max</span>(<span class="number">0</span>).<span class="ident">unsigned_abs</span>()),
-                    <span class="prelude-val">None</span> =&gt; <span class="ident">UnifiedNum::from_u64</span>(<span class="number">0</span>),
+            <span class="kw">let </span>campaigns_remaining = redis::cmd(<span class="string">&quot;MGET&quot;</span>)
+                .arg(keys)
+                .query_async::&lt;<span class="kw">_</span>, Vec&lt;<span class="prelude-ty">Option</span>&lt;i64&gt;&gt;&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>.redis.clone())
+                .<span class="kw">await</span><span class="question-mark">?
+                </span>.into_iter()
+                .map(|remaining| <span class="kw">match </span>remaining {
+                    <span class="prelude-val">Some</span>(remaining) =&gt; UnifiedNum::from_u64(remaining.max(<span class="number">0</span>).unsigned_abs()),
+                    <span class="prelude-val">None </span>=&gt; UnifiedNum::from_u64(<span class="number">0</span>),
                 })
-                .<span class="ident">collect</span>();
+                .collect();
 
-            <span class="prelude-val">Ok</span>(<span class="ident">campaigns_remaining</span>)
+            <span class="prelude-val">Ok</span>(campaigns_remaining)
         }
 
-        <span class="doccomment">/// This method will get the remaining of the provided [`Campaign`](primitives::Campaign)s</span>
-        <span class="doccomment">/// and it will also match the returned values to the [`CampaignId`]s</span>
-        <span class="doccomment">/// `MGET` should always return results in the same order!</span>
-        <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">get_multiple_with_ids</span>(
+        <span class="doccomment">/// This method will get the remaining of the provided [`Campaign`](primitives::Campaign)s
+        /// and it will also match the returned values to the [`CampaignId`]s
+        /// `MGET` should always return results in the same order!
+        </span><span class="kw">pub async fn </span>get_multiple_with_ids(
             <span class="kw-2">&amp;</span><span class="self">self</span>,
-            <span class="ident">campaigns</span>: <span class="kw-2">&amp;</span>[<span class="ident">CampaignId</span>],
-        ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">CampaignId</span>, <span class="ident">UnifiedNum</span><span class="op">&gt;</span>, <span class="ident">RedisError</span><span class="op">&gt;</span> {
-            <span class="comment">// `MGET` fails on empty keys</span>
-            <span class="kw">if</span> <span class="ident">campaigns</span>.<span class="ident">is_empty</span>() {
-                <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">HashMap::default</span>());
+            campaigns: <span class="kw-2">&amp;</span>[CampaignId],
+        ) -&gt; <span class="prelude-ty">Result</span>&lt;HashMap&lt;CampaignId, UnifiedNum&gt;, RedisError&gt; {
+            <span class="comment">// `MGET` fails on empty keys
+            </span><span class="kw">if </span>campaigns.is_empty() {
+                <span class="kw">return </span><span class="prelude-val">Ok</span>(HashMap::default());
             }
 
-            <span class="kw">let</span> <span class="ident">keys</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">campaigns</span>
-                .<span class="ident">iter</span>()
-                .<span class="ident">map</span>(<span class="op">|</span><span class="ident">campaign</span><span class="op">|</span> <span class="ident"><span class="self">Self</span>::get_key</span>(<span class="kw-2">*</span><span class="ident">campaign</span>))
-                .<span class="ident">collect</span>();
+            <span class="kw">let </span>keys: Vec&lt;String&gt; = campaigns
+                .iter()
+                .map(|campaign| <span class="self">Self</span>::get_key(<span class="kw-2">*</span>campaign))
+                .collect();
 
-            <span class="kw">let</span> <span class="ident">campaigns_remaining</span> <span class="op">=</span> <span class="ident">redis::cmd</span>(<span class="string">&quot;MGET&quot;</span>)
-                .<span class="ident">arg</span>(<span class="ident">keys</span>)
-                .<span class="ident">query_async</span>::<span class="op">&lt;</span><span class="kw">_</span>, <span class="ident">Vec</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">i64</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">redis</span>.<span class="ident">clone</span>())
-                .<span class="kw">await</span><span class="question-mark">?</span>
-                .<span class="ident">into_iter</span>()
-                .<span class="ident">map</span>(<span class="op">|</span><span class="ident">remaining</span><span class="op">|</span> <span class="kw">match</span> <span class="ident">remaining</span> {
-                    <span class="prelude-val">Some</span>(<span class="ident">remaining</span>) =&gt; <span class="ident">UnifiedNum::from_u64</span>(<span class="ident">remaining</span>.<span class="ident">max</span>(<span class="number">0</span>).<span class="ident">unsigned_abs</span>()),
-                    <span class="prelude-val">None</span> =&gt; <span class="ident">UnifiedNum::from_u64</span>(<span class="number">0</span>),
+            <span class="kw">let </span>campaigns_remaining = redis::cmd(<span class="string">&quot;MGET&quot;</span>)
+                .arg(keys)
+                .query_async::&lt;<span class="kw">_</span>, Vec&lt;<span class="prelude-ty">Option</span>&lt;i64&gt;&gt;&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>.redis.clone())
+                .<span class="kw">await</span><span class="question-mark">?
+                </span>.into_iter()
+                .map(|remaining| <span class="kw">match </span>remaining {
+                    <span class="prelude-val">Some</span>(remaining) =&gt; UnifiedNum::from_u64(remaining.max(<span class="number">0</span>).unsigned_abs()),
+                    <span class="prelude-val">None </span>=&gt; UnifiedNum::from_u64(<span class="number">0</span>),
                 })
-                .<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">UnifiedNum</span><span class="op">&gt;</span><span class="op">&gt;</span>();
+                .collect::&lt;Vec&lt;UnifiedNum&gt;&gt;();
 
-            <span class="prelude-val">Ok</span>(<span class="ident">campaigns</span>.<span class="ident">iter</span>().<span class="ident">copied</span>().<span class="ident">zip</span>(<span class="ident">campaigns_remaining</span>).<span class="ident">collect</span>())
+            <span class="prelude-val">Ok</span>(campaigns.iter().copied().zip(campaigns_remaining).collect())
         }
 
-        <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">increase_by</span>(
+        <span class="kw">pub async fn </span>increase_by(
             <span class="kw-2">&amp;</span><span class="self">self</span>,
-            <span class="ident">campaign</span>: <span class="ident">CampaignId</span>,
-            <span class="ident">amount</span>: <span class="ident">UnifiedNum</span>,
-        ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">i64</span>, <span class="ident">RedisError</span><span class="op">&gt;</span> {
-            <span class="kw">let</span> <span class="ident">key</span> <span class="op">=</span> <span class="ident"><span class="self">Self</span>::get_key</span>(<span class="ident">campaign</span>);
-            <span class="ident">redis::cmd</span>(<span class="string">&quot;INCRBY&quot;</span>)
-                .<span class="ident">arg</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>)
-                .<span class="ident">arg</span>(<span class="ident">amount</span>.<span class="ident">to_u64</span>())
-                .<span class="ident">query_async</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">redis</span>.<span class="ident">clone</span>())
-                .<span class="kw">await</span>
-        }
+            campaign: CampaignId,
+            amount: UnifiedNum,
+        ) -&gt; <span class="prelude-ty">Result</span>&lt;i64, RedisError&gt; {
+            <span class="kw">let </span>key = <span class="self">Self</span>::get_key(campaign);
+            redis::cmd(<span class="string">&quot;INCRBY&quot;</span>)
+                .arg(<span class="kw-2">&amp;</span>key)
+                .arg(amount.to_u64())
+                .query_async(<span class="kw-2">&amp;mut </span><span class="self">self</span>.redis.clone())
+                .<span class="kw">await
+        </span>}
 
-        <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">decrease_by</span>(
+        <span class="kw">pub async fn </span>decrease_by(
             <span class="kw-2">&amp;</span><span class="self">self</span>,
-            <span class="ident">campaign</span>: <span class="ident">CampaignId</span>,
-            <span class="ident">amount</span>: <span class="ident">UnifiedNum</span>,
-        ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">i64</span>, <span class="ident">RedisError</span><span class="op">&gt;</span> {
-            <span class="kw">let</span> <span class="ident">key</span> <span class="op">=</span> <span class="ident"><span class="self">Self</span>::get_key</span>(<span class="ident">campaign</span>);
-            <span class="ident">redis::cmd</span>(<span class="string">&quot;DECRBY&quot;</span>)
-                .<span class="ident">arg</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>)
-                .<span class="ident">arg</span>(<span class="ident">amount</span>.<span class="ident">to_u64</span>())
-                .<span class="ident">query_async</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">redis</span>.<span class="ident">clone</span>())
-                .<span class="kw">await</span>
-        }
+            campaign: CampaignId,
+            amount: UnifiedNum,
+        ) -&gt; <span class="prelude-ty">Result</span>&lt;i64, RedisError&gt; {
+            <span class="kw">let </span>key = <span class="self">Self</span>::get_key(campaign);
+            redis::cmd(<span class="string">&quot;DECRBY&quot;</span>)
+                .arg(<span class="kw-2">&amp;</span>key)
+                .arg(amount.to_u64())
+                .query_async(<span class="kw-2">&amp;mut </span><span class="self">self</span>.redis.clone())
+                .<span class="kw">await
+        </span>}
 
-        <span class="doccomment">/// Atomic `getset` [`redis`] operation</span>
-        <span class="doccomment">/// Used to close a [`primitives::Campaign`] `POST /campaign/close`</span>
-        <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">getset_remaining_to_zero</span>(
+        <span class="doccomment">/// Atomic `getset` [`redis`] operation
+        /// Used to close a [`primitives::Campaign`] `POST /campaign/close`
+        </span><span class="kw">pub async fn </span>getset_remaining_to_zero(
             <span class="kw-2">&amp;</span><span class="self">self</span>,
-            <span class="ident">campaign</span>: <span class="ident">CampaignId</span>,
-        ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">u64</span>, <span class="ident">RedisError</span><span class="op">&gt;</span> {
-            <span class="ident">redis::cmd</span>(<span class="string">&quot;GETSET&quot;</span>)
-                .<span class="ident">arg</span>(<span class="kw-2">&amp;</span><span class="ident"><span class="self">Self</span>::get_key</span>(<span class="ident">campaign</span>))
-                .<span class="ident">arg</span>(<span class="number">0</span>)
-                .<span class="ident">query_async</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">redis</span>.<span class="ident">clone</span>())
-                .<span class="kw">await</span>
-        }
+            campaign: CampaignId,
+        ) -&gt; <span class="prelude-ty">Result</span>&lt;u64, RedisError&gt; {
+            redis::cmd(<span class="string">&quot;GETSET&quot;</span>)
+                .arg(<span class="kw-2">&amp;</span><span class="self">Self</span>::get_key(campaign))
+                .arg(<span class="number">0</span>)
+                .query_async(<span class="kw-2">&amp;mut </span><span class="self">self</span>.redis.clone())
+                .<span class="kw">await
+        </span>}
     }
 
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
-    <span class="kw">mod</span> <span class="ident">test</span> {
-        <span class="kw">use</span> <span class="ident">primitives::test_util::DUMMY_CAMPAIGN</span>;
+    <span class="attribute">#[cfg(test)]</span>
+    <span class="kw">mod </span>test {
+        <span class="kw">use </span>primitives::test_util::DUMMY_CAMPAIGN;
 
-        <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::db::redis_pool::TESTS_POOL</span>;
+        <span class="kw">use </span><span class="kw">crate</span>::db::redis_pool::TESTS_POOL;
 
-        <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
+        <span class="kw">use super</span>::<span class="kw-2">*</span>;
 
-        <span class="attribute">#[<span class="ident">tokio::test</span>]</span>
-        <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">it_sets_initial_increases_and_decreases_remaining_for_campaign</span>() {
-            <span class="kw">let</span> <span class="ident">redis</span> <span class="op">=</span> <span class="ident">TESTS_POOL</span>.<span class="ident">get</span>().<span class="kw">await</span>.<span class="ident">expect</span>(<span class="string">&quot;Should return Object&quot;</span>);
+        <span class="attribute">#[tokio::test]</span>
+        <span class="kw">async fn </span>it_sets_initial_increases_and_decreases_remaining_for_campaign() {
+            <span class="kw">let </span>redis = TESTS_POOL.get().<span class="kw">await</span>.expect(<span class="string">&quot;Should return Object&quot;</span>);
 
-            <span class="kw">let</span> <span class="ident">campaign</span> <span class="op">=</span> <span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">id</span>;
-            <span class="kw">let</span> <span class="ident">campaign_remaining</span> <span class="op">=</span> <span class="ident">CampaignRemaining::new</span>(<span class="ident">redis</span>.<span class="ident">connection</span>.<span class="ident">clone</span>());
+            <span class="kw">let </span>campaign = DUMMY_CAMPAIGN.id;
+            <span class="kw">let </span>campaign_remaining = CampaignRemaining::new(redis.connection.clone());
 
-            <span class="comment">// Get remaining on a key which was not set</span>
-            {
-                <span class="kw">let</span> <span class="ident">get_remaining</span> <span class="op">=</span> <span class="ident">campaign_remaining</span>
-                    .<span class="ident">get_remaining_opt</span>(<span class="ident">campaign</span>)
-                    .<span class="kw">await</span>
-                    .<span class="ident">expect</span>(<span class="string">&quot;Should get None&quot;</span>);
+            <span class="comment">// Get remaining on a key which was not set
+            </span>{
+                <span class="kw">let </span>get_remaining = campaign_remaining
+                    .get_remaining_opt(campaign)
+                    .<span class="kw">await
+                    </span>.expect(<span class="string">&quot;Should get None&quot;</span>);
 
-                <span class="macro">assert_eq!</span>(<span class="prelude-val">None</span>, <span class="ident">get_remaining</span>);
+                <span class="macro">assert_eq!</span>(<span class="prelude-val">None</span>, get_remaining);
             }
 
-            <span class="comment">// Set Initial amount on that key</span>
-            {
-                <span class="kw">let</span> <span class="ident">initial_amount</span> <span class="op">=</span> <span class="ident">UnifiedNum::from</span>(<span class="number">1_000_u64</span>);
-                <span class="kw">let</span> <span class="ident">set_initial</span> <span class="op">=</span> <span class="ident">campaign_remaining</span>
-                    .<span class="ident">set_initial</span>(<span class="ident">campaign</span>, <span class="ident">initial_amount</span>)
-                    .<span class="kw">await</span>
-                    .<span class="ident">expect</span>(<span class="string">&quot;Should set value in redis&quot;</span>);
-                <span class="macro">assert!</span>(<span class="ident">set_initial</span>);
+            <span class="comment">// Set Initial amount on that key
+            </span>{
+                <span class="kw">let </span>initial_amount = UnifiedNum::from(<span class="number">1_000_u64</span>);
+                <span class="kw">let </span>set_initial = campaign_remaining
+                    .set_initial(campaign, initial_amount)
+                    .<span class="kw">await
+                    </span>.expect(<span class="string">&quot;Should set value in redis&quot;</span>);
+                <span class="macro">assert!</span>(set_initial);
 
-                <span class="comment">// get the remaining of that key, should be the initial value</span>
-                <span class="kw">let</span> <span class="ident">get_remaining</span> <span class="op">=</span> <span class="ident">campaign_remaining</span>
-                    .<span class="ident">get_remaining_opt</span>(<span class="ident">campaign</span>)
-                    .<span class="kw">await</span>
-                    .<span class="ident">expect</span>(<span class="string">&quot;Should get None&quot;</span>);
+                <span class="comment">// get the remaining of that key, should be the initial value
+                </span><span class="kw">let </span>get_remaining = campaign_remaining
+                    .get_remaining_opt(campaign)
+                    .<span class="kw">await
+                    </span>.expect(<span class="string">&quot;Should get None&quot;</span>);
 
                 <span class="macro">assert_eq!</span>(
                     <span class="prelude-val">Some</span>(<span class="number">1_000_i64</span>),
-                    <span class="ident">get_remaining</span>,
-                    <span class="string">&quot;should return the initial value that was set&quot;</span>
-                );
+                    get_remaining,
+                    <span class="string">&quot;should return the initial value that was set&quot;
+                </span>);
             }
 
-            <span class="comment">// Set initial on already existing key, should return `false`</span>
-            {
-                <span class="kw">let</span> <span class="ident">set_failing_initial</span> <span class="op">=</span> <span class="ident">campaign_remaining</span>
-                    .<span class="ident">set_initial</span>(<span class="ident">campaign</span>, <span class="ident">UnifiedNum::from</span>(<span class="number">999_u64</span>))
-                    .<span class="kw">await</span>
-                    .<span class="ident">expect</span>(<span class="string">&quot;Should set value in redis&quot;</span>);
-                <span class="macro">assert!</span>(<span class="op">!</span><span class="ident">set_failing_initial</span>);
+            <span class="comment">// Set initial on already existing key, should return `false`
+            </span>{
+                <span class="kw">let </span>set_failing_initial = campaign_remaining
+                    .set_initial(campaign, UnifiedNum::from(<span class="number">999_u64</span>))
+                    .<span class="kw">await
+                    </span>.expect(<span class="string">&quot;Should set value in redis&quot;</span>);
+                <span class="macro">assert!</span>(!set_failing_initial);
             }
 
-            <span class="comment">// Decrease by amount</span>
-            {
-                <span class="kw">let</span> <span class="ident">decrease_amount</span> <span class="op">=</span> <span class="ident">UnifiedNum::from</span>(<span class="number">64</span>);
-                <span class="kw">let</span> <span class="ident">decrease_by</span> <span class="op">=</span> <span class="ident">campaign_remaining</span>
-                    .<span class="ident">decrease_by</span>(<span class="ident">campaign</span>, <span class="ident">decrease_amount</span>)
-                    .<span class="kw">await</span>
-                    .<span class="ident">expect</span>(<span class="string">&quot;Should decrease remaining amount&quot;</span>);
+            <span class="comment">// Decrease by amount
+            </span>{
+                <span class="kw">let </span>decrease_amount = UnifiedNum::from(<span class="number">64</span>);
+                <span class="kw">let </span>decrease_by = campaign_remaining
+                    .decrease_by(campaign, decrease_amount)
+                    .<span class="kw">await
+                    </span>.expect(<span class="string">&quot;Should decrease remaining amount&quot;</span>);
 
-                <span class="macro">assert_eq!</span>(<span class="number">936_i64</span>, <span class="ident">decrease_by</span>);
+                <span class="macro">assert_eq!</span>(<span class="number">936_i64</span>, decrease_by);
             }
 
-            <span class="comment">// Increase by amount</span>
-            {
-                <span class="kw">let</span> <span class="ident">increase_amount</span> <span class="op">=</span> <span class="ident">UnifiedNum::from</span>(<span class="number">1064</span>);
-                <span class="kw">let</span> <span class="ident">increase_by</span> <span class="op">=</span> <span class="ident">campaign_remaining</span>
-                    .<span class="ident">increase_by</span>(<span class="ident">campaign</span>, <span class="ident">increase_amount</span>)
-                    .<span class="kw">await</span>
-                    .<span class="ident">expect</span>(<span class="string">&quot;Should increase remaining amount&quot;</span>);
+            <span class="comment">// Increase by amount
+            </span>{
+                <span class="kw">let </span>increase_amount = UnifiedNum::from(<span class="number">1064</span>);
+                <span class="kw">let </span>increase_by = campaign_remaining
+                    .increase_by(campaign, increase_amount)
+                    .<span class="kw">await
+                    </span>.expect(<span class="string">&quot;Should increase remaining amount&quot;</span>);
 
-                <span class="macro">assert_eq!</span>(<span class="number">2_000_i64</span>, <span class="ident">increase_by</span>);
+                <span class="macro">assert_eq!</span>(<span class="number">2_000_i64</span>, increase_by);
             }
 
-            <span class="kw">let</span> <span class="ident">get_remaining</span> <span class="op">=</span> <span class="ident">campaign_remaining</span>
-                .<span class="ident">get_remaining_opt</span>(<span class="ident">campaign</span>)
-                .<span class="kw">await</span>
-                .<span class="ident">expect</span>(<span class="string">&quot;Should get remaining&quot;</span>);
+            <span class="kw">let </span>get_remaining = campaign_remaining
+                .get_remaining_opt(campaign)
+                .<span class="kw">await
+                </span>.expect(<span class="string">&quot;Should get remaining&quot;</span>);
 
-            <span class="macro">assert_eq!</span>(<span class="prelude-val">Some</span>(<span class="number">2_000_i64</span>), <span class="ident">get_remaining</span>);
+            <span class="macro">assert_eq!</span>(<span class="prelude-val">Some</span>(<span class="number">2_000_i64</span>), get_remaining);
 
-            <span class="comment">// Decrease by amount &gt; than currently set</span>
-            {
-                <span class="kw">let</span> <span class="ident">decrease_amount</span> <span class="op">=</span> <span class="ident">UnifiedNum::from</span>(<span class="number">5_000</span>);
-                <span class="kw">let</span> <span class="ident">decrease_by</span> <span class="op">=</span> <span class="ident">campaign_remaining</span>
-                    .<span class="ident">decrease_by</span>(<span class="ident">campaign</span>, <span class="ident">decrease_amount</span>)
-                    .<span class="kw">await</span>
-                    .<span class="ident">expect</span>(<span class="string">&quot;Should decrease remaining amount&quot;</span>);
+            <span class="comment">// Decrease by amount &gt; than currently set
+            </span>{
+                <span class="kw">let </span>decrease_amount = UnifiedNum::from(<span class="number">5_000</span>);
+                <span class="kw">let </span>decrease_by = campaign_remaining
+                    .decrease_by(campaign, decrease_amount)
+                    .<span class="kw">await
+                    </span>.expect(<span class="string">&quot;Should decrease remaining amount&quot;</span>);
 
-                <span class="macro">assert_eq!</span>(<span class="op">-</span><span class="number">3_000_i64</span>, <span class="ident">decrease_by</span>);
+                <span class="macro">assert_eq!</span>(-<span class="number">3_000_i64</span>, decrease_by);
             }
 
-            <span class="comment">// Increase the negative value without going &gt; 0</span>
-            {
-                <span class="kw">let</span> <span class="ident">increase_amount</span> <span class="op">=</span> <span class="ident">UnifiedNum::from</span>(<span class="number">1000</span>);
-                <span class="kw">let</span> <span class="ident">increase_by</span> <span class="op">=</span> <span class="ident">campaign_remaining</span>
-                    .<span class="ident">increase_by</span>(<span class="ident">campaign</span>, <span class="ident">increase_amount</span>)
-                    .<span class="kw">await</span>
-                    .<span class="ident">expect</span>(<span class="string">&quot;Should increase remaining amount&quot;</span>);
+            <span class="comment">// Increase the negative value without going &gt; 0
+            </span>{
+                <span class="kw">let </span>increase_amount = UnifiedNum::from(<span class="number">1000</span>);
+                <span class="kw">let </span>increase_by = campaign_remaining
+                    .increase_by(campaign, increase_amount)
+                    .<span class="kw">await
+                    </span>.expect(<span class="string">&quot;Should increase remaining amount&quot;</span>);
 
-                <span class="macro">assert_eq!</span>(<span class="op">-</span><span class="number">2_000_i64</span>, <span class="ident">increase_by</span>);
+                <span class="macro">assert_eq!</span>(-<span class="number">2_000_i64</span>, increase_by);
             }
         }
 
-        <span class="attribute">#[<span class="ident">tokio::test</span>]</span>
-        <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">it_gets_multiple_campaigns_remaining</span>() {
-            <span class="kw">let</span> <span class="ident">redis</span> <span class="op">=</span> <span class="ident">TESTS_POOL</span>.<span class="ident">get</span>().<span class="kw">await</span>.<span class="ident">expect</span>(<span class="string">&quot;Should return Object&quot;</span>);
-            <span class="kw">let</span> <span class="ident">campaign_remaining</span> <span class="op">=</span> <span class="ident">CampaignRemaining::new</span>(<span class="ident">redis</span>.<span class="ident">connection</span>.<span class="ident">clone</span>());
+        <span class="attribute">#[tokio::test]</span>
+        <span class="kw">async fn </span>it_gets_multiple_campaigns_remaining() {
+            <span class="kw">let </span>redis = TESTS_POOL.get().<span class="kw">await</span>.expect(<span class="string">&quot;Should return Object&quot;</span>);
+            <span class="kw">let </span>campaign_remaining = CampaignRemaining::new(redis.connection.clone());
 
-            <span class="comment">// get multiple with empty campaigns slice</span>
-            <span class="comment">// `MGET` throws error on an empty keys argument</span>
-            <span class="macro">assert!</span>(
-                <span class="ident">campaign_remaining</span>
-                    .<span class="ident">get_multiple</span>(<span class="kw-2">&amp;</span>[])
-                    .<span class="kw">await</span>
-                    .<span class="ident">expect</span>(<span class="string">&quot;Should get multiple&quot;</span>)
-                    .<span class="ident">is_empty</span>(),
-                <span class="string">&quot;Should return an empty result&quot;</span>
-            );
+            <span class="comment">// get multiple with empty campaigns slice
+            // `MGET` throws error on an empty keys argument
+            </span><span class="macro">assert!</span>(
+                campaign_remaining
+                    .get_multiple(<span class="kw-2">&amp;</span>[])
+                    .<span class="kw">await
+                    </span>.expect(<span class="string">&quot;Should get multiple&quot;</span>)
+                    .is_empty(),
+                <span class="string">&quot;Should return an empty result&quot;
+            </span>);
 
-            <span class="kw">let</span> <span class="ident">campaigns</span> <span class="op">=</span> (<span class="ident">CampaignId::new</span>(), <span class="ident">CampaignId::new</span>(), <span class="ident">CampaignId::new</span>());
+            <span class="kw">let </span>campaigns = (CampaignId::new(), CampaignId::new(), CampaignId::new());
 
-            <span class="comment">// set initial amounts</span>
-            {
-                <span class="macro">assert!</span>(<span class="ident">campaign_remaining</span>
-                    .<span class="ident">set_initial</span>(<span class="ident">campaigns</span>.<span class="number">0</span>, <span class="ident">UnifiedNum::from</span>(<span class="number">100</span>))
-                    .<span class="kw">await</span>
-                    .<span class="ident">expect</span>(<span class="string">&quot;Should set value in redis&quot;</span>));
+            <span class="comment">// set initial amounts
+            </span>{
+                <span class="macro">assert!</span>(campaign_remaining
+                    .set_initial(campaigns.<span class="number">0</span>, UnifiedNum::from(<span class="number">100</span>))
+                    .<span class="kw">await
+                    </span>.expect(<span class="string">&quot;Should set value in redis&quot;</span>));
 
-                <span class="macro">assert!</span>(<span class="ident">campaign_remaining</span>
-                    .<span class="ident">set_initial</span>(<span class="ident">campaigns</span>.<span class="number">1</span>, <span class="ident">UnifiedNum::from</span>(<span class="number">200</span>))
-                    .<span class="kw">await</span>
-                    .<span class="ident">expect</span>(<span class="string">&quot;Should set value in redis&quot;</span>));
+                <span class="macro">assert!</span>(campaign_remaining
+                    .set_initial(campaigns.<span class="number">1</span>, UnifiedNum::from(<span class="number">200</span>))
+                    .<span class="kw">await
+                    </span>.expect(<span class="string">&quot;Should set value in redis&quot;</span>));
 
-                <span class="macro">assert!</span>(<span class="ident">campaign_remaining</span>
-                    .<span class="ident">set_initial</span>(<span class="ident">campaigns</span>.<span class="number">2</span>, <span class="ident">UnifiedNum::from</span>(<span class="number">300</span>))
-                    .<span class="kw">await</span>
-                    .<span class="ident">expect</span>(<span class="string">&quot;Should set value in redis&quot;</span>));
+                <span class="macro">assert!</span>(campaign_remaining
+                    .set_initial(campaigns.<span class="number">2</span>, UnifiedNum::from(<span class="number">300</span>))
+                    .<span class="kw">await
+                    </span>.expect(<span class="string">&quot;Should set value in redis&quot;</span>));
             }
 
-            <span class="comment">// set campaigns.1 to negative value, should return `0` because of `max(value, 0)`</span>
-            <span class="macro">assert_eq!</span>(
-                <span class="op">-</span><span class="number">300_i64</span>,
-                <span class="ident">campaign_remaining</span>
-                    .<span class="ident">decrease_by</span>(<span class="ident">campaigns</span>.<span class="number">1</span>, <span class="ident">UnifiedNum::from</span>(<span class="number">500</span>))
-                    .<span class="kw">await</span>
-                    .<span class="ident">expect</span>(<span class="string">&quot;Should decrease remaining&quot;</span>)
+            <span class="comment">// set campaigns.1 to negative value, should return `0` because of `max(value, 0)`
+            </span><span class="macro">assert_eq!</span>(
+                -<span class="number">300_i64</span>,
+                campaign_remaining
+                    .decrease_by(campaigns.<span class="number">1</span>, UnifiedNum::from(<span class="number">500</span>))
+                    .<span class="kw">await
+                    </span>.expect(<span class="string">&quot;Should decrease remaining&quot;</span>)
             );
 
-            <span class="kw">let</span> <span class="ident">multiple</span> <span class="op">=</span> <span class="ident">campaign_remaining</span>
-                .<span class="ident">get_multiple</span>(<span class="kw-2">&amp;</span>[<span class="ident">campaigns</span>.<span class="number">0</span>, <span class="ident">campaigns</span>.<span class="number">1</span>, <span class="ident">campaigns</span>.<span class="number">2</span>])
-                .<span class="kw">await</span>
-                .<span class="ident">expect</span>(<span class="string">&quot;Should get multiple&quot;</span>);
+            <span class="kw">let </span>multiple = campaign_remaining
+                .get_multiple(<span class="kw-2">&amp;</span>[campaigns.<span class="number">0</span>, campaigns.<span class="number">1</span>, campaigns.<span class="number">2</span>])
+                .<span class="kw">await
+                </span>.expect(<span class="string">&quot;Should get multiple&quot;</span>);
 
             <span class="macro">assert_eq!</span>(
                 <span class="macro">vec!</span>[
-                    <span class="ident">UnifiedNum::from</span>(<span class="number">100</span>),
-                    <span class="ident">UnifiedNum::from</span>(<span class="number">0</span>),
-                    <span class="ident">UnifiedNum::from</span>(<span class="number">300</span>)
+                    UnifiedNum::from(<span class="number">100</span>),
+                    UnifiedNum::from(<span class="number">0</span>),
+                    UnifiedNum::from(<span class="number">300</span>)
                 ],
-                <span class="ident">multiple</span>
+                multiple
             );
         }
     }
 }
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
-<span class="kw">mod</span> <span class="ident">test</span> {
-    <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::db</span>::{
-        <span class="ident">insert_channel</span>,
-        <span class="ident">tests_postgres</span>::{<span class="ident">setup_test_migrations</span>, <span class="ident">DATABASE_POOL</span>},
+<span class="attribute">#[cfg(test)]</span>
+<span class="kw">mod </span>test {
+    <span class="kw">use </span><span class="kw">crate</span>::db::{
+        insert_channel,
+        tests_postgres::{setup_test_migrations, DATABASE_POOL},
     };
-    <span class="kw">use</span> <span class="ident">chrono::TimeZone</span>;
-    <span class="kw">use</span> <span class="ident">primitives</span>::{
-        <span class="ident">campaign</span>,
-        <span class="ident">campaign::Validators</span>,
-        <span class="ident">config::GANACHE_CONFIG</span>,
-        <span class="ident">event_submission</span>::{<span class="ident">RateLimit</span>, <span class="ident">Rule</span>},
-        <span class="ident">sentry</span>::{<span class="ident">campaign_modify::ModifyCampaign</span>, <span class="ident">CLICK</span>, <span class="ident">IMPRESSION</span>},
-        <span class="ident">targeting::Rules</span>,
-        <span class="ident">test_util</span>::{
-            <span class="ident">ADVERTISER</span>, <span class="ident">ADVERTISER_2</span>, <span class="ident">CREATOR</span>, <span class="ident">DUMMY_AD_UNITS</span>, <span class="ident">DUMMY_CAMPAIGN</span>,
-            <span class="ident">DUMMY_VALIDATOR_FOLLOWER</span>, <span class="ident">FOLLOWER</span>, <span class="ident">IDS</span>, <span class="ident">LEADER</span>,
+    <span class="kw">use </span>chrono::TimeZone;
+    <span class="kw">use </span>primitives::{
+        campaign,
+        campaign::Validators,
+        config::GANACHE_CONFIG,
+        event_submission::{RateLimit, Rule},
+        sentry::{campaign_modify::ModifyCampaign, CLICK, IMPRESSION},
+        targeting::Rules,
+        test_util::{
+            ADVERTISER, ADVERTISER_2, CREATOR, DUMMY_AD_UNITS, DUMMY_CAMPAIGN,
+            DUMMY_VALIDATOR_FOLLOWER, FOLLOWER, IDS, LEADER,
         },
-        <span class="ident">EventSubmission</span>, <span class="ident">UnifiedNum</span>, <span class="ident">ValidatorDesc</span>, <span class="ident">ValidatorId</span>,
+        EventSubmission, UnifiedNum, ValidatorDesc, ValidatorId,
     };
-    <span class="kw">use</span> <span class="ident">std::time::Duration</span>;
-    <span class="kw">use</span> <span class="ident">tokio_postgres::error::SqlState</span>;
+    <span class="kw">use </span>std::time::Duration;
+    <span class="kw">use </span>tokio_postgres::error::SqlState;
 
-    <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
+    <span class="kw">use super</span>::<span class="kw-2">*</span>;
 
-    <span class="attribute">#[<span class="ident">tokio::test</span>]</span>
-    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">it_inserts_fetches_and_updates_a_campaign</span>() {
-        <span class="kw">let</span> <span class="ident">database</span> <span class="op">=</span> <span class="ident">DATABASE_POOL</span>.<span class="ident">get</span>().<span class="kw">await</span>.<span class="ident">expect</span>(<span class="string">&quot;Should get a DB pool&quot;</span>);
+    <span class="attribute">#[tokio::test]</span>
+    <span class="kw">async fn </span>it_inserts_fetches_and_updates_a_campaign() {
+        <span class="kw">let </span>database = DATABASE_POOL.get().<span class="kw">await</span>.expect(<span class="string">&quot;Should get a DB pool&quot;</span>);
 
-        <span class="ident">setup_test_migrations</span>(<span class="ident">database</span>.<span class="ident">pool</span>.<span class="ident">clone</span>())
-            .<span class="kw">await</span>
-            .<span class="ident">expect</span>(<span class="string">&quot;Migrations should succeed&quot;</span>);
+        setup_test_migrations(database.pool.clone())
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;Migrations should succeed&quot;</span>);
 
-        <span class="kw">let</span> <span class="ident">campaign</span> <span class="op">=</span> <span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">clone</span>();
+        <span class="kw">let </span>campaign = DUMMY_CAMPAIGN.clone();
 
-        <span class="kw">let</span> <span class="ident">channel_chain</span> <span class="op">=</span> <span class="ident">GANACHE_CONFIG</span>
-            .<span class="ident">find_chain_of</span>(<span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">channel</span>.<span class="ident">token</span>)
-            .<span class="ident">expect</span>(<span class="string">&quot;Channel token should be whitelisted in config!&quot;</span>);
-        <span class="kw">let</span> <span class="ident">channel_context</span> <span class="op">=</span> <span class="ident">channel_chain</span>.<span class="ident">with_channel</span>(<span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">channel</span>);
+        <span class="kw">let </span>channel_chain = GANACHE_CONFIG
+            .find_chain_of(DUMMY_CAMPAIGN.channel.token)
+            .expect(<span class="string">&quot;Channel token should be whitelisted in config!&quot;</span>);
+        <span class="kw">let </span>channel_context = channel_chain.with_channel(DUMMY_CAMPAIGN.channel);
 
-        <span class="comment">// insert the channel into the DB</span>
-        <span class="kw">let</span> <span class="ident">_channel</span> <span class="op">=</span> <span class="ident">insert_channel</span>(<span class="kw-2">&amp;</span><span class="ident">database</span>.<span class="ident">pool</span>, <span class="kw-2">&amp;</span><span class="ident">channel_context</span>)
-            .<span class="kw">await</span>
-            .<span class="ident">expect</span>(<span class="string">&quot;Should insert&quot;</span>);
+        <span class="comment">// insert the channel into the DB
+        </span><span class="kw">let </span>_channel = insert_channel(<span class="kw-2">&amp;</span>database.pool, <span class="kw-2">&amp;</span>channel_context)
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;Should insert&quot;</span>);
 
-        <span class="kw">let</span> <span class="ident">non_existent_campaign</span> <span class="op">=</span> <span class="ident">fetch_campaign</span>(<span class="ident">database</span>.<span class="ident">pool</span>.<span class="ident">clone</span>(), <span class="kw-2">&amp;</span><span class="ident">campaign</span>.<span class="ident">id</span>)
-            .<span class="kw">await</span>
-            .<span class="ident">expect</span>(<span class="string">&quot;Should fetch successfully&quot;</span>);
+        <span class="kw">let </span>non_existent_campaign = fetch_campaign(database.pool.clone(), <span class="kw-2">&amp;</span>campaign.id)
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;Should fetch successfully&quot;</span>);
 
-        <span class="macro">assert_eq!</span>(<span class="prelude-val">None</span>, <span class="ident">non_existent_campaign</span>);
+        <span class="macro">assert_eq!</span>(<span class="prelude-val">None</span>, non_existent_campaign);
 
-        <span class="kw">let</span> <span class="ident">is_inserted</span> <span class="op">=</span> <span class="ident">insert_campaign</span>(<span class="kw-2">&amp;</span><span class="ident">database</span>.<span class="ident">pool</span>, <span class="kw-2">&amp;</span><span class="ident">campaign</span>)
-            .<span class="kw">await</span>
-            .<span class="ident">expect</span>(<span class="string">&quot;Should succeed&quot;</span>);
+        <span class="kw">let </span>is_inserted = insert_campaign(<span class="kw-2">&amp;</span>database.pool, <span class="kw-2">&amp;</span>campaign)
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;Should succeed&quot;</span>);
 
-        <span class="macro">assert!</span>(<span class="ident">is_inserted</span>);
+        <span class="macro">assert!</span>(is_inserted);
 
-        <span class="kw">let</span> <span class="ident">is_duplicate_inserted</span> <span class="op">=</span> <span class="ident">insert_campaign</span>(<span class="kw-2">&amp;</span><span class="ident">database</span>.<span class="ident">pool</span>, <span class="kw-2">&amp;</span><span class="ident">campaign</span>).<span class="kw">await</span>;
+        <span class="kw">let </span>is_duplicate_inserted = insert_campaign(<span class="kw-2">&amp;</span>database.pool, <span class="kw-2">&amp;</span>campaign).<span class="kw">await</span>;
 
         <span class="macro">assert!</span>(<span class="macro">matches!</span>(
-            <span class="ident">is_duplicate_inserted</span>,
-            <span class="prelude-val">Err</span>(<span class="ident">PoolError::Backend</span>(<span class="ident">error</span>)) <span class="kw">if</span> <span class="ident">error</span>.<span class="ident">code</span>() <span class="op">==</span> <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span><span class="ident">SqlState::UNIQUE_VIOLATION</span>)
+            is_duplicate_inserted,
+            <span class="prelude-val">Err</span>(PoolError::Backend(error)) <span class="kw">if </span>error.code() == <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>SqlState::UNIQUE_VIOLATION)
         ));
 
-        <span class="kw">let</span> <span class="ident">fetched_campaign</span> <span class="op">=</span> <span class="ident">fetch_campaign</span>(<span class="ident">database</span>.<span class="ident">pool</span>.<span class="ident">clone</span>(), <span class="kw-2">&amp;</span><span class="ident">campaign</span>.<span class="ident">id</span>)
-            .<span class="kw">await</span>
-            .<span class="ident">expect</span>(<span class="string">&quot;Should fetch successfully&quot;</span>);
+        <span class="kw">let </span>fetched_campaign = fetch_campaign(database.pool.clone(), <span class="kw-2">&amp;</span>campaign.id)
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;Should fetch successfully&quot;</span>);
 
-        <span class="macro">assert_eq!</span>(<span class="prelude-val">Some</span>(<span class="ident">campaign</span>.<span class="ident">clone</span>()), <span class="ident">fetched_campaign</span>);
+        <span class="macro">assert_eq!</span>(<span class="prelude-val">Some</span>(campaign.clone()), fetched_campaign);
 
-        <span class="comment">// Update campaign</span>
-        {
-            <span class="kw">let</span> <span class="ident">rule</span> <span class="op">=</span> <span class="ident">Rule</span> {
-                <span class="ident">uids</span>: <span class="prelude-val">None</span>,
-                <span class="ident">rate_limit</span>: <span class="prelude-val">Some</span>(<span class="ident">RateLimit</span> {
-                    <span class="ident">limit_type</span>: <span class="string">&quot;sid&quot;</span>.<span class="ident">to_string</span>(),
-                    <span class="ident">time_frame</span>: <span class="ident">Duration::from_millis</span>(<span class="number">20_000</span>),
+        <span class="comment">// Update campaign
+        </span>{
+            <span class="kw">let </span>rule = Rule {
+                uids: <span class="prelude-val">None</span>,
+                rate_limit: <span class="prelude-val">Some</span>(RateLimit {
+                    limit_type: <span class="string">&quot;sid&quot;</span>.to_string(),
+                    time_frame: Duration::from_millis(<span class="number">20_000</span>),
                 }),
             };
-            <span class="kw">let</span> <span class="ident">new_budget</span> <span class="op">=</span> <span class="ident">campaign</span>.<span class="ident">budget</span> <span class="op">+</span> <span class="ident">UnifiedNum::from_u64</span>(<span class="number">1_000_000_000</span>);
-            <span class="kw">let</span> <span class="ident">modified_campaign</span> <span class="op">=</span> <span class="ident">ModifyCampaign</span> {
-                <span class="ident">budget</span>: <span class="prelude-val">Some</span>(<span class="ident">new_budget</span>),
-                <span class="ident">validators</span>: <span class="prelude-val">None</span>,
-                <span class="ident">title</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;Modified Campaign&quot;</span>.<span class="ident">to_string</span>()),
-                <span class="ident">pricing_bounds</span>: <span class="prelude-val">Some</span>(
+            <span class="kw">let </span>new_budget = campaign.budget + UnifiedNum::from_u64(<span class="number">1_000_000_000</span>);
+            <span class="kw">let </span>modified_campaign = ModifyCampaign {
+                budget: <span class="prelude-val">Some</span>(new_budget),
+                validators: <span class="prelude-val">None</span>,
+                title: <span class="prelude-val">Some</span>(<span class="string">&quot;Modified Campaign&quot;</span>.to_string()),
+                pricing_bounds: <span class="prelude-val">Some</span>(
                     <span class="macro">vec!</span>[
                         (
-                            <span class="ident">IMPRESSION</span>,
-                            <span class="ident">campaign::Pricing</span> {
-                                <span class="ident">min</span>: <span class="number">1</span>.<span class="ident">into</span>(),
-                                <span class="ident">max</span>: <span class="number">10</span>.<span class="ident">into</span>(),
+                            IMPRESSION,
+                            campaign::Pricing {
+                                min: <span class="number">1</span>.into(),
+                                max: <span class="number">10</span>.into(),
                             },
                         ),
                         (
-                            <span class="ident">CLICK</span>,
-                            <span class="ident">campaign::Pricing</span> {
-                                <span class="ident">min</span>: <span class="number">0</span>.<span class="ident">into</span>(),
-                                <span class="ident">max</span>: <span class="number">0</span>.<span class="ident">into</span>(),
+                            CLICK,
+                            campaign::Pricing {
+                                min: <span class="number">0</span>.into(),
+                                max: <span class="number">0</span>.into(),
                             },
                         ),
                     ]
-                    .<span class="ident">into_iter</span>()
-                    .<span class="ident">collect</span>(),
+                    .into_iter()
+                    .collect(),
                 ),
-                <span class="ident">event_submission</span>: <span class="prelude-val">Some</span>(<span class="ident">EventSubmission</span> { <span class="ident">allow</span>: <span class="macro">vec!</span>[<span class="ident">rule</span>] }),
-                <span class="ident">ad_units</span>: <span class="prelude-val">Some</span>(<span class="ident">DUMMY_AD_UNITS</span>.<span class="ident">to_vec</span>()),
-                <span class="ident">targeting_rules</span>: <span class="prelude-val">Some</span>(<span class="ident">Rules::new</span>()),
+                event_submission: <span class="prelude-val">Some</span>(EventSubmission { allow: <span class="macro">vec!</span>[rule] }),
+                ad_units: <span class="prelude-val">Some</span>(DUMMY_AD_UNITS.to_vec()),
+                targeting_rules: <span class="prelude-val">Some</span>(Rules::new()),
             };
 
-            <span class="kw">let</span> <span class="ident">applied_campaign</span> <span class="op">=</span> <span class="ident">modified_campaign</span>.<span class="ident">apply</span>(<span class="ident">campaign</span>.<span class="ident">clone</span>());
+            <span class="kw">let </span>applied_campaign = modified_campaign.apply(campaign.clone());
 
-            <span class="kw">let</span> <span class="ident">updated_campaign</span> <span class="op">=</span> <span class="ident">update_campaign</span>(<span class="kw-2">&amp;</span><span class="ident">database</span>.<span class="ident">pool</span>, <span class="kw-2">&amp;</span><span class="ident">applied_campaign</span>)
-                .<span class="kw">await</span>
-                .<span class="ident">expect</span>(<span class="string">&quot;should update&quot;</span>);
+            <span class="kw">let </span>updated_campaign = update_campaign(<span class="kw-2">&amp;</span>database.pool, <span class="kw-2">&amp;</span>applied_campaign)
+                .<span class="kw">await
+                </span>.expect(<span class="string">&quot;should update&quot;</span>);
 
             <span class="macro">assert_eq!</span>(
-                <span class="ident">applied_campaign</span>, <span class="ident">updated_campaign</span>,
-                <span class="string">&quot;Postgres should update all modified fields&quot;</span>
-            );
+                applied_campaign, updated_campaign,
+                <span class="string">&quot;Postgres should update all modified fields&quot;
+            </span>);
         }
     }
 
-    <span class="comment">// Campaigns are sorted in ascending order when retrieved</span>
-    <span class="comment">// Therefore the last campaign inserted will come up first in results</span>
-    <span class="attribute">#[<span class="ident">tokio::test</span>]</span>
-    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">it_lists_campaigns_properly</span>() {
-        <span class="kw">let</span> <span class="ident">database</span> <span class="op">=</span> <span class="ident">DATABASE_POOL</span>.<span class="ident">get</span>().<span class="kw">await</span>.<span class="ident">expect</span>(<span class="string">&quot;Should get a DB pool&quot;</span>);
+    <span class="comment">// Campaigns are sorted in ascending order when retrieved
+    // Therefore the last campaign inserted will come up first in results
+    </span><span class="attribute">#[tokio::test]</span>
+    <span class="kw">async fn </span>it_lists_campaigns_properly() {
+        <span class="kw">let </span>database = DATABASE_POOL.get().<span class="kw">await</span>.expect(<span class="string">&quot;Should get a DB pool&quot;</span>);
 
-        <span class="ident">setup_test_migrations</span>(<span class="ident">database</span>.<span class="ident">pool</span>.<span class="ident">clone</span>())
-            .<span class="kw">await</span>
-            .<span class="ident">expect</span>(<span class="string">&quot;Migrations should succeed&quot;</span>);
+        setup_test_migrations(database.pool.clone())
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;Migrations should succeed&quot;</span>);
 
-        <span class="kw">let</span> <span class="ident">campaign</span> <span class="op">=</span> <span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">clone</span>();
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">channel_with_different_leader</span> <span class="op">=</span> <span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">channel</span>;
-        <span class="ident">channel_with_different_leader</span>.<span class="ident">leader</span> <span class="op">=</span> <span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="ident">ADVERTISER_2</span>];
+        <span class="kw">let </span>campaign = DUMMY_CAMPAIGN.clone();
+        <span class="kw">let </span><span class="kw-2">mut </span>channel_with_different_leader = DUMMY_CAMPAIGN.channel;
+        channel_with_different_leader.leader = IDS[<span class="kw-2">&amp;</span>ADVERTISER_2];
 
-        <span class="kw">let</span> <span class="ident">channel_chain</span> <span class="op">=</span> <span class="ident">GANACHE_CONFIG</span>
-            .<span class="ident">find_chain_of</span>(<span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">channel</span>.<span class="ident">token</span>)
-            .<span class="ident">expect</span>(<span class="string">&quot;Channel token should be whitelisted in config!&quot;</span>);
-        <span class="kw">let</span> <span class="ident">channel_context</span> <span class="op">=</span> <span class="ident">channel_chain</span>.<span class="ident">clone</span>().<span class="ident">with_channel</span>(<span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">channel</span>);
-        <span class="kw">let</span> <span class="ident">channel_context_different_leader</span> <span class="op">=</span>
-            <span class="ident">channel_chain</span>.<span class="ident">with_channel</span>(<span class="ident">channel_with_different_leader</span>);
+        <span class="kw">let </span>channel_chain = GANACHE_CONFIG
+            .find_chain_of(DUMMY_CAMPAIGN.channel.token)
+            .expect(<span class="string">&quot;Channel token should be whitelisted in config!&quot;</span>);
+        <span class="kw">let </span>channel_context = channel_chain.clone().with_channel(DUMMY_CAMPAIGN.channel);
+        <span class="kw">let </span>channel_context_different_leader =
+            channel_chain.with_channel(channel_with_different_leader);
 
-        <span class="ident">insert_channel</span>(<span class="kw-2">&amp;</span><span class="ident">database</span>, <span class="kw-2">&amp;</span><span class="ident">channel_context</span>)
-            .<span class="kw">await</span>
-            .<span class="ident">expect</span>(<span class="string">&quot;Should insert&quot;</span>);
-        <span class="ident">insert_channel</span>(<span class="kw-2">&amp;</span><span class="ident">database</span>, <span class="kw-2">&amp;</span><span class="ident">channel_context_different_leader</span>)
-            .<span class="kw">await</span>
-            .<span class="ident">expect</span>(<span class="string">&quot;Should insert&quot;</span>);
+        insert_channel(<span class="kw-2">&amp;</span>database, <span class="kw-2">&amp;</span>channel_context)
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;Should insert&quot;</span>);
+        insert_channel(<span class="kw-2">&amp;</span>database, <span class="kw-2">&amp;</span>channel_context_different_leader)
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;Should insert&quot;</span>);
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">campaign_new_id</span> <span class="op">=</span> <span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">clone</span>();
-        <span class="ident">campaign_new_id</span>.<span class="ident">id</span> <span class="op">=</span> <span class="ident">CampaignId::new</span>();
-        <span class="ident">campaign_new_id</span>.<span class="ident">created</span> <span class="op">=</span> <span class="ident">Utc</span>.<span class="ident">ymd</span>(<span class="number">2020</span>, <span class="number">2</span>, <span class="number">1</span>).<span class="ident">and_hms</span>(<span class="number">7</span>, <span class="number">0</span>, <span class="number">0</span>); <span class="comment">// 1 year before previous</span>
+        <span class="kw">let </span><span class="kw-2">mut </span>campaign_new_id = DUMMY_CAMPAIGN.clone();
+        campaign_new_id.id = CampaignId::new();
+        campaign_new_id.created = Utc.ymd(<span class="number">2020</span>, <span class="number">2</span>, <span class="number">1</span>).and_hms(<span class="number">7</span>, <span class="number">0</span>, <span class="number">0</span>); <span class="comment">// 1 year before previous
 
-        <span class="comment">// campaign with a different creator</span>
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">campaign_new_creator</span> <span class="op">=</span> <span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">clone</span>();
-        <span class="ident">campaign_new_creator</span>.<span class="ident">id</span> <span class="op">=</span> <span class="ident">CampaignId::new</span>();
-        <span class="ident">campaign_new_creator</span>.<span class="ident">creator</span> <span class="op">=</span> <span class="kw-2">*</span><span class="ident">ADVERTISER</span>;
-        <span class="ident">campaign_new_creator</span>.<span class="ident">created</span> <span class="op">=</span> <span class="ident">Utc</span>.<span class="ident">ymd</span>(<span class="number">2019</span>, <span class="number">2</span>, <span class="number">1</span>).<span class="ident">and_hms</span>(<span class="number">7</span>, <span class="number">0</span>, <span class="number">0</span>); <span class="comment">// 1 year before previous</span>
+        // campaign with a different creator
+        </span><span class="kw">let </span><span class="kw-2">mut </span>campaign_new_creator = DUMMY_CAMPAIGN.clone();
+        campaign_new_creator.id = CampaignId::new();
+        campaign_new_creator.creator = <span class="kw-2">*</span>ADVERTISER;
+        campaign_new_creator.created = Utc.ymd(<span class="number">2019</span>, <span class="number">2</span>, <span class="number">1</span>).and_hms(<span class="number">7</span>, <span class="number">0</span>, <span class="number">0</span>); <span class="comment">// 1 year before previous
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">campaign_new_leader</span> <span class="op">=</span> <span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">clone</span>();
-        <span class="ident">campaign_new_leader</span>.<span class="ident">id</span> <span class="op">=</span> <span class="ident">CampaignId::new</span>();
-        <span class="ident">campaign_new_leader</span>.<span class="ident">created</span> <span class="op">=</span> <span class="ident">Utc</span>.<span class="ident">ymd</span>(<span class="number">2018</span>, <span class="number">2</span>, <span class="number">1</span>).<span class="ident">and_hms</span>(<span class="number">7</span>, <span class="number">0</span>, <span class="number">0</span>); <span class="comment">// 1 year before previous</span>
+        </span><span class="kw">let </span><span class="kw-2">mut </span>campaign_new_leader = DUMMY_CAMPAIGN.clone();
+        campaign_new_leader.id = CampaignId::new();
+        campaign_new_leader.created = Utc.ymd(<span class="number">2018</span>, <span class="number">2</span>, <span class="number">1</span>).and_hms(<span class="number">7</span>, <span class="number">0</span>, <span class="number">0</span>); <span class="comment">// 1 year before previous
 
-        <span class="kw">let</span> <span class="ident">different_leader</span>: <span class="ident">ValidatorDesc</span> <span class="op">=</span> <span class="ident">ValidatorDesc</span> {
-            <span class="ident">id</span>: <span class="ident">ValidatorId::try_from</span>(<span class="string">&quot;0x20754168c00a6e58116ccfd0a5f7d1bb66c5de9d&quot;</span>)
-                .<span class="ident">expect</span>(<span class="string">&quot;Failed to parse DUMMY_VALIDATOR_DIFFERENT_LEADER id&quot;</span>),
-            <span class="ident">url</span>: <span class="string">&quot;http://localhost:8005&quot;</span>.<span class="ident">to_string</span>(),
-            <span class="ident">fee</span>: <span class="number">100</span>.<span class="ident">into</span>(),
-            <span class="ident">fee_addr</span>: <span class="prelude-val">None</span>,
+        </span><span class="kw">let </span>different_leader: ValidatorDesc = ValidatorDesc {
+            id: ValidatorId::try_from(<span class="string">&quot;0x20754168c00a6e58116ccfd0a5f7d1bb66c5de9d&quot;</span>)
+                .expect(<span class="string">&quot;Failed to parse DUMMY_VALIDATOR_DIFFERENT_LEADER id&quot;</span>),
+            url: <span class="string">&quot;http://localhost:8005&quot;</span>.to_string(),
+            fee: <span class="number">100</span>.into(),
+            fee_addr: <span class="prelude-val">None</span>,
         };
-        <span class="ident">campaign_new_leader</span>.<span class="ident">channel</span> <span class="op">=</span> <span class="ident">channel_with_different_leader</span>;
-        <span class="ident">campaign_new_leader</span>.<span class="ident">validators</span> <span class="op">=</span>
-            <span class="ident">Validators::new</span>((<span class="ident">different_leader</span>.<span class="ident">clone</span>(), <span class="ident">DUMMY_VALIDATOR_FOLLOWER</span>.<span class="ident">clone</span>()));
+        campaign_new_leader.channel = channel_with_different_leader;
+        campaign_new_leader.validators =
+            Validators::new((different_leader.clone(), DUMMY_VALIDATOR_FOLLOWER.clone()));
 
-        <span class="ident">insert_campaign</span>(<span class="kw-2">&amp;</span><span class="ident">database</span>, <span class="kw-2">&amp;</span><span class="ident">campaign</span>)
-            .<span class="kw">await</span>
-            .<span class="ident">expect</span>(<span class="string">&quot;Should insert&quot;</span>); <span class="comment">// fourth</span>
-        <span class="ident">insert_campaign</span>(<span class="kw-2">&amp;</span><span class="ident">database</span>, <span class="kw-2">&amp;</span><span class="ident">campaign_new_id</span>)
-            .<span class="kw">await</span>
-            .<span class="ident">expect</span>(<span class="string">&quot;Should insert&quot;</span>); <span class="comment">// third</span>
-        <span class="ident">insert_campaign</span>(<span class="kw-2">&amp;</span><span class="ident">database</span>, <span class="kw-2">&amp;</span><span class="ident">campaign_new_creator</span>)
-            .<span class="kw">await</span>
-            .<span class="ident">expect</span>(<span class="string">&quot;Should insert&quot;</span>); <span class="comment">// second</span>
-        <span class="ident">insert_campaign</span>(<span class="kw-2">&amp;</span><span class="ident">database</span>, <span class="kw-2">&amp;</span><span class="ident">campaign_new_leader</span>)
-            .<span class="kw">await</span>
-            .<span class="ident">expect</span>(<span class="string">&quot;Should insert&quot;</span>); <span class="comment">// first</span>
+        insert_campaign(<span class="kw-2">&amp;</span>database, <span class="kw-2">&amp;</span>campaign)
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;Should insert&quot;</span>); <span class="comment">// fourth
+        </span>insert_campaign(<span class="kw-2">&amp;</span>database, <span class="kw-2">&amp;</span>campaign_new_id)
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;Should insert&quot;</span>); <span class="comment">// third
+        </span>insert_campaign(<span class="kw-2">&amp;</span>database, <span class="kw-2">&amp;</span>campaign_new_creator)
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;Should insert&quot;</span>); <span class="comment">// second
+        </span>insert_campaign(<span class="kw-2">&amp;</span>database, <span class="kw-2">&amp;</span>campaign_new_leader)
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;Should insert&quot;</span>); <span class="comment">// first
 
-        <span class="comment">// 2 out of 3 results</span>
-        <span class="kw">let</span> <span class="ident">first_page</span> <span class="op">=</span> <span class="ident">list_campaigns</span>(
-            <span class="kw-2">&amp;</span><span class="ident">database</span>.<span class="ident">pool</span>,
+        // 2 out of 3 results
+        </span><span class="kw">let </span>first_page = list_campaigns(
+            <span class="kw-2">&amp;</span>database.pool,
             <span class="number">0</span>,
             <span class="number">2</span>,
-            <span class="prelude-val">Some</span>(<span class="kw-2">*</span><span class="ident">CREATOR</span>),
+            <span class="prelude-val">Some</span>(<span class="kw-2">*</span>CREATOR),
             <span class="prelude-val">None</span>,
-            <span class="kw-2">&amp;</span><span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">created</span>,
+            <span class="kw-2">&amp;</span>DUMMY_CAMPAIGN.created,
         )
-        .<span class="kw">await</span>
-        .<span class="ident">expect</span>(<span class="string">&quot;should fetch&quot;</span>);
+        .<span class="kw">await
+        </span>.expect(<span class="string">&quot;should fetch&quot;</span>);
         <span class="macro">assert_eq!</span>(
-            <span class="ident">first_page</span>.<span class="ident">campaigns</span>,
-            <span class="macro">vec!</span>[<span class="ident">campaign_new_leader</span>.<span class="ident">clone</span>(), <span class="ident">campaign_new_id</span>.<span class="ident">clone</span>()]
+            first_page.campaigns,
+            <span class="macro">vec!</span>[campaign_new_leader.clone(), campaign_new_id.clone()]
         );
 
-        <span class="comment">// 3rd result</span>
-        <span class="kw">let</span> <span class="ident">second_page</span> <span class="op">=</span> <span class="ident">list_campaigns</span>(
-            <span class="kw-2">&amp;</span><span class="ident">database</span>.<span class="ident">pool</span>,
+        <span class="comment">// 3rd result
+        </span><span class="kw">let </span>second_page = list_campaigns(
+            <span class="kw-2">&amp;</span>database.pool,
             <span class="number">2</span>,
             <span class="number">2</span>,
-            <span class="prelude-val">Some</span>(<span class="kw-2">*</span><span class="ident">CREATOR</span>),
+            <span class="prelude-val">Some</span>(<span class="kw-2">*</span>CREATOR),
             <span class="prelude-val">None</span>,
-            <span class="kw-2">&amp;</span><span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">created</span>,
+            <span class="kw-2">&amp;</span>DUMMY_CAMPAIGN.created,
         )
-        .<span class="kw">await</span>
-        .<span class="ident">expect</span>(<span class="string">&quot;should fetch&quot;</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">second_page</span>.<span class="ident">campaigns</span>, <span class="macro">vec!</span>[<span class="ident">campaign</span>.<span class="ident">clone</span>()]);
+        .<span class="kw">await
+        </span>.expect(<span class="string">&quot;should fetch&quot;</span>);
+        <span class="macro">assert_eq!</span>(second_page.campaigns, <span class="macro">vec!</span>[campaign.clone()]);
 
-        <span class="comment">// No results past limit</span>
-        <span class="kw">let</span> <span class="ident">third_page</span> <span class="op">=</span> <span class="ident">list_campaigns</span>(
-            <span class="kw-2">&amp;</span><span class="ident">database</span>.<span class="ident">pool</span>,
+        <span class="comment">// No results past limit
+        </span><span class="kw">let </span>third_page = list_campaigns(
+            <span class="kw-2">&amp;</span>database.pool,
             <span class="number">4</span>,
             <span class="number">2</span>,
-            <span class="prelude-val">Some</span>(<span class="kw-2">*</span><span class="ident">CREATOR</span>),
+            <span class="prelude-val">Some</span>(<span class="kw-2">*</span>CREATOR),
             <span class="prelude-val">None</span>,
-            <span class="kw-2">&amp;</span><span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">created</span>,
+            <span class="kw-2">&amp;</span>DUMMY_CAMPAIGN.created,
         )
-        .<span class="kw">await</span>
-        .<span class="ident">expect</span>(<span class="string">&quot;should fetch&quot;</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">third_page</span>.<span class="ident">campaigns</span>.<span class="ident">len</span>(), <span class="number">0</span>);
+        .<span class="kw">await
+        </span>.expect(<span class="string">&quot;should fetch&quot;</span>);
+        <span class="macro">assert_eq!</span>(third_page.campaigns.len(), <span class="number">0</span>);
 
-        <span class="comment">// Test with a different creator</span>
-        <span class="kw">let</span> <span class="ident">first_page</span> <span class="op">=</span> <span class="ident">list_campaigns</span>(
-            <span class="kw-2">&amp;</span><span class="ident">database</span>.<span class="ident">pool</span>,
+        <span class="comment">// Test with a different creator
+        </span><span class="kw">let </span>first_page = list_campaigns(
+            <span class="kw-2">&amp;</span>database.pool,
             <span class="number">0</span>,
             <span class="number">2</span>,
-            <span class="prelude-val">Some</span>(<span class="kw-2">*</span><span class="ident">ADVERTISER</span>),
+            <span class="prelude-val">Some</span>(<span class="kw-2">*</span>ADVERTISER),
             <span class="prelude-val">None</span>,
-            <span class="kw-2">&amp;</span><span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">created</span>,
+            <span class="kw-2">&amp;</span>DUMMY_CAMPAIGN.created,
         )
-        .<span class="kw">await</span>
-        .<span class="ident">expect</span>(<span class="string">&quot;should fetch&quot;</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">first_page</span>.<span class="ident">campaigns</span>, <span class="macro">vec!</span>[<span class="ident">campaign_new_creator</span>.<span class="ident">clone</span>()]);
+        .<span class="kw">await
+        </span>.expect(<span class="string">&quot;should fetch&quot;</span>);
+        <span class="macro">assert_eq!</span>(first_page.campaigns, <span class="macro">vec!</span>[campaign_new_creator.clone()]);
 
-        <span class="comment">// Test with validator</span>
-        <span class="kw">let</span> <span class="ident">first_page</span> <span class="op">=</span> <span class="ident">list_campaigns</span>(
-            <span class="kw-2">&amp;</span><span class="ident">database</span>.<span class="ident">pool</span>,
+        <span class="comment">// Test with validator
+        </span><span class="kw">let </span>first_page = list_campaigns(
+            <span class="kw-2">&amp;</span>database.pool,
             <span class="number">0</span>,
             <span class="number">5</span>,
             <span class="prelude-val">None</span>,
-            <span class="prelude-val">Some</span>(<span class="ident">ValidatorParam::Validator</span>(<span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="ident">FOLLOWER</span>])),
-            <span class="kw-2">&amp;</span><span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">created</span>,
+            <span class="prelude-val">Some</span>(ValidatorParam::Validator(IDS[<span class="kw-2">&amp;</span>FOLLOWER])),
+            <span class="kw-2">&amp;</span>DUMMY_CAMPAIGN.created,
         )
-        .<span class="kw">await</span>
-        .<span class="ident">expect</span>(<span class="string">&quot;should fetch&quot;</span>);
+        .<span class="kw">await
+        </span>.expect(<span class="string">&quot;should fetch&quot;</span>);
         <span class="macro">assert_eq!</span>(
-            <span class="ident">first_page</span>.<span class="ident">campaigns</span>,
+            first_page.campaigns,
             <span class="macro">vec!</span>[
-                <span class="ident">campaign_new_leader</span>.<span class="ident">clone</span>(),
-                <span class="ident">campaign_new_creator</span>.<span class="ident">clone</span>(),
-                <span class="ident">campaign_new_id</span>.<span class="ident">clone</span>(),
-                <span class="ident">campaign</span>.<span class="ident">clone</span>()
+                campaign_new_leader.clone(),
+                campaign_new_creator.clone(),
+                campaign_new_id.clone(),
+                campaign.clone()
             ]
         );
 
-        <span class="comment">// Test with leader validator</span>
-        <span class="kw">let</span> <span class="ident">first_page</span> <span class="op">=</span> <span class="ident">list_campaigns</span>(
-            <span class="kw-2">&amp;</span><span class="ident">database</span>.<span class="ident">pool</span>,
+        <span class="comment">// Test with leader validator
+        </span><span class="kw">let </span>first_page = list_campaigns(
+            <span class="kw-2">&amp;</span>database.pool,
             <span class="number">0</span>,
             <span class="number">5</span>,
             <span class="prelude-val">None</span>,
-            <span class="prelude-val">Some</span>(<span class="ident">ValidatorParam::Leader</span>(<span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="ident">LEADER</span>])),
-            <span class="kw-2">&amp;</span><span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">created</span>,
+            <span class="prelude-val">Some</span>(ValidatorParam::Leader(IDS[<span class="kw-2">&amp;</span>LEADER])),
+            <span class="kw-2">&amp;</span>DUMMY_CAMPAIGN.created,
         )
-        .<span class="kw">await</span>
-        .<span class="ident">expect</span>(<span class="string">&quot;should fetch&quot;</span>);
+        .<span class="kw">await
+        </span>.expect(<span class="string">&quot;should fetch&quot;</span>);
         <span class="macro">assert_eq!</span>(
-            <span class="ident">first_page</span>.<span class="ident">campaigns</span>,
+            first_page.campaigns,
             <span class="macro">vec!</span>[
-                <span class="ident">campaign_new_creator</span>.<span class="ident">clone</span>(),
-                <span class="ident">campaign_new_id</span>.<span class="ident">clone</span>(),
-                <span class="ident">campaign</span>.<span class="ident">clone</span>()
+                campaign_new_creator.clone(),
+                campaign_new_id.clone(),
+                campaign.clone()
             ]
         );
 
-        <span class="comment">// Test with a different leader validator</span>
-        <span class="kw">let</span> <span class="ident">first_page</span> <span class="op">=</span> <span class="ident">list_campaigns</span>(
-            <span class="kw-2">&amp;</span><span class="ident">database</span>.<span class="ident">pool</span>,
+        <span class="comment">// Test with a different leader validator
+        </span><span class="kw">let </span>first_page = list_campaigns(
+            <span class="kw-2">&amp;</span>database.pool,
             <span class="number">0</span>,
             <span class="number">5</span>,
             <span class="prelude-val">None</span>,
-            <span class="prelude-val">Some</span>(<span class="ident">ValidatorParam::Leader</span>(<span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="ident">ADVERTISER_2</span>])),
-            <span class="kw-2">&amp;</span><span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">created</span>,
+            <span class="prelude-val">Some</span>(ValidatorParam::Leader(IDS[<span class="kw-2">&amp;</span>ADVERTISER_2])),
+            <span class="kw-2">&amp;</span>DUMMY_CAMPAIGN.created,
         )
-        .<span class="kw">await</span>
-        .<span class="ident">expect</span>(<span class="string">&quot;should fetch&quot;</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">first_page</span>.<span class="ident">campaigns</span>, <span class="macro">vec!</span>[<span class="ident">campaign_new_leader</span>.<span class="ident">clone</span>()]);
+        .<span class="kw">await
+        </span>.expect(<span class="string">&quot;should fetch&quot;</span>);
+        <span class="macro">assert_eq!</span>(first_page.campaigns, <span class="macro">vec!</span>[campaign_new_leader.clone()]);
 
-        <span class="comment">// Test with leader validator but validator isn&#39;t the leader of any campaign</span>
-        <span class="kw">let</span> <span class="ident">first_page</span> <span class="op">=</span> <span class="ident">list_campaigns</span>(
-            <span class="kw-2">&amp;</span><span class="ident">database</span>.<span class="ident">pool</span>,
+        <span class="comment">// Test with leader validator but validator isn&#39;t the leader of any campaign
+        </span><span class="kw">let </span>first_page = list_campaigns(
+            <span class="kw-2">&amp;</span>database.pool,
             <span class="number">0</span>,
             <span class="number">5</span>,
             <span class="prelude-val">None</span>,
-            <span class="prelude-val">Some</span>(<span class="ident">ValidatorParam::Leader</span>(<span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="ident">FOLLOWER</span>])),
-            <span class="kw-2">&amp;</span><span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">created</span>,
+            <span class="prelude-val">Some</span>(ValidatorParam::Leader(IDS[<span class="kw-2">&amp;</span>FOLLOWER])),
+            <span class="kw-2">&amp;</span>DUMMY_CAMPAIGN.created,
         )
-        .<span class="kw">await</span>
-        .<span class="ident">expect</span>(<span class="string">&quot;should fetch&quot;</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">first_page</span>.<span class="ident">campaigns</span>.<span class="ident">len</span>(), <span class="number">0</span>);
+        .<span class="kw">await
+        </span>.expect(<span class="string">&quot;should fetch&quot;</span>);
+        <span class="macro">assert_eq!</span>(first_page.campaigns.len(), <span class="number">0</span>);
 
-        <span class="comment">// Test with creator and provided leader validator</span>
-        <span class="kw">let</span> <span class="ident">first_page</span> <span class="op">=</span> <span class="ident">list_campaigns</span>(
-            <span class="kw-2">&amp;</span><span class="ident">database</span>.<span class="ident">pool</span>,
+        <span class="comment">// Test with creator and provided leader validator
+        </span><span class="kw">let </span>first_page = list_campaigns(
+            <span class="kw-2">&amp;</span>database.pool,
             <span class="number">0</span>,
             <span class="number">5</span>,
-            <span class="prelude-val">Some</span>(<span class="kw-2">*</span><span class="ident">CREATOR</span>),
-            <span class="prelude-val">Some</span>(<span class="ident">ValidatorParam::Leader</span>(<span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="ident">LEADER</span>])),
-            <span class="kw-2">&amp;</span><span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">created</span>,
+            <span class="prelude-val">Some</span>(<span class="kw-2">*</span>CREATOR),
+            <span class="prelude-val">Some</span>(ValidatorParam::Leader(IDS[<span class="kw-2">&amp;</span>LEADER])),
+            <span class="kw-2">&amp;</span>DUMMY_CAMPAIGN.created,
         )
-        .<span class="kw">await</span>
-        .<span class="ident">expect</span>(<span class="string">&quot;should fetch&quot;</span>);
+        .<span class="kw">await
+        </span>.expect(<span class="string">&quot;should fetch&quot;</span>);
         <span class="macro">assert_eq!</span>(
-            <span class="ident">first_page</span>.<span class="ident">campaigns</span>,
-            <span class="macro">vec!</span>[<span class="ident">campaign_new_id</span>.<span class="ident">clone</span>(), <span class="ident">campaign</span>.<span class="ident">clone</span>()]
+            first_page.campaigns,
+            <span class="macro">vec!</span>[campaign_new_id.clone(), campaign.clone()]
         );
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (20ffea693 2022-08-11)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>

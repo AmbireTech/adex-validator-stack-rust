@@ -167,174 +167,174 @@
 <span id="167">167</span>
 <span id="168">168</span>
 <span id="169">169</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">serde</span>::{<span class="ident">Deserialize</span>, <span class="ident">Serialize</span>};
-<span class="kw">use</span> <span class="ident">std</span>::{
-    <span class="ident">collections</span>::{
-        <span class="ident">btree_map</span>::{<span class="ident">Entry</span>, <span class="ident">IntoIter</span>, <span class="ident">Iter</span>, <span class="ident">Values</span>},
-        <span class="ident">BTreeMap</span>,
+</pre><pre class="rust"><code><span class="kw">use </span>serde::{Deserialize, Serialize};
+<span class="kw">use </span>std::{
+    collections::{
+        btree_map::{Entry, IntoIter, Iter, Values},
+        BTreeMap,
     },
-    <span class="ident">iter::FromIterator</span>,
-    <span class="ident">ops::Index</span>,
+    iter::FromIterator,
+    ops::Index,
 };
 
-<span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">Address</span>, <span class="ident">BigNum</span>, <span class="ident">UnifiedNum</span>};
+<span class="kw">use crate</span>::{Address, BigNum, UnifiedNum};
 
-<span class="kw">pub</span> <span class="kw">type</span> <span class="ident">UnifiedMap</span> <span class="op">=</span> <span class="ident">Map</span><span class="op">&lt;</span><span class="ident">Address</span>, <span class="ident">UnifiedNum</span><span class="op">&gt;</span>;
-<span class="kw">pub</span> <span class="kw">type</span> <span class="ident">BalancesMap</span> <span class="op">=</span> <span class="ident">Map</span><span class="op">&lt;</span><span class="ident">Address</span>, <span class="ident">BigNum</span><span class="op">&gt;</span>;
+<span class="kw">pub type </span>UnifiedMap = Map&lt;Address, UnifiedNum&gt;;
+<span class="kw">pub type </span>BalancesMap = Map&lt;Address, BigNum&gt;;
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Debug</span>, <span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>)]</span>
-<span class="attribute">#[<span class="ident">serde</span>(<span class="ident">transparent</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Map</span><span class="op">&lt;</span><span class="ident">K</span>: <span class="ident">Ord</span>, <span class="ident">V</span><span class="op">&gt;</span>(<span class="ident">BTreeMap</span><span class="op">&lt;</span><span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span>);
+<span class="attribute">#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]</span>
+<span class="attribute">#[serde(transparent)]</span>
+<span class="kw">pub struct </span>Map&lt;K: Ord, V&gt;(BTreeMap&lt;K, V&gt;);
 
-<span class="kw">impl</span> <span class="ident">Map</span><span class="op">&lt;</span><span class="ident">Address</span>, <span class="ident">UnifiedNum</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">to_precision</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">precision</span>: <span class="ident">u8</span>) -&gt; <span class="ident">BalancesMap</span> {
-        <span class="self">self</span>.<span class="ident">iter</span>()
-            .<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">address</span>, <span class="ident">unified_num</span>)<span class="op">|</span> (<span class="kw-2">*</span><span class="ident">address</span>, <span class="ident">unified_num</span>.<span class="ident">to_precision</span>(<span class="ident">precision</span>)))
-            .<span class="ident">collect</span>()
+<span class="kw">impl </span>Map&lt;Address, UnifiedNum&gt; {
+    <span class="kw">pub fn </span>to_precision(<span class="kw-2">&amp;</span><span class="self">self</span>, precision: u8) -&gt; BalancesMap {
+        <span class="self">self</span>.iter()
+            .map(|(address, unified_num)| (<span class="kw-2">*</span>address, unified_num.to_precision(precision)))
+            .collect()
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">K</span>: <span class="ident">Ord</span>, <span class="ident">V</span><span class="op">&gt;</span> <span class="ident">Default</span> <span class="kw">for</span> <span class="ident">Map</span><span class="op">&lt;</span><span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">default</span>() -&gt; <span class="self">Self</span> {
-        <span class="ident">Map</span>(<span class="ident">BTreeMap::default</span>())
+<span class="kw">impl</span>&lt;K: Ord, V&gt; Default <span class="kw">for </span>Map&lt;K, V&gt; {
+    <span class="kw">fn </span>default() -&gt; <span class="self">Self </span>{
+        Map(BTreeMap::default())
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">K</span>: <span class="ident">Ord</span>, <span class="ident">V</span><span class="op">&gt;</span> <span class="ident">Index</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;_</span> <span class="ident">K</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Map</span><span class="op">&lt;</span><span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span> {
-    <span class="kw">type</span> <span class="ident">Output</span> <span class="op">=</span> <span class="ident">V</span>;
+<span class="kw">impl</span>&lt;K: Ord, V&gt; Index&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;_ </span>K&gt; <span class="kw">for </span>Map&lt;K, V&gt; {
+    <span class="kw">type </span>Output = V;
 
-    <span class="kw">fn</span> <span class="ident">index</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">index</span>: <span class="kw-2">&amp;</span><span class="ident">K</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident"><span class="self">Self</span>::Output</span> {
-        <span class="self">self</span>.<span class="number">0</span>.<span class="ident">index</span>(<span class="ident">index</span>)
+    <span class="kw">fn </span>index(<span class="kw-2">&amp;</span><span class="self">self</span>, index: <span class="kw-2">&amp;</span>K) -&gt; <span class="kw-2">&amp;</span><span class="self">Self</span>::Output {
+        <span class="self">self</span>.<span class="number">0</span>.index(index)
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">K</span>: <span class="ident">Ord</span>, <span class="ident">V</span><span class="op">&gt;</span> <span class="ident">Map</span><span class="op">&lt;</span><span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">iter</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Iter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span>, <span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="number">0</span>.<span class="ident">iter</span>()
+<span class="kw">impl</span>&lt;K: Ord, V&gt; Map&lt;K, V&gt; {
+    <span class="kw">pub fn </span>iter(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Iter&lt;<span class="lifetime">&#39;_</span>, K, V&gt; {
+        <span class="self">self</span>.<span class="number">0</span>.iter()
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">values</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Values</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span>, <span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="number">0</span>.<span class="ident">values</span>()
+    <span class="kw">pub fn </span>values(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Values&lt;<span class="lifetime">&#39;_</span>, K, V&gt; {
+        <span class="self">self</span>.<span class="number">0</span>.values()
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">key</span>: <span class="kw-2">&amp;</span><span class="ident">K</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">V</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="number">0</span>.<span class="ident">get</span>(<span class="ident">key</span>)
+    <span class="kw">pub fn </span>get(<span class="kw-2">&amp;</span><span class="self">self</span>, key: <span class="kw-2">&amp;</span>K) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>V&gt; {
+        <span class="self">self</span>.<span class="number">0</span>.get(key)
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">contains_key</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">key</span>: <span class="kw-2">&amp;</span><span class="ident">K</span>) -&gt; <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="number">0</span>.<span class="ident">contains_key</span>(<span class="ident">key</span>)
+    <span class="kw">pub fn </span>contains_key(<span class="kw-2">&amp;</span><span class="self">self</span>, key: <span class="kw-2">&amp;</span>K) -&gt; bool {
+        <span class="self">self</span>.<span class="number">0</span>.contains_key(key)
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">entry</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">key</span>: <span class="ident">K</span>) -&gt; <span class="ident">Entry</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span>, <span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="number">0</span>.<span class="ident">entry</span>(<span class="ident">key</span>)
+    <span class="kw">pub fn </span>entry(<span class="kw-2">&amp;mut </span><span class="self">self</span>, key: K) -&gt; Entry&lt;<span class="lifetime">&#39;_</span>, K, V&gt; {
+        <span class="self">self</span>.<span class="number">0</span>.entry(key)
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">insert</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">key</span>: <span class="ident">K</span>, <span class="ident">value</span>: <span class="ident">V</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">V</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="number">0</span>.<span class="ident">insert</span>(<span class="ident">key</span>, <span class="ident">value</span>)
+    <span class="kw">pub fn </span>insert(<span class="kw-2">&amp;mut </span><span class="self">self</span>, key: K, value: V) -&gt; <span class="prelude-ty">Option</span>&lt;V&gt; {
+        <span class="self">self</span>.<span class="number">0</span>.insert(key, value)
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">len</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="number">0</span>.<span class="ident">len</span>()
+    <span class="kw">pub fn </span>len(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+        <span class="self">self</span>.<span class="number">0</span>.len()
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_empty</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="number">0</span>.<span class="ident">is_empty</span>()
-    }
-}
-
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">K</span>: <span class="ident">Ord</span>, <span class="ident">V</span><span class="op">&gt;</span> <span class="ident">FromIterator</span><span class="op">&lt;</span>(<span class="ident">K</span>, <span class="ident">V</span>)<span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Map</span><span class="op">&lt;</span><span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">from_iter</span><span class="op">&lt;</span><span class="ident">I</span>: <span class="ident">IntoIterator</span><span class="op">&lt;</span><span class="ident">Item</span> <span class="op">=</span> (<span class="ident">K</span>, <span class="ident">V</span>)<span class="op">&gt;</span><span class="op">&gt;</span>(<span class="ident">iter</span>: <span class="ident">I</span>) -&gt; <span class="self">Self</span> {
-        <span class="comment">// @TODO: Is there better way to do this?</span>
-        <span class="kw">let</span> <span class="ident">btree_map</span>: <span class="ident">BTreeMap</span><span class="op">&lt;</span><span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">iter</span>.<span class="ident">into_iter</span>().<span class="ident">collect</span>();
-
-        <span class="ident">Map</span>(<span class="ident">btree_map</span>)
+    <span class="kw">pub fn </span>is_empty(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="self">self</span>.<span class="number">0</span>.is_empty()
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">K</span>: <span class="ident">Ord</span>, <span class="ident">V</span><span class="op">&gt;</span> <span class="ident">IntoIterator</span> <span class="kw">for</span> <span class="ident">Map</span><span class="op">&lt;</span><span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span> {
-    <span class="kw">type</span> <span class="ident">Item</span> <span class="op">=</span> (<span class="ident">K</span>, <span class="ident">V</span>);
-    <span class="kw">type</span> <span class="ident">IntoIter</span> <span class="op">=</span> <span class="ident">IntoIter</span><span class="op">&lt;</span><span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span>;
+<span class="kw">impl</span>&lt;K: Ord, V&gt; FromIterator&lt;(K, V)&gt; <span class="kw">for </span>Map&lt;K, V&gt; {
+    <span class="kw">fn </span>from_iter&lt;I: IntoIterator&lt;Item = (K, V)&gt;&gt;(iter: I) -&gt; <span class="self">Self </span>{
+        <span class="comment">// @TODO: Is there better way to do this?
+        </span><span class="kw">let </span>btree_map: BTreeMap&lt;K, V&gt; = iter.into_iter().collect();
 
-    <span class="kw">fn</span> <span class="ident">into_iter</span>(<span class="self">self</span>) -&gt; <span class="ident"><span class="self">Self</span>::IntoIter</span> {
-        <span class="self">self</span>.<span class="number">0</span>.<span class="ident">into_iter</span>()
+        Map(btree_map)
     }
 }
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
-<span class="kw">mod</span> <span class="ident">test</span> {
-    <span class="kw">use</span> <span class="ident">serde_json::json</span>;
+<span class="kw">impl</span>&lt;K: Ord, V&gt; IntoIterator <span class="kw">for </span>Map&lt;K, V&gt; {
+    <span class="kw">type </span>Item = (K, V);
+    <span class="kw">type </span>IntoIter = IntoIter&lt;K, V&gt;;
 
-    <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
-    <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::test_util</span>::{<span class="ident">FOLLOWER</span>, <span class="ident">LEADER</span>};
+    <span class="kw">fn </span>into_iter(<span class="self">self</span>) -&gt; <span class="self">Self</span>::IntoIter {
+        <span class="self">self</span>.<span class="number">0</span>.into_iter()
+    }
+}
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">test_unified_map_de_serialization</span>() {
-        <span class="kw">let</span> <span class="ident">unified_map</span>: <span class="ident">UnifiedMap</span> <span class="op">=</span> <span class="macro">vec!</span>[
-            (<span class="kw-2">*</span><span class="ident">LEADER</span>, <span class="ident">UnifiedNum::from</span>(<span class="number">50_u64</span>)),
-            (<span class="kw-2">*</span><span class="ident">FOLLOWER</span>, <span class="ident">UnifiedNum::from</span>(<span class="number">100_u64</span>)),
+<span class="attribute">#[cfg(test)]</span>
+<span class="kw">mod </span>test {
+    <span class="kw">use </span>serde_json::json;
+
+    <span class="kw">use super</span>::<span class="kw-2">*</span>;
+    <span class="kw">use </span><span class="kw">crate</span>::test_util::{FOLLOWER, LEADER};
+
+    <span class="attribute">#[test]</span>
+    <span class="kw">fn </span>test_unified_map_de_serialization() {
+        <span class="kw">let </span>unified_map: UnifiedMap = <span class="macro">vec!</span>[
+            (<span class="kw-2">*</span>LEADER, UnifiedNum::from(<span class="number">50_u64</span>)),
+            (<span class="kw-2">*</span>FOLLOWER, UnifiedNum::from(<span class="number">100_u64</span>)),
         ]
-        .<span class="ident">into_iter</span>()
-        .<span class="ident">collect</span>();
+        .into_iter()
+        .collect();
 
-        <span class="kw">let</span> <span class="ident">actual_json</span> <span class="op">=</span> <span class="ident">serde_json::to_value</span>(<span class="kw-2">&amp;</span><span class="ident">unified_map</span>).<span class="ident">expect</span>(<span class="string">&quot;Should serialize it&quot;</span>);
-        <span class="kw">let</span> <span class="ident">expected_json</span> <span class="op">=</span> <span class="macro">json!</span>({
+        <span class="kw">let </span>actual_json = serde_json::to_value(<span class="kw-2">&amp;</span>unified_map).expect(<span class="string">&quot;Should serialize it&quot;</span>);
+        <span class="kw">let </span>expected_json = <span class="macro">json!</span>({
             <span class="string">&quot;0xf3f583AEC5f7C030722Fe992A5688557e1B86ef7&quot;</span>:<span class="string">&quot;100&quot;</span>,
-            <span class="string">&quot;0x80690751969B234697e9059e04ed72195c3507fa&quot;</span>:<span class="string">&quot;50&quot;</span>
-        });
+            <span class="string">&quot;0x80690751969B234697e9059e04ed72195c3507fa&quot;</span>:<span class="string">&quot;50&quot;
+        </span>});
 
-        <span class="macro">assert_eq!</span>(<span class="ident">expected_json</span>, <span class="ident">actual_json</span>);
+        <span class="macro">assert_eq!</span>(expected_json, actual_json);
 
-        <span class="kw">let</span> <span class="ident">balances_map_from_json</span>: <span class="ident">UnifiedMap</span> <span class="op">=</span>
-            <span class="ident">serde_json::from_value</span>(<span class="ident">actual_json</span>).<span class="ident">expect</span>(<span class="string">&quot;Should deserialize it&quot;</span>);
+        <span class="kw">let </span>balances_map_from_json: UnifiedMap =
+            serde_json::from_value(actual_json).expect(<span class="string">&quot;Should deserialize it&quot;</span>);
 
-        <span class="macro">assert_eq!</span>(<span class="ident">unified_map</span>, <span class="ident">balances_map_from_json</span>);
+        <span class="macro">assert_eq!</span>(unified_map, balances_map_from_json);
     }
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">test_balances_map_de_serialization</span>() {
-        <span class="kw">let</span> <span class="ident">balances_map</span>: <span class="ident">BalancesMap</span> <span class="op">=</span> <span class="macro">vec!</span>[
-            (<span class="kw-2">*</span><span class="ident">LEADER</span>, <span class="ident">BigNum::from</span>(<span class="number">50_u64</span>)),
-            (<span class="kw-2">*</span><span class="ident">FOLLOWER</span>, <span class="ident">BigNum::from</span>(<span class="number">100_u64</span>)),
+    <span class="attribute">#[test]</span>
+    <span class="kw">fn </span>test_balances_map_de_serialization() {
+        <span class="kw">let </span>balances_map: BalancesMap = <span class="macro">vec!</span>[
+            (<span class="kw-2">*</span>LEADER, BigNum::from(<span class="number">50_u64</span>)),
+            (<span class="kw-2">*</span>FOLLOWER, BigNum::from(<span class="number">100_u64</span>)),
         ]
-        .<span class="ident">into_iter</span>()
-        .<span class="ident">collect</span>();
+        .into_iter()
+        .collect();
 
-        <span class="kw">let</span> <span class="ident">actual_json</span> <span class="op">=</span> <span class="ident">serde_json::to_value</span>(<span class="kw-2">&amp;</span><span class="ident">balances_map</span>).<span class="ident">expect</span>(<span class="string">&quot;Should serialize it&quot;</span>);
-        <span class="kw">let</span> <span class="ident">expected_json</span> <span class="op">=</span> <span class="macro">json!</span>({
+        <span class="kw">let </span>actual_json = serde_json::to_value(<span class="kw-2">&amp;</span>balances_map).expect(<span class="string">&quot;Should serialize it&quot;</span>);
+        <span class="kw">let </span>expected_json = <span class="macro">json!</span>({
             <span class="string">&quot;0xf3f583AEC5f7C030722Fe992A5688557e1B86ef7&quot;</span>:<span class="string">&quot;100&quot;</span>,
-            <span class="string">&quot;0x80690751969B234697e9059e04ed72195c3507fa&quot;</span>:<span class="string">&quot;50&quot;</span>
-        });
+            <span class="string">&quot;0x80690751969B234697e9059e04ed72195c3507fa&quot;</span>:<span class="string">&quot;50&quot;
+        </span>});
 
-        <span class="macro">assert_eq!</span>(<span class="ident">expected_json</span>, <span class="ident">actual_json</span>);
+        <span class="macro">assert_eq!</span>(expected_json, actual_json);
 
-        <span class="kw">let</span> <span class="ident">balances_map_from_json</span>: <span class="ident">BalancesMap</span> <span class="op">=</span>
-            <span class="ident">serde_json::from_value</span>(<span class="ident">actual_json</span>).<span class="ident">expect</span>(<span class="string">&quot;Should deserialize it&quot;</span>);
+        <span class="kw">let </span>balances_map_from_json: BalancesMap =
+            serde_json::from_value(actual_json).expect(<span class="string">&quot;Should deserialize it&quot;</span>);
 
-        <span class="macro">assert_eq!</span>(<span class="ident">balances_map</span>, <span class="ident">balances_map_from_json</span>);
+        <span class="macro">assert_eq!</span>(balances_map, balances_map_from_json);
     }
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">test_balances_map_deserialization_with_same_keys</span>() {
-        <span class="comment">// the first is ETH Checksummed, the second is lowercase!</span>
-        <span class="kw">let</span> <span class="ident">json</span> <span class="op">=</span> <span class="macro">json!</span>({
+    <span class="attribute">#[test]</span>
+    <span class="kw">fn </span>test_balances_map_deserialization_with_same_keys() {
+        <span class="comment">// the first is ETH Checksummed, the second is lowercase!
+        </span><span class="kw">let </span>json = <span class="macro">json!</span>({
             <span class="string">&quot;0x80690751969B234697e9059e04ed72195c3507fa&quot;</span>:<span class="string">&quot;100&quot;</span>,
             <span class="string">&quot;0xf3f583AEC5f7C030722Fe992A5688557e1B86ef7&quot;</span>:<span class="string">&quot;20&quot;</span>,
-            <span class="string">&quot;0x80690751969B234697e9059e04ed72195c3507fa&quot;</span>:<span class="string">&quot;50&quot;</span>
-        });
+            <span class="string">&quot;0x80690751969B234697e9059e04ed72195c3507fa&quot;</span>:<span class="string">&quot;50&quot;
+        </span>});
 
-        <span class="kw">let</span> <span class="ident">actual_deserialized</span>: <span class="ident">BalancesMap</span> <span class="op">=</span>
-            <span class="ident">serde_json::from_value</span>(<span class="ident">json</span>).<span class="ident">expect</span>(<span class="string">&quot;Should deserialize it&quot;</span>);
+        <span class="kw">let </span>actual_deserialized: BalancesMap =
+            serde_json::from_value(json).expect(<span class="string">&quot;Should deserialize it&quot;</span>);
 
-        <span class="kw">let</span> <span class="ident">expected_deserialized</span>: <span class="ident">BalancesMap</span> <span class="op">=</span> <span class="macro">vec!</span>[
-            (<span class="kw-2">*</span><span class="ident">LEADER</span>, <span class="ident">BigNum::from</span>(<span class="number">50_u64</span>)),
-            <span class="comment">// only the second should be accepted, as it appears second in the string and it&#39;s the latest one</span>
-            (<span class="kw-2">*</span><span class="ident">FOLLOWER</span>, <span class="ident">BigNum::from</span>(<span class="number">20_u64</span>)),
+        <span class="kw">let </span>expected_deserialized: BalancesMap = <span class="macro">vec!</span>[
+            (<span class="kw-2">*</span>LEADER, BigNum::from(<span class="number">50_u64</span>)),
+            <span class="comment">// only the second should be accepted, as it appears second in the string and it&#39;s the latest one
+            </span>(<span class="kw-2">*</span>FOLLOWER, BigNum::from(<span class="number">20_u64</span>)),
         ]
-        .<span class="ident">into_iter</span>()
-        .<span class="ident">collect</span>();
+        .into_iter()
+        .collect();
 
-        <span class="macro">assert_eq!</span>(<span class="ident">expected_deserialized</span>, <span class="ident">actual_deserialized</span>);
+        <span class="macro">assert_eq!</span>(expected_deserialized, actual_deserialized);
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="primitives" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (20ffea693 2022-08-11)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="primitives" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>

@@ -461,468 +461,468 @@
 <span id="461">461</span>
 <span id="462">462</span>
 <span id="463">463</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">once_cell::sync::Lazy</span>;
-<span class="kw">use</span> <span class="ident">serde</span>::{<span class="ident">Deserialize</span>, <span class="ident">Serialize</span>};
-<span class="kw">use</span> <span class="ident">std</span>::{<span class="ident">borrow::Borrow</span>, <span class="ident">fmt</span>, <span class="ident">str::FromStr</span>};
+</pre><pre class="rust"><code><span class="kw">use </span>once_cell::sync::Lazy;
+<span class="kw">use </span>serde::{Deserialize, Serialize};
+<span class="kw">use </span>std::{borrow::Borrow, fmt, str::FromStr};
 
-<span class="kw">use</span> <span class="kw">crate</span>::{
-    <span class="ident">address::Error</span>,
-    <span class="ident">targeting::Value</span>,
-    <span class="ident">util</span>::{<span class="ident">api::Error</span> <span class="kw">as</span> <span class="ident">ApiUrlError</span>, <span class="ident">ApiUrl</span>},
-    <span class="ident">Address</span>, <span class="ident">DomainError</span>, <span class="ident">ToETHChecksum</span>, <span class="ident">ToHex</span>, <span class="ident">UnifiedNum</span>,
+<span class="kw">use crate</span>::{
+    address::Error,
+    targeting::Value,
+    util::{api::Error <span class="kw">as </span>ApiUrlError, ApiUrl},
+    Address, DomainError, ToETHChecksum, ToHex, UnifiedNum,
 };
 
-<span class="attribute">#[<span class="ident">doc</span>(<span class="ident">inline</span>)]</span>
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">messages</span>::<span class="kw-2">*</span>;
+<span class="attribute">#[doc(inline)]</span>
+<span class="kw">pub use </span>messages::<span class="kw-2">*</span>;
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>, <span class="ident">PartialOrd</span>, <span class="ident">Ord</span>, <span class="ident">Hash</span>)]</span>
-<span class="attribute">#[<span class="ident">serde</span>(<span class="ident">transparent</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ValidatorId</span>(<span class="ident">Address</span>);
+<span class="attribute">#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]</span>
+<span class="attribute">#[serde(transparent)]</span>
+<span class="kw">pub struct </span>ValidatorId(Address);
 
-<span class="kw">impl</span> <span class="ident">fmt::Debug</span> <span class="kw">for</span> <span class="ident">ValidatorId</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="ident">fmt::Result</span> {
-        <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;ValidatorId({})&quot;</span>, <span class="self">self</span>.<span class="ident">to_hex_prefixed</span>())
+<span class="kw">impl </span>fmt::Debug <span class="kw">for </span>ValidatorId {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; fmt::Result {
+        <span class="macro">write!</span>(f, <span class="string">&quot;ValidatorId({})&quot;</span>, <span class="self">self</span>.to_hex_prefixed())
     }
 }
 
-<span class="kw">impl</span> <span class="ident">ValidatorId</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">as_bytes</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>[<span class="ident">u8</span>; <span class="number">20</span>] {
-        <span class="self">self</span>.<span class="number">0</span>.<span class="ident">as_bytes</span>()
+<span class="kw">impl </span>ValidatorId {
+    <span class="kw">pub fn </span>as_bytes(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>[u8; <span class="number">20</span>] {
+        <span class="self">self</span>.<span class="number">0</span>.as_bytes()
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">to_address</span>(<span class="self">self</span>) -&gt; <span class="ident">Address</span> {
-        <span class="self">self</span>.<span class="number">0</span>
-    }
+    <span class="kw">pub fn </span>to_address(<span class="self">self</span>) -&gt; Address {
+        <span class="self">self</span>.<span class="number">0
+    </span>}
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">as_address</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">Address</span> {
-        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>
-    }
+    <span class="kw">pub fn </span>as_address(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>Address {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0
+    </span>}
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">inner</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>[<span class="ident">u8</span>; <span class="number">20</span>] {
-        <span class="self">self</span>.<span class="number">0</span>.<span class="ident">as_bytes</span>()
-    }
-}
-
-<span class="kw">impl</span> <span class="ident">ToETHChecksum</span> <span class="kw">for</span> <span class="ident">ValidatorId</span> {}
-
-<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">Address</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">ValidatorId</span> {
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">address</span>: <span class="kw-2">&amp;</span><span class="ident">Address</span>) -&gt; <span class="self">Self</span> {
-        <span class="self">Self</span>(<span class="kw-2">*</span><span class="ident">address</span>)
+    <span class="kw">pub fn </span>inner(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>[u8; <span class="number">20</span>] {
+        <span class="self">self</span>.<span class="number">0</span>.as_bytes()
     }
 }
 
-<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">ValidatorId</span> {
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">address</span>: <span class="ident">Address</span>) -&gt; <span class="self">Self</span> {
-        <span class="self">Self</span>(<span class="ident">address</span>)
+<span class="kw">impl </span>ToETHChecksum <span class="kw">for </span>ValidatorId {}
+
+<span class="kw">impl </span>From&lt;<span class="kw-2">&amp;</span>Address&gt; <span class="kw">for </span>ValidatorId {
+    <span class="kw">fn </span>from(address: <span class="kw-2">&amp;</span>Address) -&gt; <span class="self">Self </span>{
+        <span class="self">Self</span>(<span class="kw-2">*</span>address)
     }
 }
 
-<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">Lazy</span><span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">ValidatorId</span> {
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">address</span>: <span class="kw-2">&amp;</span><span class="ident">Lazy</span><span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span>) -&gt; <span class="self">Self</span> {
-        <span class="comment">// once for the reference of &amp;Lazy into Lazy</span>
-        <span class="comment">// and once for moving out of Lazy into Address</span>
-        <span class="self">Self</span>(<span class="kw-2">*</span><span class="kw-2">*</span><span class="ident">address</span>)
+<span class="kw">impl </span>From&lt;Address&gt; <span class="kw">for </span>ValidatorId {
+    <span class="kw">fn </span>from(address: Address) -&gt; <span class="self">Self </span>{
+        <span class="self">Self</span>(address)
     }
 }
 
-<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="kw-2">&amp;</span>[<span class="ident">u8</span>; <span class="number">20</span>]<span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">ValidatorId</span> {
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">bytes</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>; <span class="number">20</span>]) -&gt; <span class="self">Self</span> {
-        <span class="self">Self</span>(<span class="ident">Address::from</span>(<span class="ident">bytes</span>))
+<span class="kw">impl </span>From&lt;<span class="kw-2">&amp;</span>Lazy&lt;Address&gt;&gt; <span class="kw">for </span>ValidatorId {
+    <span class="kw">fn </span>from(address: <span class="kw-2">&amp;</span>Lazy&lt;Address&gt;) -&gt; <span class="self">Self </span>{
+        <span class="comment">// once for the reference of &amp;Lazy into Lazy
+        // and once for moving out of Lazy into Address
+        </span><span class="self">Self</span>(<span class="kw-2">**</span>address)
     }
 }
 
-<span class="kw">impl</span> <span class="ident">AsRef</span><span class="op">&lt;</span>[<span class="ident">u8</span>]<span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">ValidatorId</span> {
-    <span class="kw">fn</span> <span class="ident">as_ref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>[<span class="ident">u8</span>] {
-        <span class="self">self</span>.<span class="number">0</span>.<span class="ident">as_ref</span>()
+<span class="kw">impl </span>From&lt;<span class="kw-2">&amp;</span>[u8; <span class="number">20</span>]&gt; <span class="kw">for </span>ValidatorId {
+    <span class="kw">fn </span>from(bytes: <span class="kw-2">&amp;</span>[u8; <span class="number">20</span>]) -&gt; <span class="self">Self </span>{
+        <span class="self">Self</span>(Address::from(bytes))
     }
 }
 
-<span class="kw">impl</span> <span class="ident">FromStr</span> <span class="kw">for</span> <span class="ident">ValidatorId</span> {
-    <span class="kw">type</span> <span class="prelude-val">Err</span> <span class="op">=</span> <span class="ident">Error</span>;
-
-    <span class="kw">fn</span> <span class="ident">from_str</span>(<span class="ident">s</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident"><span class="self">Self</span>::Err</span><span class="op">&gt;</span> {
-        <span class="ident">Address::try_from</span>(<span class="ident">s</span>).<span class="ident">map</span>(<span class="self">Self</span>)
+<span class="kw">impl </span>AsRef&lt;[u8]&gt; <span class="kw">for </span>ValidatorId {
+    <span class="kw">fn </span>as_ref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>[u8] {
+        <span class="self">self</span>.<span class="number">0</span>.as_ref()
     }
 }
 
-<span class="kw">impl</span> <span class="ident">TryFrom</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">str</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">ValidatorId</span> {
-    <span class="kw">type</span> <span class="ident">Error</span> <span class="op">=</span> <span class="ident">Error</span>;
-    <span class="kw">fn</span> <span class="ident">try_from</span>(<span class="ident">value</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident"><span class="self">Self</span>::Error</span><span class="op">&gt;</span> {
-        <span class="ident">Address::try_from</span>(<span class="ident">value</span>).<span class="ident">map</span>(<span class="self">Self</span>)
+<span class="kw">impl </span>FromStr <span class="kw">for </span>ValidatorId {
+    <span class="kw">type </span><span class="prelude-val">Err </span>= Error;
+
+    <span class="kw">fn </span>from_str(s: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, <span class="self">Self</span>::Err&gt; {
+        Address::try_from(s).map(<span class="self">Self</span>)
     }
 }
 
-<span class="kw">impl</span> <span class="ident">TryFrom</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">String</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">ValidatorId</span> {
-    <span class="kw">type</span> <span class="ident">Error</span> <span class="op">=</span> <span class="ident">Error</span>;
-
-    <span class="kw">fn</span> <span class="ident">try_from</span>(<span class="ident">value</span>: <span class="kw-2">&amp;</span><span class="ident">String</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident"><span class="self">Self</span>::Error</span><span class="op">&gt;</span> {
-        <span class="ident"><span class="self">Self</span>::try_from</span>(<span class="ident">value</span>.<span class="ident">as_str</span>())
+<span class="kw">impl </span>TryFrom&lt;<span class="kw-2">&amp;</span>str&gt; <span class="kw">for </span>ValidatorId {
+    <span class="kw">type </span>Error = Error;
+    <span class="kw">fn </span>try_from(value: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, <span class="self">Self</span>::Error&gt; {
+        Address::try_from(value).map(<span class="self">Self</span>)
     }
 }
 
-<span class="kw">impl</span> <span class="ident">fmt::Display</span> <span class="kw">for</span> <span class="ident">ValidatorId</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="ident">fmt::Result</span> {
-        <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;{}&quot;</span>, <span class="self">self</span>.<span class="ident">to_checksum</span>())
+<span class="kw">impl </span>TryFrom&lt;<span class="kw-2">&amp;</span>String&gt; <span class="kw">for </span>ValidatorId {
+    <span class="kw">type </span>Error = Error;
+
+    <span class="kw">fn </span>try_from(value: <span class="kw-2">&amp;</span>String) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, <span class="self">Self</span>::Error&gt; {
+        <span class="self">Self</span>::try_from(value.as_str())
     }
 }
 
-<span class="kw">impl</span> <span class="ident">TryFrom</span><span class="op">&lt;</span><span class="ident">Value</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">ValidatorId</span> {
-    <span class="kw">type</span> <span class="ident">Error</span> <span class="op">=</span> <span class="ident">DomainError</span>;
-
-    <span class="kw">fn</span> <span class="ident">try_from</span>(<span class="ident">value</span>: <span class="ident">Value</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident"><span class="self">Self</span>::Error</span><span class="op">&gt;</span> {
-        <span class="ident">Address::try_from</span>(<span class="ident">value</span>).<span class="ident">map</span>(<span class="self">Self</span>)
+<span class="kw">impl </span>fmt::Display <span class="kw">for </span>ValidatorId {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; fmt::Result {
+        <span class="macro">write!</span>(f, <span class="string">&quot;{}&quot;</span>, <span class="self">self</span>.to_checksum())
     }
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">Eq</span>, <span class="ident">PartialEq</span>)]</span>
-<span class="attribute">#[<span class="ident">serde</span>(<span class="ident">rename_all</span> <span class="op">=</span> <span class="string">&quot;camelCase&quot;</span>)]</span>
-<span class="doccomment">/// A Validator description which includes the identity, fee (pro milles) and the Sentry URL.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ValidatorDesc</span> {
-    <span class="kw">pub</span> <span class="ident">id</span>: <span class="ident">ValidatorId</span>,
-    <span class="doccomment">/// The validator fee in pro milles (per 1000)</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Each fee is calculated based on the payout for an event.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// payout * fee / 1000 = event fee payout</span>
-    <span class="kw">pub</span> <span class="ident">fee</span>: <span class="ident">UnifiedNum</span>,
-    <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">default</span>, <span class="ident">skip_serializing_if</span> <span class="op">=</span> <span class="string">&quot;Option::is_none&quot;</span>)]</span>
-    <span class="doccomment">/// The address which will receive the fees</span>
-    <span class="kw">pub</span> <span class="ident">fee_addr</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// The url of the Validator where Sentry API is running</span>
-    <span class="kw">pub</span> <span class="ident">url</span>: <span class="ident">String</span>,
-}
+<span class="kw">impl </span>TryFrom&lt;Value&gt; <span class="kw">for </span>ValidatorId {
+    <span class="kw">type </span>Error = DomainError;
 
-<span class="kw">impl</span> <span class="ident">ValidatorDesc</span> {
-    <span class="doccomment">/// Tries to create an [`ApiUrl`] from the `url` field.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">try_api_url</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">ApiUrl</span>, <span class="ident">ApiUrlError</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">url</span>.<span class="ident">parse</span>()
+    <span class="kw">fn </span>try_from(value: Value) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, <span class="self">Self</span>::Error&gt; {
+        Address::try_from(value).map(<span class="self">Self</span>)
     }
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>, <span class="ident">Clone</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">Validator</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="ident">Leader</span>(<span class="ident">T</span>),
-    <span class="ident">Follower</span>(<span class="ident">T</span>),
+<span class="attribute">#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]</span>
+<span class="attribute">#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]</span>
+<span class="doccomment">/// A Validator description which includes the identity, fee (pro milles) and the Sentry URL.
+</span><span class="kw">pub struct </span>ValidatorDesc {
+    <span class="kw">pub </span>id: ValidatorId,
+    <span class="doccomment">/// The validator fee in pro milles (per 1000)
+    ///
+    /// Each fee is calculated based on the payout for an event.
+    ///
+    /// payout * fee / 1000 = event fee payout
+    </span><span class="kw">pub </span>fee: UnifiedNum,
+    <span class="attribute">#[serde(default, skip_serializing_if = <span class="string">&quot;Option::is_none&quot;</span>)]</span>
+    <span class="doccomment">/// The address which will receive the fees
+    </span><span class="kw">pub </span>fee_addr: <span class="prelude-ty">Option</span>&lt;Address&gt;,
+    <span class="doccomment">/// The url of the Validator where Sentry API is running
+    </span><span class="kw">pub </span>url: String,
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="ident">Validator</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">into_inner</span>(<span class="self">self</span>) -&gt; <span class="ident">T</span> {
-        <span class="kw">match</span> <span class="self">self</span> {
-            <span class="ident"><span class="self">Self</span>::Leader</span>(<span class="ident">validator</span>) =&gt; <span class="ident">validator</span>,
-            <span class="ident"><span class="self">Self</span>::Follower</span>(<span class="ident">validator</span>) =&gt; <span class="ident">validator</span>,
+<span class="kw">impl </span>ValidatorDesc {
+    <span class="doccomment">/// Tries to create an [`ApiUrl`] from the `url` field.
+    </span><span class="kw">pub fn </span>try_api_url(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;ApiUrl, ApiUrlError&gt; {
+        <span class="self">self</span>.url.parse()
+    }
+}
+
+<span class="attribute">#[derive(Debug, PartialEq, Eq, Clone)]</span>
+<span class="kw">pub enum </span>Validator&lt;T&gt; {
+    Leader(T),
+    Follower(T),
+}
+
+<span class="kw">impl</span>&lt;T&gt; Validator&lt;T&gt; {
+    <span class="kw">pub fn </span>into_inner(<span class="self">self</span>) -&gt; T {
+        <span class="kw">match </span><span class="self">self </span>{
+            <span class="self">Self</span>::Leader(validator) =&gt; validator,
+            <span class="self">Self</span>::Follower(validator) =&gt; validator,
         }
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="ident">Borrow</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Validator</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">borrow</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">T</span> {
-        <span class="kw">match</span> <span class="self">self</span> {
-            <span class="ident"><span class="self">Self</span>::Leader</span>(<span class="ident">validator</span>) =&gt; <span class="ident">validator</span>,
-            <span class="ident"><span class="self">Self</span>::Follower</span>(<span class="ident">validator</span>) =&gt; <span class="ident">validator</span>,
+<span class="kw">impl</span>&lt;T&gt; Borrow&lt;T&gt; <span class="kw">for </span>Validator&lt;T&gt; {
+    <span class="kw">fn </span>borrow(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>T {
+        <span class="kw">match </span><span class="self">self </span>{
+            <span class="self">Self</span>::Leader(validator) =&gt; validator,
+            <span class="self">Self</span>::Follower(validator) =&gt; validator,
         }
     }
 }
 
-<span class="doccomment">/// Validator Message Types</span>
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">messages</span> {
-    <span class="kw">use</span> <span class="ident">std</span>::{<span class="ident">any::type_name</span>, <span class="ident">fmt</span>, <span class="ident">marker::PhantomData</span>};
-    <span class="kw">use</span> <span class="ident">thiserror::Error</span>;
+<span class="doccomment">/// Validator Message Types
+</span><span class="kw">pub mod </span>messages {
+    <span class="kw">use </span>std::{any::type_name, fmt, marker::PhantomData};
+    <span class="kw">use </span>thiserror::Error;
 
-    <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::balances</span>::{<span class="ident">Balances</span>, <span class="ident">BalancesState</span>, <span class="ident">CheckedState</span>, <span class="ident">UncheckedState</span>};
-    <span class="kw">use</span> <span class="ident">chrono</span>::{<span class="ident">DateTime</span>, <span class="ident">Utc</span>};
-    <span class="kw">use</span> <span class="ident">serde</span>::{<span class="ident">Deserialize</span>, <span class="ident">Serialize</span>};
+    <span class="kw">use </span><span class="kw">crate</span>::balances::{Balances, BalancesState, CheckedState, UncheckedState};
+    <span class="kw">use </span>chrono::{DateTime, Utc};
+    <span class="kw">use </span>serde::{Deserialize, Serialize};
 
-    <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Error</span>, <span class="ident">Debug</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">MessageError</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Type</span><span class="op">&gt;</span> {
-        <span class="attribute">#[<span class="ident">error</span>(<span class="ident">transparent</span>)]</span>
-        <span class="ident">Balances</span>(<span class="attribute">#[<span class="ident">from</span>]</span> <span class="ident"><span class="kw">crate</span>::balances::Error</span>),
-        <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Expected {} message type but the actual is {actual}&quot;</span>, <span class="ident">type_name</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(), )]</span>
-        <span class="ident">Type</span> {
-            <span class="ident">expected</span>: <span class="ident">PhantomData</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>,
-            <span class="ident">actual</span>: <span class="ident">String</span>,
+    <span class="attribute">#[derive(Error, Debug)]</span>
+    <span class="kw">pub enum </span>MessageError&lt;T: Type&gt; {
+        <span class="attribute">#[error(transparent)]</span>
+        Balances(<span class="attribute">#[from]</span> <span class="kw">crate</span>::balances::Error),
+        <span class="attribute">#[error(<span class="string">&quot;Expected {} message type but the actual is {actual}&quot;</span>, type_name::&lt;T&gt;(), )]</span>
+        Type {
+            expected: PhantomData&lt;T&gt;,
+            actual: String,
         },
     }
 
-    <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Type</span><span class="op">&gt;</span> <span class="ident">MessageError</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-        <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">for_actual</span><span class="op">&lt;</span><span class="ident">A</span>: <span class="ident">Type</span><span class="op">&gt;</span>(<span class="ident">_actual</span>: <span class="kw-2">&amp;</span><span class="ident">A</span>) -&gt; <span class="self">Self</span> {
-            <span class="ident"><span class="self">Self</span>::Type</span> {
-                <span class="ident">expected</span>: <span class="ident">PhantomData::default</span>(),
-                <span class="ident">actual</span>: <span class="ident">type_name</span>::<span class="op">&lt;</span><span class="ident">A</span><span class="op">&gt;</span>().<span class="ident">to_string</span>(),
+    <span class="kw">impl</span>&lt;T: Type&gt; MessageError&lt;T&gt; {
+        <span class="kw">pub fn </span>for_actual&lt;A: Type&gt;(_actual: <span class="kw-2">&amp;</span>A) -&gt; <span class="self">Self </span>{
+            <span class="self">Self</span>::Type {
+                expected: PhantomData::default(),
+                actual: type_name::&lt;A&gt;().to_string(),
             }
         }
     }
 
-    <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">Type</span>:
-        <span class="ident">fmt::Debug</span>
-        <span class="op">+</span> <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">MessageTypes</span><span class="op">&gt;</span>
-        <span class="op">+</span> <span class="ident">TryFrom</span><span class="op">&lt;</span><span class="ident">MessageTypes</span>, <span class="ident">Error</span> <span class="op">=</span> <span class="ident">MessageError</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span><span class="op">&gt;</span>
-        <span class="op">+</span> <span class="ident">Clone</span>
-        <span class="op">+</span> <span class="ident">PartialEq</span>
-        <span class="op">+</span> <span class="ident">Eq</span>
+    <span class="kw">pub trait </span>Type:
+        fmt::Debug
+        + Into&lt;MessageTypes&gt;
+        + TryFrom&lt;MessageTypes, Error = MessageError&lt;<span class="self">Self</span>&gt;&gt;
+        + Clone
+        + PartialEq
+        + Eq
     {
     }
 
-    <span class="kw">impl</span> <span class="ident">Type</span> <span class="kw">for</span> <span class="ident">ApproveState</span> {}
-    <span class="kw">impl</span> <span class="ident">TryFrom</span><span class="op">&lt;</span><span class="ident">MessageTypes</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">ApproveState</span> {
-        <span class="kw">type</span> <span class="ident">Error</span> <span class="op">=</span> <span class="ident">MessageError</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>;
+    <span class="kw">impl </span>Type <span class="kw">for </span>ApproveState {}
+    <span class="kw">impl </span>TryFrom&lt;MessageTypes&gt; <span class="kw">for </span>ApproveState {
+        <span class="kw">type </span>Error = MessageError&lt;<span class="self">Self</span>&gt;;
 
-        <span class="kw">fn</span> <span class="ident">try_from</span>(<span class="ident">value</span>: <span class="ident">MessageTypes</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident"><span class="self">Self</span>::Error</span><span class="op">&gt;</span> {
-            <span class="kw">match</span> <span class="ident">value</span> {
-                <span class="ident">MessageTypes::NewState</span>(<span class="ident">msg</span>) =&gt; <span class="prelude-val">Err</span>(<span class="ident">MessageError::for_actual</span>(<span class="kw-2">&amp;</span><span class="ident">msg</span>)),
-                <span class="ident">MessageTypes::RejectState</span>(<span class="ident">msg</span>) =&gt; <span class="prelude-val">Err</span>(<span class="ident">MessageError::for_actual</span>(<span class="kw-2">&amp;</span><span class="ident">msg</span>)),
-                <span class="ident">MessageTypes::Heartbeat</span>(<span class="ident">msg</span>) =&gt; <span class="prelude-val">Err</span>(<span class="ident">MessageError::for_actual</span>(<span class="kw-2">&amp;</span><span class="ident">msg</span>)),
-                <span class="ident">MessageTypes::ApproveState</span>(<span class="ident">approve_state</span>) =&gt; <span class="prelude-val">Ok</span>(<span class="ident">approve_state</span>),
+        <span class="kw">fn </span>try_from(value: MessageTypes) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, <span class="self">Self</span>::Error&gt; {
+            <span class="kw">match </span>value {
+                MessageTypes::NewState(msg) =&gt; <span class="prelude-val">Err</span>(MessageError::for_actual(<span class="kw-2">&amp;</span>msg)),
+                MessageTypes::RejectState(msg) =&gt; <span class="prelude-val">Err</span>(MessageError::for_actual(<span class="kw-2">&amp;</span>msg)),
+                MessageTypes::Heartbeat(msg) =&gt; <span class="prelude-val">Err</span>(MessageError::for_actual(<span class="kw-2">&amp;</span>msg)),
+                MessageTypes::ApproveState(approve_state) =&gt; <span class="prelude-val">Ok</span>(approve_state),
             }
         }
     }
-    <span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">ApproveState</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">MessageTypes</span> {
-        <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">approve_state</span>: <span class="ident">ApproveState</span>) -&gt; <span class="self">Self</span> {
-            <span class="ident">MessageTypes::ApproveState</span>(<span class="ident">approve_state</span>)
+    <span class="kw">impl </span>From&lt;ApproveState&gt; <span class="kw">for </span>MessageTypes {
+        <span class="kw">fn </span>from(approve_state: ApproveState) -&gt; <span class="self">Self </span>{
+            MessageTypes::ApproveState(approve_state)
         }
     }
 
-    <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">S</span>: <span class="ident">BalancesState</span><span class="op">&gt;</span> <span class="ident">Type</span> <span class="kw">for</span> <span class="ident">NewState</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span> {}
-    <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">S</span>: <span class="ident">BalancesState</span><span class="op">&gt;</span> <span class="ident">TryFrom</span><span class="op">&lt;</span><span class="ident">MessageTypes</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">NewState</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span> {
-        <span class="kw">type</span> <span class="ident">Error</span> <span class="op">=</span> <span class="ident">MessageError</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>;
+    <span class="kw">impl</span>&lt;S: BalancesState&gt; Type <span class="kw">for </span>NewState&lt;S&gt; {}
+    <span class="kw">impl</span>&lt;S: BalancesState&gt; TryFrom&lt;MessageTypes&gt; <span class="kw">for </span>NewState&lt;S&gt; {
+        <span class="kw">type </span>Error = MessageError&lt;<span class="self">Self</span>&gt;;
 
-        <span class="kw">fn</span> <span class="ident">try_from</span>(<span class="ident">value</span>: <span class="ident">MessageTypes</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident"><span class="self">Self</span>::Error</span><span class="op">&gt;</span> {
-            <span class="kw">match</span> <span class="ident">value</span> {
-                <span class="ident">MessageTypes::ApproveState</span>(<span class="ident">msg</span>) =&gt; <span class="prelude-val">Err</span>(<span class="ident">MessageError::for_actual</span>(<span class="kw-2">&amp;</span><span class="ident">msg</span>)),
-                <span class="ident">MessageTypes::RejectState</span>(<span class="ident">msg</span>) =&gt; <span class="prelude-val">Err</span>(<span class="ident">MessageError::for_actual</span>(<span class="kw-2">&amp;</span><span class="ident">msg</span>)),
-                <span class="ident">MessageTypes::Heartbeat</span>(<span class="ident">msg</span>) =&gt; <span class="prelude-val">Err</span>(<span class="ident">MessageError::for_actual</span>(<span class="kw-2">&amp;</span><span class="ident">msg</span>)),
-                <span class="ident">MessageTypes::NewState</span>(<span class="ident">new_state</span>) =&gt; {
-                    <span class="kw">let</span> <span class="ident">balances</span> <span class="op">=</span> <span class="ident">S::from_unchecked</span>(<span class="ident">new_state</span>.<span class="ident">balances</span>)<span class="question-mark">?</span>;
+        <span class="kw">fn </span>try_from(value: MessageTypes) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, <span class="self">Self</span>::Error&gt; {
+            <span class="kw">match </span>value {
+                MessageTypes::ApproveState(msg) =&gt; <span class="prelude-val">Err</span>(MessageError::for_actual(<span class="kw-2">&amp;</span>msg)),
+                MessageTypes::RejectState(msg) =&gt; <span class="prelude-val">Err</span>(MessageError::for_actual(<span class="kw-2">&amp;</span>msg)),
+                MessageTypes::Heartbeat(msg) =&gt; <span class="prelude-val">Err</span>(MessageError::for_actual(<span class="kw-2">&amp;</span>msg)),
+                MessageTypes::NewState(new_state) =&gt; {
+                    <span class="kw">let </span>balances = S::from_unchecked(new_state.balances)<span class="question-mark">?</span>;
 
-                    <span class="prelude-val">Ok</span>(<span class="self">Self</span> {
-                        <span class="ident">state_root</span>: <span class="ident">new_state</span>.<span class="ident">state_root</span>,
-                        <span class="ident">signature</span>: <span class="ident">new_state</span>.<span class="ident">signature</span>,
-                        <span class="ident">balances</span>,
+                    <span class="prelude-val">Ok</span>(<span class="self">Self </span>{
+                        state_root: new_state.state_root,
+                        signature: new_state.signature,
+                        balances,
                     })
                 }
             }
         }
     }
 
-    <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">S</span>: <span class="ident">BalancesState</span><span class="op">&gt;</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">NewState</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">MessageTypes</span> {
-        <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">new_state</span>: <span class="ident">NewState</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span>) -&gt; <span class="self">Self</span> {
-            <span class="ident">MessageTypes::NewState</span>(<span class="ident">NewState</span> {
-                <span class="ident">state_root</span>: <span class="ident">new_state</span>.<span class="ident">state_root</span>,
-                <span class="ident">signature</span>: <span class="ident">new_state</span>.<span class="ident">signature</span>,
-                <span class="ident">balances</span>: <span class="ident">new_state</span>.<span class="ident">balances</span>.<span class="ident">into_unchecked</span>(),
+    <span class="kw">impl</span>&lt;S: BalancesState&gt; From&lt;NewState&lt;S&gt;&gt; <span class="kw">for </span>MessageTypes {
+        <span class="kw">fn </span>from(new_state: NewState&lt;S&gt;) -&gt; <span class="self">Self </span>{
+            MessageTypes::NewState(NewState {
+                state_root: new_state.state_root,
+                signature: new_state.signature,
+                balances: new_state.balances.into_unchecked(),
             })
         }
     }
 
-    <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">S</span>: <span class="ident">BalancesState</span><span class="op">&gt;</span> <span class="ident">Type</span> <span class="kw">for</span> <span class="ident">RejectState</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span> {}
-    <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">S</span>: <span class="ident">BalancesState</span><span class="op">&gt;</span> <span class="ident">TryFrom</span><span class="op">&lt;</span><span class="ident">MessageTypes</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">RejectState</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span> {
-        <span class="kw">type</span> <span class="ident">Error</span> <span class="op">=</span> <span class="ident">MessageError</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>;
+    <span class="kw">impl</span>&lt;S: BalancesState&gt; Type <span class="kw">for </span>RejectState&lt;S&gt; {}
+    <span class="kw">impl</span>&lt;S: BalancesState&gt; TryFrom&lt;MessageTypes&gt; <span class="kw">for </span>RejectState&lt;S&gt; {
+        <span class="kw">type </span>Error = MessageError&lt;<span class="self">Self</span>&gt;;
 
-        <span class="kw">fn</span> <span class="ident">try_from</span>(<span class="ident">value</span>: <span class="ident">MessageTypes</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident"><span class="self">Self</span>::Error</span><span class="op">&gt;</span> {
-            <span class="kw">match</span> <span class="ident">value</span> {
-                <span class="ident">MessageTypes::ApproveState</span>(<span class="ident">msg</span>) =&gt; <span class="prelude-val">Err</span>(<span class="ident">MessageError::for_actual</span>(<span class="kw-2">&amp;</span><span class="ident">msg</span>)),
-                <span class="ident">MessageTypes::NewState</span>(<span class="ident">msg</span>) =&gt; <span class="prelude-val">Err</span>(<span class="ident">MessageError::for_actual</span>(<span class="kw-2">&amp;</span><span class="ident">msg</span>)),
-                <span class="ident">MessageTypes::Heartbeat</span>(<span class="ident">msg</span>) =&gt; <span class="prelude-val">Err</span>(<span class="ident">MessageError::for_actual</span>(<span class="kw-2">&amp;</span><span class="ident">msg</span>)),
-                <span class="ident">MessageTypes::RejectState</span>(<span class="ident">reject_state</span>) =&gt; {
-                    <span class="kw">let</span> <span class="ident">balances</span> <span class="op">=</span> <span class="ident">reject_state</span>.<span class="ident">balances</span>.<span class="ident">map</span>(<span class="ident">S::from_unchecked</span>).<span class="ident">transpose</span>()<span class="question-mark">?</span>;
+        <span class="kw">fn </span>try_from(value: MessageTypes) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, <span class="self">Self</span>::Error&gt; {
+            <span class="kw">match </span>value {
+                MessageTypes::ApproveState(msg) =&gt; <span class="prelude-val">Err</span>(MessageError::for_actual(<span class="kw-2">&amp;</span>msg)),
+                MessageTypes::NewState(msg) =&gt; <span class="prelude-val">Err</span>(MessageError::for_actual(<span class="kw-2">&amp;</span>msg)),
+                MessageTypes::Heartbeat(msg) =&gt; <span class="prelude-val">Err</span>(MessageError::for_actual(<span class="kw-2">&amp;</span>msg)),
+                MessageTypes::RejectState(reject_state) =&gt; {
+                    <span class="kw">let </span>balances = reject_state.balances.map(S::from_unchecked).transpose()<span class="question-mark">?</span>;
 
-                    <span class="prelude-val">Ok</span>(<span class="self">Self</span> {
-                        <span class="ident">reason</span>: <span class="ident">reject_state</span>.<span class="ident">reason</span>,
-                        <span class="ident">state_root</span>: <span class="ident">reject_state</span>.<span class="ident">state_root</span>,
-                        <span class="ident">signature</span>: <span class="ident">reject_state</span>.<span class="ident">signature</span>,
-                        <span class="ident">balances</span>,
-                        <span class="ident">timestamp</span>: <span class="ident">reject_state</span>.<span class="ident">timestamp</span>,
+                    <span class="prelude-val">Ok</span>(<span class="self">Self </span>{
+                        reason: reject_state.reason,
+                        state_root: reject_state.state_root,
+                        signature: reject_state.signature,
+                        balances,
+                        timestamp: reject_state.timestamp,
                     })
                 }
             }
         }
     }
 
-    <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">S</span>: <span class="ident">BalancesState</span><span class="op">&gt;</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">RejectState</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">MessageTypes</span> {
-        <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">reject_state</span>: <span class="ident">RejectState</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span>) -&gt; <span class="self">Self</span> {
-            <span class="ident">MessageTypes::RejectState</span>(<span class="ident">RejectState</span> {
-                <span class="ident">reason</span>: <span class="ident">reject_state</span>.<span class="ident">reason</span>,
-                <span class="ident">state_root</span>: <span class="ident">reject_state</span>.<span class="ident">state_root</span>,
-                <span class="ident">signature</span>: <span class="ident">reject_state</span>.<span class="ident">signature</span>,
-                <span class="ident">balances</span>: <span class="ident">reject_state</span>
-                    .<span class="ident">balances</span>
-                    .<span class="ident">map</span>(<span class="op">|</span><span class="ident">balances</span><span class="op">|</span> <span class="ident">balances</span>.<span class="ident">into_unchecked</span>()),
-                <span class="ident">timestamp</span>: <span class="ident">reject_state</span>.<span class="ident">timestamp</span>,
+    <span class="kw">impl</span>&lt;S: BalancesState&gt; From&lt;RejectState&lt;S&gt;&gt; <span class="kw">for </span>MessageTypes {
+        <span class="kw">fn </span>from(reject_state: RejectState&lt;S&gt;) -&gt; <span class="self">Self </span>{
+            MessageTypes::RejectState(RejectState {
+                reason: reject_state.reason,
+                state_root: reject_state.state_root,
+                signature: reject_state.signature,
+                balances: reject_state
+                    .balances
+                    .map(|balances| balances.into_unchecked()),
+                timestamp: reject_state.timestamp,
             })
         }
     }
 
-    <span class="kw">impl</span> <span class="ident">Type</span> <span class="kw">for</span> <span class="ident">Heartbeat</span> {}
-    <span class="kw">impl</span> <span class="ident">TryFrom</span><span class="op">&lt;</span><span class="ident">MessageTypes</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Heartbeat</span> {
-        <span class="kw">type</span> <span class="ident">Error</span> <span class="op">=</span> <span class="ident">MessageError</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>;
+    <span class="kw">impl </span>Type <span class="kw">for </span>Heartbeat {}
+    <span class="kw">impl </span>TryFrom&lt;MessageTypes&gt; <span class="kw">for </span>Heartbeat {
+        <span class="kw">type </span>Error = MessageError&lt;<span class="self">Self</span>&gt;;
 
-        <span class="kw">fn</span> <span class="ident">try_from</span>(<span class="ident">value</span>: <span class="ident">MessageTypes</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident"><span class="self">Self</span>::Error</span><span class="op">&gt;</span> {
-            <span class="kw">match</span> <span class="ident">value</span> {
-                <span class="ident">MessageTypes::ApproveState</span>(<span class="ident">msg</span>) =&gt; <span class="prelude-val">Err</span>(<span class="ident">MessageError::for_actual</span>(<span class="kw-2">&amp;</span><span class="ident">msg</span>)),
-                <span class="ident">MessageTypes::NewState</span>(<span class="ident">msg</span>) =&gt; <span class="prelude-val">Err</span>(<span class="ident">MessageError::for_actual</span>(<span class="kw-2">&amp;</span><span class="ident">msg</span>)),
-                <span class="ident">MessageTypes::RejectState</span>(<span class="ident">msg</span>) =&gt; <span class="prelude-val">Err</span>(<span class="ident">MessageError::for_actual</span>(<span class="kw-2">&amp;</span><span class="ident">msg</span>)),
-                <span class="ident">MessageTypes::Heartbeat</span>(<span class="ident">heartbeat</span>) =&gt; <span class="prelude-val">Ok</span>(<span class="ident">heartbeat</span>),
+        <span class="kw">fn </span>try_from(value: MessageTypes) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, <span class="self">Self</span>::Error&gt; {
+            <span class="kw">match </span>value {
+                MessageTypes::ApproveState(msg) =&gt; <span class="prelude-val">Err</span>(MessageError::for_actual(<span class="kw-2">&amp;</span>msg)),
+                MessageTypes::NewState(msg) =&gt; <span class="prelude-val">Err</span>(MessageError::for_actual(<span class="kw-2">&amp;</span>msg)),
+                MessageTypes::RejectState(msg) =&gt; <span class="prelude-val">Err</span>(MessageError::for_actual(<span class="kw-2">&amp;</span>msg)),
+                MessageTypes::Heartbeat(heartbeat) =&gt; <span class="prelude-val">Ok</span>(heartbeat),
             }
         }
     }
 
-    <span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">Heartbeat</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">MessageTypes</span> {
-        <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">heartbeat</span>: <span class="ident">Heartbeat</span>) -&gt; <span class="self">Self</span> {
-            <span class="ident">MessageTypes::Heartbeat</span>(<span class="ident">heartbeat</span>)
+    <span class="kw">impl </span>From&lt;Heartbeat&gt; <span class="kw">for </span>MessageTypes {
+        <span class="kw">fn </span>from(heartbeat: Heartbeat) -&gt; <span class="self">Self </span>{
+            MessageTypes::Heartbeat(heartbeat)
         }
     }
 
-    <span class="doccomment">/// Generated by the follower when a [`NewState`]</span>
-    <span class="doccomment">/// is generated by the leader and the state is signable and correct.</span>
-    <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>)]</span>
-    <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">rename_all</span> <span class="op">=</span> <span class="string">&quot;camelCase&quot;</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ApproveState</span> {
-        <span class="kw">pub</span> <span class="ident">state_root</span>: <span class="ident">String</span>,
-        <span class="kw">pub</span> <span class="ident">signature</span>: <span class="ident">String</span>,
-        <span class="kw">pub</span> <span class="ident">is_healthy</span>: <span class="ident">bool</span>,
+    <span class="doccomment">/// Generated by the follower when a [`NewState`]
+    /// is generated by the leader and the state is signable and correct.
+    </span><span class="attribute">#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]</span>
+    <span class="attribute">#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]</span>
+    <span class="kw">pub struct </span>ApproveState {
+        <span class="kw">pub </span>state_root: String,
+        <span class="kw">pub </span>signature: String,
+        <span class="kw">pub </span>is_healthy: bool,
     }
 
-    <span class="doccomment">/// Generated by the [`Channel.leader`](crate::Channel::leader)</span>
-    <span class="doccomment">/// on changed balances for the [`Channel`](crate::Channel).</span>
-    <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>)]</span>
-    <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">rename_all</span> <span class="op">=</span> <span class="string">&quot;camelCase&quot;</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">NewState</span><span class="op">&lt;</span><span class="ident">S</span>: <span class="ident">BalancesState</span><span class="op">&gt;</span> {
-        <span class="kw">pub</span> <span class="ident">state_root</span>: <span class="ident">String</span>,
-        <span class="kw">pub</span> <span class="ident">signature</span>: <span class="ident">String</span>,
-        <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">flatten</span>, <span class="ident">bound</span> <span class="op">=</span> <span class="string">&quot;S: BalancesState&quot;</span>)]</span>
-        <span class="kw">pub</span> <span class="ident">balances</span>: <span class="ident">Balances</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span>,
+    <span class="doccomment">/// Generated by the [`Channel.leader`](crate::Channel::leader)
+    /// on changed balances for the [`Channel`](crate::Channel).
+    </span><span class="attribute">#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]</span>
+    <span class="attribute">#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]</span>
+    <span class="kw">pub struct </span>NewState&lt;S: BalancesState&gt; {
+        <span class="kw">pub </span>state_root: String,
+        <span class="kw">pub </span>signature: String,
+        <span class="attribute">#[serde(flatten, bound = <span class="string">&quot;S: BalancesState&quot;</span>)]</span>
+        <span class="kw">pub </span>balances: Balances&lt;S&gt;,
     }
 
-    <span class="kw">impl</span> <span class="ident">NewState</span><span class="op">&lt;</span><span class="ident">UncheckedState</span><span class="op">&gt;</span> {
-        <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">try_checked</span>(<span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">NewState</span><span class="op">&lt;</span><span class="ident">CheckedState</span><span class="op">&gt;</span>, <span class="ident"><span class="kw">crate</span>::balances::Error</span><span class="op">&gt;</span> {
-            <span class="prelude-val">Ok</span>(<span class="ident">NewState</span> {
-                <span class="ident">state_root</span>: <span class="self">self</span>.<span class="ident">state_root</span>,
-                <span class="ident">signature</span>: <span class="self">self</span>.<span class="ident">signature</span>,
-                <span class="ident">balances</span>: <span class="self">self</span>.<span class="ident">balances</span>.<span class="ident">check</span>()<span class="question-mark">?</span>,
+    <span class="kw">impl </span>NewState&lt;UncheckedState&gt; {
+        <span class="kw">pub fn </span>try_checked(<span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;NewState&lt;CheckedState&gt;, <span class="kw">crate</span>::balances::Error&gt; {
+            <span class="prelude-val">Ok</span>(NewState {
+                state_root: <span class="self">self</span>.state_root,
+                signature: <span class="self">self</span>.signature,
+                balances: <span class="self">self</span>.balances.check()<span class="question-mark">?</span>,
             })
         }
     }
 
-    <span class="doccomment">/// Generated by the [`Channel.follower`] on:</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// - Payout mismatch in the [`NewState`] between earner &amp; spenders (i.e. their sum is not equal)</span>
-    <span class="doccomment">/// - Invalid [`NewState`] root hash.</span>
-    <span class="doccomment">/// - Failed verification of the expected signer ([`Channel.leader`])</span>
-    <span class="doccomment">///   with the proposed [`NewState`] signature and state root.</span>
-    <span class="doccomment">/// - Invalid state transition (balances should always go up)</span>
-    <span class="doccomment">/// - [`NewState`] is unsignable because the health is below the [`Config.health_unsignable_promilles`]</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// [`Channel.follower`]: crate::Channel::follower</span>
-    <span class="doccomment">/// [`Channel.leader`]: crate::Channel::leader</span>
-    <span class="doccomment">/// [`Config.health_unsignable_promilles`]: crate::Config::health_unsignable_promilles</span>
-    <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>)]</span>
-    <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">rename_all</span> <span class="op">=</span> <span class="string">&quot;camelCase&quot;</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">RejectState</span><span class="op">&lt;</span><span class="ident">S</span>: <span class="ident">BalancesState</span><span class="op">&gt;</span> {
-        <span class="kw">pub</span> <span class="ident">reason</span>: <span class="ident">String</span>,
-        <span class="kw">pub</span> <span class="ident">state_root</span>: <span class="ident">String</span>,
-        <span class="kw">pub</span> <span class="ident">signature</span>: <span class="ident">String</span>,
-        <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">flatten</span>, <span class="ident">bound</span> <span class="op">=</span> <span class="string">&quot;S: BalancesState&quot;</span>)]</span>
-        <span class="kw">pub</span> <span class="ident">balances</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Balances</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-        <span class="doccomment">/// The timestamp when the [`NewState`] was rejected.</span>
-        <span class="kw">pub</span> <span class="ident">timestamp</span>: <span class="ident">DateTime</span><span class="op">&lt;</span><span class="ident">Utc</span><span class="op">&gt;</span>,
+    <span class="doccomment">/// Generated by the [`Channel.follower`] on:
+    ///
+    /// - Payout mismatch in the [`NewState`] between earner &amp; spenders (i.e. their sum is not equal)
+    /// - Invalid [`NewState`] root hash.
+    /// - Failed verification of the expected signer ([`Channel.leader`])
+    ///   with the proposed [`NewState`] signature and state root.
+    /// - Invalid state transition (balances should always go up)
+    /// - [`NewState`] is unsignable because the health is below the [`Config.health_unsignable_promilles`]
+    ///
+    /// [`Channel.follower`]: crate::Channel::follower
+    /// [`Channel.leader`]: crate::Channel::leader
+    /// [`Config.health_unsignable_promilles`]: crate::Config::health_unsignable_promilles
+    </span><span class="attribute">#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]</span>
+    <span class="attribute">#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]</span>
+    <span class="kw">pub struct </span>RejectState&lt;S: BalancesState&gt; {
+        <span class="kw">pub </span>reason: String,
+        <span class="kw">pub </span>state_root: String,
+        <span class="kw">pub </span>signature: String,
+        <span class="attribute">#[serde(flatten, bound = <span class="string">&quot;S: BalancesState&quot;</span>)]</span>
+        <span class="kw">pub </span>balances: <span class="prelude-ty">Option</span>&lt;Balances&lt;S&gt;&gt;,
+        <span class="doccomment">/// The timestamp when the [`NewState`] was rejected.
+        </span><span class="kw">pub </span>timestamp: DateTime&lt;Utc&gt;,
     }
 
-    <span class="doccomment">/// Heartbeat sent to each [`Channel`] validator by the</span>
-    <span class="doccomment">/// other validator of the [`Channel`].</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// The Heartbeat is sent on regular intervals every [`Config.heartbeat_time`].</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// [`Channel`]: crate::Channel</span>
-    <span class="doccomment">/// [`Config.heartbeat_time`]: crate::Config::heartbeat_time</span>
-    <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>)]</span>
-    <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">rename_all</span> <span class="op">=</span> <span class="string">&quot;camelCase&quot;</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Heartbeat</span> {
-        <span class="kw">pub</span> <span class="ident">signature</span>: <span class="ident">String</span>,
-        <span class="kw">pub</span> <span class="ident">state_root</span>: <span class="ident">String</span>,
-        <span class="kw">pub</span> <span class="ident">timestamp</span>: <span class="ident">DateTime</span><span class="op">&lt;</span><span class="ident">Utc</span><span class="op">&gt;</span>,
+    <span class="doccomment">/// Heartbeat sent to each [`Channel`] validator by the
+    /// other validator of the [`Channel`].
+    ///
+    /// The Heartbeat is sent on regular intervals every [`Config.heartbeat_time`].
+    ///
+    /// [`Channel`]: crate::Channel
+    /// [`Config.heartbeat_time`]: crate::Config::heartbeat_time
+    </span><span class="attribute">#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]</span>
+    <span class="attribute">#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]</span>
+    <span class="kw">pub struct </span>Heartbeat {
+        <span class="kw">pub </span>signature: String,
+        <span class="kw">pub </span>state_root: String,
+        <span class="kw">pub </span>timestamp: DateTime&lt;Utc&gt;,
     }
 
-    <span class="kw">impl</span> <span class="ident">Heartbeat</span> {
-        <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">signature</span>: <span class="ident">String</span>, <span class="ident">state_root</span>: <span class="ident">String</span>) -&gt; <span class="self">Self</span> {
-            <span class="self">Self</span> {
-                <span class="ident">signature</span>,
-                <span class="ident">state_root</span>,
-                <span class="ident">timestamp</span>: <span class="ident">Utc::now</span>(),
+    <span class="kw">impl </span>Heartbeat {
+        <span class="kw">pub fn </span>new(signature: String, state_root: String) -&gt; <span class="self">Self </span>{
+            <span class="self">Self </span>{
+                signature,
+                state_root,
+                timestamp: Utc::now(),
             }
         }
     }
 
-    <span class="doccomment">/// The message types used by validator.</span>
-    <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>)]</span>
-    <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">tag</span> <span class="op">=</span> <span class="string">&quot;type&quot;</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">MessageTypes</span> {
-        <span class="ident">ApproveState</span>(<span class="ident">ApproveState</span>),
-        <span class="ident">NewState</span>(<span class="ident">NewState</span><span class="op">&lt;</span><span class="ident">UncheckedState</span><span class="op">&gt;</span>),
-        <span class="ident">RejectState</span>(<span class="ident">RejectState</span><span class="op">&lt;</span><span class="ident">UncheckedState</span><span class="op">&gt;</span>),
-        <span class="ident">Heartbeat</span>(<span class="ident">Heartbeat</span>),
+    <span class="doccomment">/// The message types used by validator.
+    </span><span class="attribute">#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]</span>
+    <span class="attribute">#[serde(tag = <span class="string">&quot;type&quot;</span>)]</span>
+    <span class="kw">pub enum </span>MessageTypes {
+        ApproveState(ApproveState),
+        NewState(NewState&lt;UncheckedState&gt;),
+        RejectState(RejectState&lt;UncheckedState&gt;),
+        Heartbeat(Heartbeat),
     }
 }
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;postgres&quot;</span>)]</span>
-<span class="kw">mod</span> <span class="ident">postgres</span> {
-    <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::ValidatorId</span>;
-    <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::ToETHChecksum</span>;
-    <span class="kw">use</span> <span class="ident">bytes::BytesMut</span>;
-    <span class="kw">use</span> <span class="ident">std::error::Error</span>;
-    <span class="kw">use</span> <span class="ident">tokio_postgres::types</span>::{<span class="ident">FromSql</span>, <span class="ident">IsNull</span>, <span class="ident">ToSql</span>, <span class="ident">Type</span>};
+<span class="attribute">#[cfg(feature = <span class="string">&quot;postgres&quot;</span>)]</span>
+<span class="kw">mod </span>postgres {
+    <span class="kw">use </span><span class="kw">super</span>::ValidatorId;
+    <span class="kw">use </span><span class="kw">crate</span>::ToETHChecksum;
+    <span class="kw">use </span>bytes::BytesMut;
+    <span class="kw">use </span>std::error::Error;
+    <span class="kw">use </span>tokio_postgres::types::{FromSql, IsNull, ToSql, Type};
 
-    <span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="ident">FromSql</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">ValidatorId</span> {
-        <span class="kw">fn</span> <span class="ident">from_sql</span>(<span class="ident">ty</span>: <span class="kw-2">&amp;</span><span class="ident">Type</span>, <span class="ident">raw</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> [<span class="ident">u8</span>]) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Error</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-            <span class="kw">let</span> <span class="ident">str_slice</span> <span class="op">=</span> <span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">str</span> <span class="kw">as</span> <span class="ident">FromSql</span><span class="op">&gt;</span><span class="ident">::from_sql</span>(<span class="ident">ty</span>, <span class="ident">raw</span>)<span class="question-mark">?</span>;
+    <span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; FromSql&lt;<span class="lifetime">&#39;a</span>&gt; <span class="kw">for </span>ValidatorId {
+        <span class="kw">fn </span>from_sql(ty: <span class="kw-2">&amp;</span>Type, raw: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>[u8]) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, Box&lt;<span class="kw">dyn </span>Error + Sync + Send&gt;&gt; {
+            <span class="kw">let </span>str_slice = &lt;<span class="kw-2">&amp;</span>str <span class="kw">as </span>FromSql&gt;::from_sql(ty, raw)<span class="question-mark">?</span>;
 
-            <span class="comment">// FromHex::from_hex for fixed-sized arrays will guard against the length of the string!</span>
-            <span class="prelude-val">Ok</span>(<span class="ident">ValidatorId::try_from</span>(<span class="ident">str_slice</span>)<span class="question-mark">?</span>)
+            <span class="comment">// FromHex::from_hex for fixed-sized arrays will guard against the length of the string!
+            </span><span class="prelude-val">Ok</span>(ValidatorId::try_from(str_slice)<span class="question-mark">?</span>)
         }
 
-        <span class="kw">fn</span> <span class="ident">accepts</span>(<span class="ident">ty</span>: <span class="kw-2">&amp;</span><span class="ident">Type</span>) -&gt; <span class="ident">bool</span> {
-            <span class="macro">matches!</span>(<span class="kw-2">*</span><span class="ident">ty</span>, <span class="ident">Type::TEXT</span> <span class="op">|</span> <span class="ident">Type::VARCHAR</span>)
+        <span class="kw">fn </span>accepts(ty: <span class="kw-2">&amp;</span>Type) -&gt; bool {
+            <span class="macro">matches!</span>(<span class="kw-2">*</span>ty, Type::TEXT | Type::VARCHAR)
         }
     }
 
-    <span class="kw">impl</span> <span class="ident">ToSql</span> <span class="kw">for</span> <span class="ident">ValidatorId</span> {
-        <span class="kw">fn</span> <span class="ident">to_sql</span>(
+    <span class="kw">impl </span>ToSql <span class="kw">for </span>ValidatorId {
+        <span class="kw">fn </span>to_sql(
             <span class="kw-2">&amp;</span><span class="self">self</span>,
-            <span class="ident">ty</span>: <span class="kw-2">&amp;</span><span class="ident">Type</span>,
-            <span class="ident">w</span>: <span class="kw-2">&amp;mut</span> <span class="ident">BytesMut</span>,
-        ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">IsNull</span>, <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Error</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-            <span class="kw">let</span> <span class="ident">string</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">to_checksum</span>();
+            ty: <span class="kw-2">&amp;</span>Type,
+            w: <span class="kw-2">&amp;mut </span>BytesMut,
+        ) -&gt; <span class="prelude-ty">Result</span>&lt;IsNull, Box&lt;<span class="kw">dyn </span>Error + Sync + Send&gt;&gt; {
+            <span class="kw">let </span>string = <span class="self">self</span>.to_checksum();
 
-            <span class="op">&lt;</span><span class="ident">String</span> <span class="kw">as</span> <span class="ident">ToSql</span><span class="op">&gt;</span><span class="ident">::to_sql</span>(<span class="kw-2">&amp;</span><span class="ident">string</span>, <span class="ident">ty</span>, <span class="ident">w</span>)
+            &lt;String <span class="kw">as </span>ToSql&gt;::to_sql(<span class="kw-2">&amp;</span>string, ty, w)
         }
 
-        <span class="kw">fn</span> <span class="ident">accepts</span>(<span class="ident">ty</span>: <span class="kw-2">&amp;</span><span class="ident">Type</span>) -&gt; <span class="ident">bool</span> {
-            <span class="op">&lt;</span><span class="ident">String</span> <span class="kw">as</span> <span class="ident">ToSql</span><span class="op">&gt;</span><span class="ident">::accepts</span>(<span class="ident">ty</span>)
+        <span class="kw">fn </span>accepts(ty: <span class="kw-2">&amp;</span>Type) -&gt; bool {
+            &lt;String <span class="kw">as </span>ToSql&gt;::accepts(ty)
         }
 
-        <span class="kw">fn</span> <span class="ident">to_sql_checked</span>(
+        <span class="kw">fn </span>to_sql_checked(
             <span class="kw-2">&amp;</span><span class="self">self</span>,
-            <span class="ident">ty</span>: <span class="kw-2">&amp;</span><span class="ident">Type</span>,
-            <span class="ident">out</span>: <span class="kw-2">&amp;mut</span> <span class="ident">BytesMut</span>,
-        ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">IsNull</span>, <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Error</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-            <span class="kw">let</span> <span class="ident">string</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">to_checksum</span>();
+            ty: <span class="kw-2">&amp;</span>Type,
+            out: <span class="kw-2">&amp;mut </span>BytesMut,
+        ) -&gt; <span class="prelude-ty">Result</span>&lt;IsNull, Box&lt;<span class="kw">dyn </span>Error + Sync + Send&gt;&gt; {
+            <span class="kw">let </span>string = <span class="self">self</span>.to_checksum();
 
-            <span class="op">&lt;</span><span class="ident">String</span> <span class="kw">as</span> <span class="ident">ToSql</span><span class="op">&gt;</span><span class="ident">::to_sql_checked</span>(<span class="kw-2">&amp;</span><span class="ident">string</span>, <span class="ident">ty</span>, <span class="ident">out</span>)
+            &lt;String <span class="kw">as </span>ToSql&gt;::to_sql_checked(<span class="kw-2">&amp;</span>string, ty, out)
         }
     }
 }
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
-<span class="kw">mod</span> <span class="ident">test</span> {
-    <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
+<span class="attribute">#[cfg(test)]</span>
+<span class="kw">mod </span>test {
+    <span class="kw">use super</span>::<span class="kw-2">*</span>;
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">validator_id_is_checksummed_when_serialized</span>() {
-        <span class="kw">let</span> <span class="ident">validator_id_checksum_str</span> <span class="op">=</span> <span class="string">&quot;0xce07CbB7e054514D590a0262C93070D838bFBA2e&quot;</span>;
+    <span class="attribute">#[test]</span>
+    <span class="kw">fn </span>validator_id_is_checksummed_when_serialized() {
+        <span class="kw">let </span>validator_id_checksum_str = <span class="string">&quot;0xce07CbB7e054514D590a0262C93070D838bFBA2e&quot;</span>;
 
-        <span class="kw">let</span> <span class="ident">validator_id</span> <span class="op">=</span>
-            <span class="ident">ValidatorId::try_from</span>(<span class="ident">validator_id_checksum_str</span>).<span class="ident">expect</span>(<span class="string">&quot;Valid string was provided&quot;</span>);
-        <span class="kw">let</span> <span class="ident">actual_json</span> <span class="op">=</span> <span class="ident">serde_json::to_string</span>(<span class="kw-2">&amp;</span><span class="ident">validator_id</span>).<span class="ident">expect</span>(<span class="string">&quot;Should serialize&quot;</span>);
-        <span class="kw">let</span> <span class="ident">expected_json</span> <span class="op">=</span> <span class="macro">format!</span>(<span class="string">r#&quot;&quot;{}&quot;&quot;#</span>, <span class="ident">validator_id_checksum_str</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">expected_json</span>, <span class="ident">actual_json</span>);
+        <span class="kw">let </span>validator_id =
+            ValidatorId::try_from(validator_id_checksum_str).expect(<span class="string">&quot;Valid string was provided&quot;</span>);
+        <span class="kw">let </span>actual_json = serde_json::to_string(<span class="kw-2">&amp;</span>validator_id).expect(<span class="string">&quot;Should serialize&quot;</span>);
+        <span class="kw">let </span>expected_json = <span class="macro">format!</span>(<span class="string">r#&quot;&quot;{}&quot;&quot;#</span>, validator_id_checksum_str);
+        <span class="macro">assert_eq!</span>(expected_json, actual_json);
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="primitives" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (20ffea693 2022-08-11)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="primitives" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>

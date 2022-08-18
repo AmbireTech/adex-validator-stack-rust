@@ -658,665 +658,665 @@
 <span id="658">658</span>
 <span id="659">659</span>
 <span id="660">660</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">std::fmt</span>;
+</pre><pre class="rust"><code><span class="kw">use </span>std::fmt;
 
-<span class="kw">use</span> <span class="ident">chrono</span>::{<span class="ident">DateTime</span>, <span class="ident">Utc</span>};
-<span class="kw">use</span> <span class="ident">futures::future</span>::{<span class="ident">join</span>, <span class="ident">join_all</span>};
-<span class="kw">use</span> <span class="ident">primitives</span>::{
-    <span class="ident">balances</span>::{<span class="ident">Balances</span>, <span class="ident">CheckedState</span>},
-    <span class="ident">Address</span>, <span class="ident">ChannelId</span>, <span class="ident">UnifiedNum</span>,
+<span class="kw">use </span>chrono::{DateTime, Utc};
+<span class="kw">use </span>futures::future::{join, join_all};
+<span class="kw">use </span>primitives::{
+    balances::{Balances, CheckedState},
+    Address, ChannelId, UnifiedNum,
 };
-<span class="kw">use</span> <span class="ident">tokio_postgres</span>::{
-    <span class="ident">types</span>::{<span class="ident">FromSql</span>, <span class="ident">ToSql</span>},
-    <span class="ident">Row</span>,
+<span class="kw">use </span>tokio_postgres::{
+    types::{FromSql, ToSql},
+    Row,
 };
 
-<span class="kw">use</span> <span class="kw">super</span>::{<span class="ident">DbPool</span>, <span class="ident">PoolError</span>};
-<span class="kw">use</span> <span class="ident">thiserror::Error</span>;
+<span class="kw">use super</span>::{DbPool, PoolError};
+<span class="kw">use </span>thiserror::Error;
 
-<span class="kw">static</span> <span class="ident">UPDATE_ACCOUNTING_STATEMENT</span>: <span class="kw-2">&amp;</span><span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;INSERT INTO accounting(channel_id, side, address, amount, updated, created) VALUES($1, $2, $3, $4, NULL, NOW()) ON CONFLICT ON CONSTRAINT accounting_pkey DO UPDATE SET amount = accounting.amount + EXCLUDED.amount, updated = NOW() WHERE accounting.channel_id = $1 AND accounting.side = $2 AND accounting.address = $3 RETURNING channel_id, side, address, amount, updated, created&quot;</span>;
+<span class="kw">static </span>UPDATE_ACCOUNTING_STATEMENT: <span class="kw-2">&amp;</span>str = <span class="string">&quot;INSERT INTO accounting(channel_id, side, address, amount, updated, created) VALUES($1, $2, $3, $4, NULL, NOW()) ON CONFLICT ON CONSTRAINT accounting_pkey DO UPDATE SET amount = accounting.amount + EXCLUDED.amount, updated = NOW() WHERE accounting.channel_id = $1 AND accounting.side = $2 AND accounting.address = $3 RETURNING channel_id, side, address, amount, updated, created&quot;</span>;
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Error</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">Error</span> {
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Accounting Balances error: {0}&quot;</span>)]</span>
-    <span class="ident">Balances</span>(<span class="attribute">#[<span class="ident">from</span>]</span> <span class="ident">primitives::balances::Error</span>),
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Fetching Accounting from postgres error: {0}&quot;</span>)]</span>
-    <span class="ident">Postgres</span>(<span class="attribute">#[<span class="ident">from</span>]</span> <span class="ident">PoolError</span>),
+<span class="attribute">#[derive(Debug, Error)]</span>
+<span class="kw">pub enum </span>Error {
+    <span class="attribute">#[error(<span class="string">&quot;Accounting Balances error: {0}&quot;</span>)]</span>
+    Balances(<span class="attribute">#[from]</span> primitives::balances::Error),
+    <span class="attribute">#[error(<span class="string">&quot;Fetching Accounting from postgres error: {0}&quot;</span>)]</span>
+    Postgres(<span class="attribute">#[from]</span> PoolError),
 }
 
-<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">tokio_postgres::Error</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Error</span> {
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">error</span>: <span class="ident">tokio_postgres::Error</span>) -&gt; <span class="self">Self</span> {
-        <span class="ident"><span class="self">Self</span>::Postgres</span>(<span class="ident">PoolError::Backend</span>(<span class="ident">error</span>))
+<span class="kw">impl </span>From&lt;tokio_postgres::Error&gt; <span class="kw">for </span>Error {
+    <span class="kw">fn </span>from(error: tokio_postgres::Error) -&gt; <span class="self">Self </span>{
+        <span class="self">Self</span>::Postgres(PoolError::Backend(error))
     }
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Accounting</span> {
-    <span class="kw">pub</span> <span class="ident">channel_id</span>: <span class="ident">ChannelId</span>,
-    <span class="kw">pub</span> <span class="ident">side</span>: <span class="ident">Side</span>,
-    <span class="kw">pub</span> <span class="ident">address</span>: <span class="ident">Address</span>,
-    <span class="kw">pub</span> <span class="ident">amount</span>: <span class="ident">UnifiedNum</span>,
-    <span class="kw">pub</span> <span class="ident">updated</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">DateTime</span><span class="op">&lt;</span><span class="ident">Utc</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="kw">pub</span> <span class="ident">created</span>: <span class="ident">DateTime</span><span class="op">&lt;</span><span class="ident">Utc</span><span class="op">&gt;</span>,
+<span class="attribute">#[derive(Debug, Clone, PartialEq, Eq)]</span>
+<span class="kw">pub struct </span>Accounting {
+    <span class="kw">pub </span>channel_id: ChannelId,
+    <span class="kw">pub </span>side: Side,
+    <span class="kw">pub </span>address: Address,
+    <span class="kw">pub </span>amount: UnifiedNum,
+    <span class="kw">pub </span>updated: <span class="prelude-ty">Option</span>&lt;DateTime&lt;Utc&gt;&gt;,
+    <span class="kw">pub </span>created: DateTime&lt;Utc&gt;,
 }
 
-<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">Row</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Accounting</span> {
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">row</span>: <span class="kw-2">&amp;</span><span class="ident">Row</span>) -&gt; <span class="self">Self</span> {
-        <span class="self">Self</span> {
-            <span class="ident">channel_id</span>: <span class="ident">row</span>.<span class="ident">get</span>(<span class="string">&quot;channel_id&quot;</span>),
-            <span class="ident">side</span>: <span class="ident">row</span>.<span class="ident">get</span>(<span class="string">&quot;side&quot;</span>),
-            <span class="ident">address</span>: <span class="ident">row</span>.<span class="ident">get</span>(<span class="string">&quot;address&quot;</span>),
-            <span class="ident">amount</span>: <span class="ident">row</span>.<span class="ident">get</span>(<span class="string">&quot;amount&quot;</span>),
-            <span class="ident">updated</span>: <span class="ident">row</span>.<span class="ident">get</span>(<span class="string">&quot;updated&quot;</span>),
-            <span class="ident">created</span>: <span class="ident">row</span>.<span class="ident">get</span>(<span class="string">&quot;created&quot;</span>),
+<span class="kw">impl </span>From&lt;<span class="kw-2">&amp;</span>Row&gt; <span class="kw">for </span>Accounting {
+    <span class="kw">fn </span>from(row: <span class="kw-2">&amp;</span>Row) -&gt; <span class="self">Self </span>{
+        <span class="self">Self </span>{
+            channel_id: row.get(<span class="string">&quot;channel_id&quot;</span>),
+            side: row.get(<span class="string">&quot;side&quot;</span>),
+            address: row.get(<span class="string">&quot;address&quot;</span>),
+            amount: row.get(<span class="string">&quot;amount&quot;</span>),
+            updated: row.get(<span class="string">&quot;updated&quot;</span>),
+            created: row.get(<span class="string">&quot;created&quot;</span>),
         }
     }
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">ToSql</span>, <span class="ident">FromSql</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>)]</span>
-<span class="attribute">#[<span class="ident">postgres</span>(<span class="ident">name</span> <span class="op">=</span> <span class="string">&quot;accountingside&quot;</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">Side</span> {
-    <span class="ident">Earner</span>,
-    <span class="ident">Spender</span>,
+<span class="attribute">#[derive(Debug, Clone, Copy, ToSql, FromSql, PartialEq, Eq)]</span>
+<span class="attribute">#[postgres(name = <span class="string">&quot;accountingside&quot;</span>)]</span>
+<span class="kw">pub enum </span>Side {
+    Earner,
+    Spender,
 }
 
-<span class="kw">impl</span> <span class="ident">fmt::Display</span> <span class="kw">for</span> <span class="ident">Side</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="ident">fmt::Result</span> {
-        <span class="kw">match</span> <span class="self">self</span> {
-            <span class="ident">Side::Earner</span> =&gt; <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;Earner&quot;</span>),
-            <span class="ident">Side::Spender</span> =&gt; <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;Spender&quot;</span>),
+<span class="kw">impl </span>fmt::Display <span class="kw">for </span>Side {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; fmt::Result {
+        <span class="kw">match </span><span class="self">self </span>{
+            Side::Earner =&gt; <span class="macro">write!</span>(f, <span class="string">&quot;Earner&quot;</span>),
+            Side::Spender =&gt; <span class="macro">write!</span>(f, <span class="string">&quot;Spender&quot;</span>),
         }
     }
 }
 
-<span class="doccomment">/// ```sql</span>
-<span class="doccomment">/// SELECT channel_id, side, address, amount, updated, created FROM accounting WHERE channel_id = $1 AND address = $2 AND side = $3</span>
-<span class="doccomment">/// ```</span>
-<span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">get_accounting</span>(
-    <span class="ident">pool</span>: <span class="ident">DbPool</span>,
-    <span class="ident">channel_id</span>: <span class="ident">ChannelId</span>,
-    <span class="ident">address</span>: <span class="ident">Address</span>,
-    <span class="ident">side</span>: <span class="ident">Side</span>,
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Accounting</span><span class="op">&gt;</span>, <span class="ident">PoolError</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">client</span> <span class="op">=</span> <span class="ident">pool</span>.<span class="ident">get</span>().<span class="kw">await</span><span class="question-mark">?</span>;
-    <span class="kw">let</span> <span class="ident">statement</span> <span class="op">=</span> <span class="ident">client</span>
-        .<span class="ident">prepare</span>(<span class="string">&quot;SELECT channel_id, side, address, amount, updated, created FROM accounting WHERE channel_id = $1 AND address = $2 AND side = $3&quot;</span>)
+<span class="doccomment">/// ```sql
+/// SELECT channel_id, side, address, amount, updated, created FROM accounting WHERE channel_id = $1 AND address = $2 AND side = $3
+/// ```
+</span><span class="kw">pub async fn </span>get_accounting(
+    pool: DbPool,
+    channel_id: ChannelId,
+    address: Address,
+    side: Side,
+) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;Accounting&gt;, PoolError&gt; {
+    <span class="kw">let </span>client = pool.get().<span class="kw">await</span><span class="question-mark">?</span>;
+    <span class="kw">let </span>statement = client
+        .prepare(<span class="string">&quot;SELECT channel_id, side, address, amount, updated, created FROM accounting WHERE channel_id = $1 AND address = $2 AND side = $3&quot;</span>)
         .<span class="kw">await</span><span class="question-mark">?</span>;
 
-    <span class="kw">let</span> <span class="ident">row</span> <span class="op">=</span> <span class="ident">client</span>
-        .<span class="ident">query_opt</span>(<span class="kw-2">&amp;</span><span class="ident">statement</span>, <span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">channel_id</span>, <span class="kw-2">&amp;</span><span class="ident">address</span>, <span class="kw-2">&amp;</span><span class="ident">side</span>])
+    <span class="kw">let </span>row = client
+        .query_opt(<span class="kw-2">&amp;</span>statement, <span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span>channel_id, <span class="kw-2">&amp;</span>address, <span class="kw-2">&amp;</span>side])
         .<span class="kw">await</span><span class="question-mark">?</span>;
 
-    <span class="prelude-val">Ok</span>(<span class="ident">row</span>.<span class="ident">as_ref</span>().<span class="ident">map</span>(<span class="ident">Accounting::from</span>))
+    <span class="prelude-val">Ok</span>(row.as_ref().map(Accounting::from))
 }
 
-<span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">get_all_accountings_for_channel</span>(
-    <span class="ident">pool</span>: <span class="ident">DbPool</span>,
-    <span class="ident">channel_id</span>: <span class="ident">ChannelId</span>,
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Accounting</span><span class="op">&gt;</span>, <span class="ident">PoolError</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">client</span> <span class="op">=</span> <span class="ident">pool</span>.<span class="ident">get</span>().<span class="kw">await</span><span class="question-mark">?</span>;
-    <span class="kw">let</span> <span class="ident">statement</span> <span class="op">=</span> <span class="ident">client</span>.<span class="ident">prepare</span>(<span class="string">&quot;SELECT channel_id, side, address, amount, updated, created FROM accounting WHERE channel_id = $1&quot;</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+<span class="kw">pub async fn </span>get_all_accountings_for_channel(
+    pool: DbPool,
+    channel_id: ChannelId,
+) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;Accounting&gt;, PoolError&gt; {
+    <span class="kw">let </span>client = pool.get().<span class="kw">await</span><span class="question-mark">?</span>;
+    <span class="kw">let </span>statement = client.prepare(<span class="string">&quot;SELECT channel_id, side, address, amount, updated, created FROM accounting WHERE channel_id = $1&quot;</span>).<span class="kw">await</span><span class="question-mark">?</span>;
 
-    <span class="kw">let</span> <span class="ident">rows</span> <span class="op">=</span> <span class="ident">client</span>.<span class="ident">query</span>(<span class="kw-2">&amp;</span><span class="ident">statement</span>, <span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">channel_id</span>]).<span class="kw">await</span><span class="question-mark">?</span>;
+    <span class="kw">let </span>rows = client.query(<span class="kw-2">&amp;</span>statement, <span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span>channel_id]).<span class="kw">await</span><span class="question-mark">?</span>;
 
-    <span class="kw">let</span> <span class="ident">accountings</span> <span class="op">=</span> <span class="ident">rows</span>.<span class="ident">iter</span>().<span class="ident">map</span>(<span class="ident">Accounting::from</span>).<span class="ident">collect</span>();
+    <span class="kw">let </span>accountings = rows.iter().map(Accounting::from).collect();
 
-    <span class="prelude-val">Ok</span>(<span class="ident">accountings</span>)
+    <span class="prelude-val">Ok</span>(accountings)
 }
 
-<span class="doccomment">/// Will update current Spender/Earner amount or insert a new Accounting record</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// See `UPDATE_ACCOUNTING_STATEMENT` static for full query.</span>
-<span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">update_accounting</span>(
-    <span class="ident">pool</span>: <span class="ident">DbPool</span>,
-    <span class="ident">channel_id</span>: <span class="ident">ChannelId</span>,
-    <span class="ident">address</span>: <span class="ident">Address</span>,
-    <span class="ident">side</span>: <span class="ident">Side</span>,
-    <span class="ident">amount</span>: <span class="ident">UnifiedNum</span>,
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Accounting</span>, <span class="ident">PoolError</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">client</span> <span class="op">=</span> <span class="ident">pool</span>.<span class="ident">get</span>().<span class="kw">await</span><span class="question-mark">?</span>;
-    <span class="kw">let</span> <span class="ident">statement</span> <span class="op">=</span> <span class="ident">client</span>.<span class="ident">prepare</span>(<span class="ident">UPDATE_ACCOUNTING_STATEMENT</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+<span class="doccomment">/// Will update current Spender/Earner amount or insert a new Accounting record
+///
+/// See `UPDATE_ACCOUNTING_STATEMENT` static for full query.
+</span><span class="kw">pub async fn </span>update_accounting(
+    pool: DbPool,
+    channel_id: ChannelId,
+    address: Address,
+    side: Side,
+    amount: UnifiedNum,
+) -&gt; <span class="prelude-ty">Result</span>&lt;Accounting, PoolError&gt; {
+    <span class="kw">let </span>client = pool.get().<span class="kw">await</span><span class="question-mark">?</span>;
+    <span class="kw">let </span>statement = client.prepare(UPDATE_ACCOUNTING_STATEMENT).<span class="kw">await</span><span class="question-mark">?</span>;
 
-    <span class="kw">let</span> <span class="ident">row</span> <span class="op">=</span> <span class="ident">client</span>
-        .<span class="ident">query_one</span>(<span class="kw-2">&amp;</span><span class="ident">statement</span>, <span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">channel_id</span>, <span class="kw-2">&amp;</span><span class="ident">side</span>, <span class="kw-2">&amp;</span><span class="ident">address</span>, <span class="kw-2">&amp;</span><span class="ident">amount</span>])
+    <span class="kw">let </span>row = client
+        .query_one(<span class="kw-2">&amp;</span>statement, <span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span>channel_id, <span class="kw-2">&amp;</span>side, <span class="kw-2">&amp;</span>address, <span class="kw-2">&amp;</span>amount])
         .<span class="kw">await</span><span class="question-mark">?</span>;
 
-    <span class="prelude-val">Ok</span>(<span class="ident">Accounting::from</span>(<span class="kw-2">&amp;</span><span class="ident">row</span>))
+    <span class="prelude-val">Ok</span>(Accounting::from(<span class="kw-2">&amp;</span>row))
 }
 
-<span class="doccomment">/// `delta_balances` defines the Balances that need to be added to the spending or earnings of the `Accounting`s.</span>
-<span class="doccomment">/// It will **not** override the whole `Accounting` value</span>
-<span class="doccomment">/// Returns a tuple of `(Vec&lt;Earners Accounting&gt;, Vec&lt;Spenders Accounting&gt;)`</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// # Error</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// It will return an error if any of the updates fails but it would have updated the rest of them.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// This way we ensure that even if a single or multiple Accounting updates fail,</span>
-<span class="doccomment">/// we will still pay out the rest of them.</span>
-<span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">spend_amount</span>(
-    <span class="ident">pool</span>: <span class="ident">DbPool</span>,
-    <span class="ident">channel_id</span>: <span class="ident">ChannelId</span>,
-    <span class="ident">delta_balances</span>: <span class="ident">Balances</span><span class="op">&lt;</span><span class="ident">CheckedState</span><span class="op">&gt;</span>,
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Accounting</span><span class="op">&gt;</span>, <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Accounting</span><span class="op">&gt;</span>), <span class="ident">PoolError</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">client</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">pool</span>.<span class="ident">get</span>().<span class="kw">await</span><span class="question-mark">?</span>;
+<span class="doccomment">/// `delta_balances` defines the Balances that need to be added to the spending or earnings of the `Accounting`s.
+/// It will **not** override the whole `Accounting` value
+/// Returns a tuple of `(Vec&lt;Earners Accounting&gt;, Vec&lt;Spenders Accounting&gt;)`
+///
+/// # Error
+///
+/// It will return an error if any of the updates fails but it would have updated the rest of them.
+///
+/// This way we ensure that even if a single or multiple Accounting updates fail,
+/// we will still pay out the rest of them.
+</span><span class="kw">pub async fn </span>spend_amount(
+    pool: DbPool,
+    channel_id: ChannelId,
+    delta_balances: Balances&lt;CheckedState&gt;,
+) -&gt; <span class="prelude-ty">Result</span>&lt;(Vec&lt;Accounting&gt;, Vec&lt;Accounting&gt;), PoolError&gt; {
+    <span class="kw">let </span>client = <span class="kw-2">&amp;</span>pool.get().<span class="kw">await</span><span class="question-mark">?</span>;
 
-    <span class="kw">let</span> <span class="ident">statement</span> <span class="op">=</span> <span class="ident">client</span>.<span class="ident">prepare_cached</span>(<span class="ident">UPDATE_ACCOUNTING_STATEMENT</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+    <span class="kw">let </span>statement = client.prepare_cached(UPDATE_ACCOUNTING_STATEMENT).<span class="kw">await</span><span class="question-mark">?</span>;
 
-    <span class="comment">// Earners</span>
-    <span class="kw">let</span> <span class="ident">earners_futures</span> <span class="op">=</span> <span class="ident">delta_balances</span>.<span class="ident">earners</span>.<span class="ident">into_iter</span>().<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">earner</span>, <span class="ident">amount</span>)<span class="op">|</span> {
-        <span class="kw">let</span> <span class="ident">statement</span> <span class="op">=</span> <span class="ident">statement</span>.<span class="ident">clone</span>();
+    <span class="comment">// Earners
+    </span><span class="kw">let </span>earners_futures = delta_balances.earners.into_iter().map(|(earner, amount)| {
+        <span class="kw">let </span>statement = statement.clone();
 
-        <span class="kw">async</span> <span class="kw">move</span> {
-            <span class="ident">client</span>
-                .<span class="ident">query_one</span>(<span class="kw-2">&amp;</span><span class="ident">statement</span>, <span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">channel_id</span>, <span class="kw-2">&amp;</span><span class="ident">Side::Earner</span>, <span class="kw-2">&amp;</span><span class="ident">earner</span>, <span class="kw-2">&amp;</span><span class="ident">amount</span>])
-                .<span class="kw">await</span>
-                .<span class="ident">map</span>(<span class="op">|</span><span class="ident">row</span><span class="op">|</span> <span class="ident">Accounting::from</span>(<span class="kw-2">&amp;</span><span class="ident">row</span>))
+        <span class="kw">async move </span>{
+            client
+                .query_one(<span class="kw-2">&amp;</span>statement, <span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span>channel_id, <span class="kw-2">&amp;</span>Side::Earner, <span class="kw-2">&amp;</span>earner, <span class="kw-2">&amp;</span>amount])
+                .<span class="kw">await
+                </span>.map(|row| Accounting::from(<span class="kw-2">&amp;</span>row))
         }
     });
 
-    <span class="comment">// Spenders</span>
-    <span class="kw">let</span> <span class="ident">spenders_futures</span> <span class="op">=</span> <span class="ident">delta_balances</span>
-        .<span class="ident">spenders</span>
-        .<span class="ident">into_iter</span>()
-        .<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">spender</span>, <span class="ident">amount</span>)<span class="op">|</span> {
-            <span class="kw">let</span> <span class="ident">statement</span> <span class="op">=</span> <span class="ident">statement</span>.<span class="ident">clone</span>();
+    <span class="comment">// Spenders
+    </span><span class="kw">let </span>spenders_futures = delta_balances
+        .spenders
+        .into_iter()
+        .map(|(spender, amount)| {
+            <span class="kw">let </span>statement = statement.clone();
 
-            <span class="kw">async</span> <span class="kw">move</span> {
-                <span class="ident">client</span>
-                    .<span class="ident">query_one</span>(
-                        <span class="kw-2">&amp;</span><span class="ident">statement</span>,
-                        <span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">channel_id</span>, <span class="kw-2">&amp;</span><span class="ident">Side::Spender</span>, <span class="kw-2">&amp;</span><span class="ident">spender</span>, <span class="kw-2">&amp;</span><span class="ident">amount</span>],
+            <span class="kw">async move </span>{
+                client
+                    .query_one(
+                        <span class="kw-2">&amp;</span>statement,
+                        <span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span>channel_id, <span class="kw-2">&amp;</span>Side::Spender, <span class="kw-2">&amp;</span>spender, <span class="kw-2">&amp;</span>amount],
                     )
-                    .<span class="kw">await</span>
-                    .<span class="ident">map</span>(<span class="op">|</span><span class="ident">row</span><span class="op">|</span> <span class="ident">Accounting::from</span>(<span class="kw-2">&amp;</span><span class="ident">row</span>))
+                    .<span class="kw">await
+                    </span>.map(|row| Accounting::from(<span class="kw-2">&amp;</span>row))
             }
         });
 
-    <span class="kw">let</span> <span class="ident">earners</span> <span class="op">=</span> <span class="ident">join_all</span>(<span class="ident">earners_futures</span>);
-    <span class="kw">let</span> <span class="ident">spenders</span> <span class="op">=</span> <span class="ident">join_all</span>(<span class="ident">spenders_futures</span>);
+    <span class="kw">let </span>earners = join_all(earners_futures);
+    <span class="kw">let </span>spenders = join_all(spenders_futures);
 
-    <span class="comment">// collect all the Accounting updates into Vectors</span>
-    <span class="kw">let</span> (<span class="ident">earners</span>, <span class="ident">spenders</span>) <span class="op">=</span> <span class="ident">join</span>(<span class="ident">earners</span>, <span class="ident">spenders</span>).<span class="kw">await</span>;
+    <span class="comment">// collect all the Accounting updates into Vectors
+    </span><span class="kw">let </span>(earners, spenders) = join(earners, spenders).<span class="kw">await</span>;
 
-    <span class="comment">// Return an error if any of the Accounting updates failed</span>
-    <span class="prelude-val">Ok</span>((
-        <span class="ident">earners</span>.<span class="ident">into_iter</span>().<span class="ident">collect</span>::<span class="op">&lt;</span><span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="kw">_</span>, <span class="kw">_</span><span class="op">&gt;</span><span class="op">&gt;</span>()<span class="question-mark">?</span>,
-        <span class="ident">spenders</span>.<span class="ident">into_iter</span>().<span class="ident">collect</span>::<span class="op">&lt;</span><span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="kw">_</span>, <span class="kw">_</span><span class="op">&gt;</span><span class="op">&gt;</span>()<span class="question-mark">?</span>,
+    <span class="comment">// Return an error if any of the Accounting updates failed
+    </span><span class="prelude-val">Ok</span>((
+        earners.into_iter().collect::&lt;<span class="prelude-ty">Result</span>&lt;<span class="kw">_</span>, <span class="kw">_</span>&gt;&gt;()<span class="question-mark">?</span>,
+        spenders.into_iter().collect::&lt;<span class="prelude-ty">Result</span>&lt;<span class="kw">_</span>, <span class="kw">_</span>&gt;&gt;()<span class="question-mark">?</span>,
     ))
 }
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
-<span class="kw">mod</span> <span class="ident">test</span> {
-    <span class="kw">use</span> <span class="ident">primitives</span>::{
-        <span class="ident">config::GANACHE_CONFIG</span>,
-        <span class="ident">test_util</span>::{<span class="ident">ADVERTISER</span>, <span class="ident">ADVERTISER_2</span>, <span class="ident">CREATOR</span>, <span class="ident">DUMMY_CAMPAIGN</span>, <span class="ident">PUBLISHER</span>, <span class="ident">PUBLISHER_2</span>},
+<span class="attribute">#[cfg(test)]</span>
+<span class="kw">mod </span>test {
+    <span class="kw">use </span>primitives::{
+        config::GANACHE_CONFIG,
+        test_util::{ADVERTISER, ADVERTISER_2, CREATOR, DUMMY_CAMPAIGN, PUBLISHER, PUBLISHER_2},
     };
 
-    <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::db</span>::{
-        <span class="ident">insert_channel</span>,
-        <span class="ident">tests_postgres</span>::{<span class="ident">setup_test_migrations</span>, <span class="ident">DATABASE_POOL</span>},
+    <span class="kw">use </span><span class="kw">crate</span>::db::{
+        insert_channel,
+        tests_postgres::{setup_test_migrations, DATABASE_POOL},
     };
 
-    <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
+    <span class="kw">use super</span>::<span class="kw-2">*</span>;
 
-    <span class="attribute">#[<span class="ident">tokio::test</span>]</span>
-    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">insert_update_and_get_accounting</span>() {
-        <span class="kw">let</span> <span class="ident">database</span> <span class="op">=</span> <span class="ident">DATABASE_POOL</span>.<span class="ident">get</span>().<span class="kw">await</span>.<span class="ident">expect</span>(<span class="string">&quot;Should get a DB pool&quot;</span>);
+    <span class="attribute">#[tokio::test]</span>
+    <span class="kw">async fn </span>insert_update_and_get_accounting() {
+        <span class="kw">let </span>database = DATABASE_POOL.get().<span class="kw">await</span>.expect(<span class="string">&quot;Should get a DB pool&quot;</span>);
 
-        <span class="ident">setup_test_migrations</span>(<span class="ident">database</span>.<span class="ident">pool</span>.<span class="ident">clone</span>())
-            .<span class="kw">await</span>
-            .<span class="ident">expect</span>(<span class="string">&quot;Migrations should succeed&quot;</span>);
+        setup_test_migrations(database.pool.clone())
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;Migrations should succeed&quot;</span>);
 
-        <span class="kw">let</span> <span class="ident">channel_chain</span> <span class="op">=</span> <span class="ident">GANACHE_CONFIG</span>
-            .<span class="ident">find_chain_of</span>(<span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">channel</span>.<span class="ident">token</span>)
-            .<span class="ident">expect</span>(<span class="string">&quot;Channel token should be whitelisted in config!&quot;</span>);
-        <span class="kw">let</span> <span class="ident">channel_context</span> <span class="op">=</span> <span class="ident">channel_chain</span>.<span class="ident">with_channel</span>(<span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">channel</span>);
+        <span class="kw">let </span>channel_chain = GANACHE_CONFIG
+            .find_chain_of(DUMMY_CAMPAIGN.channel.token)
+            .expect(<span class="string">&quot;Channel token should be whitelisted in config!&quot;</span>);
+        <span class="kw">let </span>channel_context = channel_chain.with_channel(DUMMY_CAMPAIGN.channel);
 
-        <span class="comment">// insert the channel into the DB</span>
-        <span class="kw">let</span> <span class="ident">channel</span> <span class="op">=</span> <span class="ident">insert_channel</span>(<span class="kw-2">&amp;</span><span class="ident">database</span>.<span class="ident">pool</span>, <span class="kw-2">&amp;</span><span class="ident">channel_context</span>)
-            .<span class="kw">await</span>
-            .<span class="ident">expect</span>(<span class="string">&quot;Should insert&quot;</span>);
+        <span class="comment">// insert the channel into the DB
+        </span><span class="kw">let </span>channel = insert_channel(<span class="kw-2">&amp;</span>database.pool, <span class="kw-2">&amp;</span>channel_context)
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;Should insert&quot;</span>);
 
-        <span class="kw">let</span> <span class="ident">channel_id</span> <span class="op">=</span> <span class="ident">channel</span>.<span class="ident">id</span>();
-        <span class="kw">let</span> <span class="ident">earner</span> <span class="op">=</span> <span class="kw-2">*</span><span class="ident">PUBLISHER</span>;
-        <span class="kw">let</span> <span class="ident">spender</span> <span class="op">=</span> <span class="kw-2">*</span><span class="ident">CREATOR</span>;
+        <span class="kw">let </span>channel_id = channel.id();
+        <span class="kw">let </span>earner = <span class="kw-2">*</span>PUBLISHER;
+        <span class="kw">let </span>spender = <span class="kw-2">*</span>CREATOR;
 
-        <span class="kw">let</span> <span class="ident">amount</span> <span class="op">=</span> <span class="ident">UnifiedNum::from</span>(<span class="number">100_000_000</span>);
-        <span class="kw">let</span> <span class="ident">update_amount</span> <span class="op">=</span> <span class="ident">UnifiedNum::from</span>(<span class="number">200_000_000</span>);
+        <span class="kw">let </span>amount = UnifiedNum::from(<span class="number">100_000_000</span>);
+        <span class="kw">let </span>update_amount = UnifiedNum::from(<span class="number">200_000_000</span>);
 
-        <span class="comment">// Spender insert/update</span>
-        {
-            <span class="kw">let</span> <span class="ident">inserted</span> <span class="op">=</span> <span class="ident">update_accounting</span>(
-                <span class="ident">database</span>.<span class="ident">pool</span>.<span class="ident">clone</span>(),
-                <span class="ident">channel_id</span>,
-                <span class="ident">spender</span>,
-                <span class="ident">Side::Spender</span>,
-                <span class="ident">amount</span>,
+        <span class="comment">// Spender insert/update
+        </span>{
+            <span class="kw">let </span>inserted = update_accounting(
+                database.pool.clone(),
+                channel_id,
+                spender,
+                Side::Spender,
+                amount,
             )
-            .<span class="kw">await</span>
-            .<span class="ident">expect</span>(<span class="string">&quot;Should insert&quot;</span>);
-            <span class="macro">assert_eq!</span>(<span class="ident">spender</span>, <span class="ident">inserted</span>.<span class="ident">address</span>);
-            <span class="macro">assert_eq!</span>(<span class="ident">Side::Spender</span>, <span class="ident">inserted</span>.<span class="ident">side</span>);
-            <span class="macro">assert_eq!</span>(<span class="ident">amount</span>, <span class="ident">inserted</span>.<span class="ident">amount</span>);
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;Should insert&quot;</span>);
+            <span class="macro">assert_eq!</span>(spender, inserted.address);
+            <span class="macro">assert_eq!</span>(Side::Spender, inserted.side);
+            <span class="macro">assert_eq!</span>(amount, inserted.amount);
 
-            <span class="kw">let</span> <span class="ident">updated</span> <span class="op">=</span> <span class="ident">update_accounting</span>(
-                <span class="ident">database</span>.<span class="ident">pool</span>.<span class="ident">clone</span>(),
-                <span class="ident">channel_id</span>,
-                <span class="ident">spender</span>,
-                <span class="ident">Side::Spender</span>,
-                <span class="ident">update_amount</span>,
+            <span class="kw">let </span>updated = update_accounting(
+                database.pool.clone(),
+                channel_id,
+                spender,
+                Side::Spender,
+                update_amount,
             )
-            .<span class="kw">await</span>
-            .<span class="ident">expect</span>(<span class="string">&quot;Should insert&quot;</span>);
-            <span class="macro">assert_eq!</span>(<span class="ident">spender</span>, <span class="ident">updated</span>.<span class="ident">address</span>);
-            <span class="macro">assert_eq!</span>(<span class="ident">Side::Spender</span>, <span class="ident">updated</span>.<span class="ident">side</span>);
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;Should insert&quot;</span>);
+            <span class="macro">assert_eq!</span>(spender, updated.address);
+            <span class="macro">assert_eq!</span>(Side::Spender, updated.side);
             <span class="macro">assert_eq!</span>(
-                <span class="ident">amount</span> <span class="op">+</span> <span class="ident">update_amount</span>,
-                <span class="ident">updated</span>.<span class="ident">amount</span>,
-                <span class="string">&quot;Should add the newly spent amount to the existing one&quot;</span>
-            );
+                amount + update_amount,
+                updated.amount,
+                <span class="string">&quot;Should add the newly spent amount to the existing one&quot;
+            </span>);
 
-            <span class="kw">let</span> <span class="ident">spent</span> <span class="op">=</span> <span class="ident">get_accounting</span>(<span class="ident">database</span>.<span class="ident">pool</span>.<span class="ident">clone</span>(), <span class="ident">channel_id</span>, <span class="ident">spender</span>, <span class="ident">Side::Spender</span>)
-                .<span class="kw">await</span>
-                .<span class="ident">expect</span>(<span class="string">&quot;Should query for the updated accounting&quot;</span>);
-            <span class="macro">assert_eq!</span>(<span class="prelude-val">Some</span>(<span class="ident">updated</span>), <span class="ident">spent</span>);
+            <span class="kw">let </span>spent = get_accounting(database.pool.clone(), channel_id, spender, Side::Spender)
+                .<span class="kw">await
+                </span>.expect(<span class="string">&quot;Should query for the updated accounting&quot;</span>);
+            <span class="macro">assert_eq!</span>(<span class="prelude-val">Some</span>(updated), spent);
 
-            <span class="kw">let</span> <span class="ident">earned</span> <span class="op">=</span> <span class="ident">get_accounting</span>(<span class="ident">database</span>.<span class="ident">pool</span>.<span class="ident">clone</span>(), <span class="ident">channel_id</span>, <span class="ident">spender</span>, <span class="ident">Side::Earner</span>)
-                .<span class="kw">await</span>
-                .<span class="ident">expect</span>(<span class="string">&quot;Should query for accounting&quot;</span>);
-            <span class="macro">assert!</span>(<span class="ident">earned</span>.<span class="ident">is_none</span>(), <span class="string">&quot;Spender shouldn&#39;t have an earned amount&quot;</span>);
+            <span class="kw">let </span>earned = get_accounting(database.pool.clone(), channel_id, spender, Side::Earner)
+                .<span class="kw">await
+                </span>.expect(<span class="string">&quot;Should query for accounting&quot;</span>);
+            <span class="macro">assert!</span>(earned.is_none(), <span class="string">&quot;Spender shouldn&#39;t have an earned amount&quot;</span>);
         }
 
-        <span class="comment">// Earner insert/update</span>
-        {
-            <span class="kw">let</span> <span class="ident">inserted</span> <span class="op">=</span> <span class="ident">update_accounting</span>(
-                <span class="ident">database</span>.<span class="ident">pool</span>.<span class="ident">clone</span>(),
-                <span class="ident">channel_id</span>,
-                <span class="ident">earner</span>,
-                <span class="ident">Side::Earner</span>,
-                <span class="ident">amount</span>,
+        <span class="comment">// Earner insert/update
+        </span>{
+            <span class="kw">let </span>inserted = update_accounting(
+                database.pool.clone(),
+                channel_id,
+                earner,
+                Side::Earner,
+                amount,
             )
-            .<span class="kw">await</span>
-            .<span class="ident">expect</span>(<span class="string">&quot;Should insert&quot;</span>);
-            <span class="macro">assert_eq!</span>(<span class="ident">earner</span>, <span class="ident">inserted</span>.<span class="ident">address</span>);
-            <span class="macro">assert_eq!</span>(<span class="ident">Side::Earner</span>, <span class="ident">inserted</span>.<span class="ident">side</span>);
-            <span class="macro">assert_eq!</span>(<span class="ident">amount</span>, <span class="ident">inserted</span>.<span class="ident">amount</span>);
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;Should insert&quot;</span>);
+            <span class="macro">assert_eq!</span>(earner, inserted.address);
+            <span class="macro">assert_eq!</span>(Side::Earner, inserted.side);
+            <span class="macro">assert_eq!</span>(amount, inserted.amount);
 
-            <span class="kw">let</span> <span class="ident">updated</span> <span class="op">=</span> <span class="ident">update_accounting</span>(
-                <span class="ident">database</span>.<span class="ident">pool</span>.<span class="ident">clone</span>(),
-                <span class="ident">channel_id</span>,
-                <span class="ident">earner</span>,
-                <span class="ident">Side::Earner</span>,
-                <span class="ident">update_amount</span>,
+            <span class="kw">let </span>updated = update_accounting(
+                database.pool.clone(),
+                channel_id,
+                earner,
+                Side::Earner,
+                update_amount,
             )
-            .<span class="kw">await</span>
-            .<span class="ident">expect</span>(<span class="string">&quot;Should insert&quot;</span>);
-            <span class="macro">assert_eq!</span>(<span class="ident">earner</span>, <span class="ident">updated</span>.<span class="ident">address</span>);
-            <span class="macro">assert_eq!</span>(<span class="ident">Side::Earner</span>, <span class="ident">updated</span>.<span class="ident">side</span>);
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;Should insert&quot;</span>);
+            <span class="macro">assert_eq!</span>(earner, updated.address);
+            <span class="macro">assert_eq!</span>(Side::Earner, updated.side);
             <span class="macro">assert_eq!</span>(
-                <span class="ident">amount</span> <span class="op">+</span> <span class="ident">update_amount</span>,
-                <span class="ident">updated</span>.<span class="ident">amount</span>,
-                <span class="string">&quot;Should add the newly earned amount to the existing one&quot;</span>
-            );
+                amount + update_amount,
+                updated.amount,
+                <span class="string">&quot;Should add the newly earned amount to the existing one&quot;
+            </span>);
 
-            <span class="kw">let</span> <span class="ident">earned</span> <span class="op">=</span> <span class="ident">get_accounting</span>(<span class="ident">database</span>.<span class="ident">pool</span>.<span class="ident">clone</span>(), <span class="ident">channel_id</span>, <span class="ident">earner</span>, <span class="ident">Side::Earner</span>)
-                .<span class="kw">await</span>
-                .<span class="ident">expect</span>(<span class="string">&quot;Should query for the updated accounting&quot;</span>);
-            <span class="macro">assert_eq!</span>(<span class="prelude-val">Some</span>(<span class="ident">updated</span>), <span class="ident">earned</span>);
+            <span class="kw">let </span>earned = get_accounting(database.pool.clone(), channel_id, earner, Side::Earner)
+                .<span class="kw">await
+                </span>.expect(<span class="string">&quot;Should query for the updated accounting&quot;</span>);
+            <span class="macro">assert_eq!</span>(<span class="prelude-val">Some</span>(updated), earned);
 
-            <span class="kw">let</span> <span class="ident">spent</span> <span class="op">=</span> <span class="ident">get_accounting</span>(<span class="ident">database</span>.<span class="ident">pool</span>.<span class="ident">clone</span>(), <span class="ident">channel_id</span>, <span class="ident">earner</span>, <span class="ident">Side::Spender</span>)
-                .<span class="kw">await</span>
-                .<span class="ident">expect</span>(<span class="string">&quot;Should query for accounting&quot;</span>);
-            <span class="macro">assert!</span>(<span class="ident">spent</span>.<span class="ident">is_none</span>(), <span class="string">&quot;Earner shouldn&#39;t have a spent amount&quot;</span>);
+            <span class="kw">let </span>spent = get_accounting(database.pool.clone(), channel_id, earner, Side::Spender)
+                .<span class="kw">await
+                </span>.expect(<span class="string">&quot;Should query for accounting&quot;</span>);
+            <span class="macro">assert!</span>(spent.is_none(), <span class="string">&quot;Earner shouldn&#39;t have a spent amount&quot;</span>);
         }
 
-        <span class="comment">// Spender as Earner &amp; another Spender</span>
-        <span class="comment">// Will test the previously spent amount as well!</span>
-        {
-            <span class="kw">let</span> <span class="ident">spender_as_earner</span> <span class="op">=</span> <span class="ident">spender</span>;
+        <span class="comment">// Spender as Earner &amp; another Spender
+        // Will test the previously spent amount as well!
+        </span>{
+            <span class="kw">let </span>spender_as_earner = spender;
 
-            <span class="kw">let</span> <span class="ident">inserted</span> <span class="op">=</span> <span class="ident">update_accounting</span>(
-                <span class="ident">database</span>.<span class="ident">pool</span>.<span class="ident">clone</span>(),
-                <span class="ident">channel_id</span>,
-                <span class="ident">spender_as_earner</span>,
-                <span class="ident">Side::Earner</span>,
-                <span class="ident">amount</span>,
+            <span class="kw">let </span>inserted = update_accounting(
+                database.pool.clone(),
+                channel_id,
+                spender_as_earner,
+                Side::Earner,
+                amount,
             )
-            .<span class="kw">await</span>
-            .<span class="ident">expect</span>(<span class="string">&quot;Should insert&quot;</span>);
-            <span class="macro">assert_eq!</span>(<span class="ident">spender_as_earner</span>, <span class="ident">inserted</span>.<span class="ident">address</span>);
-            <span class="macro">assert_eq!</span>(<span class="ident">Side::Earner</span>, <span class="ident">inserted</span>.<span class="ident">side</span>);
-            <span class="macro">assert_eq!</span>(<span class="ident">amount</span>, <span class="ident">inserted</span>.<span class="ident">amount</span>);
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;Should insert&quot;</span>);
+            <span class="macro">assert_eq!</span>(spender_as_earner, inserted.address);
+            <span class="macro">assert_eq!</span>(Side::Earner, inserted.side);
+            <span class="macro">assert_eq!</span>(amount, inserted.amount);
 
-            <span class="kw">let</span> <span class="ident">updated</span> <span class="op">=</span> <span class="ident">update_accounting</span>(
-                <span class="ident">database</span>.<span class="ident">pool</span>.<span class="ident">clone</span>(),
-                <span class="ident">channel_id</span>,
-                <span class="ident">spender_as_earner</span>,
-                <span class="ident">Side::Earner</span>,
-                <span class="ident">UnifiedNum::from</span>(<span class="number">999</span>),
+            <span class="kw">let </span>updated = update_accounting(
+                database.pool.clone(),
+                channel_id,
+                spender_as_earner,
+                Side::Earner,
+                UnifiedNum::from(<span class="number">999</span>),
             )
-            .<span class="kw">await</span>
-            .<span class="ident">expect</span>(<span class="string">&quot;Should insert&quot;</span>);
-            <span class="macro">assert_eq!</span>(<span class="ident">spender</span>, <span class="ident">updated</span>.<span class="ident">address</span>);
-            <span class="macro">assert_eq!</span>(<span class="ident">Side::Earner</span>, <span class="ident">updated</span>.<span class="ident">side</span>);
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;Should insert&quot;</span>);
+            <span class="macro">assert_eq!</span>(spender, updated.address);
+            <span class="macro">assert_eq!</span>(Side::Earner, updated.side);
             <span class="macro">assert_eq!</span>(
-                <span class="ident">UnifiedNum::from</span>(<span class="number">100_000_999</span>),
-                <span class="ident">updated</span>.<span class="ident">amount</span>,
-                <span class="string">&quot;Should add the newly spent amount to the existing one&quot;</span>
-            );
+                UnifiedNum::from(<span class="number">100_000_999</span>),
+                updated.amount,
+                <span class="string">&quot;Should add the newly spent amount to the existing one&quot;
+            </span>);
 
-            <span class="kw">let</span> <span class="ident">earned_acc</span> <span class="op">=</span> <span class="ident">get_accounting</span>(
-                <span class="ident">database</span>.<span class="ident">pool</span>.<span class="ident">clone</span>(),
-                <span class="ident">channel_id</span>,
-                <span class="ident">spender_as_earner</span>,
-                <span class="ident">Side::Earner</span>,
+            <span class="kw">let </span>earned_acc = get_accounting(
+                database.pool.clone(),
+                channel_id,
+                spender_as_earner,
+                Side::Earner,
             )
-            .<span class="kw">await</span>
-            .<span class="ident">expect</span>(<span class="string">&quot;Should query for earned accounting&quot;</span>)
-            .<span class="ident">expect</span>(<span class="string">&quot;Should have Earned accounting for Spender as Earner&quot;</span>);
-            <span class="macro">assert_eq!</span>(<span class="ident">UnifiedNum::from</span>(<span class="number">100_000_999</span>), <span class="ident">earned_acc</span>.<span class="ident">amount</span>);
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;Should query for earned accounting&quot;</span>)
+            .expect(<span class="string">&quot;Should have Earned accounting for Spender as Earner&quot;</span>);
+            <span class="macro">assert_eq!</span>(UnifiedNum::from(<span class="number">100_000_999</span>), earned_acc.amount);
 
-            <span class="kw">let</span> <span class="ident">spent_acc</span> <span class="op">=</span> <span class="ident">get_accounting</span>(
-                <span class="ident">database</span>.<span class="ident">pool</span>.<span class="ident">clone</span>(),
-                <span class="ident">channel_id</span>,
-                <span class="ident">spender_as_earner</span>,
-                <span class="ident">Side::Spender</span>,
+            <span class="kw">let </span>spent_acc = get_accounting(
+                database.pool.clone(),
+                channel_id,
+                spender_as_earner,
+                Side::Spender,
             )
-            .<span class="kw">await</span>
-            .<span class="ident">expect</span>(<span class="string">&quot;Should query for spent accounting&quot;</span>)
-            .<span class="ident">expect</span>(<span class="string">&quot;Should have Spent accounting for Spender as Earner&quot;</span>);
-            <span class="macro">assert_eq!</span>(<span class="ident">UnifiedNum::from</span>(<span class="number">300_000_000</span>), <span class="ident">spent_acc</span>.<span class="ident">amount</span>);
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;Should query for spent accounting&quot;</span>)
+            .expect(<span class="string">&quot;Should have Spent accounting for Spender as Earner&quot;</span>);
+            <span class="macro">assert_eq!</span>(UnifiedNum::from(<span class="number">300_000_000</span>), spent_acc.amount);
         }
     }
 
-    <span class="kw">fn</span> <span class="ident">assert_accounting</span>(
-        <span class="ident">expected</span>: (<span class="ident">Address</span>, <span class="ident">Side</span>, <span class="ident">UnifiedNum</span>),
-        <span class="ident">accounting</span>: <span class="ident">Accounting</span>,
-        <span class="ident">with_set_updated</span>: <span class="ident">bool</span>,
+    <span class="kw">fn </span>assert_accounting(
+        expected: (Address, Side, UnifiedNum),
+        accounting: Accounting,
+        with_set_updated: bool,
     ) {
         <span class="macro">assert_eq!</span>(
-            <span class="ident">expected</span>.<span class="number">0</span>, <span class="ident">accounting</span>.<span class="ident">address</span>,
-            <span class="string">&quot;Accounting address is not the same&quot;</span>
-        );
+            expected.<span class="number">0</span>, accounting.address,
+            <span class="string">&quot;Accounting address is not the same&quot;
+        </span>);
         <span class="macro">assert_eq!</span>(
-            <span class="ident">expected</span>.<span class="number">1</span>, <span class="ident">accounting</span>.<span class="ident">side</span>,
-            <span class="string">&quot;Accounting side is not the same&quot;</span>
-        );
+            expected.<span class="number">1</span>, accounting.side,
+            <span class="string">&quot;Accounting side is not the same&quot;
+        </span>);
         <span class="macro">assert_eq!</span>(
-            <span class="ident">expected</span>.<span class="number">2</span>, <span class="ident">accounting</span>.<span class="ident">amount</span>,
-            <span class="string">&quot;Accounting amount is not the same&quot;</span>
-        );
+            expected.<span class="number">2</span>, accounting.amount,
+            <span class="string">&quot;Accounting amount is not the same&quot;
+        </span>);
 
-        <span class="kw">if</span> <span class="ident">with_set_updated</span> {
+        <span class="kw">if </span>with_set_updated {
             <span class="macro">assert!</span>(
-                <span class="ident">accounting</span>.<span class="ident">updated</span>.<span class="ident">is_some</span>(),
-                <span class="string">&quot;Accounting should have been updated&quot;</span>
-            )
-        } <span class="kw">else</span> {
+                accounting.updated.is_some(),
+                <span class="string">&quot;Accounting should have been updated&quot;
+            </span>)
+        } <span class="kw">else </span>{
             <span class="macro">assert!</span>(
-                <span class="ident">accounting</span>.<span class="ident">updated</span>.<span class="ident">is_none</span>(),
-                <span class="string">&quot;Accounting should not have been updated&quot;</span>
-            )
+                accounting.updated.is_none(),
+                <span class="string">&quot;Accounting should not have been updated&quot;
+            </span>)
         }
     }
 
-    <span class="attribute">#[<span class="ident">tokio::test</span>]</span>
-    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">test_spend_amount</span>() {
-        <span class="kw">let</span> <span class="ident">database</span> <span class="op">=</span> <span class="ident">DATABASE_POOL</span>.<span class="ident">get</span>().<span class="kw">await</span>.<span class="ident">expect</span>(<span class="string">&quot;Should get a DB pool&quot;</span>);
+    <span class="attribute">#[tokio::test]</span>
+    <span class="kw">async fn </span>test_spend_amount() {
+        <span class="kw">let </span>database = DATABASE_POOL.get().<span class="kw">await</span>.expect(<span class="string">&quot;Should get a DB pool&quot;</span>);
 
-        <span class="ident">setup_test_migrations</span>(<span class="ident">database</span>.<span class="ident">pool</span>.<span class="ident">clone</span>())
-            .<span class="kw">await</span>
-            .<span class="ident">expect</span>(<span class="string">&quot;Migrations should succeed&quot;</span>);
+        setup_test_migrations(database.pool.clone())
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;Migrations should succeed&quot;</span>);
 
-        <span class="kw">let</span> <span class="ident">channel_chain</span> <span class="op">=</span> <span class="ident">GANACHE_CONFIG</span>
-            .<span class="ident">find_chain_of</span>(<span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">channel</span>.<span class="ident">token</span>)
-            .<span class="ident">expect</span>(<span class="string">&quot;Channel token should be whitelisted in config!&quot;</span>);
-        <span class="kw">let</span> <span class="ident">channel_context</span> <span class="op">=</span> <span class="ident">channel_chain</span>.<span class="ident">with_channel</span>(<span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">channel</span>);
+        <span class="kw">let </span>channel_chain = GANACHE_CONFIG
+            .find_chain_of(DUMMY_CAMPAIGN.channel.token)
+            .expect(<span class="string">&quot;Channel token should be whitelisted in config!&quot;</span>);
+        <span class="kw">let </span>channel_context = channel_chain.with_channel(DUMMY_CAMPAIGN.channel);
 
-        <span class="comment">// insert the channel into the DB</span>
-        <span class="kw">let</span> <span class="ident">channel</span> <span class="op">=</span> <span class="ident">insert_channel</span>(<span class="kw-2">&amp;</span><span class="ident">database</span>.<span class="ident">pool</span>, <span class="kw-2">&amp;</span><span class="ident">channel_context</span>)
-            .<span class="kw">await</span>
-            .<span class="ident">expect</span>(<span class="string">&quot;Should insert&quot;</span>);
+        <span class="comment">// insert the channel into the DB
+        </span><span class="kw">let </span>channel = insert_channel(<span class="kw-2">&amp;</span>database.pool, <span class="kw-2">&amp;</span>channel_context)
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;Should insert&quot;</span>);
 
-        <span class="kw">let</span> <span class="ident">channel_id</span> <span class="op">=</span> <span class="ident">channel</span>.<span class="ident">id</span>();
-        <span class="kw">let</span> <span class="ident">earner</span> <span class="op">=</span> <span class="kw-2">*</span><span class="ident">PUBLISHER</span>;
-        <span class="kw">let</span> <span class="ident">spender</span> <span class="op">=</span> <span class="kw-2">*</span><span class="ident">CREATOR</span>;
-        <span class="kw">let</span> <span class="ident">spender_as_earner</span> <span class="op">=</span> <span class="ident">spender</span>;
-        <span class="kw">let</span> <span class="ident">other_spender</span> <span class="op">=</span> <span class="kw-2">*</span><span class="ident">ADVERTISER</span>;
+        <span class="kw">let </span>channel_id = channel.id();
+        <span class="kw">let </span>earner = <span class="kw-2">*</span>PUBLISHER;
+        <span class="kw">let </span>spender = <span class="kw-2">*</span>CREATOR;
+        <span class="kw">let </span>spender_as_earner = spender;
+        <span class="kw">let </span>other_spender = <span class="kw-2">*</span>ADVERTISER;
 
-        <span class="kw">let</span> <span class="ident">cases</span> <span class="op">=</span> [
-            <span class="comment">// Spender &amp; Earner insert</span>
-            (
-                <span class="ident">UnifiedNum::from</span>(<span class="number">100_000_000</span>),
-                <span class="ident">earner</span>,
-                <span class="ident">spender</span>,
+        <span class="kw">let </span>cases = [
+            <span class="comment">// Spender &amp; Earner insert
+            </span>(
+                UnifiedNum::from(<span class="number">100_000_000</span>),
+                earner,
+                spender,
                 [
-                    <span class="macro">vec!</span>[(<span class="ident">earner</span>, <span class="ident">Side::Earner</span>, <span class="ident">UnifiedNum::from</span>(<span class="number">100_000_000</span>), <span class="bool-val">false</span>)],
-                    <span class="macro">vec!</span>[(<span class="ident">spender</span>, <span class="ident">Side::Spender</span>, <span class="ident">UnifiedNum::from</span>(<span class="number">100_000_000</span>), <span class="bool-val">false</span>)],
+                    <span class="macro">vec!</span>[(earner, Side::Earner, UnifiedNum::from(<span class="number">100_000_000</span>), <span class="bool-val">false</span>)],
+                    <span class="macro">vec!</span>[(spender, Side::Spender, UnifiedNum::from(<span class="number">100_000_000</span>), <span class="bool-val">false</span>)],
                 ],
             ),
-            <span class="comment">// Spender &amp; Earner update</span>
-            (
-                <span class="ident">UnifiedNum::from</span>(<span class="number">200_000_000</span>),
-                <span class="ident">earner</span>,
-                <span class="ident">spender</span>,
+            <span class="comment">// Spender &amp; Earner update
+            </span>(
+                UnifiedNum::from(<span class="number">200_000_000</span>),
+                earner,
+                spender,
                 [
-                    <span class="macro">vec!</span>[(<span class="ident">earner</span>, <span class="ident">Side::Earner</span>, <span class="ident">UnifiedNum::from</span>(<span class="number">300_000_000</span>), <span class="bool-val">true</span>)],
-                    <span class="macro">vec!</span>[(<span class="ident">spender</span>, <span class="ident">Side::Spender</span>, <span class="ident">UnifiedNum::from</span>(<span class="number">300_000_000</span>), <span class="bool-val">true</span>)],
+                    <span class="macro">vec!</span>[(earner, Side::Earner, UnifiedNum::from(<span class="number">300_000_000</span>), <span class="bool-val">true</span>)],
+                    <span class="macro">vec!</span>[(spender, Side::Spender, UnifiedNum::from(<span class="number">300_000_000</span>), <span class="bool-val">true</span>)],
                 ],
             ),
-            <span class="comment">// Spender as an Earner &amp; another spender</span>
-            (
-                <span class="ident">UnifiedNum::from</span>(<span class="number">999</span>),
-                <span class="ident">spender_as_earner</span>,
-                <span class="ident">other_spender</span>,
+            <span class="comment">// Spender as an Earner &amp; another spender
+            </span>(
+                UnifiedNum::from(<span class="number">999</span>),
+                spender_as_earner,
+                other_spender,
                 [
-                    <span class="macro">vec!</span>[(<span class="ident">spender</span>, <span class="ident">Side::Earner</span>, <span class="ident">UnifiedNum::from</span>(<span class="number">999</span>), <span class="bool-val">false</span>)],
-                    <span class="macro">vec!</span>[(<span class="ident">other_spender</span>, <span class="ident">Side::Spender</span>, <span class="ident">UnifiedNum::from</span>(<span class="number">999</span>), <span class="bool-val">false</span>)],
+                    <span class="macro">vec!</span>[(spender, Side::Earner, UnifiedNum::from(<span class="number">999</span>), <span class="bool-val">false</span>)],
+                    <span class="macro">vec!</span>[(other_spender, Side::Spender, UnifiedNum::from(<span class="number">999</span>), <span class="bool-val">false</span>)],
                 ],
             ),
         ];
 
-        <span class="kw">for</span> (<span class="ident">amount_to_spend</span>, <span class="ident">earner</span>, <span class="ident">spender</span>, [<span class="ident">earners</span>, <span class="ident">spenders</span>]) <span class="kw">in</span> <span class="ident">cases</span> {
-            <span class="comment">// Spender &amp; Earner insert</span>
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">balances</span> <span class="op">=</span> <span class="ident">Balances</span>::<span class="op">&lt;</span><span class="ident">CheckedState</span><span class="op">&gt;</span><span class="ident">::default</span>();
-            <span class="ident">balances</span>
-                .<span class="ident">spend</span>(<span class="ident">spender</span>, <span class="ident">earner</span>, <span class="ident">amount_to_spend</span>)
-                .<span class="ident">expect</span>(<span class="string">&quot;Should spend&quot;</span>);
+        <span class="kw">for </span>(amount_to_spend, earner, spender, [earners, spenders]) <span class="kw">in </span>cases {
+            <span class="comment">// Spender &amp; Earner insert
+            </span><span class="kw">let </span><span class="kw-2">mut </span>balances = Balances::&lt;CheckedState&gt;::default();
+            balances
+                .spend(spender, earner, amount_to_spend)
+                .expect(<span class="string">&quot;Should spend&quot;</span>);
 
-            <span class="kw">let</span> (<span class="ident">actual_earners</span>, <span class="ident">actual_spenders</span>) <span class="op">=</span>
-                <span class="ident">spend_amount</span>(<span class="ident">database</span>.<span class="ident">pool</span>.<span class="ident">clone</span>(), <span class="ident">channel_id</span>, <span class="ident">balances</span>)
-                    .<span class="kw">await</span>
-                    .<span class="ident">expect</span>(<span class="string">&quot;Should insert Earner and Spender&quot;</span>);
+            <span class="kw">let </span>(actual_earners, actual_spenders) =
+                spend_amount(database.pool.clone(), channel_id, balances)
+                    .<span class="kw">await
+                    </span>.expect(<span class="string">&quot;Should insert Earner and Spender&quot;</span>);
 
-            <span class="kw">for</span> (<span class="ident">actual</span>, <span class="ident">expected</span>) <span class="kw">in</span> <span class="ident">actual_earners</span>.<span class="ident">into_iter</span>().<span class="ident">zip</span>(<span class="ident">earners</span>) {
-                <span class="ident">assert_accounting</span>((<span class="ident">expected</span>.<span class="number">0</span>, <span class="ident">expected</span>.<span class="number">1</span>, <span class="ident">expected</span>.<span class="number">2</span>), <span class="ident">actual</span>, <span class="ident">expected</span>.<span class="number">3</span>)
+            <span class="kw">for </span>(actual, expected) <span class="kw">in </span>actual_earners.into_iter().zip(earners) {
+                assert_accounting((expected.<span class="number">0</span>, expected.<span class="number">1</span>, expected.<span class="number">2</span>), actual, expected.<span class="number">3</span>)
             }
 
-            <span class="kw">for</span> (<span class="ident">actual</span>, <span class="ident">expected</span>) <span class="kw">in</span> <span class="ident">actual_spenders</span>.<span class="ident">into_iter</span>().<span class="ident">zip</span>(<span class="ident">spenders</span>) {
-                <span class="ident">assert_accounting</span>((<span class="ident">expected</span>.<span class="number">0</span>, <span class="ident">expected</span>.<span class="number">1</span>, <span class="ident">expected</span>.<span class="number">2</span>), <span class="ident">actual</span>, <span class="ident">expected</span>.<span class="number">3</span>)
+            <span class="kw">for </span>(actual, expected) <span class="kw">in </span>actual_spenders.into_iter().zip(spenders) {
+                assert_accounting((expected.<span class="number">0</span>, expected.<span class="number">1</span>, expected.<span class="number">2</span>), actual, expected.<span class="number">3</span>)
             }
         }
 
-        <span class="comment">// Check the final amounts of Spent/Earned for the Spender</span>
-        <span class="kw">let</span> <span class="ident">earned</span> <span class="op">=</span> <span class="ident">get_accounting</span>(<span class="ident">database</span>.<span class="ident">pool</span>.<span class="ident">clone</span>(), <span class="ident">channel_id</span>, <span class="ident">spender</span>, <span class="ident">Side::Earner</span>)
-            .<span class="kw">await</span>
-            .<span class="ident">expect</span>(<span class="string">&quot;Should query for accounting&quot;</span>)
-            .<span class="ident">expect</span>(<span class="string">&quot;Should have Earned accounting for Spender as Earner&quot;</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">UnifiedNum::from</span>(<span class="number">999</span>), <span class="ident">earned</span>.<span class="ident">amount</span>);
+        <span class="comment">// Check the final amounts of Spent/Earned for the Spender
+        </span><span class="kw">let </span>earned = get_accounting(database.pool.clone(), channel_id, spender, Side::Earner)
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;Should query for accounting&quot;</span>)
+            .expect(<span class="string">&quot;Should have Earned accounting for Spender as Earner&quot;</span>);
+        <span class="macro">assert_eq!</span>(UnifiedNum::from(<span class="number">999</span>), earned.amount);
 
-        <span class="kw">let</span> <span class="ident">spent</span> <span class="op">=</span> <span class="ident">get_accounting</span>(<span class="ident">database</span>.<span class="ident">pool</span>.<span class="ident">clone</span>(), <span class="ident">channel_id</span>, <span class="ident">spender</span>, <span class="ident">Side::Spender</span>)
-            .<span class="kw">await</span>
-            .<span class="ident">expect</span>(<span class="string">&quot;Should query for accounting&quot;</span>)
-            .<span class="ident">expect</span>(<span class="string">&quot;Should have Spent accounting for Spender as Earner&quot;</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">UnifiedNum::from</span>(<span class="number">300_000_000</span>), <span class="ident">spent</span>.<span class="ident">amount</span>);
+        <span class="kw">let </span>spent = get_accounting(database.pool.clone(), channel_id, spender, Side::Spender)
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;Should query for accounting&quot;</span>)
+            .expect(<span class="string">&quot;Should have Spent accounting for Spender as Earner&quot;</span>);
+        <span class="macro">assert_eq!</span>(UnifiedNum::from(<span class="number">300_000_000</span>), spent.amount);
     }
 
-    <span class="attribute">#[<span class="ident">tokio::test</span>]</span>
-    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">test_spend_amount_with_multiple_spends</span>() {
-        <span class="kw">let</span> <span class="ident">database</span> <span class="op">=</span> <span class="ident">DATABASE_POOL</span>.<span class="ident">get</span>().<span class="kw">await</span>.<span class="ident">expect</span>(<span class="string">&quot;Should get a DB pool&quot;</span>);
+    <span class="attribute">#[tokio::test]</span>
+    <span class="kw">async fn </span>test_spend_amount_with_multiple_spends() {
+        <span class="kw">let </span>database = DATABASE_POOL.get().<span class="kw">await</span>.expect(<span class="string">&quot;Should get a DB pool&quot;</span>);
 
-        <span class="ident">setup_test_migrations</span>(<span class="ident">database</span>.<span class="ident">pool</span>.<span class="ident">clone</span>())
-            .<span class="kw">await</span>
-            .<span class="ident">expect</span>(<span class="string">&quot;Migrations should succeed&quot;</span>);
+        setup_test_migrations(database.pool.clone())
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;Migrations should succeed&quot;</span>);
 
-        <span class="kw">let</span> <span class="ident">channel_chain</span> <span class="op">=</span> <span class="ident">GANACHE_CONFIG</span>
-            .<span class="ident">find_chain_of</span>(<span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">channel</span>.<span class="ident">token</span>)
-            .<span class="ident">expect</span>(<span class="string">&quot;Channel token should be whitelisted in config!&quot;</span>);
-        <span class="kw">let</span> <span class="ident">channel_context</span> <span class="op">=</span> <span class="ident">channel_chain</span>.<span class="ident">with_channel</span>(<span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">channel</span>);
+        <span class="kw">let </span>channel_chain = GANACHE_CONFIG
+            .find_chain_of(DUMMY_CAMPAIGN.channel.token)
+            .expect(<span class="string">&quot;Channel token should be whitelisted in config!&quot;</span>);
+        <span class="kw">let </span>channel_context = channel_chain.with_channel(DUMMY_CAMPAIGN.channel);
 
-        <span class="comment">// insert the channel into the DB</span>
-        <span class="kw">let</span> <span class="ident">channel</span> <span class="op">=</span> <span class="ident">insert_channel</span>(<span class="kw-2">&amp;</span><span class="ident">database</span>.<span class="ident">pool</span>, <span class="kw-2">&amp;</span><span class="ident">channel_context</span>)
-            .<span class="kw">await</span>
-            .<span class="ident">expect</span>(<span class="string">&quot;Should insert&quot;</span>);
+        <span class="comment">// insert the channel into the DB
+        </span><span class="kw">let </span>channel = insert_channel(<span class="kw-2">&amp;</span>database.pool, <span class="kw-2">&amp;</span>channel_context)
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;Should insert&quot;</span>);
 
-        <span class="kw">let</span> <span class="ident">channel_id</span> <span class="op">=</span> <span class="ident">channel</span>.<span class="ident">id</span>();
-        <span class="kw">let</span> <span class="ident">earner</span> <span class="op">=</span> <span class="kw-2">*</span><span class="ident">PUBLISHER</span>;
-        <span class="kw">let</span> <span class="ident">other_earner</span> <span class="op">=</span> <span class="kw-2">*</span><span class="ident">PUBLISHER_2</span>;
-        <span class="kw">let</span> <span class="ident">spender</span> <span class="op">=</span> <span class="kw-2">*</span><span class="ident">CREATOR</span>;
-        <span class="kw">let</span> <span class="ident">spender_as_earner</span> <span class="op">=</span> <span class="ident">spender</span>;
-        <span class="kw">let</span> <span class="ident">other_spender</span> <span class="op">=</span> <span class="kw-2">*</span><span class="ident">ADVERTISER</span>;
-        <span class="kw">let</span> <span class="ident">third_spender</span> <span class="op">=</span> <span class="kw-2">*</span><span class="ident">ADVERTISER_2</span>;
+        <span class="kw">let </span>channel_id = channel.id();
+        <span class="kw">let </span>earner = <span class="kw-2">*</span>PUBLISHER;
+        <span class="kw">let </span>other_earner = <span class="kw-2">*</span>PUBLISHER_2;
+        <span class="kw">let </span>spender = <span class="kw-2">*</span>CREATOR;
+        <span class="kw">let </span>spender_as_earner = spender;
+        <span class="kw">let </span>other_spender = <span class="kw-2">*</span>ADVERTISER;
+        <span class="kw">let </span>third_spender = <span class="kw-2">*</span>ADVERTISER_2;
 
-        <span class="comment">// Spenders &amp; Earners insert</span>
-        {
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">balances</span> <span class="op">=</span> <span class="ident">Balances</span>::<span class="op">&lt;</span><span class="ident">CheckedState</span><span class="op">&gt;</span><span class="ident">::default</span>();
-            <span class="ident">balances</span>
-                .<span class="ident">spend</span>(<span class="ident">spender</span>, <span class="ident">earner</span>, <span class="ident">UnifiedNum::from</span>(<span class="number">400_000</span>))
-                .<span class="ident">expect</span>(<span class="string">&quot;Should spend&quot;</span>);
-            <span class="ident">balances</span>
-                .<span class="ident">spend</span>(<span class="ident">other_spender</span>, <span class="ident">other_earner</span>, <span class="ident">UnifiedNum::from</span>(<span class="number">500_000</span>))
-                .<span class="ident">expect</span>(<span class="string">&quot;Should spend&quot;</span>);
+        <span class="comment">// Spenders &amp; Earners insert
+        </span>{
+            <span class="kw">let </span><span class="kw-2">mut </span>balances = Balances::&lt;CheckedState&gt;::default();
+            balances
+                .spend(spender, earner, UnifiedNum::from(<span class="number">400_000</span>))
+                .expect(<span class="string">&quot;Should spend&quot;</span>);
+            balances
+                .spend(other_spender, other_earner, UnifiedNum::from(<span class="number">500_000</span>))
+                .expect(<span class="string">&quot;Should spend&quot;</span>);
 
-            <span class="kw">let</span> (<span class="ident">earners_acc</span>, <span class="ident">spenders_acc</span>) <span class="op">=</span>
-                <span class="ident">spend_amount</span>(<span class="ident">database</span>.<span class="ident">pool</span>.<span class="ident">clone</span>(), <span class="ident">channel_id</span>, <span class="ident">balances</span>)
-                    .<span class="kw">await</span>
-                    .<span class="ident">expect</span>(<span class="string">&quot;Should insert Earners and Spenders&quot;</span>);
+            <span class="kw">let </span>(earners_acc, spenders_acc) =
+                spend_amount(database.pool.clone(), channel_id, balances)
+                    .<span class="kw">await
+                    </span>.expect(<span class="string">&quot;Should insert Earners and Spenders&quot;</span>);
 
-            <span class="macro">assert_eq!</span>(<span class="number">2</span>, <span class="ident">earners_acc</span>.<span class="ident">len</span>());
-            <span class="macro">assert_eq!</span>(<span class="number">2</span>, <span class="ident">spenders_acc</span>.<span class="ident">len</span>());
+            <span class="macro">assert_eq!</span>(<span class="number">2</span>, earners_acc.len());
+            <span class="macro">assert_eq!</span>(<span class="number">2</span>, spenders_acc.len());
 
-            <span class="comment">// Earners assertions</span>
-            <span class="ident">assert_accounting</span>(
-                (<span class="ident">earner</span>, <span class="ident">Side::Earner</span>, <span class="ident">UnifiedNum::from</span>(<span class="number">400_000</span>)),
-                <span class="ident">earners_acc</span>
-                    .<span class="ident">iter</span>()
-                    .<span class="ident">find</span>(<span class="op">|</span><span class="ident">a</span><span class="op">|</span> <span class="ident">a</span>.<span class="ident">address</span> <span class="op">==</span> <span class="ident">earner</span>)
-                    .<span class="ident">expect</span>(<span class="string">&quot;Should find Accounting&quot;</span>)
-                    .<span class="ident">clone</span>(),
+            <span class="comment">// Earners assertions
+            </span>assert_accounting(
+                (earner, Side::Earner, UnifiedNum::from(<span class="number">400_000</span>)),
+                earners_acc
+                    .iter()
+                    .find(|a| a.address == earner)
+                    .expect(<span class="string">&quot;Should find Accounting&quot;</span>)
+                    .clone(),
                 <span class="bool-val">false</span>,
             );
-            <span class="ident">assert_accounting</span>(
-                (<span class="ident">other_earner</span>, <span class="ident">Side::Earner</span>, <span class="ident">UnifiedNum::from</span>(<span class="number">500_000</span>)),
-                <span class="ident">earners_acc</span>
-                    .<span class="ident">iter</span>()
-                    .<span class="ident">find</span>(<span class="op">|</span><span class="ident">a</span><span class="op">|</span> <span class="ident">a</span>.<span class="ident">address</span> <span class="op">==</span> <span class="ident">other_earner</span>)
-                    .<span class="ident">expect</span>(<span class="string">&quot;Should find Accounting&quot;</span>)
-                    .<span class="ident">clone</span>(),
+            assert_accounting(
+                (other_earner, Side::Earner, UnifiedNum::from(<span class="number">500_000</span>)),
+                earners_acc
+                    .iter()
+                    .find(|a| a.address == other_earner)
+                    .expect(<span class="string">&quot;Should find Accounting&quot;</span>)
+                    .clone(),
                 <span class="bool-val">false</span>,
             );
 
-            <span class="comment">// Spenders assertions</span>
-            <span class="ident">assert_accounting</span>(
-                (<span class="ident">spender</span>, <span class="ident">Side::Spender</span>, <span class="ident">UnifiedNum::from</span>(<span class="number">400_000</span>)),
-                <span class="ident">spenders_acc</span>
-                    .<span class="ident">iter</span>()
-                    .<span class="ident">find</span>(<span class="op">|</span><span class="ident">a</span><span class="op">|</span> <span class="ident">a</span>.<span class="ident">address</span> <span class="op">==</span> <span class="ident">spender</span>)
-                    .<span class="ident">expect</span>(<span class="string">&quot;Should find Accounting&quot;</span>)
-                    .<span class="ident">clone</span>(),
+            <span class="comment">// Spenders assertions
+            </span>assert_accounting(
+                (spender, Side::Spender, UnifiedNum::from(<span class="number">400_000</span>)),
+                spenders_acc
+                    .iter()
+                    .find(|a| a.address == spender)
+                    .expect(<span class="string">&quot;Should find Accounting&quot;</span>)
+                    .clone(),
                 <span class="bool-val">false</span>,
             );
-            <span class="ident">assert_accounting</span>(
-                (<span class="ident">other_spender</span>, <span class="ident">Side::Spender</span>, <span class="ident">UnifiedNum::from</span>(<span class="number">500_000</span>)),
-                <span class="ident">spenders_acc</span>
-                    .<span class="ident">iter</span>()
-                    .<span class="ident">find</span>(<span class="op">|</span><span class="ident">a</span><span class="op">|</span> <span class="ident">a</span>.<span class="ident">address</span> <span class="op">==</span> <span class="ident">other_spender</span>)
-                    .<span class="ident">expect</span>(<span class="string">&quot;Should find Accounting&quot;</span>)
-                    .<span class="ident">clone</span>(),
+            assert_accounting(
+                (other_spender, Side::Spender, UnifiedNum::from(<span class="number">500_000</span>)),
+                spenders_acc
+                    .iter()
+                    .find(|a| a.address == other_spender)
+                    .expect(<span class="string">&quot;Should find Accounting&quot;</span>)
+                    .clone(),
                 <span class="bool-val">false</span>,
             );
         }
-        <span class="comment">// Spenders &amp; Earners update with 1 insert (third_spender &amp; spender_as_earner)</span>
-        {
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">balances</span> <span class="op">=</span> <span class="ident">Balances</span>::<span class="op">&lt;</span><span class="ident">CheckedState</span><span class="op">&gt;</span><span class="ident">::default</span>();
-            <span class="ident">balances</span>
-                .<span class="ident">spend</span>(<span class="ident">spender</span>, <span class="ident">earner</span>, <span class="ident">UnifiedNum::from</span>(<span class="number">1_400_000</span>))
-                .<span class="ident">expect</span>(<span class="string">&quot;Should spend&quot;</span>);
-            <span class="ident">balances</span>
-                .<span class="ident">spend</span>(<span class="ident">other_spender</span>, <span class="ident">other_earner</span>, <span class="ident">UnifiedNum::from</span>(<span class="number">1_500_000</span>))
-                .<span class="ident">expect</span>(<span class="string">&quot;Should spend&quot;</span>);
-            <span class="ident">balances</span>
-                .<span class="ident">spend</span>(<span class="ident">third_spender</span>, <span class="ident">spender_as_earner</span>, <span class="ident">UnifiedNum::from</span>(<span class="number">600_000</span>))
-                .<span class="ident">expect</span>(<span class="string">&quot;Should spend&quot;</span>);
+        <span class="comment">// Spenders &amp; Earners update with 1 insert (third_spender &amp; spender_as_earner)
+        </span>{
+            <span class="kw">let </span><span class="kw-2">mut </span>balances = Balances::&lt;CheckedState&gt;::default();
+            balances
+                .spend(spender, earner, UnifiedNum::from(<span class="number">1_400_000</span>))
+                .expect(<span class="string">&quot;Should spend&quot;</span>);
+            balances
+                .spend(other_spender, other_earner, UnifiedNum::from(<span class="number">1_500_000</span>))
+                .expect(<span class="string">&quot;Should spend&quot;</span>);
+            balances
+                .spend(third_spender, spender_as_earner, UnifiedNum::from(<span class="number">600_000</span>))
+                .expect(<span class="string">&quot;Should spend&quot;</span>);
 
-            <span class="kw">let</span> (<span class="ident">earners_acc</span>, <span class="ident">spenders_acc</span>) <span class="op">=</span>
-                <span class="ident">spend_amount</span>(<span class="ident">database</span>.<span class="ident">pool</span>.<span class="ident">clone</span>(), <span class="ident">channel_id</span>, <span class="ident">balances</span>)
-                    .<span class="kw">await</span>
-                    .<span class="ident">expect</span>(<span class="string">&quot;Should update &amp; insert new Earners and Spenders&quot;</span>);
+            <span class="kw">let </span>(earners_acc, spenders_acc) =
+                spend_amount(database.pool.clone(), channel_id, balances)
+                    .<span class="kw">await
+                    </span>.expect(<span class="string">&quot;Should update &amp; insert new Earners and Spenders&quot;</span>);
 
-            <span class="macro">assert_eq!</span>(<span class="number">3</span>, <span class="ident">earners_acc</span>.<span class="ident">len</span>());
-            <span class="macro">assert_eq!</span>(<span class="number">3</span>, <span class="ident">spenders_acc</span>.<span class="ident">len</span>());
+            <span class="macro">assert_eq!</span>(<span class="number">3</span>, earners_acc.len());
+            <span class="macro">assert_eq!</span>(<span class="number">3</span>, spenders_acc.len());
 
-            <span class="comment">// Earners assertions</span>
-            <span class="ident">assert_accounting</span>(
-                (<span class="ident">earner</span>, <span class="ident">Side::Earner</span>, <span class="ident">UnifiedNum::from</span>(<span class="number">1_800_000</span>)),
-                <span class="ident">earners_acc</span>
-                    .<span class="ident">iter</span>()
-                    .<span class="ident">find</span>(<span class="op">|</span><span class="ident">a</span><span class="op">|</span> <span class="ident">a</span>.<span class="ident">address</span> <span class="op">==</span> <span class="ident">earner</span>)
-                    .<span class="ident">unwrap</span>()
-                    .<span class="ident">clone</span>(),
+            <span class="comment">// Earners assertions
+            </span>assert_accounting(
+                (earner, Side::Earner, UnifiedNum::from(<span class="number">1_800_000</span>)),
+                earners_acc
+                    .iter()
+                    .find(|a| a.address == earner)
+                    .unwrap()
+                    .clone(),
                 <span class="bool-val">true</span>,
             );
-            <span class="ident">assert_accounting</span>(
-                (<span class="ident">other_earner</span>, <span class="ident">Side::Earner</span>, <span class="ident">UnifiedNum::from</span>(<span class="number">2_000_000</span>)),
-                <span class="ident">earners_acc</span>
-                    .<span class="ident">iter</span>()
-                    .<span class="ident">find</span>(<span class="op">|</span><span class="ident">a</span><span class="op">|</span> <span class="ident">a</span>.<span class="ident">address</span> <span class="op">==</span> <span class="ident">other_earner</span>)
-                    .<span class="ident">unwrap</span>()
-                    .<span class="ident">clone</span>(),
+            assert_accounting(
+                (other_earner, Side::Earner, UnifiedNum::from(<span class="number">2_000_000</span>)),
+                earners_acc
+                    .iter()
+                    .find(|a| a.address == other_earner)
+                    .unwrap()
+                    .clone(),
                 <span class="bool-val">true</span>,
             );
-            <span class="ident">assert_accounting</span>(
-                (<span class="ident">spender_as_earner</span>, <span class="ident">Side::Earner</span>, <span class="ident">UnifiedNum::from</span>(<span class="number">600_000</span>)),
-                <span class="ident">earners_acc</span>
-                    .<span class="ident">iter</span>()
-                    .<span class="ident">find</span>(<span class="op">|</span><span class="ident">a</span><span class="op">|</span> <span class="ident">a</span>.<span class="ident">address</span> <span class="op">==</span> <span class="ident">spender_as_earner</span>)
-                    .<span class="ident">unwrap</span>()
-                    .<span class="ident">clone</span>(),
+            assert_accounting(
+                (spender_as_earner, Side::Earner, UnifiedNum::from(<span class="number">600_000</span>)),
+                earners_acc
+                    .iter()
+                    .find(|a| a.address == spender_as_earner)
+                    .unwrap()
+                    .clone(),
                 <span class="bool-val">false</span>,
             );
 
-            <span class="comment">// Spenders assertions</span>
-            <span class="ident">assert_accounting</span>(
-                (<span class="ident">spender</span>, <span class="ident">Side::Spender</span>, <span class="ident">UnifiedNum::from</span>(<span class="number">1_800_000</span>)),
-                <span class="ident">spenders_acc</span>
-                    .<span class="ident">iter</span>()
-                    .<span class="ident">find</span>(<span class="op">|</span><span class="ident">a</span><span class="op">|</span> <span class="ident">a</span>.<span class="ident">address</span> <span class="op">==</span> <span class="ident">spender</span>)
-                    .<span class="ident">unwrap</span>()
-                    .<span class="ident">clone</span>(),
+            <span class="comment">// Spenders assertions
+            </span>assert_accounting(
+                (spender, Side::Spender, UnifiedNum::from(<span class="number">1_800_000</span>)),
+                spenders_acc
+                    .iter()
+                    .find(|a| a.address == spender)
+                    .unwrap()
+                    .clone(),
                 <span class="bool-val">true</span>,
             );
-            <span class="ident">assert_accounting</span>(
-                (<span class="ident">other_spender</span>, <span class="ident">Side::Spender</span>, <span class="ident">UnifiedNum::from</span>(<span class="number">2_000_000</span>)),
-                <span class="ident">spenders_acc</span>
-                    .<span class="ident">iter</span>()
-                    .<span class="ident">find</span>(<span class="op">|</span><span class="ident">a</span><span class="op">|</span> <span class="ident">a</span>.<span class="ident">address</span> <span class="op">==</span> <span class="ident">other_spender</span>)
-                    .<span class="ident">unwrap</span>()
-                    .<span class="ident">clone</span>(),
+            assert_accounting(
+                (other_spender, Side::Spender, UnifiedNum::from(<span class="number">2_000_000</span>)),
+                spenders_acc
+                    .iter()
+                    .find(|a| a.address == other_spender)
+                    .unwrap()
+                    .clone(),
                 <span class="bool-val">true</span>,
             );
-            <span class="ident">assert_accounting</span>(
-                (<span class="ident">third_spender</span>, <span class="ident">Side::Spender</span>, <span class="ident">UnifiedNum::from</span>(<span class="number">600_000</span>)),
-                <span class="ident">spenders_acc</span>
-                    .<span class="ident">iter</span>()
-                    .<span class="ident">find</span>(<span class="op">|</span><span class="ident">a</span><span class="op">|</span> <span class="ident">a</span>.<span class="ident">address</span> <span class="op">==</span> <span class="ident">third_spender</span>)
-                    .<span class="ident">unwrap</span>()
-                    .<span class="ident">clone</span>(),
+            assert_accounting(
+                (third_spender, Side::Spender, UnifiedNum::from(<span class="number">600_000</span>)),
+                spenders_acc
+                    .iter()
+                    .find(|a| a.address == third_spender)
+                    .unwrap()
+                    .clone(),
                 <span class="bool-val">false</span>,
             );
         }
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (20ffea693 2022-08-11)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>

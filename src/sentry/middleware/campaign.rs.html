@@ -167,174 +167,232 @@
 <span id="167">167</span>
 <span id="168">168</span>
 <span id="169">169</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">db::fetch_campaign</span>, <span class="ident">middleware::Middleware</span>};
-<span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">response::ResponseError</span>, <span class="ident">routes::routers::RouteParams</span>, <span class="ident">Application</span>, <span class="ident">Auth</span>};
-<span class="kw">use</span> <span class="ident">adapter::client::Locked</span>;
-<span class="kw">use</span> <span class="ident">async_trait::async_trait</span>;
-<span class="kw">use</span> <span class="ident">hyper</span>::{<span class="ident">Body</span>, <span class="ident">Request</span>};
-<span class="kw">use</span> <span class="ident">primitives::campaign::Campaign</span>;
+<span id="170">170</span>
+<span id="171">171</span>
+<span id="172">172</span>
+<span id="173">173</span>
+<span id="174">174</span>
+<span id="175">175</span>
+<span id="176">176</span>
+<span id="177">177</span>
+<span id="178">178</span>
+<span id="179">179</span>
+<span id="180">180</span>
+<span id="181">181</span>
+<span id="182">182</span>
+<span id="183">183</span>
+<span id="184">184</span>
+<span id="185">185</span>
+<span id="186">186</span>
+<span id="187">187</span>
+<span id="188">188</span>
+<span id="189">189</span>
+<span id="190">190</span>
+<span id="191">191</span>
+<span id="192">192</span>
+<span id="193">193</span>
+<span id="194">194</span>
+<span id="195">195</span>
+<span id="196">196</span>
+<span id="197">197</span>
+<span id="198">198</span>
+</pre><pre class="rust"><code><span class="kw">use </span>std::sync::Arc;
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">CampaignLoad</span>;
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">CalledByCreator</span>;
+<span class="kw">use </span>axum::{
+    extract::{Path, RequestParts},
+    middleware::Next,
+};
+<span class="kw">use </span>serde::Deserialize;
 
-<span class="attribute">#[<span class="ident">async_trait</span>]</span>
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">Locked</span> <span class="op">+</span> <span class="lifetime">&#39;static</span><span class="op">&gt;</span> <span class="ident">Middleware</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">CampaignLoad</span> {
-    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">call</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>(
-        <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="kw-2">mut</span> <span class="ident">request</span>: <span class="ident">Request</span><span class="op">&lt;</span><span class="ident">Body</span><span class="op">&gt;</span>,
-        <span class="ident">application</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">Application</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span>,
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Request</span><span class="op">&lt;</span><span class="ident">Body</span><span class="op">&gt;</span>, <span class="ident">ResponseError</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">id</span> <span class="op">=</span> <span class="ident">request</span>
-            .<span class="ident">extensions</span>()
-            .<span class="ident">get</span>::<span class="op">&lt;</span><span class="ident">RouteParams</span><span class="op">&gt;</span>()
-            .<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">ResponseError::BadRequest</span>(<span class="string">&quot;Route params not found&quot;</span>.<span class="ident">to_string</span>()))<span class="question-mark">?</span>
-            .<span class="ident">get</span>(<span class="number">0</span>)
-            .<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">ResponseError::BadRequest</span>(<span class="string">&quot;No id&quot;</span>.<span class="ident">to_string</span>()))<span class="question-mark">?</span>;
+<span class="kw">use </span>adapter::client::Locked;
+<span class="kw">use </span>primitives::{campaign::Campaign, CampaignId, ChainOf};
 
-        <span class="kw">let</span> <span class="ident">campaign_id</span> <span class="op">=</span> <span class="ident">id</span>
-            .<span class="ident">parse</span>()
-            .<span class="ident">map_err</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">ResponseError::BadRequest</span>(<span class="string">&quot;Wrong Campaign Id&quot;</span>.<span class="ident">to_string</span>()))<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">campaign</span> <span class="op">=</span> <span class="ident">fetch_campaign</span>(<span class="ident">application</span>.<span class="ident">pool</span>.<span class="ident">clone</span>(), <span class="kw-2">&amp;</span><span class="ident">campaign_id</span>)
-            .<span class="kw">await</span><span class="question-mark">?</span>
-            .<span class="ident">ok_or</span>(<span class="ident">ResponseError::NotFound</span>)<span class="question-mark">?</span>;
+<span class="kw">use crate</span>::{db::fetch_campaign, response::ResponseError, Application, Auth};
 
-        <span class="kw">let</span> <span class="ident">campaign_context</span> <span class="op">=</span> <span class="ident">application</span>
-            .<span class="ident">config</span>
-            .<span class="ident">find_chain_of</span>(<span class="ident">campaign</span>.<span class="ident">channel</span>.<span class="ident">token</span>)
-            .<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">ResponseError::BadRequest</span>(<span class="string">&quot;Channel token not whitelisted&quot;</span>.<span class="ident">to_string</span>()))<span class="question-mark">?</span>
-            .<span class="ident">with_campaign</span>(<span class="ident">campaign</span>);
-
-        <span class="comment">// If this is an authenticated call</span>
-        <span class="comment">// Check if the Campaign&#39;s Channel context (Chain Id) aligns with the Authentication token Chain id</span>
-        <span class="kw">match</span> <span class="ident">request</span>.<span class="ident">extensions</span>().<span class="ident">get</span>::<span class="op">&lt;</span><span class="ident">Auth</span><span class="op">&gt;</span>() {
-            <span class="comment">// If Chain Ids differ, the requester hasn&#39;t generated Auth token</span>
-            <span class="comment">// to access the Channel in it&#39;s Chain Id.</span>
-            <span class="prelude-val">Some</span>(<span class="ident">auth</span>) <span class="kw">if</span> <span class="ident">auth</span>.<span class="ident">chain</span>.<span class="ident">chain_id</span> <span class="op">!</span><span class="op">=</span> <span class="ident">campaign_context</span>.<span class="ident">chain</span>.<span class="ident">chain_id</span> =&gt; {
-                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">ResponseError::Forbidden</span>(<span class="string">&quot;Authentication token is generated for different Chain and differs from the Campaign&#39;s Channel Chain&quot;</span>.<span class="ident">into</span>()))
-            }
-            <span class="kw">_</span> =&gt; {},
-        }
-
-        <span class="ident">request</span>.<span class="ident">extensions_mut</span>().<span class="ident">insert</span>(<span class="ident">campaign_context</span>);
-
-        <span class="prelude-val">Ok</span>(<span class="ident">request</span>)
-    }
+<span class="doccomment">/// This struct is required because of routes that have more parameters
+/// apart from the `CampaignId`
+</span><span class="attribute">#[derive(Debug, Deserialize)]</span>
+<span class="kw">struct </span>CampaignParam {
+    <span class="kw">pub </span>id: CampaignId,
 }
 
-<span class="attribute">#[<span class="ident">async_trait</span>]</span>
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">Locked</span> <span class="op">+</span> <span class="lifetime">&#39;static</span><span class="op">&gt;</span> <span class="ident">Middleware</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">CalledByCreator</span> {
-    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">call</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>(
-        <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">request</span>: <span class="ident">Request</span><span class="op">&lt;</span><span class="ident">Body</span><span class="op">&gt;</span>,
-        <span class="ident">_application</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">Application</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span>,
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Request</span><span class="op">&lt;</span><span class="ident">Body</span><span class="op">&gt;</span>, <span class="ident">ResponseError</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">campaign</span> <span class="op">=</span> <span class="ident">request</span>
-            .<span class="ident">extensions</span>()
-            .<span class="ident">get</span>::<span class="op">&lt;</span><span class="ident">Campaign</span><span class="op">&gt;</span>()
-            .<span class="ident">expect</span>(<span class="string">&quot;We must have a campaign in extensions&quot;</span>)
-            .<span class="ident">to_owned</span>();
+<span class="kw">pub async fn </span>campaign_load&lt;C: Locked + <span class="lifetime">&#39;static</span>, B&gt;(
+    request: axum::http::Request&lt;B&gt;,
+    next: Next&lt;B&gt;,
+) -&gt; <span class="prelude-ty">Result</span>&lt;axum::response::Response, ResponseError&gt;
+<span class="kw">where
+    </span>B: Send,
+{
+    <span class="kw">let </span>(config, pool) = {
+        <span class="kw">let </span>app = request
+            .extensions()
+            .get::&lt;Arc&lt;Application&lt;C&gt;&gt;&gt;()
+            .expect(<span class="string">&quot;Application should always be present&quot;</span>);
 
-        <span class="kw">let</span> <span class="ident">auth</span> <span class="op">=</span> <span class="ident">request</span>
-            .<span class="ident">extensions</span>()
-            .<span class="ident">get</span>::<span class="op">&lt;</span><span class="ident">Auth</span><span class="op">&gt;</span>()
-            .<span class="ident">expect</span>(<span class="string">&quot;request should have session&quot;</span>)
-            .<span class="ident">to_owned</span>();
-
-        <span class="kw">if</span> <span class="ident">auth</span>.<span class="ident">uid</span>.<span class="ident">to_address</span>() <span class="op">!</span><span class="op">=</span> <span class="ident">campaign</span>.<span class="ident">creator</span> {
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">ResponseError::Forbidden</span>(
-                <span class="string">&quot;Request not sent by campaign creator&quot;</span>.<span class="ident">to_string</span>(),
-            ));
-        }
-
-        <span class="prelude-val">Ok</span>(<span class="ident">request</span>)
-    }
-}
-
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
-<span class="kw">mod</span> <span class="ident">test</span> {
-    <span class="kw">use</span> <span class="ident">primitives</span>::{<span class="ident">test_util::DUMMY_CAMPAIGN</span>, <span class="ident">Campaign</span>, <span class="ident">ChainOf</span>};
-
-    <span class="kw">use</span> <span class="kw">crate</span>::{
-        <span class="ident">db</span>::{<span class="ident">insert_campaign</span>, <span class="ident">insert_channel</span>},
-        <span class="ident">test_util::setup_dummy_app</span>,
+        (app.config.clone(), app.pool.clone())
     };
 
-    <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
+    <span class="comment">// running extractors requires a `RequestParts`
+    </span><span class="kw">let </span><span class="kw-2">mut </span>request_parts = RequestParts::new(request);
 
-    <span class="attribute">#[<span class="ident">tokio::test</span>]</span>
-    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">campaign_loading</span>() {
-        <span class="kw">let</span> <span class="ident">app</span> <span class="op">=</span> <span class="ident">setup_dummy_app</span>().<span class="kw">await</span>;
+    <span class="kw">let </span>campaign_id = request_parts
+        .extract::&lt;Path&lt;CampaignParam&gt;&gt;()
+        .<span class="kw">await
+        </span>.map_err(|<span class="kw">_</span>| ResponseError::BadRequest(<span class="string">&quot;Bad Campaign Id&quot;</span>.to_string()))<span class="question-mark">?
+        </span>.id;
 
-        <span class="kw">let</span> <span class="ident">build_request</span> <span class="op">=</span> <span class="op">|</span><span class="ident">params</span>: <span class="ident">RouteParams</span><span class="op">|</span> {
-            <span class="ident">Request::builder</span>()
-                .<span class="ident">extension</span>(<span class="ident">params</span>)
-                .<span class="ident">body</span>(<span class="ident">Body::empty</span>())
-                .<span class="ident">expect</span>(<span class="string">&quot;Should build Request&quot;</span>)
+    <span class="kw">let </span>campaign = fetch_campaign(pool.clone(), <span class="kw-2">&amp;</span>campaign_id)
+        .<span class="kw">await</span><span class="question-mark">?
+        </span>.ok_or(ResponseError::NotFound)<span class="question-mark">?</span>;
+
+    <span class="kw">let </span>campaign_context = config
+        .find_chain_of(campaign.channel.token)
+        .ok_or_else(|| ResponseError::BadRequest(<span class="string">&quot;Channel token not whitelisted&quot;</span>.to_string()))<span class="question-mark">?
+        </span>.with_campaign(campaign);
+
+    <span class="comment">// If this is an authenticated call
+    // Check if the Campaign&#39;s Channel context (Chain Id) aligns with the Authentication token Chain id
+    </span><span class="kw">match </span>request_parts.extensions().get::&lt;Auth&gt;() {
+            <span class="comment">// If Chain Ids differ, the requester hasn&#39;t generated Auth token
+            // to access the Channel in it&#39;s Chain Id.
+            </span><span class="prelude-val">Some</span>(auth) <span class="kw">if </span>auth.chain.chain_id != campaign_context.chain.chain_id =&gt; {
+                <span class="kw">return </span><span class="prelude-val">Err</span>(ResponseError::Forbidden(<span class="string">&quot;Authentication token is generated for different Chain and differs from the Campaign&#39;s Channel Chain&quot;</span>.into()))
+            }
+            <span class="kw">_ </span>=&gt; {},
+        }
+
+    request_parts.extensions_mut().insert(campaign_context);
+
+    <span class="kw">let </span>request = request_parts.try_into_request().expect(<span class="string">&quot;Body extracted&quot;</span>);
+
+    <span class="prelude-val">Ok</span>(next.run(request).<span class="kw">await</span>)
+}
+
+<span class="kw">pub async fn </span>called_by_creator&lt;C: Locked + <span class="lifetime">&#39;static</span>, B&gt;(
+    request: axum::http::Request&lt;B&gt;,
+    next: Next&lt;B&gt;,
+) -&gt; <span class="prelude-ty">Result</span>&lt;axum::response::Response, ResponseError&gt;
+<span class="kw">where
+    </span>B: Send,
+{
+    <span class="kw">let </span>campaign_context = request
+        .extensions()
+        .get::&lt;ChainOf&lt;Campaign&gt;&gt;()
+        .expect(<span class="string">&quot;We must have a campaign in extensions&quot;</span>);
+
+    <span class="kw">let </span>auth = request
+        .extensions()
+        .get::&lt;Auth&gt;()
+        .expect(<span class="string">&quot;request should have session&quot;</span>);
+
+    <span class="kw">if </span>auth.uid.to_address() != campaign_context.context.creator {
+        <span class="kw">return </span><span class="prelude-val">Err</span>(ResponseError::Forbidden(
+            <span class="string">&quot;Request not sent by campaign creator&quot;</span>.to_string(),
+        ));
+    }
+
+    <span class="prelude-val">Ok</span>(next.run(request).<span class="kw">await</span>)
+}
+
+<span class="attribute">#[cfg(test)]</span>
+<span class="kw">mod </span>test {
+    <span class="kw">use </span>axum::{
+        body::Body,
+        http::{Request, StatusCode},
+        middleware::from_fn,
+        routing::get,
+        Extension, Router,
+    };
+    <span class="kw">use </span>tower::Service;
+
+    <span class="kw">use </span>adapter::Dummy;
+    <span class="kw">use </span>primitives::{test_util::DUMMY_CAMPAIGN, Campaign, ChainOf};
+
+    <span class="kw">use crate</span>::{
+        db::{insert_campaign, insert_channel},
+        test_util::setup_dummy_app,
+    };
+
+    <span class="kw">use super</span>::<span class="kw-2">*</span>;
+
+    <span class="attribute">#[tokio::test]</span>
+    <span class="kw">async fn </span>test_campaign_loading() {
+        <span class="kw">let </span>app_guard = setup_dummy_app().<span class="kw">await</span>;
+        <span class="kw">let </span>app = Arc::new(app_guard.app);
+
+        <span class="kw">let </span>build_request = |id: CampaignId| {
+            Request::builder()
+                .uri(<span class="macro">format!</span>(<span class="string">&quot;/{id}&quot;</span>))
+                .extension(app.clone())
+                .body(Body::empty())
+                .expect(<span class="string">&quot;Should build Request&quot;</span>)
         };
 
-        <span class="kw">let</span> <span class="ident">campaign</span> <span class="op">=</span> <span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">clone</span>();
+        <span class="kw">let </span>campaign = DUMMY_CAMPAIGN.clone();
 
-        <span class="kw">let</span> <span class="ident">campaign_load</span> <span class="op">=</span> <span class="ident">CampaignLoad</span>;
+        <span class="kw">async fn </span>handle(Extension(_campaign_context): Extension&lt;ChainOf&lt;Campaign&gt;&gt;) -&gt; String {
+            <span class="string">&quot;Ok&quot;</span>.into()
+        }
 
-        <span class="comment">// bad CampaignId</span>
-        {
-            <span class="kw">let</span> <span class="ident">route_params</span> <span class="op">=</span> <span class="ident">RouteParams</span>(<span class="macro">vec!</span>[<span class="string">&quot;Bad campaign Id&quot;</span>.<span class="ident">to_string</span>()]);
+        <span class="kw">let </span><span class="kw-2">mut </span>router = Router::new()
+            .route(<span class="string">&quot;/:id&quot;</span>, get(handle))
+            .layer(from_fn(campaign_load::&lt;Dummy, <span class="kw">_</span>&gt;));
 
-            <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">campaign_load</span>
-                .<span class="ident">call</span>(<span class="ident">build_request</span>(<span class="ident">route_params</span>), <span class="kw-2">&amp;</span><span class="ident">app</span>)
-                .<span class="kw">await</span>
-                .<span class="ident">expect_err</span>(<span class="string">&quot;Should return error for Bad Campaign&quot;</span>);
+        <span class="comment">// bad CampaignId
+        </span>{
+            <span class="kw">let </span><span class="kw-2">mut </span>request = build_request(campaign.id);
+            <span class="kw-2">*</span>request.uri_mut() = <span class="string">&quot;/WrongCampaignId&quot;</span>.parse().unwrap();
+
+            <span class="kw">let </span>response = router
+                .call(request)
+                .<span class="kw">await
+                </span>.expect(<span class="string">&quot;Should make request to Router&quot;</span>);
 
             <span class="macro">assert_eq!</span>(
-                <span class="ident">ResponseError::BadRequest</span>(<span class="string">&quot;Wrong Campaign Id&quot;</span>.<span class="ident">to_string</span>()),
-                <span class="ident">res</span>
+                StatusCode::BAD_REQUEST,
+                <span class="comment">// ResponseError::BadRequest(&quot;Wrong Campaign Id&quot;.to_string()),
+                </span>response.status()
             );
         }
 
-        <span class="kw">let</span> <span class="ident">route_params</span> <span class="op">=</span> <span class="ident">RouteParams</span>(<span class="macro">vec!</span>[<span class="ident">campaign</span>.<span class="ident">id</span>.<span class="ident">to_string</span>()]);
-        <span class="comment">// non-existent campaign</span>
-        {
-            <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">campaign_load</span>
-                .<span class="ident">call</span>(<span class="ident">build_request</span>(<span class="ident">route_params</span>.<span class="ident">clone</span>()), <span class="kw-2">&amp;</span><span class="ident">app</span>)
-                .<span class="kw">await</span>
-                .<span class="ident">expect_err</span>(<span class="string">&quot;Should return error for Not Found&quot;</span>);
+        <span class="comment">// non-existent campaign
+        </span>{
+            <span class="kw">let </span>request = build_request(campaign.id);
 
-            <span class="macro">assert!</span>(<span class="macro">matches!</span>(<span class="ident">res</span>, <span class="ident">ResponseError::NotFound</span>));
+            <span class="kw">let </span>response = router
+                .call(request)
+                .<span class="kw">await
+                </span>.expect(<span class="string">&quot;Should make request to Router&quot;</span>);
+
+            <span class="macro">assert_eq!</span>(response.status(), StatusCode::NOT_FOUND);
         }
 
-        <span class="comment">// existing Campaign</span>
-        {
-            <span class="kw">let</span> <span class="ident">channel_chain</span> <span class="op">=</span> <span class="ident">app</span>
-                .<span class="ident">config</span>
-                .<span class="ident">find_chain_of</span>(<span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">channel</span>.<span class="ident">token</span>)
-                .<span class="ident">expect</span>(<span class="string">&quot;Channel token should be whitelisted in config!&quot;</span>);
-            <span class="kw">let</span> <span class="ident">channel_context</span> <span class="op">=</span> <span class="ident">channel_chain</span>.<span class="ident">with_channel</span>(<span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">channel</span>);
-            <span class="comment">// insert Channel</span>
-            <span class="ident">insert_channel</span>(<span class="kw-2">&amp;</span><span class="ident">app</span>.<span class="ident">pool</span>, <span class="kw-2">&amp;</span><span class="ident">channel_context</span>)
-                .<span class="kw">await</span>
-                .<span class="ident">expect</span>(<span class="string">&quot;Should insert Channel&quot;</span>);
-            <span class="comment">// insert Campaign</span>
-            <span class="macro">assert!</span>(<span class="ident">insert_campaign</span>(<span class="kw-2">&amp;</span><span class="ident">app</span>.<span class="ident">pool</span>, <span class="kw-2">&amp;</span><span class="ident">campaign</span>)
-                .<span class="kw">await</span>
-                .<span class="ident">expect</span>(<span class="string">&quot;Should insert Campaign&quot;</span>));
+        <span class="comment">// existing Campaign
+        </span>{
+            <span class="kw">let </span>channel_chain = app
+                .config
+                .find_chain_of(DUMMY_CAMPAIGN.channel.token)
+                .expect(<span class="string">&quot;Channel token should be whitelisted in config!&quot;</span>);
+            <span class="kw">let </span>channel_context = channel_chain.with_channel(DUMMY_CAMPAIGN.channel);
+            <span class="comment">// insert Channel
+            </span>insert_channel(<span class="kw-2">&amp;</span>app.pool, <span class="kw-2">&amp;</span>channel_context)
+                .<span class="kw">await
+                </span>.expect(<span class="string">&quot;Should insert Channel&quot;</span>);
+            <span class="comment">// insert Campaign
+            </span><span class="macro">assert!</span>(insert_campaign(<span class="kw-2">&amp;</span>app.pool, <span class="kw-2">&amp;</span>campaign)
+                .<span class="kw">await
+                </span>.expect(<span class="string">&quot;Should insert Campaign&quot;</span>));
 
-            <span class="kw">let</span> <span class="ident">request</span> <span class="op">=</span> <span class="ident">campaign_load</span>
-                .<span class="ident">call</span>(<span class="ident">build_request</span>(<span class="ident">route_params</span>), <span class="kw-2">&amp;</span><span class="ident">app</span>)
-                .<span class="kw">await</span>
-                .<span class="ident">expect</span>(<span class="string">&quot;Should load campaign&quot;</span>);
+            <span class="kw">let </span>request = build_request(campaign.id);
 
-            <span class="macro">assert_eq!</span>(
-                <span class="ident">campaign</span>,
-                <span class="ident">request</span>
-                    .<span class="ident">extensions</span>()
-                    .<span class="ident">get</span>::<span class="op">&lt;</span><span class="ident">ChainOf</span><span class="op">&lt;</span><span class="ident">Campaign</span><span class="op">&gt;</span><span class="op">&gt;</span>()
-                    .<span class="ident">expect</span>(<span class="string">&quot;Should get Campaign with Chain context&quot;</span>)
-                    .<span class="ident">context</span>
-            );
+            <span class="kw">let </span>response = router
+                .call(request)
+                .<span class="kw">await
+                </span>.expect(<span class="string">&quot;Should make request to Router&quot;</span>);
+
+            <span class="macro">assert_eq!</span>(response.status(), StatusCode::OK);
         }
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (20ffea693 2022-08-11)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>

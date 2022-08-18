@@ -76,83 +76,83 @@
 <span id="76">76</span>
 <span id="77">77</span>
 <span id="78">78</span>
-</pre><pre class="rust"><code><span class="attribute">#![<span class="ident">deny</span>(<span class="ident">rust_2018_idioms</span>)]</span>
-<span class="attribute">#![<span class="ident">deny</span>(<span class="ident">clippy::all</span>)]</span>
-<span class="attribute">#![<span class="ident">deny</span>(<span class="ident">rustdoc::broken_intra_doc_links</span>)]</span>
-<span class="attribute">#![<span class="ident">cfg_attr</span>(<span class="ident">docsrs</span>, <span class="ident">feature</span>(<span class="ident">doc_cfg</span>))]</span>
+</pre><pre class="rust"><code><span class="attribute">#![deny(rust_2018_idioms)]</span>
+<span class="attribute">#![deny(clippy::all)]</span>
+<span class="attribute">#![deny(rustdoc::broken_intra_doc_links)]</span>
+<span class="attribute">#![cfg_attr(docsrs, feature(doc_cfg))]</span>
 
-<span class="kw">pub</span> <span class="kw">use</span> {
-    <span class="ident"><span class="self">self</span>::adapter</span>::{
-        <span class="ident">state</span>::{<span class="ident">LockedState</span>, <span class="ident">UnlockedState</span>},
-        <span class="ident">Adapter</span>,
+<span class="kw">pub use </span>{
+    <span class="self">self</span>::adapter::{
+        state::{LockedState, UnlockedState},
+        Adapter,
     },
-    <span class="ident">dummy::Dummy</span>,
-    <span class="ident">error::Error</span>,
-    <span class="ident">ethereum::Ethereum</span>,
+    dummy::Dummy,
+    error::Error,
+    ethereum::Ethereum,
 };
 
-<span class="doccomment">/// Primitives used by the [`Adapter`].</span>
-<span class="doccomment">/// Including re-exported types from the `primitives` crate that are being used.</span>
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">primitives</span> {
-    <span class="kw">use</span> <span class="ident">serde</span>::{<span class="ident">Deserialize</span>, <span class="ident">Serialize</span>};
+<span class="doccomment">/// Primitives used by the [`Adapter`].
+/// Including re-exported types from the `primitives` crate that are being used.
+</span><span class="kw">pub mod </span>primitives {
+    <span class="kw">use </span>serde::{Deserialize, Serialize};
 
-    <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">::primitives</span>::{
-        <span class="ident">config</span>::{<span class="ident">ChainInfo</span>, <span class="ident">Config</span>, <span class="ident">TokenInfo</span>},
-        <span class="ident">Address</span>, <span class="ident">BigNum</span>, <span class="ident">Chain</span>, <span class="ident">ChainId</span>, <span class="ident">ChainOf</span>, <span class="ident">Channel</span>, <span class="ident">ValidatorId</span>,
+    <span class="kw">pub use </span>::primitives::{
+        config::{ChainInfo, Config, TokenInfo},
+        Address, BigNum, Chain, ChainId, ChainOf, Channel, ValidatorId,
     };
 
-    <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::ethereum::WalletState</span>;
+    <span class="kw">use </span><span class="kw">crate</span>::ethereum::WalletState;
 
-    <span class="doccomment">/// The [`Deposit`] struct with [`BigNum`] values.</span>
-    <span class="doccomment">/// Returned by [`crate::client::Locked::get_deposit`]</span>
-    <span class="kw">pub</span> <span class="kw">type</span> <span class="ident">Deposit</span> <span class="op">=</span> <span class="ident">::primitives::Deposit</span><span class="op">&lt;</span><span class="ident">primitives::BigNum</span><span class="op">&gt;</span>;
+    <span class="doccomment">/// The [`Deposit`] struct with [`BigNum`] values.
+    /// Returned by [`crate::client::Locked::get_deposit`]
+    </span><span class="kw">pub type </span>Deposit = ::primitives::Deposit&lt;primitives::BigNum&gt;;
 
-    <span class="doccomment">/// A helper type that allows you to use either of them</span>
-    <span class="doccomment">/// and dereference the adapter when calling for example an application</span>
-    <span class="doccomment">/// with a concrete implementation of the [`crate::Adapter`].</span>
-    <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">AdapterTypes</span><span class="op">&lt;</span><span class="ident">S</span>, <span class="ident">ES</span><span class="op">&gt;</span> {
-        <span class="ident">Dummy</span>(<span class="ident">Box</span><span class="op">&lt;</span><span class="ident"><span class="kw">crate</span>::dummy::Adapter</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span><span class="op">&gt;</span>),
-        <span class="ident">Ethereum</span>(<span class="ident">Box</span><span class="op">&lt;</span><span class="ident"><span class="kw">crate</span>::Adapter</span><span class="op">&lt;</span><span class="ident"><span class="kw">crate</span>::Ethereum</span><span class="op">&lt;</span><span class="ident">ES</span><span class="op">&gt;</span>, <span class="ident">S</span><span class="op">&gt;</span><span class="op">&gt;</span>),
+    <span class="doccomment">/// A helper type that allows you to use either of them
+    /// and dereference the adapter when calling for example an application
+    /// with a concrete implementation of the [`crate::Adapter`].
+    </span><span class="kw">pub enum </span>AdapterTypes&lt;S, ES&gt; {
+        Dummy(Box&lt;<span class="kw">crate</span>::dummy::Adapter&lt;S&gt;&gt;),
+        Ethereum(Box&lt;<span class="kw">crate</span>::Adapter&lt;<span class="kw">crate</span>::Ethereum&lt;ES&gt;, S&gt;&gt;),
     }
 
-    <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">S</span>, <span class="ident">ES</span>: <span class="ident">WalletState</span><span class="op">&gt;</span> <span class="ident">AdapterTypes</span><span class="op">&lt;</span><span class="ident">S</span>, <span class="ident">ES</span><span class="op">&gt;</span> {
-        <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">dummy</span>(<span class="ident">dummy</span>: <span class="ident"><span class="kw">crate</span>::dummy::Adapter</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span>) -&gt; <span class="self">Self</span> {
-            <span class="ident"><span class="self">Self</span>::Dummy</span>(<span class="ident">Box::new</span>(<span class="ident">dummy</span>))
+    <span class="kw">impl</span>&lt;S, ES: WalletState&gt; AdapterTypes&lt;S, ES&gt; {
+        <span class="kw">pub fn </span>dummy(dummy: <span class="kw">crate</span>::dummy::Adapter&lt;S&gt;) -&gt; <span class="self">Self </span>{
+            <span class="self">Self</span>::Dummy(Box::new(dummy))
         }
 
-        <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">ethereum</span>(<span class="ident">ethereum</span>: <span class="ident"><span class="kw">crate</span>::Adapter</span><span class="op">&lt;</span><span class="ident"><span class="kw">crate</span>::Ethereum</span><span class="op">&lt;</span><span class="ident">ES</span><span class="op">&gt;</span>, <span class="ident">S</span><span class="op">&gt;</span>) -&gt; <span class="self">Self</span> {
-            <span class="ident"><span class="self">Self</span>::Ethereum</span>(<span class="ident">Box::new</span>(<span class="ident">ethereum</span>))
+        <span class="kw">pub fn </span>ethereum(ethereum: <span class="kw">crate</span>::Adapter&lt;<span class="kw">crate</span>::Ethereum&lt;ES&gt;, S&gt;) -&gt; <span class="self">Self </span>{
+            <span class="self">Self</span>::Ethereum(Box::new(ethereum))
         }
     }
 
-    <span class="doccomment">/// [`Session`] struct returned by the [`crate::Adapter`] when [`crate::client::Locked::session_from_token`] is called.</span>
-    <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">Serialize</span>, <span class="ident">Deserialize</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Session</span> {
-        <span class="kw">pub</span> <span class="ident">era</span>: <span class="ident">i64</span>,
-        <span class="doccomment">/// Authenticated as [`Address`].</span>
-        <span class="kw">pub</span> <span class="ident">uid</span>: <span class="ident">Address</span>,
-        <span class="doccomment">/// Authenticated for [`Chain`].</span>
-        <span class="kw">pub</span> <span class="ident">chain</span>: <span class="ident">Chain</span>,
+    <span class="doccomment">/// [`Session`] struct returned by the [`crate::Adapter`] when [`crate::client::Locked::session_from_token`] is called.
+    </span><span class="attribute">#[derive(Debug, Clone, Serialize, Deserialize)]</span>
+    <span class="kw">pub struct </span>Session {
+        <span class="kw">pub </span>era: i64,
+        <span class="doccomment">/// Authenticated as [`Address`].
+        </span><span class="kw">pub </span>uid: Address,
+        <span class="doccomment">/// Authenticated for [`Chain`].
+        </span><span class="kw">pub </span>chain: Chain,
     }
 }
 
-<span class="doccomment">/// Re-export of the [`crate::client`] traits and the states of the [`Adapter`].</span>
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">prelude</span> {
-    <span class="doccomment">/// Re-export traits used for working with the [`crate::Adapter`].</span>
-    <span class="kw">pub</span> <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::client</span>::{<span class="ident">Locked</span>, <span class="ident">Unlockable</span>, <span class="ident">Unlocked</span>};
+<span class="doccomment">/// Re-export of the [`crate::client`] traits and the states of the [`Adapter`].
+</span><span class="kw">pub mod </span>prelude {
+    <span class="doccomment">/// Re-export traits used for working with the [`crate::Adapter`].
+    </span><span class="kw">pub use </span><span class="kw">crate</span>::client::{Locked, Unlockable, Unlocked};
 
-    <span class="kw">pub</span> <span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">LockedState</span>, <span class="ident">UnlockedState</span>};
+    <span class="kw">pub use crate</span>::{LockedState, UnlockedState};
 }
 
-<span class="kw">mod</span> <span class="ident">adapter</span>;
+<span class="kw">mod </span>adapter;
 
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">client</span>;
+<span class="kw">pub mod </span>client;
 
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">dummy</span>;
+<span class="kw">pub mod </span>dummy;
 
-<span class="kw">mod</span> <span class="ident">error</span>;
+<span class="kw">mod </span>error;
 
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">ethereum</span>;
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">util</span>;
+<span class="kw">pub mod </span>ethereum;
+<span class="kw">pub mod </span>util;
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="adapter" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (20ffea693 2022-08-11)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="adapter" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>

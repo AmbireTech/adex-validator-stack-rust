@@ -330,337 +330,337 @@
 <span id="330">330</span>
 <span id="331">331</span>
 <span id="332">332</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::db::TotalCount</span>;
-<span class="kw">use</span> <span class="ident">chrono::Utc</span>;
-<span class="kw">use</span> <span class="ident">primitives</span>::{<span class="ident">sentry::Pagination</span>, <span class="ident">spender::Spendable</span>, <span class="ident">Address</span>, <span class="ident">ChannelId</span>};
+</pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::db::TotalCount;
+<span class="kw">use </span>chrono::Utc;
+<span class="kw">use </span>primitives::{sentry::Pagination, spender::Spendable, Address, ChannelId};
 
-<span class="kw">use</span> <span class="kw">super</span>::{<span class="ident">DbPool</span>, <span class="ident">PoolError</span>};
+<span class="kw">use super</span>::{DbPool, PoolError};
 
-<span class="doccomment">/// ```text</span>
-<span class="doccomment">/// INSERT INTO spendable (spender, channel_id, total, created)</span>
-<span class="doccomment">/// values (&#39;0xce07CbB7e054514D590a0262C93070D838bFBA2e&#39;, &#39;0x061d5e2a67d0a9a10f1c732bca12a676d83f79663a396f7d87b3e30b9b411088&#39;, 10.00000000, NOW());</span>
-<span class="doccomment">/// ```</span>
-<span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">insert_spendable</span>(<span class="ident">pool</span>: <span class="ident">DbPool</span>, <span class="ident">spendable</span>: <span class="kw-2">&amp;</span><span class="ident">Spendable</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">bool</span>, <span class="ident">PoolError</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">client</span> <span class="op">=</span> <span class="ident">pool</span>.<span class="ident">get</span>().<span class="kw">await</span><span class="question-mark">?</span>;
-    <span class="kw">let</span> <span class="ident">stmt</span> <span class="op">=</span> <span class="ident">client</span>
-        .<span class="ident">prepare</span>(
+<span class="doccomment">/// ```text
+/// INSERT INTO spendable (spender, channel_id, total, created)
+/// values (&#39;0xce07CbB7e054514D590a0262C93070D838bFBA2e&#39;, &#39;0x061d5e2a67d0a9a10f1c732bca12a676d83f79663a396f7d87b3e30b9b411088&#39;, 10.00000000, NOW());
+/// ```
+</span><span class="kw">pub async fn </span>insert_spendable(pool: DbPool, spendable: <span class="kw-2">&amp;</span>Spendable) -&gt; <span class="prelude-ty">Result</span>&lt;bool, PoolError&gt; {
+    <span class="kw">let </span>client = pool.get().<span class="kw">await</span><span class="question-mark">?</span>;
+    <span class="kw">let </span>stmt = client
+        .prepare(
             <span class="string">&quot;INSERT INTO spendable (spender, channel_id, total, created) values ($1, $2, $3, $4)&quot;</span>,
         )
         .<span class="kw">await</span><span class="question-mark">?</span>;
 
-    <span class="kw">let</span> <span class="ident">row</span> <span class="op">=</span> <span class="ident">client</span>
-        .<span class="ident">execute</span>(
-            <span class="kw-2">&amp;</span><span class="ident">stmt</span>,
+    <span class="kw">let </span>row = client
+        .execute(
+            <span class="kw-2">&amp;</span>stmt,
             <span class="kw-2">&amp;</span>[
-                <span class="kw-2">&amp;</span><span class="ident">spendable</span>.<span class="ident">spender</span>,
-                <span class="kw-2">&amp;</span><span class="ident">spendable</span>.<span class="ident">channel</span>.<span class="ident">id</span>(),
-                <span class="kw-2">&amp;</span><span class="ident">spendable</span>.<span class="ident">deposit</span>.<span class="ident">total</span>,
-                <span class="kw-2">&amp;</span><span class="ident">Utc::now</span>(),
+                <span class="kw-2">&amp;</span>spendable.spender,
+                <span class="kw-2">&amp;</span>spendable.channel.id(),
+                <span class="kw-2">&amp;</span>spendable.deposit.total,
+                <span class="kw-2">&amp;</span>Utc::now(),
             ],
         )
         .<span class="kw">await</span><span class="question-mark">?</span>;
 
-    <span class="kw">let</span> <span class="ident">is_inserted</span> <span class="op">=</span> <span class="ident">row</span> <span class="op">==</span> <span class="number">1</span>;
-    <span class="prelude-val">Ok</span>(<span class="ident">is_inserted</span>)
+    <span class="kw">let </span>is_inserted = row == <span class="number">1</span>;
+    <span class="prelude-val">Ok</span>(is_inserted)
 }
 
-<span class="doccomment">/// ```text</span>
-<span class="doccomment">/// SELECT spender, total, channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce FROM spendable INNER JOIN channels ON channels.id = spendable.channel_id WHERE spender = $1 AND channel_id = $2</span>
-<span class="doccomment">/// ```</span>
-<span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">fetch_spendable</span>(
-    <span class="ident">pool</span>: <span class="ident">DbPool</span>,
-    <span class="ident">spender</span>: <span class="kw-2">&amp;</span><span class="ident">Address</span>,
-    <span class="ident">channel_id</span>: <span class="kw-2">&amp;</span><span class="ident">ChannelId</span>,
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Spendable</span><span class="op">&gt;</span>, <span class="ident">PoolError</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">client</span> <span class="op">=</span> <span class="ident">pool</span>.<span class="ident">get</span>().<span class="kw">await</span><span class="question-mark">?</span>;
-    <span class="kw">let</span> <span class="ident">statement</span> <span class="op">=</span> <span class="ident">client</span>.<span class="ident">prepare</span>(<span class="string">&quot;SELECT spender, total, spendable.created, channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce FROM spendable INNER JOIN channels ON channels.id = spendable.channel_id WHERE spender = $1 AND channel_id = $2&quot;</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+<span class="doccomment">/// ```text
+/// SELECT spender, total, channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce FROM spendable INNER JOIN channels ON channels.id = spendable.channel_id WHERE spender = $1 AND channel_id = $2
+/// ```
+</span><span class="kw">pub async fn </span>fetch_spendable(
+    pool: DbPool,
+    spender: <span class="kw-2">&amp;</span>Address,
+    channel_id: <span class="kw-2">&amp;</span>ChannelId,
+) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;Spendable&gt;, PoolError&gt; {
+    <span class="kw">let </span>client = pool.get().<span class="kw">await</span><span class="question-mark">?</span>;
+    <span class="kw">let </span>statement = client.prepare(<span class="string">&quot;SELECT spender, total, spendable.created, channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce FROM spendable INNER JOIN channels ON channels.id = spendable.channel_id WHERE spender = $1 AND channel_id = $2&quot;</span>).<span class="kw">await</span><span class="question-mark">?</span>;
 
-    <span class="kw">let</span> <span class="ident">row</span> <span class="op">=</span> <span class="ident">client</span>.<span class="ident">query_opt</span>(<span class="kw-2">&amp;</span><span class="ident">statement</span>, <span class="kw-2">&amp;</span>[<span class="ident">spender</span>, <span class="ident">channel_id</span>]).<span class="kw">await</span><span class="question-mark">?</span>;
+    <span class="kw">let </span>row = client.query_opt(<span class="kw-2">&amp;</span>statement, <span class="kw-2">&amp;</span>[spender, channel_id]).<span class="kw">await</span><span class="question-mark">?</span>;
 
-    <span class="prelude-val">Ok</span>(<span class="ident">row</span>.<span class="ident">as_ref</span>().<span class="ident">map</span>(<span class="ident">Spendable::from</span>))
+    <span class="prelude-val">Ok</span>(row.as_ref().map(Spendable::from))
 }
 
-<span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">get_all_spendables_for_channel</span>(
-    <span class="ident">pool</span>: <span class="ident">DbPool</span>,
-    <span class="ident">channel_id</span>: <span class="kw-2">&amp;</span><span class="ident">ChannelId</span>,
-    <span class="ident">skip</span>: <span class="ident">u64</span>,
-    <span class="ident">limit</span>: <span class="ident">u64</span>,
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Spendable</span><span class="op">&gt;</span>, <span class="ident">Pagination</span>), <span class="ident">PoolError</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">client</span> <span class="op">=</span> <span class="ident">pool</span>.<span class="ident">get</span>().<span class="kw">await</span><span class="question-mark">?</span>;
-    <span class="kw">let</span> <span class="ident">query</span> <span class="op">=</span> <span class="macro">format!</span>(<span class="string">&quot;SELECT spender, total, spendable.created, channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce FROM spendable INNER JOIN channels ON channels.id = spendable.channel_id WHERE channel_id = $1 ORDER BY spendable.created ASC LIMIT {} OFFSET {}&quot;</span>, <span class="ident">limit</span>, <span class="ident">skip</span>);
+<span class="kw">pub async fn </span>get_all_spendables_for_channel(
+    pool: DbPool,
+    channel_id: <span class="kw-2">&amp;</span>ChannelId,
+    skip: u64,
+    limit: u64,
+) -&gt; <span class="prelude-ty">Result</span>&lt;(Vec&lt;Spendable&gt;, Pagination), PoolError&gt; {
+    <span class="kw">let </span>client = pool.get().<span class="kw">await</span><span class="question-mark">?</span>;
+    <span class="kw">let </span>query = <span class="macro">format!</span>(<span class="string">&quot;SELECT spender, total, spendable.created, channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce FROM spendable INNER JOIN channels ON channels.id = spendable.channel_id WHERE channel_id = $1 ORDER BY spendable.created ASC LIMIT {} OFFSET {}&quot;</span>, limit, skip);
 
-    <span class="kw">let</span> <span class="ident">statement</span> <span class="op">=</span> <span class="ident">client</span>.<span class="ident">prepare</span>(<span class="kw-2">&amp;</span><span class="ident">query</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+    <span class="kw">let </span>statement = client.prepare(<span class="kw-2">&amp;</span>query).<span class="kw">await</span><span class="question-mark">?</span>;
 
-    <span class="kw">let</span> <span class="ident">rows</span> <span class="op">=</span> <span class="ident">client</span>.<span class="ident">query</span>(<span class="kw-2">&amp;</span><span class="ident">statement</span>, <span class="kw-2">&amp;</span>[<span class="ident">channel_id</span>]).<span class="kw">await</span><span class="question-mark">?</span>;
-    <span class="kw">let</span> <span class="ident">spendables</span> <span class="op">=</span> <span class="ident">rows</span>.<span class="ident">iter</span>().<span class="ident">map</span>(<span class="ident">Spendable::from</span>).<span class="ident">collect</span>();
+    <span class="kw">let </span>rows = client.query(<span class="kw-2">&amp;</span>statement, <span class="kw-2">&amp;</span>[channel_id]).<span class="kw">await</span><span class="question-mark">?</span>;
+    <span class="kw">let </span>spendables = rows.iter().map(Spendable::from).collect();
 
-    <span class="kw">let</span> <span class="ident">total_count</span> <span class="op">=</span> <span class="ident">list_spendable_total_count</span>(<span class="kw-2">&amp;</span><span class="ident">pool</span>, <span class="ident">channel_id</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+    <span class="kw">let </span>total_count = list_spendable_total_count(<span class="kw-2">&amp;</span>pool, channel_id).<span class="kw">await</span><span class="question-mark">?</span>;
 
-    <span class="comment">// fast ceil for total_pages</span>
-    <span class="kw">let</span> <span class="ident">total_pages</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">total_count</span> <span class="op">==</span> <span class="number">0</span> {
-        <span class="number">1</span>
-    } <span class="kw">else</span> {
-        <span class="number">1</span> <span class="op">+</span> ((<span class="ident">total_count</span> <span class="op">-</span> <span class="number">1</span>) <span class="op">/</span> <span class="ident">limit</span> <span class="kw">as</span> <span class="ident">u64</span>)
+    <span class="comment">// fast ceil for total_pages
+    </span><span class="kw">let </span>total_pages = <span class="kw">if </span>total_count == <span class="number">0 </span>{
+        <span class="number">1
+    </span>} <span class="kw">else </span>{
+        <span class="number">1 </span>+ ((total_count - <span class="number">1</span>) / limit <span class="kw">as </span>u64)
     };
 
-    <span class="kw">let</span> <span class="ident">pagination</span> <span class="op">=</span> <span class="ident">Pagination</span> {
-        <span class="ident">total_pages</span>,
-        <span class="ident">page</span>: <span class="ident">skip</span> <span class="op">/</span> <span class="ident">limit</span> <span class="kw">as</span> <span class="ident">u64</span>,
+    <span class="kw">let </span>pagination = Pagination {
+        total_pages,
+        page: skip / limit <span class="kw">as </span>u64,
     };
 
-    <span class="prelude-val">Ok</span>((<span class="ident">spendables</span>, <span class="ident">pagination</span>))
+    <span class="prelude-val">Ok</span>((spendables, pagination))
 }
 
-<span class="kw">static</span> <span class="ident">UPDATE_SPENDABLE_STATEMENT</span>: <span class="kw-2">&amp;</span><span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;WITH inserted_spendable AS (INSERT INTO spendable(spender, channel_id, total, created) VALUES($1, $2, $3, $4) ON CONFLICT ON CONSTRAINT spendable_pkey DO UPDATE SET total = $3 WHERE spendable.spender = $1 AND spendable.channel_id = $2 RETURNING *) SELECT inserted_spendable.*, channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce FROM inserted_spendable INNER JOIN channels ON inserted_spendable.channel_id = channels.id&quot;</span>;
+<span class="kw">static </span>UPDATE_SPENDABLE_STATEMENT: <span class="kw-2">&amp;</span>str = <span class="string">&quot;WITH inserted_spendable AS (INSERT INTO spendable(spender, channel_id, total, created) VALUES($1, $2, $3, $4) ON CONFLICT ON CONSTRAINT spendable_pkey DO UPDATE SET total = $3 WHERE spendable.spender = $1 AND spendable.channel_id = $2 RETURNING *) SELECT inserted_spendable.*, channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce FROM inserted_spendable INNER JOIN channels ON inserted_spendable.channel_id = channels.id&quot;</span>;
 
-<span class="comment">// Updates spendable entry deposit or inserts a new spendable entry if it doesn&#39;t exist</span>
-<span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">update_spendable</span>(<span class="ident">pool</span>: <span class="ident">DbPool</span>, <span class="ident">spendable</span>: <span class="kw-2">&amp;</span><span class="ident">Spendable</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Spendable</span>, <span class="ident">PoolError</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">client</span> <span class="op">=</span> <span class="ident">pool</span>.<span class="ident">get</span>().<span class="kw">await</span><span class="question-mark">?</span>;
-    <span class="kw">let</span> <span class="ident">statement</span> <span class="op">=</span> <span class="ident">client</span>.<span class="ident">prepare</span>(<span class="ident">UPDATE_SPENDABLE_STATEMENT</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+<span class="comment">// Updates spendable entry deposit or inserts a new spendable entry if it doesn&#39;t exist
+</span><span class="kw">pub async fn </span>update_spendable(pool: DbPool, spendable: <span class="kw-2">&amp;</span>Spendable) -&gt; <span class="prelude-ty">Result</span>&lt;Spendable, PoolError&gt; {
+    <span class="kw">let </span>client = pool.get().<span class="kw">await</span><span class="question-mark">?</span>;
+    <span class="kw">let </span>statement = client.prepare(UPDATE_SPENDABLE_STATEMENT).<span class="kw">await</span><span class="question-mark">?</span>;
 
-    <span class="kw">let</span> <span class="ident">row</span> <span class="op">=</span> <span class="ident">client</span>
-        .<span class="ident">query_one</span>(
-            <span class="kw-2">&amp;</span><span class="ident">statement</span>,
+    <span class="kw">let </span>row = client
+        .query_one(
+            <span class="kw-2">&amp;</span>statement,
             <span class="kw-2">&amp;</span>[
-                <span class="kw-2">&amp;</span><span class="ident">spendable</span>.<span class="ident">spender</span>,
-                <span class="kw-2">&amp;</span><span class="ident">spendable</span>.<span class="ident">channel</span>.<span class="ident">id</span>(),
-                <span class="kw-2">&amp;</span><span class="ident">spendable</span>.<span class="ident">deposit</span>.<span class="ident">total</span>,
-                <span class="kw-2">&amp;</span><span class="ident">Utc::now</span>(),
+                <span class="kw-2">&amp;</span>spendable.spender,
+                <span class="kw-2">&amp;</span>spendable.channel.id(),
+                <span class="kw-2">&amp;</span>spendable.deposit.total,
+                <span class="kw-2">&amp;</span>Utc::now(),
             ],
         )
         .<span class="kw">await</span><span class="question-mark">?</span>;
 
-    <span class="prelude-val">Ok</span>(<span class="ident">Spendable::from</span>(<span class="kw-2">&amp;</span><span class="ident">row</span>))
+    <span class="prelude-val">Ok</span>(Spendable::from(<span class="kw-2">&amp;</span>row))
 }
 
-<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">list_spendable_total_count</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>(
-    <span class="ident">pool</span>: <span class="kw-2">&amp;</span><span class="ident">DbPool</span>,
-    <span class="ident">channel_id</span>: <span class="kw-2">&amp;</span><span class="ident">ChannelId</span>,
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">u64</span>, <span class="ident">PoolError</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">client</span> <span class="op">=</span> <span class="ident">pool</span>.<span class="ident">get</span>().<span class="kw">await</span><span class="question-mark">?</span>;
+<span class="kw">async fn </span>list_spendable_total_count&lt;<span class="lifetime">&#39;a</span>&gt;(
+    pool: <span class="kw-2">&amp;</span>DbPool,
+    channel_id: <span class="kw-2">&amp;</span>ChannelId,
+) -&gt; <span class="prelude-ty">Result</span>&lt;u64, PoolError&gt; {
+    <span class="kw">let </span>client = pool.get().<span class="kw">await</span><span class="question-mark">?</span>;
 
-    <span class="kw">let</span> <span class="ident">statement</span> <span class="op">=</span> <span class="string">&quot;SELECT COUNT(spendable)::varchar FROM spendable WHERE channel_id = $1&quot;</span>;
-    <span class="kw">let</span> <span class="ident">stmt</span> <span class="op">=</span> <span class="ident">client</span>.<span class="ident">prepare</span>(<span class="ident">statement</span>).<span class="kw">await</span><span class="question-mark">?</span>;
-    <span class="kw">let</span> <span class="ident">row</span> <span class="op">=</span> <span class="ident">client</span>.<span class="ident">query_one</span>(<span class="kw-2">&amp;</span><span class="ident">stmt</span>, <span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">channel_id</span>]).<span class="kw">await</span><span class="question-mark">?</span>;
+    <span class="kw">let </span>statement = <span class="string">&quot;SELECT COUNT(spendable)::varchar FROM spendable WHERE channel_id = $1&quot;</span>;
+    <span class="kw">let </span>stmt = client.prepare(statement).<span class="kw">await</span><span class="question-mark">?</span>;
+    <span class="kw">let </span>row = client.query_one(<span class="kw-2">&amp;</span>stmt, <span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span>channel_id]).<span class="kw">await</span><span class="question-mark">?</span>;
 
-    <span class="prelude-val">Ok</span>(<span class="ident">row</span>.<span class="ident">get</span>::<span class="op">&lt;</span><span class="kw">_</span>, <span class="ident">TotalCount</span><span class="op">&gt;</span>(<span class="number">0</span>).<span class="number">0</span>)
+    <span class="prelude-val">Ok</span>(row.get::&lt;<span class="kw">_</span>, TotalCount&gt;(<span class="number">0</span>).<span class="number">0</span>)
 }
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
-<span class="kw">mod</span> <span class="ident">test</span> {
-    <span class="kw">use</span> <span class="ident">std::collections::HashMap</span>;
+<span class="attribute">#[cfg(test)]</span>
+<span class="kw">mod </span>test {
+    <span class="kw">use </span>std::collections::HashMap;
 
-    <span class="kw">use</span> <span class="ident">primitives</span>::{
-        <span class="ident">config::GANACHE_CONFIG</span>,
-        <span class="ident">spender::Spendable</span>,
-        <span class="ident">test_util::DUMMY_CAMPAIGN</span>,
-        <span class="ident">test_util</span>::{<span class="ident">ADVERTISER</span>, <span class="ident">CREATOR</span>, <span class="ident">FOLLOWER</span>, <span class="ident">GUARDIAN</span>, <span class="ident">GUARDIAN_2</span>, <span class="ident">PUBLISHER</span>},
-        <span class="ident">Deposit</span>, <span class="ident">UnifiedNum</span>,
+    <span class="kw">use </span>primitives::{
+        config::GANACHE_CONFIG,
+        spender::Spendable,
+        test_util::DUMMY_CAMPAIGN,
+        test_util::{ADVERTISER, CREATOR, FOLLOWER, GUARDIAN, GUARDIAN_2, PUBLISHER},
+        Deposit, UnifiedNum,
     };
 
-    <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::db</span>::{
-        <span class="ident">insert_channel</span>,
-        <span class="ident">tests_postgres</span>::{<span class="ident">setup_test_migrations</span>, <span class="ident">DATABASE_POOL</span>},
+    <span class="kw">use </span><span class="kw">crate</span>::db::{
+        insert_channel,
+        tests_postgres::{setup_test_migrations, DATABASE_POOL},
     };
-    <span class="kw">use</span> <span class="ident">tokio::time</span>::{<span class="ident">sleep</span>, <span class="ident">Duration</span>};
+    <span class="kw">use </span>tokio::time::{sleep, Duration};
 
-    <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
+    <span class="kw">use super</span>::<span class="kw-2">*</span>;
 
-    <span class="attribute">#[<span class="ident">tokio::test</span>]</span>
-    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">it_inserts_and_fetches_and_updates_spendable</span>() {
-        <span class="kw">let</span> <span class="ident">database</span> <span class="op">=</span> <span class="ident">DATABASE_POOL</span>.<span class="ident">get</span>().<span class="kw">await</span>.<span class="ident">expect</span>(<span class="string">&quot;Should get a DB pool&quot;</span>);
+    <span class="attribute">#[tokio::test]</span>
+    <span class="kw">async fn </span>it_inserts_and_fetches_and_updates_spendable() {
+        <span class="kw">let </span>database = DATABASE_POOL.get().<span class="kw">await</span>.expect(<span class="string">&quot;Should get a DB pool&quot;</span>);
 
-        <span class="ident">setup_test_migrations</span>(<span class="ident">database</span>.<span class="ident">pool</span>.<span class="ident">clone</span>())
-            .<span class="kw">await</span>
-            .<span class="ident">expect</span>(<span class="string">&quot;Migrations should succeed&quot;</span>);
+        setup_test_migrations(database.pool.clone())
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;Migrations should succeed&quot;</span>);
 
-        <span class="kw">let</span> <span class="ident">spendable</span> <span class="op">=</span> <span class="ident">Spendable</span> {
-            <span class="ident">spender</span>: <span class="kw-2">*</span><span class="ident">ADVERTISER</span>,
-            <span class="ident">channel</span>: <span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">channel</span>,
-            <span class="ident">deposit</span>: <span class="ident">Deposit</span> {
-                <span class="ident">total</span>: <span class="ident">UnifiedNum::from</span>(<span class="number">100_000_000</span>),
+        <span class="kw">let </span>spendable = Spendable {
+            spender: <span class="kw-2">*</span>ADVERTISER,
+            channel: DUMMY_CAMPAIGN.channel,
+            deposit: Deposit {
+                total: UnifiedNum::from(<span class="number">100_000_000</span>),
             },
         };
 
-        <span class="kw">let</span> <span class="ident">channel_chain</span> <span class="op">=</span> <span class="ident">GANACHE_CONFIG</span>
-            .<span class="ident">find_chain_of</span>(<span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">channel</span>.<span class="ident">token</span>)
-            .<span class="ident">expect</span>(<span class="string">&quot;Channel token should be whitelisted in config!&quot;</span>);
-        <span class="kw">let</span> <span class="ident">channel_context</span> <span class="op">=</span> <span class="ident">channel_chain</span>.<span class="ident">with_channel</span>(<span class="ident">spendable</span>.<span class="ident">channel</span>);
-        <span class="ident">insert_channel</span>(<span class="kw-2">&amp;</span><span class="ident">database</span>.<span class="ident">pool</span>, <span class="kw-2">&amp;</span><span class="ident">channel_context</span>)
-            .<span class="kw">await</span>
-            .<span class="ident">expect</span>(<span class="string">&quot;Should insert Channel before creating spendable&quot;</span>);
+        <span class="kw">let </span>channel_chain = GANACHE_CONFIG
+            .find_chain_of(DUMMY_CAMPAIGN.channel.token)
+            .expect(<span class="string">&quot;Channel token should be whitelisted in config!&quot;</span>);
+        <span class="kw">let </span>channel_context = channel_chain.with_channel(spendable.channel);
+        insert_channel(<span class="kw-2">&amp;</span>database.pool, <span class="kw-2">&amp;</span>channel_context)
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;Should insert Channel before creating spendable&quot;</span>);
 
-        <span class="kw">let</span> <span class="ident">is_inserted</span> <span class="op">=</span> <span class="ident">insert_spendable</span>(<span class="ident">database</span>.<span class="ident">pool</span>.<span class="ident">clone</span>(), <span class="kw-2">&amp;</span><span class="ident">spendable</span>)
-            .<span class="kw">await</span>
-            .<span class="ident">expect</span>(<span class="string">&quot;Should succeed&quot;</span>);
-        <span class="ident">sleep</span>(<span class="ident">Duration::from_millis</span>(<span class="number">100</span>)).<span class="kw">await</span>;
+        <span class="kw">let </span>is_inserted = insert_spendable(database.pool.clone(), <span class="kw-2">&amp;</span>spendable)
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;Should succeed&quot;</span>);
+        sleep(Duration::from_millis(<span class="number">100</span>)).<span class="kw">await</span>;
 
-        <span class="macro">assert!</span>(<span class="ident">is_inserted</span>);
+        <span class="macro">assert!</span>(is_inserted);
 
-        <span class="kw">let</span> <span class="ident">fetched_spendable</span> <span class="op">=</span> <span class="ident">fetch_spendable</span>(
-            <span class="ident">database</span>.<span class="ident">pool</span>.<span class="ident">clone</span>(),
-            <span class="kw-2">&amp;</span><span class="ident">spendable</span>.<span class="ident">spender</span>,
-            <span class="kw-2">&amp;</span><span class="ident">spendable</span>.<span class="ident">channel</span>.<span class="ident">id</span>(),
+        <span class="kw">let </span>fetched_spendable = fetch_spendable(
+            database.pool.clone(),
+            <span class="kw-2">&amp;</span>spendable.spender,
+            <span class="kw-2">&amp;</span>spendable.channel.id(),
         )
-        .<span class="kw">await</span>
-        .<span class="ident">expect</span>(<span class="string">&quot;Should fetch successfully&quot;</span>);
+        .<span class="kw">await
+        </span>.expect(<span class="string">&quot;Should fetch successfully&quot;</span>);
 
-        <span class="macro">assert_eq!</span>(<span class="prelude-val">Some</span>(<span class="ident">spendable</span>), <span class="ident">fetched_spendable</span>);
+        <span class="macro">assert_eq!</span>(<span class="prelude-val">Some</span>(spendable), fetched_spendable);
     }
 
-    <span class="kw">fn</span> <span class="ident">new_spendable_with</span>(<span class="ident">spender</span>: <span class="kw-2">&amp;</span><span class="ident">Address</span>) -&gt; <span class="ident">Spendable</span> {
-        <span class="ident">Spendable</span> {
-            <span class="ident">spender</span>: <span class="kw-2">*</span><span class="ident">spender</span>,
-            <span class="ident">channel</span>: <span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">channel</span>,
-            <span class="ident">deposit</span>: <span class="ident">Deposit</span> {
-                <span class="ident">total</span>: <span class="ident">UnifiedNum::from</span>(<span class="number">100_000_000</span>),
+    <span class="kw">fn </span>new_spendable_with(spender: <span class="kw-2">&amp;</span>Address) -&gt; Spendable {
+        Spendable {
+            spender: <span class="kw-2">*</span>spender,
+            channel: DUMMY_CAMPAIGN.channel,
+            deposit: Deposit {
+                total: UnifiedNum::from(<span class="number">100_000_000</span>),
             },
         }
     }
 
-    <span class="attribute">#[<span class="ident">tokio::test</span>]</span>
-    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">insert_and_get_single_spendable_for_channel</span>() {
-        <span class="kw">let</span> <span class="ident">database</span> <span class="op">=</span> <span class="ident">DATABASE_POOL</span>.<span class="ident">get</span>().<span class="kw">await</span>.<span class="ident">expect</span>(<span class="string">&quot;Should get a DB pool&quot;</span>);
+    <span class="attribute">#[tokio::test]</span>
+    <span class="kw">async fn </span>insert_and_get_single_spendable_for_channel() {
+        <span class="kw">let </span>database = DATABASE_POOL.get().<span class="kw">await</span>.expect(<span class="string">&quot;Should get a DB pool&quot;</span>);
 
-        <span class="ident">setup_test_migrations</span>(<span class="ident">database</span>.<span class="ident">pool</span>.<span class="ident">clone</span>())
-            .<span class="kw">await</span>
-            .<span class="ident">expect</span>(<span class="string">&quot;Migrations should succeed&quot;</span>);
+        setup_test_migrations(database.pool.clone())
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;Migrations should succeed&quot;</span>);
 
-        <span class="kw">let</span> <span class="ident">channel</span> <span class="op">=</span> <span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">channel</span>;
-        <span class="kw">let</span> <span class="ident">channel_chain</span> <span class="op">=</span> <span class="ident">GANACHE_CONFIG</span>
-            .<span class="ident">find_chain_of</span>(<span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">channel</span>.<span class="ident">token</span>)
-            .<span class="ident">expect</span>(<span class="string">&quot;Channel token should be whitelisted in config!&quot;</span>);
-        <span class="kw">let</span> <span class="ident">channel_context</span> <span class="op">=</span> <span class="ident">channel_chain</span>.<span class="ident">with_channel</span>(<span class="ident">channel</span>);
+        <span class="kw">let </span>channel = DUMMY_CAMPAIGN.channel;
+        <span class="kw">let </span>channel_chain = GANACHE_CONFIG
+            .find_chain_of(DUMMY_CAMPAIGN.channel.token)
+            .expect(<span class="string">&quot;Channel token should be whitelisted in config!&quot;</span>);
+        <span class="kw">let </span>channel_context = channel_chain.with_channel(channel);
 
-        <span class="ident">insert_channel</span>(<span class="kw-2">&amp;</span><span class="ident">database</span>, <span class="kw-2">&amp;</span><span class="ident">channel_context</span>)
-            .<span class="kw">await</span>
-            .<span class="ident">expect</span>(<span class="string">&quot;Should insert&quot;</span>);
+        insert_channel(<span class="kw-2">&amp;</span>database, <span class="kw-2">&amp;</span>channel_context)
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;Should insert&quot;</span>);
 
-        <span class="comment">// Test for 0 records</span>
-        <span class="kw">let</span> (<span class="ident">spendables</span>, <span class="ident">pagination</span>) <span class="op">=</span>
-            <span class="ident">get_all_spendables_for_channel</span>(<span class="ident">database</span>.<span class="ident">clone</span>(), <span class="kw-2">&amp;</span><span class="ident">channel</span>.<span class="ident">id</span>(), <span class="number">0</span>, <span class="number">2</span>)
-                .<span class="kw">await</span>
-                .<span class="ident">expect</span>(<span class="string">&quot;should get result&quot;</span>);
-        <span class="macro">assert!</span>(<span class="ident">spendables</span>.<span class="ident">is_empty</span>());
-        <span class="macro">assert_eq!</span>(<span class="ident">pagination</span>.<span class="ident">total_pages</span>, <span class="number">1</span>);
+        <span class="comment">// Test for 0 records
+        </span><span class="kw">let </span>(spendables, pagination) =
+            get_all_spendables_for_channel(database.clone(), <span class="kw-2">&amp;</span>channel.id(), <span class="number">0</span>, <span class="number">2</span>)
+                .<span class="kw">await
+                </span>.expect(<span class="string">&quot;should get result&quot;</span>);
+        <span class="macro">assert!</span>(spendables.is_empty());
+        <span class="macro">assert_eq!</span>(pagination.total_pages, <span class="number">1</span>);
 
-        <span class="comment">// Test for 1 pages</span>
-        <span class="kw">let</span> <span class="ident">spendable_user</span> <span class="op">=</span> <span class="ident">new_spendable_with</span>(<span class="kw-2">&amp;</span><span class="ident">FOLLOWER</span>);
+        <span class="comment">// Test for 1 pages
+        </span><span class="kw">let </span>spendable_user = new_spendable_with(<span class="kw-2">&amp;</span>FOLLOWER);
 
-        <span class="ident">insert_spendable</span>(<span class="ident">database</span>.<span class="ident">pool</span>.<span class="ident">clone</span>(), <span class="kw-2">&amp;</span><span class="ident">spendable_user</span>)
-            .<span class="kw">await</span>
-            .<span class="ident">expect</span>(<span class="string">&quot;should insert spendable&quot;</span>);
-        <span class="ident">sleep</span>(<span class="ident">Duration::from_millis</span>(<span class="number">100</span>)).<span class="kw">await</span>;
+        insert_spendable(database.pool.clone(), <span class="kw-2">&amp;</span>spendable_user)
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;should insert spendable&quot;</span>);
+        sleep(Duration::from_millis(<span class="number">100</span>)).<span class="kw">await</span>;
 
-        <span class="kw">let</span> (<span class="ident">spendables</span>, <span class="ident">pagination</span>) <span class="op">=</span>
-            <span class="ident">get_all_spendables_for_channel</span>(<span class="ident">database</span>.<span class="ident">clone</span>(), <span class="kw-2">&amp;</span><span class="ident">channel</span>.<span class="ident">id</span>(), <span class="number">0</span>, <span class="number">2</span>)
-                .<span class="kw">await</span>
-                .<span class="ident">expect</span>(<span class="string">&quot;should get result&quot;</span>);
-        <span class="kw">let</span> <span class="ident">expected_spendables</span> <span class="op">=</span> <span class="macro">vec!</span>[<span class="ident">spendable_user</span>.<span class="ident">clone</span>()];
-        <span class="kw">let</span> <span class="ident">expected_pagination</span> <span class="op">=</span> <span class="ident">Pagination</span> {
-            <span class="ident">page</span>: <span class="number">0</span>,
-            <span class="ident">total_pages</span>: <span class="number">1</span>,
+        <span class="kw">let </span>(spendables, pagination) =
+            get_all_spendables_for_channel(database.clone(), <span class="kw-2">&amp;</span>channel.id(), <span class="number">0</span>, <span class="number">2</span>)
+                .<span class="kw">await
+                </span>.expect(<span class="string">&quot;should get result&quot;</span>);
+        <span class="kw">let </span>expected_spendables = <span class="macro">vec!</span>[spendable_user.clone()];
+        <span class="kw">let </span>expected_pagination = Pagination {
+            page: <span class="number">0</span>,
+            total_pages: <span class="number">1</span>,
         };
-        <span class="macro">pretty_assertions::assert_eq!</span>(<span class="ident">spendables</span>, <span class="ident">expected_spendables</span>);
-        <span class="macro">pretty_assertions::assert_eq!</span>(<span class="ident">pagination</span>, <span class="ident">expected_pagination</span>);
+        <span class="macro">pretty_assertions::assert_eq!</span>(spendables, expected_spendables);
+        <span class="macro">pretty_assertions::assert_eq!</span>(pagination, expected_pagination);
     }
 
-    <span class="attribute">#[<span class="ident">tokio::test</span>]</span>
-    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">gets_multiple_pages_of_spendables_for_channel</span>() {
-        <span class="kw">let</span> <span class="ident">database</span> <span class="op">=</span> <span class="ident">DATABASE_POOL</span>.<span class="ident">get</span>().<span class="kw">await</span>.<span class="ident">expect</span>(<span class="string">&quot;Should get a DB pool&quot;</span>);
+    <span class="attribute">#[tokio::test]</span>
+    <span class="kw">async fn </span>gets_multiple_pages_of_spendables_for_channel() {
+        <span class="kw">let </span>database = DATABASE_POOL.get().<span class="kw">await</span>.expect(<span class="string">&quot;Should get a DB pool&quot;</span>);
 
-        <span class="ident">setup_test_migrations</span>(<span class="ident">database</span>.<span class="ident">pool</span>.<span class="ident">clone</span>())
-            .<span class="kw">await</span>
-            .<span class="ident">expect</span>(<span class="string">&quot;Migrations should succeed&quot;</span>);
+        setup_test_migrations(database.pool.clone())
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;Migrations should succeed&quot;</span>);
 
-        <span class="kw">let</span> <span class="ident">channel</span> <span class="op">=</span> <span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">channel</span>;
-        <span class="kw">let</span> <span class="ident">channel_chain</span> <span class="op">=</span> <span class="ident">GANACHE_CONFIG</span>
-            .<span class="ident">find_chain_of</span>(<span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">channel</span>.<span class="ident">token</span>)
-            .<span class="ident">expect</span>(<span class="string">&quot;Channel token should be whitelisted in config!&quot;</span>);
-        <span class="kw">let</span> <span class="ident">channel_context</span> <span class="op">=</span> <span class="ident">channel_chain</span>.<span class="ident">with_channel</span>(<span class="ident">channel</span>);
+        <span class="kw">let </span>channel = DUMMY_CAMPAIGN.channel;
+        <span class="kw">let </span>channel_chain = GANACHE_CONFIG
+            .find_chain_of(DUMMY_CAMPAIGN.channel.token)
+            .expect(<span class="string">&quot;Channel token should be whitelisted in config!&quot;</span>);
+        <span class="kw">let </span>channel_context = channel_chain.with_channel(channel);
 
-        <span class="ident">insert_channel</span>(<span class="kw-2">&amp;</span><span class="ident">database</span>, <span class="kw-2">&amp;</span><span class="ident">channel_context</span>)
-            .<span class="kw">await</span>
-            .<span class="ident">expect</span>(<span class="string">&quot;Should insert&quot;</span>);
+        insert_channel(<span class="kw-2">&amp;</span>database, <span class="kw-2">&amp;</span>channel_context)
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;Should insert&quot;</span>);
 
-        <span class="kw">let</span> <span class="ident">create_spendables</span>: <span class="ident">Vec</span><span class="op">&lt;</span>(<span class="ident">Address</span>, <span class="ident">Spendable</span>)<span class="op">&gt;</span> <span class="op">=</span> <span class="macro">vec!</span>[
-            (<span class="kw-2">*</span><span class="ident">PUBLISHER</span>, <span class="ident">new_spendable_with</span>(<span class="kw-2">&amp;</span><span class="ident">PUBLISHER</span>)),
-            (<span class="kw-2">*</span><span class="ident">ADVERTISER</span>, <span class="ident">new_spendable_with</span>(<span class="kw-2">&amp;</span><span class="ident">ADVERTISER</span>)),
-            (<span class="kw-2">*</span><span class="ident">CREATOR</span>, <span class="ident">new_spendable_with</span>(<span class="kw-2">&amp;</span><span class="ident">CREATOR</span>)),
-            (<span class="kw-2">*</span><span class="ident">GUARDIAN</span>, <span class="ident">new_spendable_with</span>(<span class="kw-2">&amp;</span><span class="ident">GUARDIAN</span>)),
-            (<span class="kw-2">*</span><span class="ident">GUARDIAN_2</span>, <span class="ident">new_spendable_with</span>(<span class="kw-2">&amp;</span><span class="ident">GUARDIAN_2</span>)),
+        <span class="kw">let </span>create_spendables: Vec&lt;(Address, Spendable)&gt; = <span class="macro">vec!</span>[
+            (<span class="kw-2">*</span>PUBLISHER, new_spendable_with(<span class="kw-2">&amp;</span>PUBLISHER)),
+            (<span class="kw-2">*</span>ADVERTISER, new_spendable_with(<span class="kw-2">&amp;</span>ADVERTISER)),
+            (<span class="kw-2">*</span>CREATOR, new_spendable_with(<span class="kw-2">&amp;</span>CREATOR)),
+            (<span class="kw-2">*</span>GUARDIAN, new_spendable_with(<span class="kw-2">&amp;</span>GUARDIAN)),
+            (<span class="kw-2">*</span>GUARDIAN_2, new_spendable_with(<span class="kw-2">&amp;</span>GUARDIAN_2)),
         ];
 
-        <span class="comment">// insert all spendables</span>
-        <span class="kw">for</span> (<span class="ident">address</span>, <span class="ident">spendable</span>) <span class="kw">in</span> <span class="ident">create_spendables</span>.<span class="ident">iter</span>() {
-            <span class="ident">insert_spendable</span>(<span class="ident">database</span>.<span class="ident">pool</span>.<span class="ident">clone</span>(), <span class="ident">spendable</span>)
-                .<span class="kw">await</span>
-                .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> {
+        <span class="comment">// insert all spendables
+        </span><span class="kw">for </span>(address, spendable) <span class="kw">in </span>create_spendables.iter() {
+            insert_spendable(database.pool.clone(), spendable)
+                .<span class="kw">await
+                </span>.unwrap_or_else(|<span class="kw">_</span>| {
                     <span class="macro">panic!</span>(
                         <span class="string">&quot;Failed to insert spendable for {:?} with Spendable: {:?}&quot;</span>,
-                        <span class="ident">address</span>, <span class="ident">spendable</span>
+                        address, spendable
                     )
                 });
-            <span class="comment">// use sleep to make all spendables with different time</span>
-            <span class="comment">// they will follow the order in which they were defined in the variable</span>
-            <span class="ident">sleep</span>(<span class="ident">Duration::from_millis</span>(<span class="number">100</span>)).<span class="kw">await</span>;
+            <span class="comment">// use sleep to make all spendables with different time
+            // they will follow the order in which they were defined in the variable
+            </span>sleep(Duration::from_millis(<span class="number">100</span>)).<span class="kw">await</span>;
         }
 
-        <span class="kw">let</span> <span class="ident">spendables</span> <span class="op">=</span> <span class="ident">create_spendables</span>.<span class="ident">into_iter</span>().<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">HashMap</span><span class="op">&lt;</span><span class="kw">_</span>, <span class="kw">_</span><span class="op">&gt;</span><span class="op">&gt;</span>();
+        <span class="kw">let </span>spendables = create_spendables.into_iter().collect::&lt;HashMap&lt;<span class="kw">_</span>, <span class="kw">_</span>&gt;&gt;();
 
-        <span class="kw">let</span> <span class="ident">expected_pages</span> <span class="op">=</span> <span class="macro">vec!</span>[
+        <span class="kw">let </span>expected_pages = <span class="macro">vec!</span>[
             (
-                <span class="macro">vec!</span>[<span class="kw-2">&amp;</span><span class="ident">spendables</span>[<span class="kw-2">&amp;</span><span class="ident">PUBLISHER</span>], <span class="kw-2">&amp;</span><span class="ident">spendables</span>[<span class="kw-2">&amp;</span><span class="ident">ADVERTISER</span>]],
-                <span class="ident">Pagination</span> {
-                    <span class="ident">page</span>: <span class="number">0</span>,
-                    <span class="ident">total_pages</span>: <span class="number">3</span>,
+                <span class="macro">vec!</span>[<span class="kw-2">&amp;</span>spendables[<span class="kw-2">&amp;</span>PUBLISHER], <span class="kw-2">&amp;</span>spendables[<span class="kw-2">&amp;</span>ADVERTISER]],
+                Pagination {
+                    page: <span class="number">0</span>,
+                    total_pages: <span class="number">3</span>,
                 },
             ),
             (
-                <span class="macro">vec!</span>[<span class="kw-2">&amp;</span><span class="ident">spendables</span>[<span class="kw-2">&amp;</span><span class="ident">CREATOR</span>], <span class="kw-2">&amp;</span><span class="ident">spendables</span>[<span class="kw-2">&amp;</span><span class="ident">GUARDIAN</span>]],
-                <span class="ident">Pagination</span> {
-                    <span class="ident">page</span>: <span class="number">1</span>,
-                    <span class="ident">total_pages</span>: <span class="number">3</span>,
+                <span class="macro">vec!</span>[<span class="kw-2">&amp;</span>spendables[<span class="kw-2">&amp;</span>CREATOR], <span class="kw-2">&amp;</span>spendables[<span class="kw-2">&amp;</span>GUARDIAN]],
+                Pagination {
+                    page: <span class="number">1</span>,
+                    total_pages: <span class="number">3</span>,
                 },
             ),
             (
-                <span class="macro">vec!</span>[<span class="kw-2">&amp;</span><span class="ident">spendables</span>[<span class="kw-2">&amp;</span><span class="ident">GUARDIAN_2</span>]],
-                <span class="ident">Pagination</span> {
-                    <span class="ident">page</span>: <span class="number">2</span>,
-                    <span class="ident">total_pages</span>: <span class="number">3</span>,
+                <span class="macro">vec!</span>[<span class="kw-2">&amp;</span>spendables[<span class="kw-2">&amp;</span>GUARDIAN_2]],
+                Pagination {
+                    page: <span class="number">2</span>,
+                    total_pages: <span class="number">3</span>,
                 },
             ),
         ];
 
-        <span class="kw">for</span> (<span class="ident">expected_spendables</span>, <span class="ident">expected_pagination</span>) <span class="kw">in</span> <span class="ident">expected_pages</span>.<span class="ident">iter</span>() {
-            <span class="comment">// for page = 0; skip = 0</span>
-            <span class="comment">// for page = 1; skip = 2</span>
-            <span class="comment">// etc.</span>
-            <span class="kw">let</span> <span class="ident">limit</span> <span class="op">=</span> <span class="number">2</span>;
-            <span class="kw">let</span> <span class="ident">skip</span> <span class="op">=</span> <span class="ident">expected_pagination</span>.<span class="ident">page</span> <span class="op">*</span> <span class="ident">limit</span>;
+        <span class="kw">for </span>(expected_spendables, expected_pagination) <span class="kw">in </span>expected_pages.iter() {
+            <span class="comment">// for page = 0; skip = 0
+            // for page = 1; skip = 2
+            // etc.
+            </span><span class="kw">let </span>limit = <span class="number">2</span>;
+            <span class="kw">let </span>skip = expected_pagination.page * limit;
 
-            <span class="kw">let</span> <span class="ident">debug_msg</span> <span class="op">=</span> <span class="macro">format!</span>(
+            <span class="kw">let </span>debug_msg = <span class="macro">format!</span>(
                 <span class="string">&quot;{:?} page = {} with skip = {} &amp; limit = {}&quot;</span>,
-                <span class="ident">channel</span>.<span class="ident">id</span>(),
-                <span class="ident">expected_pagination</span>.<span class="ident">page</span>,
-                <span class="ident">skip</span>,
-                <span class="ident">limit</span>
+                channel.id(),
+                expected_pagination.page,
+                skip,
+                limit
             );
 
-            <span class="kw">let</span> (<span class="ident">spendables</span>, <span class="ident">pagination</span>) <span class="op">=</span>
-                <span class="ident">get_all_spendables_for_channel</span>(<span class="ident">database</span>.<span class="ident">clone</span>(), <span class="kw-2">&amp;</span><span class="ident">channel</span>.<span class="ident">id</span>(), <span class="ident">skip</span>, <span class="ident">limit</span>)
-                    .<span class="kw">await</span>
-                    .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="macro">panic!</span>(<span class="string">&quot;could not fetch spendables {}&quot;</span>, <span class="ident">debug_msg</span>));
+            <span class="kw">let </span>(spendables, pagination) =
+                get_all_spendables_for_channel(database.clone(), <span class="kw-2">&amp;</span>channel.id(), skip, limit)
+                    .<span class="kw">await
+                    </span>.unwrap_or_else(|<span class="kw">_</span>| <span class="macro">panic!</span>(<span class="string">&quot;could not fetch spendables {}&quot;</span>, debug_msg));
 
             <span class="macro">pretty_assertions::assert_eq!</span>(
-                <span class="kw-2">&amp;</span><span class="ident">pagination</span>,
-                <span class="ident">expected_pagination</span>,
+                <span class="kw-2">&amp;</span>pagination,
+                expected_pagination,
                 <span class="string">&quot;Unexpected pagination for {}&quot;</span>,
-                <span class="ident">debug_msg</span>
+                debug_msg
             );
-            <span class="macro">pretty_assertions::assert_eq!</span>(<span class="kw-2">&amp;</span><span class="ident">spendables</span>, <span class="ident">expected_spendables</span>);
+            <span class="macro">pretty_assertions::assert_eq!</span>(<span class="kw-2">&amp;</span>spendables, expected_spendables);
         }
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (20ffea693 2022-08-11)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>

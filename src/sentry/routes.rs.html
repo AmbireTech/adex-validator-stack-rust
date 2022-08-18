@@ -510,517 +510,517 @@
 <span id="510">510</span>
 <span id="511">511</span>
 <span id="512">512</span>
-</pre><pre class="rust"><code><span class="doccomment">//! Sentry REST API documentation</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! All routes are listed below. Here is an overview and links to all of them:</span>
-<span class="doccomment">//! - [Channel](#channel) routes</span>
-<span class="doccomment">//!   - [GET `/v5/channel/list`](#get-v5channellist)</span>
-<span class="doccomment">//!   - [GET `/v5/channel/:id/accounting`](#get-v5channelidaccounting)</span>
-<span class="doccomment">//!   - [GET `/v5/channel/:id/spender/:addr`](#get-v5channelidspenderaddr-auth-required) (auth required)</span>
-<span class="doccomment">//!   - [POST `/v5/channel/:id/spender/:addr`](#post-v5channelidspenderaddr-auth-required) (auth required)</span>
-<span class="doccomment">//!   - [GET `/v5/channel/:id/spender/all`](#get-v5channelidspenderall-auth-required) (auth required)</span>
-<span class="doccomment">//!   - [GET `/v5/channel/:id/validator-messages`](#get-v5channelidvalidator-messages)</span>
-<span class="doccomment">//!   - [GET `/v5/channel/:id/validator-messages/:addr`](#get-v5channelidvalidator-messages)</span>
-<span class="doccomment">//!   - [GET `/v5/channel/:id/validator-messages/:addr/:validator_messages`](#get-v5channelidvalidator-messages)</span>
-<span class="doccomment">//!   - [POST `/v5/channel/:id/validator-messages`](#post-v5channelidvalidator-messages-auth-required) (auth required)</span>
-<span class="doccomment">//!   - [GET `/v5/channel/:id/last-approved`](#get-v5channelidlast-approved)</span>
-<span class="doccomment">//!   - [POST `/v5/channel/:id/pay`](#post-v5channelidpay-auth-required) (auth required)</span>
-<span class="doccomment">//!   - [GET `/v5/channel/:id/get-leaf`](#get-v5channelidget-leaf)</span>
-<span class="doccomment">//!   - [POST `/v5/channel/dummy-deposit`](#post-v5channeldummy-deposit-auth-required) (auth required) available only with Dummy adapter</span>
-<span class="doccomment">//! - [Campaign](#campaign) routes</span>
-<span class="doccomment">//!     - [GET `/v5/campaign/list`](#get-v5campaignlist)</span>
-<span class="doccomment">//!     - [POST `/v5/campaign`](#post-v5campaign-auth-required) (auth required)</span>
-<span class="doccomment">//!     - [POST `/v5/campaign/:id`](#post-v5campaignid-auth-required) (auth required)</span>
-<span class="doccomment">//!     - [POST `/v5/campaign/:id/events`](#post-v5campaignidevents) (auth required)</span>
-<span class="doccomment">//!     - [POST `/v5/campaign/:id/close`](#post-v5campaignidclose-auth-required) (auth required)</span>
-<span class="doccomment">//! - [Analytics](#analytics) routes</span>
-<span class="doccomment">//!   - [GET `/v5/analytics`](#get-v5analytics)</span>
-<span class="doccomment">//!   - [GET `/v5/analytics/for-publisher`](#get-v5analyticsfor-publisher-auth-required) (auth required)</span>
-<span class="doccomment">//!   - [GET `/v5/analytics/for-advertiser`](#get-v5analyticsfor-advertiser-auth-required) (auth required)</span>
-<span class="doccomment">//!   - [GET `/v5/analytics/for-admin`](#get-v5analyticsfor-admin-auth-required) (auth required)</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! ## Channel</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! All routes are implemented under the module [channel].</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! ### Route parameters</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Paths which include these parameters are validated as follows:</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! - `:id` - [`ChannelId`]</span>
-<span class="doccomment">//! - `:addr` - a valid [`Address`] or [`ValidatorId`].</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! ### Routes</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! #### GET `/v5/channel/list`</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! The route is handled by [`channel::channel_list()`].</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Request query parameters: [`ChannelListQuery`](primitives::sentry::channel_list::ChannelListQuery)</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Response: [`ChannelListResponse`](primitives::sentry::channel_list::ChannelListResponse)</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! ##### Examples</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Query:</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! ```</span>
-<span class="attribute">#![<span class="ident">doc</span> <span class="op">=</span> <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/channel_list_query.rs&quot;</span>)]</span>
-<span class="doccomment">//! ```</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! #### GET `/v5/channel/:id/accounting`</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Gets all of the accounting entries for a channel from the database and checks the balances.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! The route is handled by [`channel::get_accounting_for_channel()`].</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Response: [`AccountingResponse`]</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! ##### Examples</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Response:</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! ```</span>
-<span class="attribute">#![<span class="ident">doc</span> <span class="op">=</span> <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/accounting_response.rs&quot;</span>)]</span>
-<span class="doccomment">//! ```</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! #### GET `/v5/channel/:id/spender/:addr` (auth required)</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Gets the spender limits for a spender on a [`Channel`]. It does so by fetching the</span>
-<span class="doccomment">//! latest Spendable entry from the database (or creating one if it doesn&#39;t exist yet) from which</span>
-<span class="doccomment">//! the total deposited amount is retrieved, and the latest NewState from which the total spent</span>
-<span class="doccomment">//! amount is retrieved.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! The route is handled by [`channel::get_spender_limits()`].</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Response: [`SpenderResponse`]</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! ##### Examples</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Response:</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! ```</span>
-<span class="attribute">#![<span class="ident">doc</span> <span class="op">=</span> <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/spender_response.rs&quot;</span>)]</span>
-<span class="doccomment">//! ```</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! #### POST `/v5/channel/:id/spender/:addr` (auth required)</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! This route forces the addition of a spender [`Accounting`]</span>
-<span class="doccomment">//! (if one does not exist) to the given [`Channel`] with `spent = 0`.</span>
-<span class="doccomment">//! This will also ensure that the spender is added to the [`NewState`] as well.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! The route is handled by [`channel::add_spender_leaf()`].</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Response: [`SuccessResponse`]</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! #### GET `/v5/channel/:id/spender/all` (auth required)</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! This routes gets total_deposited and total_spent for every spender on a [`Channel`]</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! The route is handled by [`channel::get_all_spender_limits()`].</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Response: [`AllSpendersResponse`]</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! ##### Examples</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Response:</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! ```</span>
-<span class="attribute">#![<span class="ident">doc</span> <span class="op">=</span> <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/all_spenders_response.rs&quot;</span>)]</span>
-<span class="doccomment">//! ```</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! #### GET `/v5/channel/:id/validator-messages`</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Retrieve the latest validator [`MessageTypes`] for a given [`Channel`].</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! The query `limit` parameter is constraint to a maximum of [`Config.msgs_find_limit`],</span>
-<span class="doccomment">//! if a large value is passed it will use the [`Config.msgs_find_limit`] instead.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! **Sub-routes** with additional filtering:</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! - GET `/v5/channel/:id/validator-messages/:addr` - filter by the given [`ValidatorId`]</span>
-<span class="doccomment">//! - GET `/v5/channel/:id/validator-messages/:addr/:validator_messages` - filters by the given [`ValidatorId`] and</span>
-<span class="doccomment">//!   validator [`MessageTypes`].</span>
-<span class="doccomment">//!    - `:validator_messages` - url encoded list of Validator [`MessageTypes`] separated by a `+`.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//!       E.g. `NewState+ApproveState` becomes `NewState%2BApproveState`</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! The route is handled by [`channel::validator_message::list_validator_messages()`].</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Request query parameters: [`ValidatorMessagesListQuery`](primitives::sentry::ValidatorMessagesListQuery)</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Response: [`ValidatorMessagesListResponse`](primitives::sentry::ValidatorMessagesListResponse)</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! ##### Examples</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Query:</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! ```</span>
-<span class="attribute">#![<span class="ident">doc</span> <span class="op">=</span> <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/validator_messages_list_query.rs&quot;</span>)]</span>
-<span class="doccomment">//! ```</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Response:</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! ```</span>
-<span class="attribute">#![<span class="ident">doc</span> <span class="op">=</span> <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/validator_messages_list_response.rs&quot;</span>)]</span>
-<span class="doccomment">//! ```</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! #### POST `/v5/channel/:id/validator-messages` (auth required)</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Create new validator [`MessageTypes`] for the given [`Channel`],</span>
-<span class="doccomment">//! used when propagating messages from the validator worker.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! **Authentication is required** to validate that the [`Auth.uid`] is either</span>
-<span class="doccomment">//! the [`Channel.leader`] or [`Channel.follower`].</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! The route is handled by [`channel::validator_message::create_validator_messages()`].</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Request body (json): [`ValidatorMessagesCreateRequest`](primitives::sentry::ValidatorMessagesCreateRequest)</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Response: [`SuccessResponse`]</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! ##### Examples</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Request:</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! ```</span>
-<span class="attribute">#![<span class="ident">doc</span> <span class="op">=</span> <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/validator_messages_create_request.rs&quot;</span>)]</span>
-<span class="doccomment">//! ```</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! #### GET `/v5/channel/:id/last-approved`</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Retrieves the latest [`ApproveState`] and the corresponding [`NewState`]</span>
-<span class="doccomment">//! validator messages for the given [`Channel`].</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! If the [`Channel`] is new one or both of the states might have not been generated yet.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! The same is true of the [`Heartbeat`]s messages if they are requested with the query parameter.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Retrieves the latest [`ApproveState`] and the corresponding [`NewState`]</span>
-<span class="doccomment">//! validator messages for the given [`Channel`].</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! If the [`Channel`] is new one or both of the states might have not been generated yet.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! The same is true of the [`Heartbeat`]s messages if they are requested with the query parameter.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! The route is handled by [`channel::last_approved()`].</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Request query parameters: [`LastApprovedQuery`][primitives::sentry::LastApprovedQuery]</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Response: [`LastApprovedResponse`][primitives::sentry::LastApprovedResponse]</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! ##### Examples</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Query:</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! ```</span>
-<span class="attribute">#![<span class="ident">doc</span> <span class="op">=</span> <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/channel_last_approved_query.rs&quot;</span>)]</span>
-<span class="doccomment">//! ```</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Response:</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! ```</span>
-<span class="attribute">#![<span class="ident">doc</span> <span class="op">=</span> <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/channel_last_approved_response.rs&quot;</span>)]</span>
-<span class="doccomment">//! ```</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! #### POST `/v5/channel/:id/pay` (auth required)</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Channel Payout with authentication of the spender.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! This route handles withdrawals of advertiser funds for the authenticated spender.</span>
-<span class="doccomment">//! It needs to ensure all campaigns are closed. It accepts a JSON body in the request which contains</span>
-<span class="doccomment">//! all of the earners and updates their balances accordingly. Used when an advertiser/spender wants</span>
-<span class="doccomment">//! to get their remaining funds back.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! The route is handled by [`channel::channel_payout()`].</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Request JSON body: [`ChannelPayRequest`]</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Response: [`SuccessResponse`](primitives::sentry::SuccessResponse)</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! ##### Examples</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Request (json):</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! ```</span>
-<span class="attribute">#![<span class="ident">doc</span> <span class="op">=</span> <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/channel_pay_request.rs&quot;</span>)]</span>
-<span class="doccomment">//! ```</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! #### GET `/v5/channel/:id/get-leaf`</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! TODO: implement and document as part of issue #382</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! This route gets the latest approved state ([`NewState`]/[`ApproveState`] pair),</span>
-<span class="doccomment">//! and finds the given `spender`/`earner` in the balances tree, and produce a merkle proof for it.</span>
-<span class="doccomment">//! This is useful for the Platform to verify if a spender leaf really exists.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! The route is handled by `todo`.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Request query parameters:</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! - `spender=[0x...]` or `earner=[0x...]` (required)</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Example Spender:</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! `/get-leaf?spender=0x...`</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Example Earner:</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! `/get-leaf?earner=0x....`</span>
-<span class="doccomment">//! This module includes all routes for `Sentry` and the documentation of each Request/Response.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! #### POST `/v5/channel/dummy-deposit` (auth required)</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Set a deposit for a Channel and depositor (the authenticated address) in the Dummy adapter.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! **NOTE:** This route is available **only** when using the Dummy adapter and it&#39;s not</span>
-<span class="doccomment">//! an official production route!</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! The route is handled by [`channel::channel_dummy_deposit()`].</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Request body (json): [`ChannelDummyDeposit`](crate::routes::channel::ChannelDummyDeposit)</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Response: [`SuccessResponse`](primitives::sentry::SuccessResponse)</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! ##### Examples</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Request:</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! ```</span>
-<span class="attribute">#![<span class="ident">doc</span> <span class="op">=</span> <span class="macro">include_str!</span>(<span class="string">&quot;../examples/channel_dummy_deposit.rs&quot;</span>)]</span>
-<span class="doccomment">//! ```</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! ## Campaign</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! All routes are implemented under the module [campaign].</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! ### Route parameters</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Paths which include these parameters are validated as follow:</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! - `:id` - [`CampaignId`]</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! ### Routes</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! #### GET `/v5/campaign/list`</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Lists all campaigns with pagination and orders them in</span>
-<span class="doccomment">//! ascending order (`ASC`) by `Campaign.created`.</span>
-<span class="doccomment">//! This ensures that the order in the pages will not change if a new</span>
-<span class="doccomment">//! `Campaign` is created while still retrieving a page.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! The route is handled by [`campaign::campaign_list()`].</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Request query parameters: [`CampaignListQuery`](primitives::sentry::campaign_list::CampaignListQuery)</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//!   - `page=[integer]` (optional) default: `0`</span>
-<span class="doccomment">//!   - `creator=[0x....]` (optional) - address of the creator to be filtered by</span>
-<span class="doccomment">//!   - `activeTo=[integer]` (optional) in seconds - filters campaigns by `Campaign.active.to &gt; query.activeTo`</span>
-<span class="doccomment">//!   - `validator=[0x...]` or `leader=[0x...]` (optional) - address of the validator to be filtered by. You can either</span>
-<span class="doccomment">//!     - `validator=[0x...]` - it will return all `Campaign`s where this address is **either** `Channel.leader` or `Channel.follower`</span>
-<span class="doccomment">//!     - `leader=[0x...]` - it will return all `Campaign`s where this address is `Channel.leader`</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Response: [`CampaignListResponse`](primitives::sentry::campaign_list::CampaignListResponse)</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! ##### Examples</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Query:</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! ```</span>
-<span class="attribute">#![<span class="ident">doc</span> <span class="op">=</span> <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/campaign_list_query.rs&quot;</span>)]</span>
-<span class="doccomment">//! ```</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Response:</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! ```</span>
-<span class="attribute">#![<span class="ident">doc</span> <span class="op">=</span> <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/campaign_list_response.rs&quot;</span>)]</span>
-<span class="doccomment">//! ```</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! #### POST `/v5/campaign` (auth required)</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Create a new Campaign. Request must be sent by the [`Campaign.creator`].</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! **Authentication is required** to validate [`Campaign.creator`] == [`Auth.uid`]</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! It will make sure the `Channel` is created if new and it will update</span>
-<span class="doccomment">//! the spendable amount using the [`Adapter.get_deposit()`](adapter::client::Locked::get_deposit).</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! The route is handled by [`campaign::create_campaign()`].</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Request body (json): [`CreateCampaign`][primitives::sentry::campaign_create::CreateCampaign]</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Response: [`Campaign`]</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! ##### Examples</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! ```</span>
-<span class="attribute">#![<span class="ident">doc</span> <span class="op">=</span> <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/create_campaign_request.rs&quot;</span>)]</span>
-<span class="doccomment">//! ```</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! #### POST `/v5/campaign/:id` (auth required)</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Modify the [`Campaign`]. Request must be sent by the [`Campaign.creator`].</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! **Authentication is required** to validate [`Campaign.creator`] == [`Auth.uid`]</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! The route is handled by [`campaign::update_campaign::handle_route()`].</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Request body (json): [`ModifyCampaign`][primitives::sentry::campaign_modify::ModifyCampaign]</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Response: [`Campaign`]</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! ##### Examples</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! ```</span>
-<span class="attribute">#![<span class="ident">doc</span> <span class="op">=</span> <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/modify_campaign_request.rs&quot;</span>)]</span>
-<span class="doccomment">//! ```</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! #### POST `/v5/campaign/:id/events`</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Add new [`Event`]s (`IMPRESSION`s &amp; `CLICK`s) to the [`Campaign`].</span>
-<span class="doccomment">//! Applies [`Campaign.event_submission`] rules and additional validation using [`check_access()`].</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! The route is handled by [`campaign::insert_events::handle_route()`].</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Request body (json): [`InsertEventsRequest`](primitives::sentry::InsertEventsRequest)</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Response: [`SuccessResponse`]</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! #### POST `/v5/campaign/:id/close` (auth required)</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Close the campaign.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! The route is handled by [`campaign::close_campaign()`].</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Request must be sent by the [`Campaign.creator`].</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! **Authentication is required** to validate [`Campaign.creator`] == [`Auth.uid`]</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Closes the campaign by setting [`Campaign.budget`](primitives::Campaign::budget) so that `remaining budget = 0`.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Response: [`SuccessResponse`]</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! ## Analytics</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! #### GET `/v5/analytics`</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Allowed keys: [`AllowedKey::Country`][primitives::analytics::query::AllowedKey::Country], [`AllowedKey::AdSlotType`][primitives::analytics::query::AllowedKey::AdSlotType]</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Request query parameters: [`AnalyticsQuery`]</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Response: [`AnalyticsResponse`]</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! ##### Examples</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Query:</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! ```</span>
-<span class="attribute">#![<span class="ident">doc</span> <span class="op">=</span> <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/analytics_query.rs&quot;</span>)]</span>
-<span class="doccomment">//! ```</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Response:</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! ```</span>
-<span class="attribute">#![<span class="ident">doc</span> <span class="op">=</span> <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/analytics_response.rs&quot;</span>)]</span>
-<span class="doccomment">//! ```</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! #### GET `/v5/analytics/for-publisher` (auth required)</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Returns all analytics where the currently authenticated address [`Auth.uid`] is a **publisher**.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! All [`ALLOWED_KEYS`] are allowed for this route.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! The route is handled by [`get_analytics()`].</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Request query parameters: [`AnalyticsQuery`]</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Response: [`AnalyticsResponse`]</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! ##### Examples</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! See [GET `/v5/analytics`](#get-v5analytics)</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! #### GET `/v5/analytics/for-advertiser` (auth required)</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Returns all analytics where the currently authenticated address [`Auth.uid`] is an **advertiser**.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! All [`ALLOWED_KEYS`] are allowed for this route.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! The route is handled by [`get_analytics()`].</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Request query parameters: [`AnalyticsQuery`]</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Response: [`AnalyticsResponse`]</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! ##### Examples</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! See [GET `/v5/analytics`](#get-v5analytics)</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! #### GET `/v5/analytics/for-admin` (auth required)</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Admin access to the analytics with no restrictions on the keys for filtering.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! All [`ALLOWED_KEYS`] are allowed for admins.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Admin addresses are configured in the [`Config.admins`](primitives::Config::admins).</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! The route is handled by [`get_analytics()`].</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Request query parameters: [`AnalyticsQuery`]</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Response: [`AnalyticsResponse`]</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! ##### Examples</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! See [GET `/v5/analytics`](#get-v5analytics)</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! [`Adapter`]: adapter::Adapter</span>
-<span class="doccomment">//! [`Address`]: primitives::Address</span>
-<span class="doccomment">//! [`AllowedKey`]: primitives::analytics::query::AllowedKey</span>
-<span class="doccomment">//! [`ALLOWED_KEYS`]: primitives::analytics::query::ALLOWED_KEYS</span>
-<span class="doccomment">//! [`ApproveState`]: primitives::validator::ApproveState</span>
-<span class="doccomment">//! [`Accounting`]: crate::db::accounting::Accounting</span>
-<span class="doccomment">//! [`AccountingResponse`]: primitives::sentry::AccountingResponse</span>
-<span class="doccomment">//! [`AllSpendersResponse`]: primitives::sentry::AllSpendersResponse</span>
-<span class="doccomment">//! [`AnalyticsResponse`]: primitives::sentry::AnalyticsResponse</span>
-<span class="doccomment">//! [`AnalyticsQuery`]: primitives::analytics::AnalyticsQuery</span>
-<span class="doccomment">//! [`Auth.uid`]: crate::Auth::uid</span>
-<span class="doccomment">//! [`Campaign`]: primitives::Campaign</span>
-<span class="doccomment">//! [`Campaign.creator`]: primitives::Campaign::creator</span>
-<span class="doccomment">//! [`Campaign.event_submission`]: primitives::Campaign::event_submission</span>
-<span class="doccomment">//! [`CampaignId`]: primitives::CampaignId</span>
-<span class="doccomment">//! [`Channel`]: primitives::Channel</span>
-<span class="doccomment">//! [`Channel.leader`]: primitives::Channel::leader</span>
-<span class="doccomment">//! [`Channel.follower`]: primitives::Channel::follower</span>
-<span class="doccomment">//! [`ChannelId`]: primitives::ChannelId</span>
-<span class="doccomment">//! [`ChannelPayRequest`]: primitives::sentry::ChannelPayRequest</span>
-<span class="doccomment">//! [`check_access()`]: crate::access::check_access</span>
-<span class="doccomment">//! [`Config.msgs_find_limit`]: primitives::Config::msgs_find_limit</span>
-<span class="doccomment">//! [`Event`]: primitives::sentry::Event</span>
-<span class="doccomment">//! [`Heartbeat`]: primitives::validator::Heartbeat</span>
-<span class="doccomment">//! [`MessageTypes`]: primitives::validator::MessageTypes</span>
-<span class="doccomment">//! [`NewState`]: primitives::validator::NewState</span>
-<span class="doccomment">//! [`SpenderResponse`]: primitives::sentry::SpenderResponse</span>
-<span class="doccomment">//! [`SuccessResponse`]: primitives::sentry::SuccessResponse</span>
-<span class="doccomment">//! [`ValidatorId`]: primitives::ValidatorId</span>
+</pre><pre class="rust"><code><span class="doccomment">//! Sentry REST API documentation
+//!
+//!
+//! All routes are listed below. Here is an overview and links to all of them:
+//! - [Channel](#channel) routes
+//!   - [GET `/v5/channel/list`](#get-v5channellist)
+//!   - [GET `/v5/channel/:id/accounting`](#get-v5channelidaccounting)
+//!   - [GET `/v5/channel/:id/spender/:addr`](#get-v5channelidspenderaddr-auth-required) (auth required)
+//!   - [POST `/v5/channel/:id/spender/:addr`](#post-v5channelidspenderaddr-auth-required) (auth required)
+//!   - [GET `/v5/channel/:id/spender/all`](#get-v5channelidspenderall-auth-required) (auth required)
+//!   - [GET `/v5/channel/:id/validator-messages`](#get-v5channelidvalidator-messages)
+//!   - [GET `/v5/channel/:id/validator-messages/:addr`](#get-v5channelidvalidator-messages)
+//!   - [GET `/v5/channel/:id/validator-messages/:addr/:validator_messages`](#get-v5channelidvalidator-messages)
+//!   - [POST `/v5/channel/:id/validator-messages`](#post-v5channelidvalidator-messages-auth-required) (auth required)
+//!   - [GET `/v5/channel/:id/last-approved`](#get-v5channelidlast-approved)
+//!   - [POST `/v5/channel/:id/pay`](#post-v5channelidpay-auth-required) (auth required)
+//!   - [GET `/v5/channel/:id/get-leaf`](#get-v5channelidget-leaf)
+//!   - [POST `/v5/channel/dummy-deposit`](#post-v5channeldummy-deposit-auth-required) (auth required) available only with Dummy adapter
+//! - [Campaign](#campaign) routes
+//!     - [GET `/v5/campaign/list`](#get-v5campaignlist)
+//!     - [POST `/v5/campaign`](#post-v5campaign-auth-required) (auth required)
+//!     - [POST `/v5/campaign/:id`](#post-v5campaignid-auth-required) (auth required)
+//!     - [POST `/v5/campaign/:id/events`](#post-v5campaignidevents) (auth required)
+//!     - [POST `/v5/campaign/:id/close`](#post-v5campaignidclose-auth-required) (auth required)
+//! - [Analytics](#analytics) routes
+//!   - [GET `/v5/analytics`](#get-v5analytics)
+//!   - [GET `/v5/analytics/for-publisher`](#get-v5analyticsfor-publisher-auth-required) (auth required)
+//!   - [GET `/v5/analytics/for-advertiser`](#get-v5analyticsfor-advertiser-auth-required) (auth required)
+//!   - [GET `/v5/analytics/for-admin`](#get-v5analyticsfor-admin-auth-required) (auth required)
+//!
+//! ## Channel
+//!
+//! All routes are implemented under the module [channel].
+//!
+//! ### Route parameters
+//!
+//! Paths which include these parameters are validated as follows:
+//!
+//! - `:id` - [`ChannelId`]
+//! - `:addr` - a valid [`Address`] or [`ValidatorId`].
+//!
+//! ### Routes
+//!
+//! #### GET `/v5/channel/list`
+//!
+//! The route is handled by [`channel::channel_list()`].
+//!
+//! Request query parameters: [`ChannelListQuery`](primitives::sentry::channel_list::ChannelListQuery)
+//!
+//! Response: [`ChannelListResponse`](primitives::sentry::channel_list::ChannelListResponse)
+//!
+//! ##### Examples
+//!
+//! Query:
+//!
+//! ```
+</span><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/channel_list_query.rs&quot;</span>)]</span>
+<span class="doccomment">//! ```
+//!
+//! #### GET `/v5/channel/:id/accounting`
+//!
+//! Gets all of the accounting entries for a channel from the database and checks the balances.
+//!
+//! The route is handled by [`channel::get_accounting_for_channel()`].
+//!
+//! Response: [`AccountingResponse`]
+//!
+//! ##### Examples
+//!
+//! Response:
+//!
+//! ```
+</span><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/accounting_response.rs&quot;</span>)]</span>
+<span class="doccomment">//! ```
+//!
+//! #### GET `/v5/channel/:id/spender/:addr` (auth required)
+//!
+//! Gets the spender limits for a spender on a [`Channel`]. It does so by fetching the
+//! latest Spendable entry from the database (or creating one if it doesn&#39;t exist yet) from which
+//! the total deposited amount is retrieved, and the latest NewState from which the total spent
+//! amount is retrieved.
+//!
+//! The route is handled by [`channel::get_spender_limits()`].
+//!
+//! Response: [`SpenderResponse`]
+//!
+//! ##### Examples
+//!
+//! Response:
+//!
+//! ```
+</span><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/spender_response.rs&quot;</span>)]</span>
+<span class="doccomment">//! ```
+//!
+//! #### POST `/v5/channel/:id/spender/:addr` (auth required)
+//!
+//! This route forces the addition of a spender [`Accounting`]
+//! (if one does not exist) to the given [`Channel`] with `spent = 0`.
+//! This will also ensure that the spender is added to the [`NewState`] as well.
+//!
+//! The route is handled by [`channel::add_spender_leaf()`].
+//!
+//! Response: [`SuccessResponse`]
+//!
+//! #### GET `/v5/channel/:id/spender/all` (auth required)
+//!
+//! This routes gets total_deposited and total_spent for every spender on a [`Channel`]
+//!
+//! The route is handled by [`channel::get_all_spender_limits()`].
+//!
+//! Response: [`AllSpendersResponse`]
+//!
+//! ##### Examples
+//!
+//! Response:
+//!
+//! ```
+</span><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/all_spenders_response.rs&quot;</span>)]</span>
+<span class="doccomment">//! ```
+//!
+//! #### GET `/v5/channel/:id/validator-messages`
+//!
+//! Retrieve the latest validator [`MessageTypes`] for a given [`Channel`].
+//!
+//! The query `limit` parameter is constraint to a maximum of [`Config.msgs_find_limit`],
+//! if a large value is passed it will use the [`Config.msgs_find_limit`] instead.
+//!
+//!
+//! **Sub-routes** with additional filtering:
+//!
+//! - GET `/v5/channel/:id/validator-messages/:addr` - filter by the given [`ValidatorId`]
+//! - GET `/v5/channel/:id/validator-messages/:addr/:validator_messages` - filters by the given [`ValidatorId`] and
+//!   validator [`MessageTypes`].
+//!    - `:validator_messages` - url encoded list of Validator [`MessageTypes`] separated by a `+`.
+//!
+//!       E.g. `NewState+ApproveState` becomes `NewState%2BApproveState`
+//!
+//! The route is handled by [`channel::validator_message::list_validator_messages()`].
+//!
+//! Request query parameters: [`ValidatorMessagesListQuery`](primitives::sentry::ValidatorMessagesListQuery)
+//!
+//! Response: [`ValidatorMessagesListResponse`](primitives::sentry::ValidatorMessagesListResponse)
+//!
+//! ##### Examples
+//!
+//! Query:
+//!
+//! ```
+</span><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/validator_messages_list_query.rs&quot;</span>)]</span>
+<span class="doccomment">//! ```
+//!
+//! Response:
+//!
+//! ```
+</span><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/validator_messages_list_response.rs&quot;</span>)]</span>
+<span class="doccomment">//! ```
+//!
+//! #### POST `/v5/channel/:id/validator-messages` (auth required)
+//!
+//! Create new validator [`MessageTypes`] for the given [`Channel`],
+//! used when propagating messages from the validator worker.
+//!
+//! **Authentication is required** to validate that the [`Auth.uid`] is either
+//! the [`Channel.leader`] or [`Channel.follower`].
+//!
+//! The route is handled by [`channel::validator_message::create_validator_messages()`].
+//!
+//! Request body (json): [`ValidatorMessagesCreateRequest`](primitives::sentry::ValidatorMessagesCreateRequest)
+//!
+//! Response: [`SuccessResponse`]
+//!
+//! ##### Examples
+//!
+//! Request:
+//!
+//! ```
+</span><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/validator_messages_create_request.rs&quot;</span>)]</span>
+<span class="doccomment">//! ```
+//!
+//! #### GET `/v5/channel/:id/last-approved`
+//!
+//! Retrieves the latest [`ApproveState`] and the corresponding [`NewState`]
+//! validator messages for the given [`Channel`].
+//!
+//! If the [`Channel`] is new one or both of the states might have not been generated yet.
+//!
+//! The same is true of the [`Heartbeat`]s messages if they are requested with the query parameter.
+//!
+//! Retrieves the latest [`ApproveState`] and the corresponding [`NewState`]
+//! validator messages for the given [`Channel`].
+//!
+//! If the [`Channel`] is new one or both of the states might have not been generated yet.
+//!
+//! The same is true of the [`Heartbeat`]s messages if they are requested with the query parameter.
+//!
+//! The route is handled by [`channel::last_approved()`].
+//!
+//! Request query parameters: [`LastApprovedQuery`][primitives::sentry::LastApprovedQuery]
+//!
+//! Response: [`LastApprovedResponse`][primitives::sentry::LastApprovedResponse]
+//!
+//! ##### Examples
+//!
+//! Query:
+//!
+//! ```
+</span><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/channel_last_approved_query.rs&quot;</span>)]</span>
+<span class="doccomment">//! ```
+//!
+//! Response:
+//!
+//! ```
+</span><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/channel_last_approved_response.rs&quot;</span>)]</span>
+<span class="doccomment">//! ```
+//!
+//! #### POST `/v5/channel/:id/pay` (auth required)
+//!
+//! Channel Payout with authentication of the spender.
+//!
+//! This route handles withdrawals of advertiser funds for the authenticated spender.
+//! It needs to ensure all campaigns are closed. It accepts a JSON body in the request which contains
+//! all of the earners and updates their balances accordingly. Used when an advertiser/spender wants
+//! to get their remaining funds back.
+//!
+//! The route is handled by [`channel::channel_payout()`].
+//!
+//! Request JSON body: [`ChannelPayRequest`]
+//!
+//! Response: [`SuccessResponse`](primitives::sentry::SuccessResponse)
+//!
+//! ##### Examples
+//!
+//! Request (json):
+//!
+//! ```
+</span><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/channel_pay_request.rs&quot;</span>)]</span>
+<span class="doccomment">//! ```
+//!
+//!
+//! #### GET `/v5/channel/:id/get-leaf`
+//!
+//! TODO: implement and document as part of issue #382
+//!
+//! This route gets the latest approved state ([`NewState`]/[`ApproveState`] pair),
+//! and finds the given `spender`/`earner` in the balances tree, and produce a merkle proof for it.
+//! This is useful for the Platform to verify if a spender leaf really exists.
+//!
+//! The route is handled by `todo`.
+//!
+//! Request query parameters:
+//!
+//! - `spender=[0x...]` or `earner=[0x...]` (required)
+//!
+//! Example Spender:
+//!
+//! `/get-leaf?spender=0x...`
+//!
+//! Example Earner:
+//!
+//! `/get-leaf?earner=0x....`
+//! This module includes all routes for `Sentry` and the documentation of each Request/Response.
+//!
+//! #### POST `/v5/channel/dummy-deposit` (auth required)
+//!
+//! Set a deposit for a Channel and depositor (the authenticated address) in the Dummy adapter.
+//!
+//! **NOTE:** This route is available **only** when using the Dummy adapter and it&#39;s not
+//! an official production route!
+//!
+//! The route is handled by [`channel::channel_dummy_deposit()`].
+//!
+//! Request body (json): [`ChannelDummyDeposit`](crate::routes::channel::ChannelDummyDeposit)
+//!
+//! Response: [`SuccessResponse`](primitives::sentry::SuccessResponse)
+//!
+//! ##### Examples
+//!
+//! Request:
+//!
+//! ```
+</span><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;../examples/channel_dummy_deposit.rs&quot;</span>)]</span>
+<span class="doccomment">//! ```
+//!
+//! ## Campaign
+//!
+//! All routes are implemented under the module [campaign].
+//!
+//! ### Route parameters
+//!
+//! Paths which include these parameters are validated as follow:
+//!
+//! - `:id` - [`CampaignId`]
+//!
+//! ### Routes
+//!
+//! #### GET `/v5/campaign/list`
+//!
+//! Lists all campaigns with pagination and orders them in
+//! ascending order (`ASC`) by `Campaign.created`.
+//! This ensures that the order in the pages will not change if a new
+//! `Campaign` is created while still retrieving a page.
+//!
+//! The route is handled by [`campaign::campaign_list()`].
+//!
+//! Request query parameters: [`CampaignListQuery`](primitives::sentry::campaign_list::CampaignListQuery)
+//!
+//!   - `page=[integer]` (optional) default: `0`
+//!   - `creator=[0x....]` (optional) - address of the creator to be filtered by
+//!   - `activeTo=[integer]` (optional) in seconds - filters campaigns by `Campaign.active.to &gt; query.activeTo`
+//!   - `validator=[0x...]` or `leader=[0x...]` (optional) - address of the validator to be filtered by. You can either
+//!     - `validator=[0x...]` - it will return all `Campaign`s where this address is **either** `Channel.leader` or `Channel.follower`
+//!     - `leader=[0x...]` - it will return all `Campaign`s where this address is `Channel.leader`
+//!
+//!
+//! Response: [`CampaignListResponse`](primitives::sentry::campaign_list::CampaignListResponse)
+//!
+//! ##### Examples
+//!
+//! Query:
+//!
+//! ```
+</span><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/campaign_list_query.rs&quot;</span>)]</span>
+<span class="doccomment">//! ```
+//!
+//! Response:
+//!
+//! ```
+</span><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/campaign_list_response.rs&quot;</span>)]</span>
+<span class="doccomment">//! ```
+//!
+//! #### POST `/v5/campaign` (auth required)
+//!
+//! Create a new Campaign. Request must be sent by the [`Campaign.creator`].
+//!
+//! **Authentication is required** to validate [`Campaign.creator`] == [`Auth.uid`]
+//!
+//! It will make sure the `Channel` is created if new and it will update
+//! the spendable amount using the [`Adapter.get_deposit()`](adapter::client::Locked::get_deposit).
+//!
+//! The route is handled by [`campaign::create_campaign()`].
+//!
+//! Request body (json): [`CreateCampaign`][primitives::sentry::campaign_create::CreateCampaign]
+//!
+//! Response: [`Campaign`]
+//!
+//! ##### Examples
+//!
+//! ```
+</span><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/create_campaign_request.rs&quot;</span>)]</span>
+<span class="doccomment">//! ```
+//!
+//! #### POST `/v5/campaign/:id` (auth required)
+//!
+//! Modify the [`Campaign`]. Request must be sent by the [`Campaign.creator`].
+//!
+//! **Authentication is required** to validate [`Campaign.creator`] == [`Auth.uid`]
+//!
+//! The route is handled by [`campaign::update_campaign::handle_route()`].
+//!
+//! Request body (json): [`ModifyCampaign`][primitives::sentry::campaign_modify::ModifyCampaign]
+//!
+//! Response: [`Campaign`]
+//!
+//! ##### Examples
+//!
+//! ```
+</span><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/modify_campaign_request.rs&quot;</span>)]</span>
+<span class="doccomment">//! ```
+//!
+//! #### POST `/v5/campaign/:id/events`
+//!
+//! Add new [`Event`]s (`IMPRESSION`s &amp; `CLICK`s) to the [`Campaign`].
+//! Applies [`Campaign.event_submission`] rules and additional validation using [`check_access()`].
+//!
+//! The route is handled by [`campaign::insert_events::handle_route()`].
+//!
+//! Request body (json): [`InsertEventsRequest`](primitives::sentry::InsertEventsRequest)
+//!
+//! Response: [`SuccessResponse`]
+//!
+//! #### POST `/v5/campaign/:id/close` (auth required)
+//!
+//! Close the campaign.
+//!
+//! The route is handled by [`campaign::close_campaign()`].
+//!
+//! Request must be sent by the [`Campaign.creator`].
+//!
+//! **Authentication is required** to validate [`Campaign.creator`] == [`Auth.uid`]
+//!
+//! Closes the campaign by setting [`Campaign.budget`](primitives::Campaign::budget) so that `remaining budget = 0`.
+//!
+//! Response: [`SuccessResponse`]
+//!
+//! ## Analytics
+//!
+//! #### GET `/v5/analytics`
+//!
+//! Allowed keys: [`AllowedKey::Country`][primitives::analytics::query::AllowedKey::Country], [`AllowedKey::AdSlotType`][primitives::analytics::query::AllowedKey::AdSlotType]
+//!
+//! Request query parameters: [`AnalyticsQuery`]
+//!
+//! Response: [`AnalyticsResponse`]
+//!
+//! ##### Examples
+//!
+//! Query:
+//!
+//! ```
+</span><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/analytics_query.rs&quot;</span>)]</span>
+<span class="doccomment">//! ```
+//!
+//! Response:
+//!
+//! ```
+</span><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/analytics_response.rs&quot;</span>)]</span>
+<span class="doccomment">//! ```
+//!
+//! #### GET `/v5/analytics/for-publisher` (auth required)
+//!
+//! Returns all analytics where the currently authenticated address [`Auth.uid`] is a **publisher**.
+//!
+//! All [`ALLOWED_KEYS`] are allowed for this route.
+//!
+//! The route is handled by [`get_analytics()`].
+//!
+//! Request query parameters: [`AnalyticsQuery`]
+//!
+//! Response: [`AnalyticsResponse`]
+//!
+//! ##### Examples
+//!
+//! See [GET `/v5/analytics`](#get-v5analytics)
+//!
+//! #### GET `/v5/analytics/for-advertiser` (auth required)
+//!
+//! Returns all analytics where the currently authenticated address [`Auth.uid`] is an **advertiser**.
+//!
+//! All [`ALLOWED_KEYS`] are allowed for this route.
+//!
+//! The route is handled by [`get_analytics()`].
+//!
+//! Request query parameters: [`AnalyticsQuery`]
+//!
+//! Response: [`AnalyticsResponse`]
+//!
+//! ##### Examples
+//!
+//! See [GET `/v5/analytics`](#get-v5analytics)
+//!
+//! #### GET `/v5/analytics/for-admin` (auth required)
+//!
+//! Admin access to the analytics with no restrictions on the keys for filtering.
+//!
+//! All [`ALLOWED_KEYS`] are allowed for admins.
+//!
+//! Admin addresses are configured in the [`Config.admins`](primitives::Config::admins).
+//!
+//! The route is handled by [`get_analytics()`].
+//!
+//! Request query parameters: [`AnalyticsQuery`]
+//!
+//! Response: [`AnalyticsResponse`]
+//!
+//! ##### Examples
+//!
+//! See [GET `/v5/analytics`](#get-v5analytics)
+//!
+//! [`Adapter`]: adapter::Adapter
+//! [`Address`]: primitives::Address
+//! [`AllowedKey`]: primitives::analytics::query::AllowedKey
+//! [`ALLOWED_KEYS`]: primitives::analytics::query::ALLOWED_KEYS
+//! [`ApproveState`]: primitives::validator::ApproveState
+//! [`Accounting`]: crate::db::accounting::Accounting
+//! [`AccountingResponse`]: primitives::sentry::AccountingResponse
+//! [`AllSpendersResponse`]: primitives::sentry::AllSpendersResponse
+//! [`AnalyticsResponse`]: primitives::sentry::AnalyticsResponse
+//! [`AnalyticsQuery`]: primitives::analytics::AnalyticsQuery
+//! [`Auth.uid`]: crate::Auth::uid
+//! [`Campaign`]: primitives::Campaign
+//! [`Campaign.creator`]: primitives::Campaign::creator
+//! [`Campaign.event_submission`]: primitives::Campaign::event_submission
+//! [`CampaignId`]: primitives::CampaignId
+//! [`Channel`]: primitives::Channel
+//! [`Channel.leader`]: primitives::Channel::leader
+//! [`Channel.follower`]: primitives::Channel::follower
+//! [`ChannelId`]: primitives::ChannelId
+//! [`ChannelPayRequest`]: primitives::sentry::ChannelPayRequest
+//! [`check_access()`]: crate::access::check_access
+//! [`Config.msgs_find_limit`]: primitives::Config::msgs_find_limit
+//! [`Event`]: primitives::sentry::Event
+//! [`Heartbeat`]: primitives::validator::Heartbeat
+//! [`MessageTypes`]: primitives::validator::MessageTypes
+//! [`NewState`]: primitives::validator::NewState
+//! [`SpenderResponse`]: primitives::sentry::SpenderResponse
+//! [`SuccessResponse`]: primitives::sentry::SuccessResponse
+//! [`ValidatorId`]: primitives::ValidatorId
 
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">analytics::analytics</span> <span class="kw">as</span> <span class="ident">get_analytics</span>;
+</span><span class="kw">pub use </span>analytics::analytics <span class="kw">as </span>get_analytics;
 
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">cfg::config</span> <span class="kw">as</span> <span class="ident">get_cfg</span>;
+<span class="kw">pub use </span>cfg::config <span class="kw">as </span>get_cfg;
 
-<span class="comment">// `analytics` module has single request, so we only export this request</span>
-<span class="kw">mod</span> <span class="ident">analytics</span>;
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">campaign</span>;
-<span class="comment">// `cfg` module has single request, so we only export this request</span>
-<span class="kw">mod</span> <span class="ident">cfg</span>;
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">channel</span>;
+<span class="comment">// `analytics` module has single request, so we only export this request
+</span><span class="kw">mod </span>analytics;
+<span class="kw">pub mod </span>campaign;
+<span class="comment">// `cfg` module has single request, so we only export this request
+</span><span class="kw">mod </span>cfg;
+<span class="kw">pub mod </span>channel;
 
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">routers</span>;
+<span class="kw">pub mod </span>routers;
 
-<span class="kw">mod</span> <span class="ident">units_for_slot</span>;
+<span class="kw">mod </span>units_for_slot;
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (20ffea693 2022-08-11)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>

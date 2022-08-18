@@ -423,430 +423,430 @@
 <span id="423">423</span>
 <span id="424">424</span>
 <span id="425">425</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">thiserror::Error</span>;
+</pre><pre class="rust"><code><span class="kw">use </span>thiserror::Error;
 
-<span class="kw">use</span> <span class="ident">adapter</span>::{<span class="ident">prelude</span>::<span class="kw-2">*</span>, <span class="ident">Error</span> <span class="kw">as</span> <span class="ident">AdapterError</span>};
-<span class="kw">use</span> <span class="ident">primitives</span>::{
-    <span class="ident">balances::CheckedState</span>,
-    <span class="ident">validator</span>::{<span class="ident">MessageError</span>, <span class="ident">MessageTypes</span>, <span class="ident">NewState</span>},
-    <span class="ident">Balances</span>, <span class="ident">ChainOf</span>, <span class="ident">Channel</span>,
+<span class="kw">use </span>adapter::{prelude::<span class="kw-2">*</span>, Error <span class="kw">as </span>AdapterError};
+<span class="kw">use </span>primitives::{
+    balances::CheckedState,
+    validator::{MessageError, MessageTypes, NewState},
+    Balances, ChainOf, Channel,
 };
 
-<span class="kw">use</span> <span class="kw">crate</span>::{
-    <span class="ident">heartbeat</span>::{<span class="ident">heartbeat</span>, <span class="ident">Error</span> <span class="kw">as</span> <span class="ident">HeartbeatError</span>, <span class="ident">HeartbeatStatus</span>},
-    <span class="ident">sentry_interface</span>::{<span class="ident">Error</span> <span class="kw">as</span> <span class="ident">SentryApiError</span>, <span class="ident">PropagationResult</span>, <span class="ident">SentryApi</span>},
-    <span class="ident">GetStateRoot</span>, <span class="ident">GetStateRootError</span>,
+<span class="kw">use crate</span>::{
+    heartbeat::{heartbeat, Error <span class="kw">as </span>HeartbeatError, HeartbeatStatus},
+    sentry_interface::{Error <span class="kw">as </span>SentryApiError, PropagationResult, SentryApi},
+    GetStateRoot, GetStateRootError,
 };
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">TickStatus</span> {
-    <span class="kw">pub</span> <span class="ident">heartbeat</span>: <span class="ident">HeartbeatStatus</span>,
-    <span class="doccomment">/// When `None` the conditions for creating a `NewState` haven&#39;t been met</span>
-    <span class="kw">pub</span> <span class="ident">new_state</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">PropagationResult</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+<span class="attribute">#[derive(Debug)]</span>
+<span class="kw">pub struct </span>TickStatus {
+    <span class="kw">pub </span>heartbeat: HeartbeatStatus,
+    <span class="doccomment">/// When `None` the conditions for creating a `NewState` haven&#39;t been met
+    </span><span class="kw">pub </span>new_state: <span class="prelude-ty">Option</span>&lt;Vec&lt;PropagationResult&gt;&gt;,
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Error</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">Error</span> {
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;SentryApi: {0}&quot;</span>)]</span>
-    <span class="ident">SentryApi</span>(<span class="attribute">#[<span class="ident">from</span>]</span> <span class="ident">SentryApiError</span>),
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;StateRootHash: {0}&quot;</span>)]</span>
-    <span class="ident">StateRootHash</span>(<span class="attribute">#[<span class="ident">from</span>]</span> <span class="ident">GetStateRootError</span>),
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Adapter: {0}&quot;</span>)]</span>
-    <span class="ident">Adapter</span>(<span class="attribute">#[<span class="ident">from</span>]</span> <span class="ident">AdapterError</span>),
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Heartbeat: {0}&quot;</span>)]</span>
-    <span class="ident">Heartbeat</span>(<span class="attribute">#[<span class="ident">from</span>]</span> <span class="ident">HeartbeatError</span>),
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;NewState Balances: {0}&quot;</span>)]</span>
-    <span class="ident">Message</span>(<span class="attribute">#[<span class="ident">from</span>]</span> <span class="ident">MessageError</span><span class="op">&lt;</span><span class="ident">NewState</span><span class="op">&lt;</span><span class="ident">CheckedState</span><span class="op">&gt;</span><span class="op">&gt;</span>),
-    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Overflow&quot;</span>)]</span>
-    <span class="ident">Overflow</span>,
+<span class="attribute">#[derive(Debug, Error)]</span>
+<span class="kw">pub enum </span>Error {
+    <span class="attribute">#[error(<span class="string">&quot;SentryApi: {0}&quot;</span>)]</span>
+    SentryApi(<span class="attribute">#[from]</span> SentryApiError),
+    <span class="attribute">#[error(<span class="string">&quot;StateRootHash: {0}&quot;</span>)]</span>
+    StateRootHash(<span class="attribute">#[from]</span> GetStateRootError),
+    <span class="attribute">#[error(<span class="string">&quot;Adapter: {0}&quot;</span>)]</span>
+    Adapter(<span class="attribute">#[from]</span> AdapterError),
+    <span class="attribute">#[error(<span class="string">&quot;Heartbeat: {0}&quot;</span>)]</span>
+    Heartbeat(<span class="attribute">#[from]</span> HeartbeatError),
+    <span class="attribute">#[error(<span class="string">&quot;NewState Balances: {0}&quot;</span>)]</span>
+    Message(<span class="attribute">#[from]</span> MessageError&lt;NewState&lt;CheckedState&gt;&gt;),
+    <span class="attribute">#[error(<span class="string">&quot;Overflow&quot;</span>)]</span>
+    Overflow,
 }
 
-<span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">tick</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">Unlocked</span> <span class="op">+</span> <span class="lifetime">&#39;static</span><span class="op">&gt;</span>(
-    <span class="ident">sentry</span>: <span class="kw-2">&amp;</span><span class="ident">SentryApi</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span>,
-    <span class="ident">channel_context</span>: <span class="kw-2">&amp;</span><span class="ident">ChainOf</span><span class="op">&lt;</span><span class="ident">Channel</span><span class="op">&gt;</span>,
-    <span class="ident">accounting_balances</span>: <span class="ident">Balances</span><span class="op">&lt;</span><span class="ident">CheckedState</span><span class="op">&gt;</span>,
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">TickStatus</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">channel</span> <span class="op">=</span> <span class="ident">channel_context</span>.<span class="ident">context</span>;
+<span class="kw">pub async fn </span>tick&lt;C: Unlocked + <span class="lifetime">&#39;static</span>&gt;(
+    sentry: <span class="kw-2">&amp;</span>SentryApi&lt;C&gt;,
+    channel_context: <span class="kw-2">&amp;</span>ChainOf&lt;Channel&gt;,
+    accounting_balances: Balances&lt;CheckedState&gt;,
+) -&gt; <span class="prelude-ty">Result</span>&lt;TickStatus, Error&gt; {
+    <span class="kw">let </span>channel = channel_context.context;
 
-    <span class="comment">// Check if Accounting != than latest NewState (Accounting.balances != NewState.balances)</span>
-    <span class="kw">let</span> <span class="ident">should_generate_new_state</span> <span class="op">=</span>
+    <span class="comment">// Check if Accounting != than latest NewState (Accounting.balances != NewState.balances)
+    </span><span class="kw">let </span>should_generate_new_state =
         {
-            <span class="comment">// If the accounting is empty, then we don&#39;t need to create a NewState</span>
-            <span class="kw">if</span> <span class="ident">accounting_balances</span>.<span class="ident">earners</span>.<span class="ident">is_empty</span>() <span class="op">|</span><span class="op">|</span> <span class="ident">accounting_balances</span>.<span class="ident">spenders</span>.<span class="ident">is_empty</span>() {
-                <span class="bool-val">false</span>
-            } <span class="kw">else</span> {
-                <span class="kw">let</span> <span class="ident">latest_new_state</span> <span class="op">=</span> <span class="ident">sentry</span>
-                    .<span class="ident">get_our_latest_msg</span>(<span class="ident">channel</span>.<span class="ident">id</span>(), <span class="kw-2">&amp;</span>[<span class="string">&quot;NewState&quot;</span>])
-                    .<span class="kw">await</span><span class="question-mark">?</span>
-                    .<span class="ident">map</span>(<span class="ident">NewState</span>::<span class="op">&lt;</span><span class="ident">CheckedState</span><span class="op">&gt;</span><span class="ident">::try_from</span>)
-                    .<span class="ident">transpose</span>()<span class="question-mark">?</span>;
+            <span class="comment">// If the accounting is empty, then we don&#39;t need to create a NewState
+            </span><span class="kw">if </span>accounting_balances.earners.is_empty() || accounting_balances.spenders.is_empty() {
+                <span class="bool-val">false
+            </span>} <span class="kw">else </span>{
+                <span class="kw">let </span>latest_new_state = sentry
+                    .get_our_latest_msg(channel.id(), <span class="kw-2">&amp;</span>[<span class="string">&quot;NewState&quot;</span>])
+                    .<span class="kw">await</span><span class="question-mark">?
+                    </span>.map(NewState::&lt;CheckedState&gt;::try_from)
+                    .transpose()<span class="question-mark">?</span>;
 
-                <span class="kw">match</span> <span class="ident">latest_new_state</span> {
-                    <span class="prelude-val">Some</span>(<span class="ident">new_state</span>) =&gt; {
-                        <span class="kw">let</span> <span class="ident">check_spenders</span> <span class="op">=</span> <span class="ident">accounting_balances</span>.<span class="ident">spenders</span>.<span class="ident">iter</span>().<span class="ident">any</span>(
-                            <span class="op">|</span>(<span class="ident">spender</span>, <span class="ident">accounting_balance</span>)<span class="op">|</span> {
-                                <span class="kw">match</span> <span class="ident">new_state</span>.<span class="ident">balances</span>.<span class="ident">spenders</span>.<span class="ident">get</span>(<span class="ident">spender</span>) {
-                                    <span class="prelude-val">Some</span>(<span class="ident">prev_balance</span>) =&gt; <span class="ident">accounting_balance</span> <span class="op">&gt;</span> <span class="ident">prev_balance</span>,
-                                    <span class="comment">// if there is no previous balance for this Spender then it should generate a `NewState`</span>
-                                    <span class="comment">// this includes adding an empty Spender to be included in the MerkleTree</span>
-                                    <span class="prelude-val">None</span> =&gt; <span class="bool-val">true</span>,
+                <span class="kw">match </span>latest_new_state {
+                    <span class="prelude-val">Some</span>(new_state) =&gt; {
+                        <span class="kw">let </span>check_spenders = accounting_balances.spenders.iter().any(
+                            |(spender, accounting_balance)| {
+                                <span class="kw">match </span>new_state.balances.spenders.get(spender) {
+                                    <span class="prelude-val">Some</span>(prev_balance) =&gt; accounting_balance &gt; prev_balance,
+                                    <span class="comment">// if there is no previous balance for this Spender then it should generate a `NewState`
+                                    // this includes adding an empty Spender to be included in the MerkleTree
+                                    </span><span class="prelude-val">None </span>=&gt; <span class="bool-val">true</span>,
                                 }
                             },
                         );
 
-                        <span class="kw">let</span> <span class="ident">check_earners</span> <span class="op">=</span> <span class="ident">accounting_balances</span>.<span class="ident">earners</span>.<span class="ident">iter</span>().<span class="ident">any</span>(
-                            <span class="op">|</span>(<span class="ident">earner</span>, <span class="ident">accounting_balance</span>)<span class="op">|</span> {
-                                <span class="kw">match</span> <span class="ident">new_state</span>.<span class="ident">balances</span>.<span class="ident">earners</span>.<span class="ident">get</span>(<span class="ident">earner</span>) {
-                                    <span class="prelude-val">Some</span>(<span class="ident">prev_balance</span>) =&gt; <span class="ident">accounting_balance</span> <span class="op">&gt;</span> <span class="ident">prev_balance</span>,
-                                    <span class="comment">// if there is no previous balance for this Earner then it should generate a `NewState`</span>
-                                    <span class="comment">// this includes adding an empty Earner to be included in the MerkleTree</span>
-                                    <span class="prelude-val">None</span> =&gt; <span class="bool-val">true</span>,
+                        <span class="kw">let </span>check_earners = accounting_balances.earners.iter().any(
+                            |(earner, accounting_balance)| {
+                                <span class="kw">match </span>new_state.balances.earners.get(earner) {
+                                    <span class="prelude-val">Some</span>(prev_balance) =&gt; accounting_balance &gt; prev_balance,
+                                    <span class="comment">// if there is no previous balance for this Earner then it should generate a `NewState`
+                                    // this includes adding an empty Earner to be included in the MerkleTree
+                                    </span><span class="prelude-val">None </span>=&gt; <span class="bool-val">true</span>,
                                 }
                             },
                         );
 
-                        <span class="ident">check_spenders</span> <span class="op">|</span><span class="op">|</span> <span class="ident">check_earners</span>
+                        check_spenders || check_earners
                     }
-                    <span class="comment">// if no previous `NewState` (i.e. `Channel` is new) - it should generate a `NewState`</span>
-                    <span class="comment">// this is only valid if the Accounting balances are not empty!</span>
-                    <span class="prelude-val">None</span> =&gt; <span class="bool-val">true</span>,
+                    <span class="comment">// if no previous `NewState` (i.e. `Channel` is new) - it should generate a `NewState`
+                    // this is only valid if the Accounting balances are not empty!
+                    </span><span class="prelude-val">None </span>=&gt; <span class="bool-val">true</span>,
                 }
             }
         };
 
-    <span class="comment">// Create a `NewState` if balances have changed</span>
-    <span class="kw">let</span> <span class="ident">new_state</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">should_generate_new_state</span> {
-        <span class="prelude-val">Some</span>(<span class="ident">on_new_accounting</span>(<span class="ident">sentry</span>, <span class="ident">channel_context</span>, <span class="ident">accounting_balances</span>).<span class="kw">await</span><span class="question-mark">?</span>)
-    } <span class="kw">else</span> {
-        <span class="prelude-val">None</span>
-    };
+    <span class="comment">// Create a `NewState` if balances have changed
+    </span><span class="kw">let </span>new_state = <span class="kw">if </span>should_generate_new_state {
+        <span class="prelude-val">Some</span>(on_new_accounting(sentry, channel_context, accounting_balances).<span class="kw">await</span><span class="question-mark">?</span>)
+    } <span class="kw">else </span>{
+        <span class="prelude-val">None
+    </span>};
 
-    <span class="prelude-val">Ok</span>(<span class="ident">TickStatus</span> {
-        <span class="ident">heartbeat</span>: <span class="ident">heartbeat</span>(<span class="ident">sentry</span>, <span class="ident">channel_context</span>).<span class="kw">await</span><span class="question-mark">?</span>,
-        <span class="ident">new_state</span>,
+    <span class="prelude-val">Ok</span>(TickStatus {
+        heartbeat: heartbeat(sentry, channel_context).<span class="kw">await</span><span class="question-mark">?</span>,
+        new_state,
     })
 }
 
-<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">on_new_accounting</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">Unlocked</span> <span class="op">+</span> <span class="lifetime">&#39;static</span><span class="op">&gt;</span>(
-    <span class="ident">sentry</span>: <span class="kw-2">&amp;</span><span class="ident">SentryApi</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span>,
-    <span class="ident">channel_context</span>: <span class="kw-2">&amp;</span><span class="ident">ChainOf</span><span class="op">&lt;</span><span class="ident">Channel</span><span class="op">&gt;</span>,
-    <span class="ident">accounting_balances</span>: <span class="ident">Balances</span><span class="op">&lt;</span><span class="ident">CheckedState</span><span class="op">&gt;</span>,
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">PropagationResult</span><span class="op">&gt;</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">state_root</span> <span class="op">=</span> <span class="ident">accounting_balances</span>.<span class="ident">encode</span>(
-        <span class="ident">channel_context</span>.<span class="ident">context</span>.<span class="ident">id</span>(),
-        <span class="ident">channel_context</span>.<span class="ident">token</span>.<span class="ident">precision</span>.<span class="ident">get</span>(),
+<span class="kw">async fn </span>on_new_accounting&lt;C: Unlocked + <span class="lifetime">&#39;static</span>&gt;(
+    sentry: <span class="kw-2">&amp;</span>SentryApi&lt;C&gt;,
+    channel_context: <span class="kw-2">&amp;</span>ChainOf&lt;Channel&gt;,
+    accounting_balances: Balances&lt;CheckedState&gt;,
+) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;PropagationResult&gt;, Error&gt; {
+    <span class="kw">let </span>state_root = accounting_balances.encode(
+        channel_context.context.id(),
+        channel_context.token.precision.get(),
     )<span class="question-mark">?</span>;
 
-    <span class="kw">let</span> <span class="ident">signature</span> <span class="op">=</span> <span class="ident">sentry</span>.<span class="ident">adapter</span>.<span class="ident">sign</span>(<span class="kw-2">&amp;</span><span class="ident">state_root</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span>signature = sentry.adapter.sign(<span class="kw-2">&amp;</span>state_root)<span class="question-mark">?</span>;
 
-    <span class="kw">let</span> <span class="ident">propagation_results</span> <span class="op">=</span> <span class="ident">sentry</span>
-        .<span class="ident">propagate</span>(
-            <span class="ident">channel_context</span>,
-            <span class="kw-2">&amp;</span>[<span class="ident">MessageTypes::NewState</span>(<span class="ident">NewState</span> {
-                <span class="ident">state_root</span>,
-                <span class="ident">signature</span>,
-                <span class="ident">balances</span>: <span class="ident">accounting_balances</span>.<span class="ident">into_unchecked</span>(),
+    <span class="kw">let </span>propagation_results = sentry
+        .propagate(
+            channel_context,
+            <span class="kw-2">&amp;</span>[MessageTypes::NewState(NewState {
+                state_root,
+                signature,
+                balances: accounting_balances.into_unchecked(),
             })],
         )
         .<span class="kw">await</span><span class="question-mark">?</span>;
 
-    <span class="prelude-val">Ok</span>(<span class="ident">propagation_results</span>)
+    <span class="prelude-val">Ok</span>(propagation_results)
 }
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
-<span class="kw">mod</span> <span class="ident">test</span> {
-    <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
-    <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::sentry_interface</span>::{<span class="ident">ChainsValidators</span>, <span class="ident">Validator</span>};
-    <span class="kw">use</span> <span class="ident">adapter::dummy</span>::{<span class="ident">Adapter</span>, <span class="ident">Dummy</span>, <span class="ident">Options</span>};
-    <span class="kw">use</span> <span class="ident">chrono::Utc</span>;
-    <span class="kw">use</span> <span class="ident">primitives</span>::{
-        <span class="ident">balances::UncheckedState</span>,
-        <span class="ident">campaign::Validators</span>,
-        <span class="ident">config::GANACHE_CONFIG</span>,
-        <span class="ident">sentry</span>::{<span class="ident">SuccessResponse</span>, <span class="ident">ValidatorMessage</span>, <span class="ident">ValidatorMessagesListResponse</span>},
-        <span class="ident">test_util</span>::{
-            <span class="ident">discard_logger</span>, <span class="ident">ADVERTISER</span>, <span class="ident">CREATOR</span>, <span class="ident">DUMMY_AUTH</span>, <span class="ident">DUMMY_CAMPAIGN</span>,
-            <span class="ident">DUMMY_VALIDATOR_FOLLOWER</span>, <span class="ident">DUMMY_VALIDATOR_LEADER</span>, <span class="ident">FOLLOWER</span>, <span class="ident">IDS</span>, <span class="ident">LEADER</span>, <span class="ident">PUBLISHER</span>,
-            <span class="ident">PUBLISHER_2</span>,
+<span class="attribute">#[cfg(test)]</span>
+<span class="kw">mod </span>test {
+    <span class="kw">use super</span>::<span class="kw-2">*</span>;
+    <span class="kw">use </span><span class="kw">crate</span>::sentry_interface::{ChainsValidators, Validator};
+    <span class="kw">use </span>adapter::dummy::{Adapter, Dummy, Options};
+    <span class="kw">use </span>chrono::Utc;
+    <span class="kw">use </span>primitives::{
+        balances::UncheckedState,
+        campaign::Validators,
+        config::GANACHE_CONFIG,
+        sentry::{SuccessResponse, ValidatorMessage, ValidatorMessagesListResponse},
+        test_util::{
+            discard_logger, ADVERTISER, CREATOR, DUMMY_AUTH, DUMMY_CAMPAIGN,
+            DUMMY_VALIDATOR_FOLLOWER, DUMMY_VALIDATOR_LEADER, FOLLOWER, IDS, LEADER, PUBLISHER,
+            PUBLISHER_2,
         },
-        <span class="ident">util::ApiUrl</span>,
-        <span class="ident">validator</span>::{<span class="ident">Heartbeat</span>, <span class="ident">MessageTypes</span>, <span class="ident">NewState</span>},
-        <span class="ident">ChainId</span>, <span class="ident">Config</span>, <span class="ident">ToETHChecksum</span>, <span class="ident">UnifiedNum</span>, <span class="ident">ValidatorDesc</span>, <span class="ident">ValidatorId</span>,
+        util::ApiUrl,
+        validator::{Heartbeat, MessageTypes, NewState},
+        ChainId, Config, ToETHChecksum, UnifiedNum, ValidatorDesc, ValidatorId,
     };
-    <span class="kw">use</span> <span class="ident">std</span>::{<span class="ident">collections::HashMap</span>, <span class="ident">str::FromStr</span>};
-    <span class="kw">use</span> <span class="ident">wiremock</span>::{
-        <span class="ident">matchers</span>::{<span class="ident">method</span>, <span class="ident">path</span>, <span class="ident">query_param</span>},
-        <span class="ident">Mock</span>, <span class="ident">MockGuard</span>, <span class="ident">MockServer</span>, <span class="ident">ResponseTemplate</span>,
+    <span class="kw">use </span>std::{collections::HashMap, str::FromStr};
+    <span class="kw">use </span>wiremock::{
+        matchers::{method, path, query_param},
+        Mock, MockGuard, MockServer, ResponseTemplate,
     };
-    <span class="comment">// Initializes a SentryApi instance</span>
-    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">setup_sentry</span>(<span class="ident">server</span>: <span class="kw-2">&amp;</span><span class="ident">MockServer</span>, <span class="ident">config</span>: <span class="kw-2">&amp;</span><span class="ident">Config</span>) -&gt; <span class="ident">SentryApi</span><span class="op">&lt;</span><span class="ident">Dummy</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">sentry_url</span> <span class="op">=</span>
-            <span class="ident">ApiUrl::from_str</span>(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;{}/leader&quot;</span>, <span class="kw-2">&amp;</span><span class="ident">server</span>.<span class="ident">uri</span>())).<span class="ident">expect</span>(<span class="string">&quot;Should parse&quot;</span>);
+    <span class="comment">// Initializes a SentryApi instance
+    </span><span class="kw">async fn </span>setup_sentry(server: <span class="kw-2">&amp;</span>MockServer, config: <span class="kw-2">&amp;</span>Config) -&gt; SentryApi&lt;Dummy&gt; {
+        <span class="kw">let </span>sentry_url =
+            ApiUrl::from_str(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;{}/leader&quot;</span>, <span class="kw-2">&amp;</span>server.uri())).expect(<span class="string">&quot;Should parse&quot;</span>);
 
-        <span class="kw">let</span> <span class="ident">adapter</span> <span class="op">=</span> <span class="ident">Adapter::with_unlocked</span>(<span class="ident">Dummy::init</span>(<span class="ident">Options</span> {
-            <span class="ident">dummy_identity</span>: <span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="ident">LEADER</span>],
-            <span class="ident">dummy_auth_tokens</span>: <span class="ident">DUMMY_AUTH</span>.<span class="ident">clone</span>(),
-            <span class="ident">dummy_chains</span>: <span class="ident">config</span>.<span class="ident">chains</span>.<span class="ident">values</span>().<span class="ident">cloned</span>().<span class="ident">collect</span>(),
+        <span class="kw">let </span>adapter = Adapter::with_unlocked(Dummy::init(Options {
+            dummy_identity: IDS[<span class="kw-2">&amp;</span>LEADER],
+            dummy_auth_tokens: DUMMY_AUTH.clone(),
+            dummy_chains: config.chains.values().cloned().collect(),
         }));
-        <span class="kw">let</span> <span class="ident">logger</span> <span class="op">=</span> <span class="ident">discard_logger</span>();
+        <span class="kw">let </span>logger = discard_logger();
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">validators</span>: <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">ValidatorId</span>, <span class="ident">Validator</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">HashMap::new</span>();
-        <span class="kw">let</span> <span class="ident">leader</span> <span class="op">=</span> <span class="ident">Validator</span> {
-            <span class="ident">url</span>: <span class="ident">ApiUrl::from_str</span>(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;{}/leader&quot;</span>, <span class="ident">server</span>.<span class="ident">uri</span>())).<span class="ident">expect</span>(<span class="string">&quot;should be valid&quot;</span>),
-            <span class="ident">token</span>: <span class="ident">DUMMY_AUTH</span>
-                .<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">LEADER</span>)
-                .<span class="ident">expect</span>(<span class="string">&quot;should be valid&quot;</span>)
-                .<span class="ident">to_string</span>(),
+        <span class="kw">let </span><span class="kw-2">mut </span>validators: HashMap&lt;ValidatorId, Validator&gt; = HashMap::new();
+        <span class="kw">let </span>leader = Validator {
+            url: ApiUrl::from_str(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;{}/leader&quot;</span>, server.uri())).expect(<span class="string">&quot;should be valid&quot;</span>),
+            token: DUMMY_AUTH
+                .get(<span class="kw-2">&amp;*</span>LEADER)
+                .expect(<span class="string">&quot;should be valid&quot;</span>)
+                .to_string(),
         };
-        <span class="kw">let</span> <span class="ident">follower</span> <span class="op">=</span> <span class="ident">Validator</span> {
-            <span class="ident">url</span>: <span class="ident">ApiUrl::from_str</span>(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;{}/follower&quot;</span>, <span class="ident">server</span>.<span class="ident">uri</span>())).<span class="ident">expect</span>(<span class="string">&quot;should be valid&quot;</span>),
-            <span class="ident">token</span>: <span class="ident">DUMMY_AUTH</span>
-                .<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">FOLLOWER</span>)
-                .<span class="ident">expect</span>(<span class="string">&quot;should be valid&quot;</span>)
-                .<span class="ident">to_string</span>(),
+        <span class="kw">let </span>follower = Validator {
+            url: ApiUrl::from_str(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;{}/follower&quot;</span>, server.uri())).expect(<span class="string">&quot;should be valid&quot;</span>),
+            token: DUMMY_AUTH
+                .get(<span class="kw-2">&amp;*</span>FOLLOWER)
+                .expect(<span class="string">&quot;should be valid&quot;</span>)
+                .to_string(),
         };
-        <span class="ident">validators</span>.<span class="ident">insert</span>(<span class="ident">DUMMY_VALIDATOR_LEADER</span>.<span class="ident">id</span>, <span class="ident">leader</span>);
-        <span class="ident">validators</span>.<span class="ident">insert</span>(<span class="ident">DUMMY_VALIDATOR_FOLLOWER</span>.<span class="ident">id</span>, <span class="ident">follower</span>);
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">propagate_to</span>: <span class="ident">ChainsValidators</span> <span class="op">=</span> <span class="ident">HashMap::new</span>();
-        <span class="ident">propagate_to</span>.<span class="ident">insert</span>(<span class="ident">ChainId::from</span>(<span class="number">1337</span>), <span class="ident">validators</span>);
-        <span class="ident">SentryApi::new</span>(<span class="ident">adapter</span>, <span class="ident">logger</span>, <span class="ident">config</span>.<span class="ident">clone</span>(), <span class="ident">sentry_url</span>)
-            .<span class="ident">expect</span>(<span class="string">&quot;Should create instance&quot;</span>)
-            .<span class="ident">with_propagate</span>(<span class="ident">propagate_to</span>)
-            .<span class="ident">expect</span>(<span class="string">&quot;Should propagate&quot;</span>)
+        validators.insert(DUMMY_VALIDATOR_LEADER.id, leader);
+        validators.insert(DUMMY_VALIDATOR_FOLLOWER.id, follower);
+        <span class="kw">let </span><span class="kw-2">mut </span>propagate_to: ChainsValidators = HashMap::new();
+        propagate_to.insert(ChainId::from(<span class="number">1337</span>), validators);
+        SentryApi::new(adapter, logger, config.clone(), sentry_url)
+            .expect(<span class="string">&quot;Should create instance&quot;</span>)
+            .with_propagate(propagate_to)
+            .expect(<span class="string">&quot;Should propagate&quot;</span>)
     }
 
-    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">setup_new_state_response</span>(
-        <span class="ident">server</span>: <span class="kw-2">&amp;</span><span class="ident">MockServer</span>,
-        <span class="ident">new_state_msg</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">NewState</span><span class="op">&lt;</span><span class="ident">UncheckedState</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    ) -&gt; <span class="ident">MockGuard</span> {
-        <span class="kw">let</span> <span class="ident">new_state_res</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">new_state_msg</span> {
-            <span class="prelude-val">Some</span>(<span class="ident">msg</span>) =&gt; <span class="ident">ValidatorMessagesListResponse</span> {
-                <span class="ident">messages</span>: <span class="macro">vec!</span>[<span class="ident">ValidatorMessage</span> {
-                    <span class="ident">from</span>: <span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">channel</span>.<span class="ident">leader</span>,
-                    <span class="ident">received</span>: <span class="ident">Utc::now</span>(),
-                    <span class="ident">msg</span>: <span class="ident">MessageTypes::NewState</span>(<span class="ident">msg</span>),
+    <span class="kw">async fn </span>setup_new_state_response(
+        server: <span class="kw-2">&amp;</span>MockServer,
+        new_state_msg: <span class="prelude-ty">Option</span>&lt;NewState&lt;UncheckedState&gt;&gt;,
+    ) -&gt; MockGuard {
+        <span class="kw">let </span>new_state_res = <span class="kw">match </span>new_state_msg {
+            <span class="prelude-val">Some</span>(msg) =&gt; ValidatorMessagesListResponse {
+                messages: <span class="macro">vec!</span>[ValidatorMessage {
+                    from: DUMMY_CAMPAIGN.channel.leader,
+                    received: Utc::now(),
+                    msg: MessageTypes::NewState(msg),
                 }],
             },
-            <span class="prelude-val">None</span> =&gt; <span class="ident">ValidatorMessagesListResponse</span> { <span class="ident">messages</span>: <span class="macro">vec!</span>[] },
+            <span class="prelude-val">None </span>=&gt; ValidatorMessagesListResponse { messages: <span class="macro">vec!</span>[] },
         };
 
-        <span class="ident">Mock::given</span>(<span class="ident">method</span>(<span class="string">&quot;GET&quot;</span>))
-            .<span class="ident">and</span>(<span class="ident">path</span>(<span class="macro">format!</span>(
+        Mock::given(method(<span class="string">&quot;GET&quot;</span>))
+            .and(path(<span class="macro">format!</span>(
                 <span class="string">&quot;/leader/v5/channel/{}/validator-messages/{}/{}&quot;</span>,
-                <span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">channel</span>.<span class="ident">id</span>(),
-                <span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">channel</span>.<span class="ident">leader</span>,
+                DUMMY_CAMPAIGN.channel.id(),
+                DUMMY_CAMPAIGN.channel.leader,
                 <span class="string">&quot;NewState&quot;</span>,
             )))
-            .<span class="ident">and</span>(<span class="ident">query_param</span>(<span class="string">&quot;limit&quot;</span>, <span class="string">&quot;1&quot;</span>))
-            .<span class="ident">respond_with</span>(<span class="ident">ResponseTemplate::new</span>(<span class="number">200</span>).<span class="ident">set_body_json</span>(<span class="kw-2">&amp;</span><span class="ident">new_state_res</span>))
-            .<span class="ident">expect</span>(<span class="number">1</span>)
-            .<span class="ident">named</span>(<span class="string">&quot;GET NewState helper&quot;</span>)
-            .<span class="ident">mount_as_scoped</span>(<span class="ident">server</span>)
-            .<span class="kw">await</span>
-    }
+            .and(query_param(<span class="string">&quot;limit&quot;</span>, <span class="string">&quot;1&quot;</span>))
+            .respond_with(ResponseTemplate::new(<span class="number">200</span>).set_body_json(<span class="kw-2">&amp;</span>new_state_res))
+            .expect(<span class="number">1</span>)
+            .named(<span class="string">&quot;GET NewState helper&quot;</span>)
+            .mount_as_scoped(server)
+            .<span class="kw">await
+    </span>}
 
-    <span class="attribute">#[<span class="ident">tokio::test</span>]</span>
-    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">test_leader_tick</span>() {
-        <span class="kw">let</span> <span class="ident">config</span> <span class="op">=</span> <span class="ident">GANACHE_CONFIG</span>.<span class="ident">clone</span>();
-        <span class="kw">let</span> <span class="ident">server</span> <span class="op">=</span> <span class="ident">MockServer::start</span>().<span class="kw">await</span>;
-        <span class="kw">let</span> <span class="ident">ok_response</span> <span class="op">=</span> <span class="ident">SuccessResponse</span> { <span class="ident">success</span>: <span class="bool-val">true</span> };
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">mock_campaign</span> <span class="op">=</span> <span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">clone</span>();
-        <span class="ident">mock_campaign</span>.<span class="ident">validators</span> <span class="op">=</span> <span class="ident">Validators::new</span>((
-            <span class="ident">ValidatorDesc</span> {
-                <span class="ident">id</span>: <span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="ident">LEADER</span>],
-                <span class="ident">url</span>: <span class="macro">format!</span>(<span class="string">&quot;{}/leader&quot;</span>, <span class="ident">server</span>.<span class="ident">uri</span>()),
-                <span class="ident">fee</span>: <span class="number">100</span>.<span class="ident">into</span>(),
-                <span class="ident">fee_addr</span>: <span class="prelude-val">None</span>,
+    <span class="attribute">#[tokio::test]</span>
+    <span class="kw">async fn </span>test_leader_tick() {
+        <span class="kw">let </span>config = GANACHE_CONFIG.clone();
+        <span class="kw">let </span>server = MockServer::start().<span class="kw">await</span>;
+        <span class="kw">let </span>ok_response = SuccessResponse { success: <span class="bool-val">true </span>};
+        <span class="kw">let </span><span class="kw-2">mut </span>mock_campaign = DUMMY_CAMPAIGN.clone();
+        mock_campaign.validators = Validators::new((
+            ValidatorDesc {
+                id: IDS[<span class="kw-2">&amp;</span>LEADER],
+                url: <span class="macro">format!</span>(<span class="string">&quot;{}/leader&quot;</span>, server.uri()),
+                fee: <span class="number">100</span>.into(),
+                fee_addr: <span class="prelude-val">None</span>,
             },
-            <span class="ident">ValidatorDesc</span> {
-                <span class="ident">id</span>: <span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="ident">LEADER</span>],
-                <span class="ident">url</span>: <span class="macro">format!</span>(<span class="string">&quot;{}/follower&quot;</span>, <span class="ident">server</span>.<span class="ident">uri</span>()),
-                <span class="ident">fee</span>: <span class="number">100</span>.<span class="ident">into</span>(),
-                <span class="ident">fee_addr</span>: <span class="prelude-val">None</span>,
+            ValidatorDesc {
+                id: IDS[<span class="kw-2">&amp;</span>LEADER],
+                url: <span class="macro">format!</span>(<span class="string">&quot;{}/follower&quot;</span>, server.uri()),
+                fee: <span class="number">100</span>.into(),
+                fee_addr: <span class="prelude-val">None</span>,
             },
         ));
 
-        <span class="comment">// Making sure all propagations to leader/follower succeed</span>
-        <span class="ident">Mock::given</span>(<span class="ident">method</span>(<span class="string">&quot;POST&quot;</span>))
-            .<span class="ident">and</span>(<span class="ident">path</span>(<span class="macro">format!</span>(
+        <span class="comment">// Making sure all propagations to leader/follower succeed
+        </span>Mock::given(method(<span class="string">&quot;POST&quot;</span>))
+            .and(path(<span class="macro">format!</span>(
                 <span class="string">&quot;leader/v5/channel/{}/validator-messages&quot;</span>,
-                <span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">channel</span>.<span class="ident">id</span>()
+                DUMMY_CAMPAIGN.channel.id()
             )))
-            .<span class="ident">respond_with</span>(<span class="ident">ResponseTemplate::new</span>(<span class="number">200</span>).<span class="ident">set_body_json</span>(<span class="kw-2">&amp;</span><span class="ident">ok_response</span>))
-            .<span class="ident">mount</span>(<span class="kw-2">&amp;</span><span class="ident">server</span>)
+            .respond_with(ResponseTemplate::new(<span class="number">200</span>).set_body_json(<span class="kw-2">&amp;</span>ok_response))
+            .mount(<span class="kw-2">&amp;</span>server)
             .<span class="kw">await</span>;
 
-        <span class="ident">Mock::given</span>(<span class="ident">method</span>(<span class="string">&quot;POST&quot;</span>))
-            .<span class="ident">and</span>(<span class="ident">path</span>(<span class="macro">format!</span>(
+        Mock::given(method(<span class="string">&quot;POST&quot;</span>))
+            .and(path(<span class="macro">format!</span>(
                 <span class="string">&quot;follower/v5/channel/{}/validator-messages&quot;</span>,
-                <span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">channel</span>.<span class="ident">id</span>()
+                DUMMY_CAMPAIGN.channel.id()
             )))
-            .<span class="ident">respond_with</span>(<span class="ident">ResponseTemplate::new</span>(<span class="number">200</span>).<span class="ident">set_body_json</span>(<span class="kw-2">&amp;</span><span class="ident">ok_response</span>))
-            .<span class="ident">mount</span>(<span class="kw-2">&amp;</span><span class="ident">server</span>)
+            .respond_with(ResponseTemplate::new(<span class="number">200</span>).set_body_json(<span class="kw-2">&amp;</span>ok_response))
+            .mount(<span class="kw-2">&amp;</span>server)
             .<span class="kw">await</span>;
 
-        <span class="kw">let</span> <span class="ident">heartbeat</span> <span class="op">=</span> <span class="ident">Heartbeat</span> {
-            <span class="ident">signature</span>: <span class="ident">String::new</span>(),
-            <span class="ident">state_root</span>: <span class="ident">String::new</span>(),
-            <span class="ident">timestamp</span>: <span class="ident">Utc::now</span>(),
+        <span class="kw">let </span>heartbeat = Heartbeat {
+            signature: String::new(),
+            state_root: String::new(),
+            timestamp: Utc::now(),
         };
-        <span class="kw">let</span> <span class="ident">heartbeat_res</span> <span class="op">=</span> <span class="ident">ValidatorMessagesListResponse</span> {
-            <span class="ident">messages</span>: <span class="macro">vec!</span>[<span class="ident">ValidatorMessage</span> {
-                <span class="ident">from</span>: <span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">channel</span>.<span class="ident">leader</span>,
-                <span class="ident">received</span>: <span class="ident">Utc::now</span>(),
-                <span class="ident">msg</span>: <span class="ident">MessageTypes::Heartbeat</span>(<span class="ident">heartbeat</span>),
+        <span class="kw">let </span>heartbeat_res = ValidatorMessagesListResponse {
+            messages: <span class="macro">vec!</span>[ValidatorMessage {
+                from: DUMMY_CAMPAIGN.channel.leader,
+                received: Utc::now(),
+                msg: MessageTypes::Heartbeat(heartbeat),
             }],
         };
-        <span class="ident">Mock::given</span>(<span class="ident">method</span>(<span class="string">&quot;GET&quot;</span>))
-            .<span class="ident">and</span>(<span class="ident">path</span>(<span class="macro">format!</span>(
+        Mock::given(method(<span class="string">&quot;GET&quot;</span>))
+            .and(path(<span class="macro">format!</span>(
                 <span class="string">&quot;/leader/v5/channel/{}/validator-messages/{}/{}&quot;</span>,
-                <span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">channel</span>.<span class="ident">id</span>(),
-                <span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">channel</span>.<span class="ident">leader</span>,
+                DUMMY_CAMPAIGN.channel.id(),
+                DUMMY_CAMPAIGN.channel.leader,
                 <span class="string">&quot;Heartbeat&quot;</span>,
             )))
-            .<span class="ident">and</span>(<span class="ident">query_param</span>(<span class="string">&quot;limit&quot;</span>, <span class="string">&quot;1&quot;</span>))
-            .<span class="ident">respond_with</span>(<span class="ident">ResponseTemplate::new</span>(<span class="number">200</span>).<span class="ident">set_body_json</span>(<span class="kw-2">&amp;</span><span class="ident">heartbeat_res</span>))
-            .<span class="ident">mount</span>(<span class="kw-2">&amp;</span><span class="ident">server</span>)
+            .and(query_param(<span class="string">&quot;limit&quot;</span>, <span class="string">&quot;1&quot;</span>))
+            .respond_with(ResponseTemplate::new(<span class="number">200</span>).set_body_json(<span class="kw-2">&amp;</span>heartbeat_res))
+            .mount(<span class="kw-2">&amp;</span>server)
             .<span class="kw">await</span>;
-        <span class="kw">let</span> <span class="ident">sentry</span> <span class="op">=</span> <span class="ident">setup_sentry</span>(<span class="kw-2">&amp;</span><span class="ident">server</span>, <span class="kw-2">&amp;</span><span class="ident">config</span>).<span class="kw">await</span>;
+        <span class="kw">let </span>sentry = setup_sentry(<span class="kw-2">&amp;</span>server, <span class="kw-2">&amp;</span>config).<span class="kw">await</span>;
 
-        <span class="kw">let</span> <span class="ident">channel_context</span> <span class="op">=</span> <span class="ident">config</span>
-            .<span class="ident">find_chain_of</span>(<span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">channel</span>.<span class="ident">token</span>)
-            .<span class="ident">expect</span>(<span class="string">&quot;Should find Dummy campaign token in config&quot;</span>)
-            .<span class="ident">with_channel</span>(<span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">channel</span>);
+        <span class="kw">let </span>channel_context = config
+            .find_chain_of(DUMMY_CAMPAIGN.channel.token)
+            .expect(<span class="string">&quot;Should find Dummy campaign token in config&quot;</span>)
+            .with_channel(DUMMY_CAMPAIGN.channel);
 
-        <span class="kw">let</span> <span class="ident">get_initial_balances</span> <span class="op">=</span> <span class="op">|</span><span class="op">|</span> {
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">balances</span>: <span class="ident">Balances</span><span class="op">&lt;</span><span class="ident">CheckedState</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Balances::new</span>();
-            <span class="ident">balances</span>
-                .<span class="ident">spend</span>(<span class="kw-2">*</span><span class="ident">ADVERTISER</span>, <span class="kw-2">*</span><span class="ident">PUBLISHER</span>, <span class="ident">UnifiedNum::from_u64</span>(<span class="number">1000</span>))
-                .<span class="ident">expect</span>(<span class="string">&quot;should spend&quot;</span>);
-            <span class="ident">balances</span>
-                .<span class="ident">spend</span>(<span class="kw-2">*</span><span class="ident">ADVERTISER</span>, <span class="kw-2">*</span><span class="ident">PUBLISHER_2</span>, <span class="ident">UnifiedNum::from_u64</span>(<span class="number">1000</span>))
-                .<span class="ident">expect</span>(<span class="string">&quot;should spend&quot;</span>);
-            <span class="ident">balances</span>
-                .<span class="ident">spend</span>(<span class="kw-2">*</span><span class="ident">CREATOR</span>, <span class="kw-2">*</span><span class="ident">PUBLISHER</span>, <span class="ident">UnifiedNum::from_u64</span>(<span class="number">1000</span>))
-                .<span class="ident">expect</span>(<span class="string">&quot;should spend&quot;</span>);
-            <span class="ident">balances</span>
-                .<span class="ident">spend</span>(<span class="kw-2">*</span><span class="ident">CREATOR</span>, <span class="kw-2">*</span><span class="ident">PUBLISHER_2</span>, <span class="ident">UnifiedNum::from_u64</span>(<span class="number">1000</span>))
-                .<span class="ident">expect</span>(<span class="string">&quot;should spend&quot;</span>);
-            <span class="ident">balances</span>
+        <span class="kw">let </span>get_initial_balances = || {
+            <span class="kw">let </span><span class="kw-2">mut </span>balances: Balances&lt;CheckedState&gt; = Balances::new();
+            balances
+                .spend(<span class="kw-2">*</span>ADVERTISER, <span class="kw-2">*</span>PUBLISHER, UnifiedNum::from_u64(<span class="number">1000</span>))
+                .expect(<span class="string">&quot;should spend&quot;</span>);
+            balances
+                .spend(<span class="kw-2">*</span>ADVERTISER, <span class="kw-2">*</span>PUBLISHER_2, UnifiedNum::from_u64(<span class="number">1000</span>))
+                .expect(<span class="string">&quot;should spend&quot;</span>);
+            balances
+                .spend(<span class="kw-2">*</span>CREATOR, <span class="kw-2">*</span>PUBLISHER, UnifiedNum::from_u64(<span class="number">1000</span>))
+                .expect(<span class="string">&quot;should spend&quot;</span>);
+            balances
+                .spend(<span class="kw-2">*</span>CREATOR, <span class="kw-2">*</span>PUBLISHER_2, UnifiedNum::from_u64(<span class="number">1000</span>))
+                .expect(<span class="string">&quot;should spend&quot;</span>);
+            balances
         };
 
-        <span class="comment">// Test case for empty balances</span>
-        {
-            <span class="kw">let</span> <span class="ident">balances</span>: <span class="ident">Balances</span><span class="op">&lt;</span><span class="ident">CheckedState</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Balances::new</span>();
-            <span class="kw">let</span> <span class="ident">tick_result</span> <span class="op">=</span> <span class="ident">tick</span>(<span class="kw-2">&amp;</span><span class="ident">sentry</span>, <span class="kw-2">&amp;</span><span class="ident">channel_context</span>, <span class="ident">balances</span>)
-                .<span class="kw">await</span>
-                .<span class="ident">expect</span>(<span class="string">&quot;Shouldn&#39;t return an error&quot;</span>);
+        <span class="comment">// Test case for empty balances
+        </span>{
+            <span class="kw">let </span>balances: Balances&lt;CheckedState&gt; = Balances::new();
+            <span class="kw">let </span>tick_result = tick(<span class="kw-2">&amp;</span>sentry, <span class="kw-2">&amp;</span>channel_context, balances)
+                .<span class="kw">await
+                </span>.expect(<span class="string">&quot;Shouldn&#39;t return an error&quot;</span>);
             <span class="macro">assert!</span>(
-                <span class="ident">tick_result</span>.<span class="ident">new_state</span>.<span class="ident">is_none</span>(),
-                <span class="string">&quot;Shouldn&#39;t generate a NewState when balances are empty&quot;</span>
-            );
+                tick_result.new_state.is_none(),
+                <span class="string">&quot;Shouldn&#39;t generate a NewState when balances are empty&quot;
+            </span>);
         }
-        <span class="comment">// No NewState message is returned -&gt; Channel has just been created</span>
-        {
-            <span class="kw">let</span> <span class="ident">_mock_guard</span> <span class="op">=</span> <span class="ident">setup_new_state_response</span>(<span class="kw-2">&amp;</span><span class="ident">server</span>, <span class="prelude-val">None</span>).<span class="kw">await</span>;
+        <span class="comment">// No NewState message is returned -&gt; Channel has just been created
+        </span>{
+            <span class="kw">let </span>_mock_guard = setup_new_state_response(<span class="kw-2">&amp;</span>server, <span class="prelude-val">None</span>).<span class="kw">await</span>;
 
-            <span class="kw">let</span> <span class="ident">tick_result</span> <span class="op">=</span> <span class="ident">tick</span>(<span class="kw-2">&amp;</span><span class="ident">sentry</span>, <span class="kw-2">&amp;</span><span class="ident">channel_context</span>, <span class="ident">get_initial_balances</span>())
-                .<span class="kw">await</span>
-                .<span class="ident">expect</span>(<span class="string">&quot;Shouldn&#39;t return an error&quot;</span>);
+            <span class="kw">let </span>tick_result = tick(<span class="kw-2">&amp;</span>sentry, <span class="kw-2">&amp;</span>channel_context, get_initial_balances())
+                .<span class="kw">await
+                </span>.expect(<span class="string">&quot;Shouldn&#39;t return an error&quot;</span>);
             <span class="macro">assert!</span>(
-                <span class="ident">tick_result</span>.<span class="ident">new_state</span>.<span class="ident">is_some</span>(),
-                <span class="string">&quot;A NewState message should be generated when there isn&#39;t one&quot;</span>
-            );
-            <span class="kw">let</span> <span class="ident">propagated_to</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">ValidatorId</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">tick_result</span>
-                .<span class="ident">new_state</span>
-                .<span class="ident">unwrap</span>()
-                .<span class="ident">into_iter</span>()
-                .<span class="ident">collect</span>::<span class="op">&lt;</span><span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span>, <span class="kw">_</span><span class="op">&gt;</span><span class="op">&gt;</span>()
-                .<span class="ident">expect</span>(<span class="string">&quot;Shouldn&#39;t return an error&quot;</span>);
+                tick_result.new_state.is_some(),
+                <span class="string">&quot;A NewState message should be generated when there isn&#39;t one&quot;
+            </span>);
+            <span class="kw">let </span>propagated_to: Vec&lt;ValidatorId&gt; = tick_result
+                .new_state
+                .unwrap()
+                .into_iter()
+                .collect::&lt;<span class="prelude-ty">Result</span>&lt;Vec&lt;<span class="kw">_</span>&gt;, <span class="kw">_</span>&gt;&gt;()
+                .expect(<span class="string">&quot;Shouldn&#39;t return an error&quot;</span>);
             <span class="macro">assert!</span>(
-                <span class="ident">propagated_to</span>.<span class="ident">contains</span>(<span class="kw-2">&amp;</span><span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">LEADER</span>]),
-                <span class="string">&quot;NewState message is propagated to the leader validator&quot;</span>
-            );
+                propagated_to.contains(<span class="kw-2">&amp;</span>IDS[<span class="kw-2">&amp;*</span>LEADER]),
+                <span class="string">&quot;NewState message is propagated to the leader validator&quot;
+            </span>);
             <span class="macro">assert!</span>(
-                <span class="ident">propagated_to</span>.<span class="ident">contains</span>(<span class="kw-2">&amp;</span><span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">FOLLOWER</span>]),
-                <span class="string">&quot;NewState message is propagated to the follower validator&quot;</span>
-            );
+                propagated_to.contains(<span class="kw-2">&amp;</span>IDS[<span class="kw-2">&amp;*</span>FOLLOWER]),
+                <span class="string">&quot;NewState message is propagated to the follower validator&quot;
+            </span>);
             <span class="macro">assert_eq!</span>(
-                <span class="ident">propagated_to</span>.<span class="ident">len</span>(),
+                propagated_to.len(),
                 <span class="number">2</span>,
-                <span class="string">&quot;NewState message isn&#39;t propagated to any other validator&quot;</span>
-            );
+                <span class="string">&quot;NewState message isn&#39;t propagated to any other validator&quot;
+            </span>);
         }
 
-        <span class="comment">// Test case where both spender and earner balances in the returned NewState message are equal to the ones in accounting_balances thus no new_state will be generated</span>
-        {
-            <span class="comment">// Setting up the expected response</span>
-            <span class="kw">let</span> <span class="ident">proposed_balances</span> <span class="op">=</span> <span class="ident">get_initial_balances</span>();
-            <span class="kw">let</span> <span class="ident">state_root</span> <span class="op">=</span> <span class="ident">proposed_balances</span>
-                .<span class="ident">encode</span>(
-                    <span class="ident">channel_context</span>.<span class="ident">context</span>.<span class="ident">id</span>(),
-                    <span class="ident">channel_context</span>.<span class="ident">token</span>.<span class="ident">precision</span>.<span class="ident">get</span>(),
+        <span class="comment">// Test case where both spender and earner balances in the returned NewState message are equal to the ones in accounting_balances thus no new_state will be generated
+        </span>{
+            <span class="comment">// Setting up the expected response
+            </span><span class="kw">let </span>proposed_balances = get_initial_balances();
+            <span class="kw">let </span>state_root = proposed_balances
+                .encode(
+                    channel_context.context.id(),
+                    channel_context.token.precision.get(),
                 )
-                .<span class="ident">expect</span>(<span class="string">&quot;should encode&quot;</span>);
-            <span class="kw">let</span> <span class="ident">new_state</span>: <span class="ident">NewState</span><span class="op">&lt;</span><span class="ident">UncheckedState</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">NewState</span> {
-                <span class="ident">state_root</span>,
-                <span class="ident">signature</span>: <span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">LEADER</span>].<span class="ident">to_checksum</span>(),
-                <span class="ident">balances</span>: <span class="ident">proposed_balances</span>.<span class="ident">into_unchecked</span>(),
+                .expect(<span class="string">&quot;should encode&quot;</span>);
+            <span class="kw">let </span>new_state: NewState&lt;UncheckedState&gt; = NewState {
+                state_root,
+                signature: IDS[<span class="kw-2">&amp;*</span>LEADER].to_checksum(),
+                balances: proposed_balances.into_unchecked(),
             };
-            <span class="kw">let</span> <span class="ident">_mock_guard</span> <span class="op">=</span> <span class="ident">setup_new_state_response</span>(<span class="kw-2">&amp;</span><span class="ident">server</span>, <span class="prelude-val">Some</span>(<span class="ident">new_state</span>)).<span class="kw">await</span>;
+            <span class="kw">let </span>_mock_guard = setup_new_state_response(<span class="kw-2">&amp;</span>server, <span class="prelude-val">Some</span>(new_state)).<span class="kw">await</span>;
 
-            <span class="kw">let</span> <span class="ident">tick_result</span> <span class="op">=</span> <span class="ident">tick</span>(<span class="kw-2">&amp;</span><span class="ident">sentry</span>, <span class="kw-2">&amp;</span><span class="ident">channel_context</span>, <span class="ident">get_initial_balances</span>())
-                .<span class="kw">await</span>
-                .<span class="ident">expect</span>(<span class="string">&quot;Shouldn&#39;t return an error&quot;</span>);
-            <span class="macro">assert!</span>(<span class="ident">tick_result</span>.<span class="ident">new_state</span>.<span class="ident">is_none</span>(), <span class="string">&quot;Shouldn&#39;t generate a NewState when the balances in the previous NewState are equal to the ones in accounting_balances&quot;</span>);
+            <span class="kw">let </span>tick_result = tick(<span class="kw-2">&amp;</span>sentry, <span class="kw-2">&amp;</span>channel_context, get_initial_balances())
+                .<span class="kw">await
+                </span>.expect(<span class="string">&quot;Shouldn&#39;t return an error&quot;</span>);
+            <span class="macro">assert!</span>(tick_result.new_state.is_none(), <span class="string">&quot;Shouldn&#39;t generate a NewState when the balances in the previous NewState are equal to the ones in accounting_balances&quot;</span>);
         }
 
-        <span class="comment">// Balance returned from the NewState message is lower for an earner/spender than the one in accounting_balances</span>
-        {
-            <span class="comment">// Setting up the expected response</span>
-            <span class="kw">let</span> <span class="ident">proposed_balances</span> <span class="op">=</span> <span class="ident">get_initial_balances</span>();
-            <span class="kw">let</span> <span class="ident">state_root</span> <span class="op">=</span> <span class="ident">proposed_balances</span>
-                .<span class="ident">encode</span>(
-                    <span class="ident">channel_context</span>.<span class="ident">context</span>.<span class="ident">id</span>(),
-                    <span class="ident">channel_context</span>.<span class="ident">token</span>.<span class="ident">precision</span>.<span class="ident">get</span>(),
+        <span class="comment">// Balance returned from the NewState message is lower for an earner/spender than the one in accounting_balances
+        </span>{
+            <span class="comment">// Setting up the expected response
+            </span><span class="kw">let </span>proposed_balances = get_initial_balances();
+            <span class="kw">let </span>state_root = proposed_balances
+                .encode(
+                    channel_context.context.id(),
+                    channel_context.token.precision.get(),
                 )
-                .<span class="ident">expect</span>(<span class="string">&quot;should encode&quot;</span>);
-            <span class="kw">let</span> <span class="ident">new_state</span>: <span class="ident">NewState</span><span class="op">&lt;</span><span class="ident">UncheckedState</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">NewState</span> {
-                <span class="ident">state_root</span>,
-                <span class="ident">signature</span>: <span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">LEADER</span>].<span class="ident">to_checksum</span>(),
-                <span class="ident">balances</span>: <span class="ident">proposed_balances</span>.<span class="ident">into_unchecked</span>(),
+                .expect(<span class="string">&quot;should encode&quot;</span>);
+            <span class="kw">let </span>new_state: NewState&lt;UncheckedState&gt; = NewState {
+                state_root,
+                signature: IDS[<span class="kw-2">&amp;*</span>LEADER].to_checksum(),
+                balances: proposed_balances.into_unchecked(),
             };
-            <span class="kw">let</span> <span class="ident">_mock_guard</span> <span class="op">=</span> <span class="ident">setup_new_state_response</span>(<span class="kw-2">&amp;</span><span class="ident">server</span>, <span class="prelude-val">Some</span>(<span class="ident">new_state</span>)).<span class="kw">await</span>;
+            <span class="kw">let </span>_mock_guard = setup_new_state_response(<span class="kw-2">&amp;</span>server, <span class="prelude-val">Some</span>(new_state)).<span class="kw">await</span>;
 
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">expected_balances</span> <span class="op">=</span> <span class="ident">get_initial_balances</span>();
-            <span class="ident">expected_balances</span>
-                .<span class="ident">spend</span>(<span class="kw-2">*</span><span class="ident">ADVERTISER</span>, <span class="kw-2">*</span><span class="ident">PUBLISHER</span>, <span class="ident">UnifiedNum::from_u64</span>(<span class="number">1000</span>))
-                .<span class="ident">expect</span>(<span class="string">&quot;should spend&quot;</span>);
-            <span class="kw">let</span> <span class="ident">tick_result</span> <span class="op">=</span> <span class="ident">tick</span>(<span class="kw-2">&amp;</span><span class="ident">sentry</span>, <span class="kw-2">&amp;</span><span class="ident">channel_context</span>, <span class="ident">expected_balances</span>)
-                .<span class="kw">await</span>
-                .<span class="ident">expect</span>(<span class="string">&quot;Shouldn&#39;t return an error&quot;</span>);
+            <span class="kw">let </span><span class="kw-2">mut </span>expected_balances = get_initial_balances();
+            expected_balances
+                .spend(<span class="kw-2">*</span>ADVERTISER, <span class="kw-2">*</span>PUBLISHER, UnifiedNum::from_u64(<span class="number">1000</span>))
+                .expect(<span class="string">&quot;should spend&quot;</span>);
+            <span class="kw">let </span>tick_result = tick(<span class="kw-2">&amp;</span>sentry, <span class="kw-2">&amp;</span>channel_context, expected_balances)
+                .<span class="kw">await
+                </span>.expect(<span class="string">&quot;Shouldn&#39;t return an error&quot;</span>);
             <span class="macro">assert!</span>(
-                <span class="ident">tick_result</span>.<span class="ident">new_state</span>.<span class="ident">is_some</span>(),
-                <span class="string">&quot;NewState message should be generated accounting_balances have been changed&quot;</span>
-            );
-            <span class="kw">let</span> <span class="ident">propagated_to</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">ValidatorId</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">tick_result</span>
-                .<span class="ident">new_state</span>
-                .<span class="ident">unwrap</span>()
-                .<span class="ident">into_iter</span>()
-                .<span class="ident">collect</span>::<span class="op">&lt;</span><span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span>, <span class="kw">_</span><span class="op">&gt;</span><span class="op">&gt;</span>()
-                .<span class="ident">expect</span>(<span class="string">&quot;Shouldn&#39;t return an error&quot;</span>);
+                tick_result.new_state.is_some(),
+                <span class="string">&quot;NewState message should be generated accounting_balances have been changed&quot;
+            </span>);
+            <span class="kw">let </span>propagated_to: Vec&lt;ValidatorId&gt; = tick_result
+                .new_state
+                .unwrap()
+                .into_iter()
+                .collect::&lt;<span class="prelude-ty">Result</span>&lt;Vec&lt;<span class="kw">_</span>&gt;, <span class="kw">_</span>&gt;&gt;()
+                .expect(<span class="string">&quot;Shouldn&#39;t return an error&quot;</span>);
             <span class="macro">assert!</span>(
-                <span class="ident">propagated_to</span>.<span class="ident">contains</span>(<span class="kw-2">&amp;</span><span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">LEADER</span>]),
-                <span class="string">&quot;NewState message is propagated to the leader validator&quot;</span>
-            );
+                propagated_to.contains(<span class="kw-2">&amp;</span>IDS[<span class="kw-2">&amp;*</span>LEADER]),
+                <span class="string">&quot;NewState message is propagated to the leader validator&quot;
+            </span>);
             <span class="macro">assert!</span>(
-                <span class="ident">propagated_to</span>.<span class="ident">contains</span>(<span class="kw-2">&amp;</span><span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">FOLLOWER</span>]),
-                <span class="string">&quot;NewState message is propagated to the follower validator&quot;</span>
-            );
+                propagated_to.contains(<span class="kw-2">&amp;</span>IDS[<span class="kw-2">&amp;*</span>FOLLOWER]),
+                <span class="string">&quot;NewState message is propagated to the follower validator&quot;
+            </span>);
             <span class="macro">assert_eq!</span>(
-                <span class="ident">propagated_to</span>.<span class="ident">len</span>(),
+                propagated_to.len(),
                 <span class="number">2</span>,
-                <span class="string">&quot;NewState message isn&#39;t propagated to any other validator&quot;</span>
-            );
+                <span class="string">&quot;NewState message isn&#39;t propagated to any other validator&quot;
+            </span>);
         }
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="validator_worker" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (20ffea693 2022-08-11)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="validator_worker" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>

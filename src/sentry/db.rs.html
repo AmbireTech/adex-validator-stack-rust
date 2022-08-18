@@ -637,644 +637,644 @@
 <span id="637">637</span>
 <span id="638">638</span>
 <span id="639">639</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">deadpool_postgres</span>::{<span class="ident">Manager</span>, <span class="ident">ManagerConfig</span>, <span class="ident">RecyclingMethod</span>};
-<span class="kw">use</span> <span class="ident">primitives</span>::{
-    <span class="ident">config::Environment</span>,
-    <span class="ident">postgres</span>::{<span class="ident">POSTGRES_DB</span>, <span class="ident">POSTGRES_HOST</span>, <span class="ident">POSTGRES_PASSWORD</span>, <span class="ident">POSTGRES_PORT</span>, <span class="ident">POSTGRES_USER</span>},
+</pre><pre class="rust"><code><span class="kw">use </span>deadpool_postgres::{Manager, ManagerConfig, RecyclingMethod};
+<span class="kw">use </span>primitives::{
+    config::Environment,
+    postgres::{POSTGRES_DB, POSTGRES_HOST, POSTGRES_PASSWORD, POSTGRES_PORT, POSTGRES_USER},
 };
-<span class="kw">use</span> <span class="ident">redis</span>::{<span class="ident">aio::MultiplexedConnection</span>, <span class="ident">IntoConnectionInfo</span>};
-<span class="kw">use</span> <span class="ident">std::str::FromStr</span>;
-<span class="kw">use</span> <span class="ident">tokio_postgres</span>::{
-    <span class="ident">types</span>::{<span class="ident">accepts</span>, <span class="ident">FromSql</span>, <span class="ident">Type</span>},
-    <span class="ident">NoTls</span>,
+<span class="kw">use </span>redis::{aio::MultiplexedConnection, IntoConnectionInfo};
+<span class="kw">use </span>std::str::FromStr;
+<span class="kw">use </span>tokio_postgres::{
+    types::{accepts, FromSql, Type},
+    NoTls,
 };
 
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">accounting</span>;
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">analytics</span>;
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">campaign</span>;
-<span class="kw">mod</span> <span class="ident">channel</span>;
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">spendable</span>;
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">validator_message</span>;
+<span class="kw">pub mod </span>accounting;
+<span class="kw">pub mod </span>analytics;
+<span class="kw">pub mod </span>campaign;
+<span class="kw">mod </span>channel;
+<span class="kw">pub mod </span>spendable;
+<span class="kw">pub mod </span>validator_message;
 
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident"><span class="self">self</span>::campaign</span>::<span class="kw-2">*</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident"><span class="self">self</span>::channel</span>::<span class="kw-2">*</span>;
+<span class="kw">pub use </span><span class="self">self</span>::campaign::<span class="kw-2">*</span>;
+<span class="kw">pub use </span><span class="self">self</span>::channel::<span class="kw-2">*</span>;
 
-<span class="comment">// Re-export the Postgres Config</span>
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">tokio_postgres::Config</span> <span class="kw">as</span> <span class="ident">PostgresConfig</span>;
+<span class="comment">// Re-export the Postgres Config
+</span><span class="kw">pub use </span>tokio_postgres::Config <span class="kw">as </span>PostgresConfig;
 
-<span class="comment">// Re-export the Postgres PoolError for easier usages</span>
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">deadpool_postgres::PoolError</span>;
-<span class="comment">// Re-export the redis RedisError for easier usage</span>
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">redis::RedisError</span>;
+<span class="comment">// Re-export the Postgres PoolError for easier usages
+</span><span class="kw">pub use </span>deadpool_postgres::PoolError;
+<span class="comment">// Re-export the redis RedisError for easier usage
+</span><span class="kw">pub use </span>redis::RedisError;
 
-<span class="kw">pub</span> <span class="kw">type</span> <span class="ident">DbPool</span> <span class="op">=</span> <span class="ident">deadpool_postgres::Pool</span>;
+<span class="kw">pub type </span>DbPool = deadpool_postgres::Pool;
 
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">TotalCount</span>(<span class="kw">pub</span> <span class="ident">u64</span>);
-<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="ident">FromSql</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">TotalCount</span> {
-    <span class="kw">fn</span> <span class="ident">from_sql</span>(
-        <span class="ident">ty</span>: <span class="kw-2">&amp;</span><span class="ident">Type</span>,
-        <span class="ident">raw</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> [<span class="ident">u8</span>],
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">std::error::Error</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">str_slice</span> <span class="op">=</span> <span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">str</span> <span class="kw">as</span> <span class="ident">FromSql</span><span class="op">&gt;</span><span class="ident">::from_sql</span>(<span class="ident">ty</span>, <span class="ident">raw</span>)<span class="question-mark">?</span>;
+<span class="kw">pub struct </span>TotalCount(<span class="kw">pub </span>u64);
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; FromSql&lt;<span class="lifetime">&#39;a</span>&gt; <span class="kw">for </span>TotalCount {
+    <span class="kw">fn </span>from_sql(
+        ty: <span class="kw-2">&amp;</span>Type,
+        raw: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>[u8],
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, Box&lt;<span class="kw">dyn </span>std::error::Error + Sync + Send&gt;&gt; {
+        <span class="kw">let </span>str_slice = &lt;<span class="kw-2">&amp;</span>str <span class="kw">as </span>FromSql&gt;::from_sql(ty, raw)<span class="question-mark">?</span>;
 
-        <span class="prelude-val">Ok</span>(<span class="self">Self</span>(<span class="ident">u64::from_str</span>(<span class="ident">str_slice</span>)<span class="question-mark">?</span>))
+        <span class="prelude-val">Ok</span>(<span class="self">Self</span>(u64::from_str(str_slice)<span class="question-mark">?</span>))
     }
 
-    <span class="comment">// Use a varchar or text, since otherwise `int8` fails deserialization</span>
-    <span class="macro">accepts!</span>(<span class="ident">VARCHAR</span>, <span class="ident">TEXT</span>);
+    <span class="comment">// Use a varchar or text, since otherwise `int8` fails deserialization
+    </span><span class="macro">accepts!</span>(VARCHAR, TEXT);
 }
 
-<span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">redis_connection</span>(
-    <span class="ident">url</span>: <span class="kw">impl</span> <span class="ident">IntoConnectionInfo</span>,
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">MultiplexedConnection</span>, <span class="ident">RedisError</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">client</span> <span class="op">=</span> <span class="ident">redis::Client::open</span>(<span class="ident">url</span>)<span class="question-mark">?</span>;
+<span class="kw">pub async fn </span>redis_connection(
+    url: <span class="kw">impl </span>IntoConnectionInfo,
+) -&gt; <span class="prelude-ty">Result</span>&lt;MultiplexedConnection, RedisError&gt; {
+    <span class="kw">let </span>client = redis::Client::open(url)<span class="question-mark">?</span>;
 
-    <span class="ident">client</span>.<span class="ident">get_multiplexed_async_connection</span>().<span class="kw">await</span>
-}
+    client.get_multiplexed_async_connection().<span class="kw">await
+</span>}
 
-<span class="doccomment">/// Uses the default `max_size` of the `PoolConfig` which is `num_cpus::get_physical() * 4`</span>
-<span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">postgres_connection</span>(
-    <span class="ident">config</span>: <span class="ident">tokio_postgres::Config</span>,
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">DbPool</span>, <span class="ident">deadpool_postgres::BuildError</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">mgr_config</span> <span class="op">=</span> <span class="ident">ManagerConfig</span> {
-        <span class="ident">recycling_method</span>: <span class="ident">RecyclingMethod::Verified</span>,
+<span class="doccomment">/// Uses the default `max_size` of the `PoolConfig` which is `num_cpus::get_physical() * 4`
+</span><span class="kw">pub async fn </span>postgres_connection(
+    config: tokio_postgres::Config,
+) -&gt; <span class="prelude-ty">Result</span>&lt;DbPool, deadpool_postgres::BuildError&gt; {
+    <span class="kw">let </span>mgr_config = ManagerConfig {
+        recycling_method: RecyclingMethod::Verified,
     };
 
-    <span class="kw">let</span> <span class="ident">manager</span> <span class="op">=</span> <span class="ident">Manager::from_config</span>(<span class="ident">config</span>, <span class="ident">NoTls</span>, <span class="ident">mgr_config</span>);
+    <span class="kw">let </span>manager = Manager::from_config(config, NoTls, mgr_config);
 
-    <span class="comment">// use default max_size which is set by PoolConfig::default()</span>
-    <span class="comment">// num_cpus::get_physical() * 4</span>
-    <span class="ident">DbPool::builder</span>(<span class="ident">manager</span>).<span class="ident">build</span>()
+    <span class="comment">// use default max_size which is set by PoolConfig::default()
+    // num_cpus::get_physical() * 4
+    </span>DbPool::builder(manager).build()
 }
 
-<span class="doccomment">/// Sets the migrations using the `POSTGRES_*` environment variables</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">setup_migrations</span>(<span class="ident">environment</span>: <span class="ident">Environment</span>) {
-    <span class="kw">use</span> <span class="ident">migrant_lib</span>::{<span class="ident">Config</span>, <span class="ident">Direction</span>, <span class="ident">Migrator</span>, <span class="ident">Settings</span>};
+<span class="doccomment">/// Sets the migrations using the `POSTGRES_*` environment variables
+</span><span class="kw">pub fn </span>setup_migrations(environment: Environment) {
+    <span class="kw">use </span>migrant_lib::{Config, Direction, Migrator, Settings};
 
-    <span class="kw">let</span> <span class="ident">settings</span> <span class="op">=</span> <span class="ident">Settings::configure_postgres</span>()
-        .<span class="ident">database_user</span>(<span class="ident">POSTGRES_USER</span>.<span class="ident">as_str</span>())
-        .<span class="ident">database_password</span>(<span class="ident">POSTGRES_PASSWORD</span>.<span class="ident">as_str</span>())
-        .<span class="ident">database_host</span>(<span class="ident">POSTGRES_HOST</span>.<span class="ident">as_str</span>())
-        .<span class="ident">database_port</span>(<span class="kw-2">*</span><span class="ident">POSTGRES_PORT</span>)
-        .<span class="ident">database_name</span>(<span class="ident">POSTGRES_DB</span>.<span class="ident">as_ref</span>())
-        .<span class="ident">build</span>()
-        .<span class="ident">expect</span>(<span class="string">&quot;Should build migration settings&quot;</span>);
+    <span class="kw">let </span>settings = Settings::configure_postgres()
+        .database_user(POSTGRES_USER.as_str())
+        .database_password(POSTGRES_PASSWORD.as_str())
+        .database_host(POSTGRES_HOST.as_str())
+        .database_port(<span class="kw-2">*</span>POSTGRES_PORT)
+        .database_name(POSTGRES_DB.as_ref())
+        .build()
+        .expect(<span class="string">&quot;Should build migration settings&quot;</span>);
 
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">config</span> <span class="op">=</span> <span class="ident">Config::with_settings</span>(<span class="kw-2">&amp;</span><span class="ident">settings</span>);
-    <span class="ident">config</span>.<span class="ident">setup</span>().<span class="ident">expect</span>(<span class="string">&quot;Should setup Postgres connection&quot;</span>);
-    <span class="comment">// Toggle setting so tags are validated in a cli compatible manner.</span>
-    <span class="comment">// This needs to happen before any call to `Config::use_migrations` or `Config::reload`</span>
-    <span class="ident">config</span>.<span class="ident">use_cli_compatible_tags</span>(<span class="bool-val">true</span>);
+    <span class="kw">let </span><span class="kw-2">mut </span>config = Config::with_settings(<span class="kw-2">&amp;</span>settings);
+    config.setup().expect(<span class="string">&quot;Should setup Postgres connection&quot;</span>);
+    <span class="comment">// Toggle setting so tags are validated in a cli compatible manner.
+    // This needs to happen before any call to `Config::use_migrations` or `Config::reload`
+    </span>config.use_cli_compatible_tags(<span class="bool-val">true</span>);
 
-    <span class="macro">macro_rules!</span> <span class="ident">make_migration</span> {
-        (<span class="macro-nonterminal">$</span><span class="macro-nonterminal">tag</span>:<span class="ident">expr</span>) =&gt; {
-            <span class="ident">migrant_lib::EmbeddedMigration::with_tag</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">tag</span>)
-                .<span class="ident">up</span>(<span class="macro">include_str!</span>(<span class="macro">concat!</span>(<span class="string">&quot;../migrations/&quot;</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">tag</span>, <span class="string">&quot;/up.sql&quot;</span>)))
-                .<span class="ident">down</span>(<span class="macro">include_str!</span>(<span class="macro">concat!</span>(<span class="string">&quot;../migrations/&quot;</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">tag</span>, <span class="string">&quot;/down.sql&quot;</span>)))
-                .<span class="ident">boxed</span>()
+    <span class="macro">macro_rules!</span> make_migration {
+        (<span class="macro-nonterminal">$tag</span>:expr) =&gt; {
+            migrant_lib::EmbeddedMigration::with_tag(<span class="macro-nonterminal">$tag</span>)
+                .up(<span class="macro">include_str!</span>(<span class="macro">concat!</span>(<span class="string">&quot;../migrations/&quot;</span>, <span class="macro-nonterminal">$tag</span>, <span class="string">&quot;/up.sql&quot;</span>)))
+                .down(<span class="macro">include_str!</span>(<span class="macro">concat!</span>(<span class="string">&quot;../migrations/&quot;</span>, <span class="macro-nonterminal">$tag</span>, <span class="string">&quot;/down.sql&quot;</span>)))
+                .boxed()
         };
     }
 
-    <span class="comment">// NOTE: Make sure to update list of migrations for the tests as well!</span>
-    <span class="comment">// `tests_postgres::MIGRATIONS`</span>
-    <span class="kw">let</span> <span class="ident">migrations</span> <span class="op">=</span> <span class="macro">vec!</span>[<span class="macro">make_migration!</span>(<span class="string">&quot;20190806011140_initial-tables&quot;</span>)];
+    <span class="comment">// NOTE: Make sure to update list of migrations for the tests as well!
+    // `tests_postgres::MIGRATIONS`
+    </span><span class="kw">let </span>migrations = <span class="macro">vec!</span>[<span class="macro">make_migration!</span>(<span class="string">&quot;20190806011140_initial-tables&quot;</span>)];
 
-    <span class="comment">// if let Environment::Development = environment {</span>
-    <span class="comment">//     // seeds database tables for testing</span>
-    <span class="comment">//     migrations.push(make_migration!(&quot;20190806011140_initial-tables/seed&quot;));</span>
-    <span class="comment">// }</span>
+    <span class="comment">// if let Environment::Development = environment {
+    //     // seeds database tables for testing
+    //     migrations.push(make_migration!(&quot;20190806011140_initial-tables/seed&quot;));
+    // }
 
-    <span class="comment">// Define Migrations</span>
-    <span class="ident">config</span>
-        .<span class="ident">use_migrations</span>(<span class="kw-2">&amp;</span><span class="ident">migrations</span>)
-        .<span class="ident">expect</span>(<span class="string">&quot;Loading migrations failed&quot;</span>);
+    // Define Migrations
+    </span>config
+        .use_migrations(<span class="kw-2">&amp;</span>migrations)
+        .expect(<span class="string">&quot;Loading migrations failed&quot;</span>);
 
-    <span class="comment">// Reload config, ping the database for applied migrations</span>
-    <span class="kw">let</span> <span class="ident">config</span> <span class="op">=</span> <span class="ident">config</span>.<span class="ident">reload</span>().<span class="ident">expect</span>(<span class="string">&quot;Should reload applied migrations&quot;</span>);
+    <span class="comment">// Reload config, ping the database for applied migrations
+    </span><span class="kw">let </span>config = config.reload().expect(<span class="string">&quot;Should reload applied migrations&quot;</span>);
 
-    <span class="kw">if</span> <span class="kw">let</span> <span class="ident">Environment::Development</span> <span class="op">=</span> <span class="ident">environment</span> {
-        <span class="comment">// delete all existing data to make tests reproducible</span>
-        <span class="ident">Migrator::with_config</span>(<span class="kw-2">&amp;</span><span class="ident">config</span>)
-            .<span class="ident">all</span>(<span class="bool-val">true</span>)
-            .<span class="ident">direction</span>(<span class="ident">Direction::Down</span>)
-            .<span class="ident">swallow_completion</span>(<span class="bool-val">true</span>)
-            .<span class="ident">apply</span>()
-            .<span class="ident">expect</span>(<span class="string">&quot;Applying migrations failed&quot;</span>);
+    <span class="kw">if let </span>Environment::Development = environment {
+        <span class="comment">// delete all existing data to make tests reproducible
+        </span>Migrator::with_config(<span class="kw-2">&amp;</span>config)
+            .all(<span class="bool-val">true</span>)
+            .direction(Direction::Down)
+            .swallow_completion(<span class="bool-val">true</span>)
+            .apply()
+            .expect(<span class="string">&quot;Applying migrations failed&quot;</span>);
     }
 
-    <span class="kw">let</span> <span class="ident">config</span> <span class="op">=</span> <span class="ident">config</span>.<span class="ident">reload</span>().<span class="ident">expect</span>(<span class="string">&quot;Should reload applied migrations&quot;</span>);
+    <span class="kw">let </span>config = config.reload().expect(<span class="string">&quot;Should reload applied migrations&quot;</span>);
 
-    <span class="ident">Migrator::with_config</span>(<span class="kw-2">&amp;</span><span class="ident">config</span>)
-        <span class="comment">// set `swallow_completion` to `true`</span>
-        <span class="comment">// so no error will be returned if all migrations have already been ran</span>
-        .<span class="ident">swallow_completion</span>(<span class="bool-val">true</span>)
-        .<span class="ident">show_output</span>(<span class="bool-val">true</span>)
-        .<span class="ident">direction</span>(<span class="ident">Direction::Up</span>)
-        .<span class="ident">all</span>(<span class="bool-val">true</span>)
-        .<span class="ident">apply</span>()
-        .<span class="ident">expect</span>(<span class="string">&quot;Applying migrations failed&quot;</span>);
+    Migrator::with_config(<span class="kw-2">&amp;</span>config)
+        <span class="comment">// set `swallow_completion` to `true`
+        // so no error will be returned if all migrations have already been ran
+        </span>.swallow_completion(<span class="bool-val">true</span>)
+        .show_output(<span class="bool-val">true</span>)
+        .direction(Direction::Up)
+        .all(<span class="bool-val">true</span>)
+        .apply()
+        .expect(<span class="string">&quot;Applying migrations failed&quot;</span>);
 
-    <span class="kw">let</span> <span class="ident">_config</span> <span class="op">=</span> <span class="ident">config</span>
-        .<span class="ident">reload</span>()
-        .<span class="ident">expect</span>(<span class="string">&quot;Reloading config for migration failed&quot;</span>);
+    <span class="kw">let </span>_config = config
+        .reload()
+        .expect(<span class="string">&quot;Reloading config for migration failed&quot;</span>);
 }
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">any</span>(<span class="ident">test</span>, <span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;test-util&quot;</span>))]</span>
-<span class="attribute">#[<span class="ident">cfg_attr</span>(<span class="ident">docsrs</span>, <span class="ident">doc</span>(<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;test-util&quot;</span>)))]</span>
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">tests_postgres</span> {
-    <span class="kw">use</span> <span class="ident">std</span>::{
-        <span class="ident">ops</span>::{<span class="ident">Deref</span>, <span class="ident">DerefMut</span>},
-        <span class="ident">sync::atomic</span>::{<span class="ident">AtomicUsize</span>, <span class="ident">Ordering</span>},
+<span class="attribute">#[cfg(any(test, feature = <span class="string">&quot;test-util&quot;</span>))]</span>
+<span class="attribute">#[cfg_attr(docsrs, doc(cfg(feature = <span class="string">&quot;test-util&quot;</span>)))]</span>
+<span class="kw">pub mod </span>tests_postgres {
+    <span class="kw">use </span>std::{
+        ops::{Deref, DerefMut},
+        sync::atomic::{AtomicUsize, Ordering},
     };
 
-    <span class="kw">use</span> <span class="ident">deadpool::managed</span>::{<span class="ident">Manager</span> <span class="kw">as</span> <span class="ident">ManagerTrait</span>, <span class="ident">RecycleError</span>, <span class="ident">RecycleResult</span>};
-    <span class="kw">use</span> <span class="ident">deadpool_postgres::ManagerConfig</span>;
-    <span class="kw">use</span> <span class="ident">once_cell::sync::Lazy</span>;
-    <span class="kw">use</span> <span class="ident">primitives::postgres::POSTGRES_CONFIG</span>;
-    <span class="kw">use</span> <span class="ident">tokio_postgres</span>::{<span class="ident">NoTls</span>, <span class="ident">SimpleQueryMessage</span>};
+    <span class="kw">use </span>deadpool::managed::{Manager <span class="kw">as </span>ManagerTrait, RecycleError, RecycleResult};
+    <span class="kw">use </span>deadpool_postgres::ManagerConfig;
+    <span class="kw">use </span>once_cell::sync::Lazy;
+    <span class="kw">use </span>primitives::postgres::POSTGRES_CONFIG;
+    <span class="kw">use </span>tokio_postgres::{NoTls, SimpleQueryMessage};
 
-    <span class="kw">use</span> <span class="ident">async_trait::async_trait</span>;
-    <span class="kw">use</span> <span class="ident">thiserror::Error</span>;
+    <span class="kw">use </span>async_trait::async_trait;
+    <span class="kw">use </span>thiserror::Error;
 
-    <span class="kw">use</span> <span class="kw">super</span>::{<span class="ident">DbPool</span>, <span class="ident">PoolError</span>};
+    <span class="kw">use super</span>::{DbPool, PoolError};
 
-    <span class="kw">pub</span> <span class="kw">type</span> <span class="ident">Pool</span> <span class="op">=</span> <span class="ident">deadpool::managed::Pool</span><span class="op">&lt;</span><span class="ident">Manager</span><span class="op">&gt;</span>;
+    <span class="kw">pub type </span>Pool = deadpool::managed::Pool&lt;Manager&gt;;
 
-    <span class="kw">pub</span> <span class="kw">static</span> <span class="ident">DATABASE_POOL</span>: <span class="ident">Lazy</span><span class="op">&lt;</span><span class="ident">Pool</span><span class="op">&gt;</span> <span class="op">=</span>
-        <span class="ident">Lazy::new</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">create_pool</span>(<span class="string">&quot;test&quot;</span>).<span class="ident">expect</span>(<span class="string">&quot;Should create test pool&quot;</span>));
+    <span class="kw">pub static </span>DATABASE_POOL: Lazy&lt;Pool&gt; =
+        Lazy::new(|| create_pool(<span class="string">&quot;test&quot;</span>).expect(<span class="string">&quot;Should create test pool&quot;</span>));
 
-    <span class="doccomment">/// we must have a duplication of the migration because of how migrant is handling migrations</span>
-    <span class="doccomment">/// we need to separately setup test migrations</span>
-    <span class="kw">pub</span> <span class="kw">static</span> <span class="ident">MIGRATIONS</span>: <span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">str</span>] <span class="op">=</span> <span class="kw-2">&amp;</span>[<span class="string">&quot;20190806011140_initial-tables&quot;</span>];
+    <span class="doccomment">/// we must have a duplication of the migration because of how migrant is handling migrations
+    /// we need to separately setup test migrations
+    </span><span class="kw">pub static </span>MIGRATIONS: <span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span>str] = <span class="kw-2">&amp;</span>[<span class="string">&quot;20190806011140_initial-tables&quot;</span>];
 
-    <span class="kw">fn</span> <span class="ident">create_pool</span>(<span class="ident">db_prefix</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Pool</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">manager_config</span> <span class="op">=</span> <span class="ident">ManagerConfig</span> {
-            <span class="comment">// to guarantee that `is_closed()` &amp; test query will be ran to determine bad connections</span>
-            <span class="ident">recycling_method</span>: <span class="ident">deadpool_postgres::RecyclingMethod::Verified</span>,
+    <span class="kw">fn </span>create_pool(db_prefix: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Result</span>&lt;Pool, Error&gt; {
+        <span class="kw">let </span>manager_config = ManagerConfig {
+            <span class="comment">// to guarantee that `is_closed()` &amp; test query will be ran to determine bad connections
+            </span>recycling_method: deadpool_postgres::RecyclingMethod::Verified,
         };
-        <span class="kw">let</span> <span class="ident">manager</span> <span class="op">=</span> <span class="ident">Manager::new</span>(<span class="ident">POSTGRES_CONFIG</span>.<span class="ident">clone</span>(), <span class="ident">manager_config</span>, <span class="ident">db_prefix</span>)<span class="question-mark">?</span>;
+        <span class="kw">let </span>manager = Manager::new(POSTGRES_CONFIG.clone(), manager_config, db_prefix)<span class="question-mark">?</span>;
 
-        <span class="ident">Pool::builder</span>(<span class="ident">manager</span>)
-            .<span class="ident">max_size</span>(<span class="number">15</span>)
-            .<span class="ident">build</span>()
-            .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">err</span><span class="op">|</span> <span class="kw">match</span> <span class="ident">err</span> {
-                <span class="ident">deadpool::managed::BuildError::Backend</span>(<span class="ident">err</span>) =&gt; <span class="ident">err</span>,
-                <span class="ident">deadpool::managed::BuildError::NoRuntimeSpecified</span>(<span class="ident">message</span>) =&gt; {
-                    <span class="ident">Error::Build</span>(<span class="ident">deadpool::managed::BuildError::NoRuntimeSpecified</span>(<span class="ident">message</span>))
+        Pool::builder(manager)
+            .max_size(<span class="number">15</span>)
+            .build()
+            .map_err(|err| <span class="kw">match </span>err {
+                deadpool::managed::BuildError::Backend(err) =&gt; err,
+                deadpool::managed::BuildError::NoRuntimeSpecified(message) =&gt; {
+                    Error::Build(deadpool::managed::BuildError::NoRuntimeSpecified(message))
                 }
             })
     }
 
-    <span class="doccomment">/// A Database is used to isolate test runs from each other</span>
-    <span class="doccomment">/// we need to know the name of the database we&#39;ve created.</span>
-    <span class="doccomment">/// This will allow us the drop the database when we are recycling the connection</span>
-    <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Database</span> {
-        <span class="doccomment">/// The database name that will be created by the pool `CREATE DATABASE`</span>
-        <span class="doccomment">/// This database will be set on configuration level of the underlying connection Pool for tests</span>
-        <span class="kw">pub</span> <span class="ident">name</span>: <span class="ident">String</span>,
-        <span class="kw">pub</span> <span class="ident">pool</span>: <span class="ident">deadpool_postgres::Pool</span>,
+    <span class="doccomment">/// A Database is used to isolate test runs from each other
+    /// we need to know the name of the database we&#39;ve created.
+    /// This will allow us the drop the database when we are recycling the connection
+    </span><span class="kw">pub struct </span>Database {
+        <span class="doccomment">/// The database name that will be created by the pool `CREATE DATABASE`
+        /// This database will be set on configuration level of the underlying connection Pool for tests
+        </span><span class="kw">pub </span>name: String,
+        <span class="kw">pub </span>pool: deadpool_postgres::Pool,
     }
 
-    <span class="kw">impl</span> <span class="ident">Database</span> {
-        <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">name</span>: <span class="ident">String</span>, <span class="ident">pool</span>: <span class="ident">DbPool</span>) -&gt; <span class="self">Self</span> {
-            <span class="self">Self</span> { <span class="ident">name</span>, <span class="ident">pool</span> }
+    <span class="kw">impl </span>Database {
+        <span class="kw">pub fn </span>new(name: String, pool: DbPool) -&gt; <span class="self">Self </span>{
+            <span class="self">Self </span>{ name, pool }
         }
     }
 
-    <span class="kw">impl</span> <span class="ident">Deref</span> <span class="kw">for</span> <span class="ident">Database</span> {
-        <span class="kw">type</span> <span class="ident">Target</span> <span class="op">=</span> <span class="ident">deadpool_postgres::Pool</span>;
+    <span class="kw">impl </span>Deref <span class="kw">for </span>Database {
+        <span class="kw">type </span>Target = deadpool_postgres::Pool;
 
-        <span class="kw">fn</span> <span class="ident">deref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">deadpool_postgres::Pool</span> {
-            <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">pool</span>
+        <span class="kw">fn </span>deref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>deadpool_postgres::Pool {
+            <span class="kw-2">&amp;</span><span class="self">self</span>.pool
         }
     }
 
-    <span class="kw">impl</span> <span class="ident">DerefMut</span> <span class="kw">for</span> <span class="ident">Database</span> {
-        <span class="kw">fn</span> <span class="ident">deref_mut</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut</span> <span class="ident"><span class="self">Self</span>::Target</span> {
-            <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">pool</span>
+    <span class="kw">impl </span>DerefMut <span class="kw">for </span>Database {
+        <span class="kw">fn </span>deref_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span><span class="self">Self</span>::Target {
+            <span class="kw-2">&amp;mut </span><span class="self">self</span>.pool
         }
     }
 
-    <span class="kw">impl</span> <span class="ident">AsRef</span><span class="op">&lt;</span><span class="ident">deadpool_postgres::Pool</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Database</span> {
-        <span class="kw">fn</span> <span class="ident">as_ref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">deadpool_postgres::Pool</span> {
-            <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">pool</span>
+    <span class="kw">impl </span>AsRef&lt;deadpool_postgres::Pool&gt; <span class="kw">for </span>Database {
+        <span class="kw">fn </span>as_ref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>deadpool_postgres::Pool {
+            <span class="kw-2">&amp;</span><span class="self">self</span>.pool
         }
     }
 
-    <span class="kw">impl</span> <span class="ident">AsMut</span><span class="op">&lt;</span><span class="ident">deadpool_postgres::Pool</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Database</span> {
-        <span class="kw">fn</span> <span class="ident">as_mut</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut</span> <span class="ident">deadpool_postgres::Pool</span> {
-            <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">pool</span>
+    <span class="kw">impl </span>AsMut&lt;deadpool_postgres::Pool&gt; <span class="kw">for </span>Database {
+        <span class="kw">fn </span>as_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>deadpool_postgres::Pool {
+            <span class="kw-2">&amp;mut </span><span class="self">self</span>.pool
         }
     }
 
-    <span class="doccomment">/// Manager Error</span>
-    <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Error</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">Error</span> {
-        <span class="attribute">#[<span class="ident">error</span>(<span class="ident">transparent</span>)]</span>
-        <span class="ident">Build</span>(<span class="attribute">#[<span class="ident">from</span>]</span> <span class="ident">deadpool_postgres::BuildError</span>),
-        <span class="attribute">#[<span class="ident">error</span>(<span class="ident">transparent</span>)]</span>
-        <span class="ident">Pool</span>(<span class="attribute">#[<span class="ident">from</span>]</span> <span class="ident">PoolError</span>),
+    <span class="doccomment">/// Manager Error
+    </span><span class="attribute">#[derive(Debug, Error)]</span>
+    <span class="kw">pub enum </span>Error {
+        <span class="attribute">#[error(transparent)]</span>
+        Build(<span class="attribute">#[from]</span> deadpool_postgres::BuildError),
+        <span class="attribute">#[error(transparent)]</span>
+        Pool(<span class="attribute">#[from]</span> PoolError),
     }
 
-    <span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">tokio_postgres::Error</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Error</span> {
-        <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">err</span>: <span class="ident">tokio_postgres::Error</span>) -&gt; <span class="self">Self</span> {
-            <span class="ident">Error::Pool</span>(<span class="ident">PoolError::Backend</span>(<span class="ident">err</span>))
+    <span class="kw">impl </span>From&lt;tokio_postgres::Error&gt; <span class="kw">for </span>Error {
+        <span class="kw">fn </span>from(err: tokio_postgres::Error) -&gt; <span class="self">Self </span>{
+            Error::Pool(PoolError::Backend(err))
         }
     }
 
-    <span class="doccomment">/// Base Pool and Config are used to create a new DATABASE and later on</span>
-    <span class="doccomment">/// create the actual connection to the database with default options set</span>
-    <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Manager</span> {
-        <span class="ident">base_config</span>: <span class="ident">tokio_postgres::Config</span>,
-        <span class="ident">base_pool</span>: <span class="ident">deadpool_postgres::Pool</span>,
-        <span class="ident">manager_config</span>: <span class="ident">ManagerConfig</span>,
-        <span class="ident">index</span>: <span class="ident">AtomicUsize</span>,
-        <span class="ident">db_prefix</span>: <span class="ident">String</span>,
+    <span class="doccomment">/// Base Pool and Config are used to create a new DATABASE and later on
+    /// create the actual connection to the database with default options set
+    </span><span class="kw">pub struct </span>Manager {
+        base_config: tokio_postgres::Config,
+        base_pool: deadpool_postgres::Pool,
+        manager_config: ManagerConfig,
+        index: AtomicUsize,
+        db_prefix: String,
     }
 
-    <span class="kw">impl</span> <span class="ident">Manager</span> {
-        <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(
-            <span class="ident">base_config</span>: <span class="ident">tokio_postgres::Config</span>,
-            <span class="ident">manager_config</span>: <span class="ident">ManagerConfig</span>,
-            <span class="ident">db_prefix</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>,
-        ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
-            <span class="comment">// We need to create the schema with a temporary connection, in order to use it for the real Test Pool</span>
-            <span class="kw">let</span> <span class="ident">base_manager</span> <span class="op">=</span> <span class="ident">deadpool_postgres::Manager::from_config</span>(
-                <span class="ident">base_config</span>.<span class="ident">clone</span>(),
-                <span class="ident">NoTls</span>,
-                <span class="ident">manager_config</span>.<span class="ident">clone</span>(),
+    <span class="kw">impl </span>Manager {
+        <span class="kw">pub fn </span>new(
+            base_config: tokio_postgres::Config,
+            manager_config: ManagerConfig,
+            db_prefix: <span class="kw-2">&amp;</span>str,
+        ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, Error&gt; {
+            <span class="comment">// We need to create the schema with a temporary connection, in order to use it for the real Test Pool
+            </span><span class="kw">let </span>base_manager = deadpool_postgres::Manager::from_config(
+                base_config.clone(),
+                NoTls,
+                manager_config.clone(),
             );
-            <span class="kw">let</span> <span class="ident">base_pool</span> <span class="op">=</span> <span class="ident">deadpool_postgres::Pool::builder</span>(<span class="ident">base_manager</span>)
-                .<span class="ident">max_size</span>(<span class="number">15</span>)
-                .<span class="ident">build</span>()<span class="question-mark">?</span>;
+            <span class="kw">let </span>base_pool = deadpool_postgres::Pool::builder(base_manager)
+                .max_size(<span class="number">15</span>)
+                .build()<span class="question-mark">?</span>;
 
-            <span class="prelude-val">Ok</span>(<span class="ident"><span class="self">Self</span>::new_with_pool</span>(
-                <span class="ident">base_pool</span>,
-                <span class="ident">base_config</span>,
-                <span class="ident">manager_config</span>,
-                <span class="ident">db_prefix</span>,
+            <span class="prelude-val">Ok</span>(<span class="self">Self</span>::new_with_pool(
+                base_pool,
+                base_config,
+                manager_config,
+                db_prefix,
             ))
         }
 
-        <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new_with_pool</span>(
-            <span class="ident">base_pool</span>: <span class="ident">deadpool_postgres::Pool</span>,
-            <span class="ident">base_config</span>: <span class="ident">tokio_postgres::Config</span>,
-            <span class="ident">manager_config</span>: <span class="ident">ManagerConfig</span>,
-            <span class="ident">db_prefix</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>,
-        ) -&gt; <span class="self">Self</span> {
-            <span class="self">Self</span> {
-                <span class="ident">base_config</span>,
-                <span class="ident">base_pool</span>,
-                <span class="ident">manager_config</span>,
-                <span class="ident">index</span>: <span class="ident">AtomicUsize::new</span>(<span class="number">0</span>),
-                <span class="ident">db_prefix</span>: <span class="ident">db_prefix</span>.<span class="ident">into</span>(),
+        <span class="kw">pub fn </span>new_with_pool(
+            base_pool: deadpool_postgres::Pool,
+            base_config: tokio_postgres::Config,
+            manager_config: ManagerConfig,
+            db_prefix: <span class="kw-2">&amp;</span>str,
+        ) -&gt; <span class="self">Self </span>{
+            <span class="self">Self </span>{
+                base_config,
+                base_pool,
+                manager_config,
+                index: AtomicUsize::new(<span class="number">0</span>),
+                db_prefix: db_prefix.into(),
             }
         }
     }
 
-    <span class="attribute">#[<span class="ident">async_trait</span>]</span>
-    <span class="kw">impl</span> <span class="ident">ManagerTrait</span> <span class="kw">for</span> <span class="ident">Manager</span> {
-        <span class="kw">type</span> <span class="ident">Type</span> <span class="op">=</span> <span class="ident">Database</span>;
+    <span class="attribute">#[async_trait]</span>
+    <span class="kw">impl </span>ManagerTrait <span class="kw">for </span>Manager {
+        <span class="kw">type </span>Type = Database;
 
-        <span class="kw">type</span> <span class="ident">Error</span> <span class="op">=</span> <span class="ident">Error</span>;
+        <span class="kw">type </span>Error = Error;
 
-        <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">create</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::Type</span>, <span class="ident"><span class="self">Self</span>::Error</span><span class="op">&gt;</span> {
-            <span class="kw">let</span> <span class="ident">pool_index</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">index</span>.<span class="ident">fetch_add</span>(<span class="number">1</span>, <span class="ident">Ordering::SeqCst</span>);
+        <span class="kw">async fn </span>create(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>::Type, <span class="self">Self</span>::Error&gt; {
+            <span class="kw">let </span>pool_index = <span class="self">self</span>.index.fetch_add(<span class="number">1</span>, Ordering::SeqCst);
 
-            <span class="comment">// e.g. test_0, test_1, test_2</span>
-            <span class="kw">let</span> <span class="ident">db_name</span> <span class="op">=</span> <span class="macro">format!</span>(<span class="string">&quot;{}_{}&quot;</span>, <span class="self">self</span>.<span class="ident">db_prefix</span>, <span class="ident">pool_index</span>);
+            <span class="comment">// e.g. test_0, test_1, test_2
+            </span><span class="kw">let </span>db_name = <span class="macro">format!</span>(<span class="string">&quot;{}_{}&quot;</span>, <span class="self">self</span>.db_prefix, pool_index);
 
-            <span class="comment">// 1. Drop the database if it exists - if a test failed before, the database wouldn&#39;t have been removed</span>
-            <span class="comment">// 2. Create database</span>
-            <span class="kw">let</span> <span class="ident">drop_db</span> <span class="op">=</span> <span class="macro">format!</span>(<span class="string">&quot;DROP DATABASE IF EXISTS {0} WITH (FORCE);&quot;</span>, <span class="ident">db_name</span>);
-            <span class="kw">let</span> <span class="ident">created_db</span> <span class="op">=</span> <span class="macro">format!</span>(<span class="string">&quot;CREATE DATABASE {0};&quot;</span>, <span class="ident">db_name</span>);
+            <span class="comment">// 1. Drop the database if it exists - if a test failed before, the database wouldn&#39;t have been removed
+            // 2. Create database
+            </span><span class="kw">let </span>drop_db = <span class="macro">format!</span>(<span class="string">&quot;DROP DATABASE IF EXISTS {0} WITH (FORCE);&quot;</span>, db_name);
+            <span class="kw">let </span>created_db = <span class="macro">format!</span>(<span class="string">&quot;CREATE DATABASE {0};&quot;</span>, db_name);
 
-            <span class="kw">let</span> <span class="ident">temp_client</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">base_pool</span>.<span class="ident">get</span>().<span class="kw">await</span>.<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">err</span><span class="op">|</span> {
-                <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="ident">err</span> {
-                    <span class="ident">PoolError::Backend</span>(<span class="ident">backend_err</span>) <span class="kw">if</span> <span class="ident">backend_err</span>.<span class="ident">is_closed</span>() =&gt; {
+            <span class="kw">let </span>temp_client = <span class="self">self</span>.base_pool.get().<span class="kw">await</span>.map_err(|err| {
+                <span class="kw">match </span><span class="kw-2">&amp;</span>err {
+                    PoolError::Backend(backend_err) <span class="kw">if </span>backend_err.is_closed() =&gt; {
                         <span class="macro">panic!</span>(<span class="string">&quot;Closed PG Client connection of the base Pool!&quot;</span>);
                     }
-                    <span class="kw">_</span> =&gt; {}
+                    <span class="kw">_ </span>=&gt; {}
                 }
-                <span class="ident">err</span>
+                err
             })<span class="question-mark">?</span>;
 
-            <span class="macro">assert!</span>(<span class="op">!</span><span class="self">self</span>.<span class="ident">base_pool</span>.<span class="ident">is_closed</span>(), <span class="string">&quot;Base Pool should never close&quot;</span>);
+            <span class="macro">assert!</span>(!<span class="self">self</span>.base_pool.is_closed(), <span class="string">&quot;Base Pool should never close&quot;</span>);
             <span class="macro">assert!</span>(
-                <span class="op">!</span><span class="self">self</span>
-                    .<span class="ident">base_pool</span>
-                    .<span class="ident">get</span>()
-                    .<span class="kw">await</span>
-                    .<span class="ident">expect</span>(<span class="string">&quot;Should get connection&quot;</span>)
-                    .<span class="ident">is_closed</span>(),
-                <span class="string">&quot;a base pool connection should never be closed&quot;</span>
-            );
+                !<span class="self">self
+                    </span>.base_pool
+                    .get()
+                    .<span class="kw">await
+                    </span>.expect(<span class="string">&quot;Should get connection&quot;</span>)
+                    .is_closed(),
+                <span class="string">&quot;a base pool connection should never be closed&quot;
+            </span>);
 
-            <span class="kw">let</span> <span class="ident">drop_db_result</span> <span class="op">=</span> <span class="ident">temp_client</span>.<span class="ident">simple_query</span>(<span class="ident">drop_db</span>.<span class="ident">as_str</span>()).<span class="kw">await</span><span class="question-mark">?</span>;
-            <span class="macro">assert_eq!</span>(<span class="number">1</span>, <span class="ident">drop_db_result</span>.<span class="ident">len</span>());
+            <span class="kw">let </span>drop_db_result = temp_client.simple_query(drop_db.as_str()).<span class="kw">await</span><span class="question-mark">?</span>;
+            <span class="macro">assert_eq!</span>(<span class="number">1</span>, drop_db_result.len());
             <span class="macro">assert!</span>(<span class="macro">matches!</span>(
-                <span class="ident">drop_db_result</span>[<span class="number">0</span>],
-                <span class="ident">SimpleQueryMessage::CommandComplete</span>(..)
+                drop_db_result[<span class="number">0</span>],
+                SimpleQueryMessage::CommandComplete(..)
             ));
 
-            <span class="kw">let</span> <span class="ident">create_db_result</span> <span class="op">=</span> <span class="ident">temp_client</span>.<span class="ident">simple_query</span>(<span class="ident">created_db</span>.<span class="ident">as_str</span>()).<span class="kw">await</span><span class="question-mark">?</span>;
-            <span class="macro">assert_eq!</span>(<span class="number">1</span>, <span class="ident">create_db_result</span>.<span class="ident">len</span>());
+            <span class="kw">let </span>create_db_result = temp_client.simple_query(created_db.as_str()).<span class="kw">await</span><span class="question-mark">?</span>;
+            <span class="macro">assert_eq!</span>(<span class="number">1</span>, create_db_result.len());
             <span class="macro">assert!</span>(<span class="macro">matches!</span>(
-                <span class="ident">create_db_result</span>[<span class="number">0</span>],
-                <span class="ident">SimpleQueryMessage::CommandComplete</span>(..)
+                create_db_result[<span class="number">0</span>],
+                SimpleQueryMessage::CommandComplete(..)
             ));
 
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">config</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">base_config</span>.<span class="ident">clone</span>();
-            <span class="comment">// set the database in the configuration of the inside Pool (used for tests)</span>
-            <span class="ident">config</span>.<span class="ident">dbname</span>(<span class="kw-2">&amp;</span><span class="ident">db_name</span>);
+            <span class="kw">let </span><span class="kw-2">mut </span>config = <span class="self">self</span>.base_config.clone();
+            <span class="comment">// set the database in the configuration of the inside Pool (used for tests)
+            </span>config.dbname(<span class="kw-2">&amp;</span>db_name);
 
-            <span class="kw">let</span> <span class="ident">manager</span> <span class="op">=</span>
-                <span class="ident">deadpool_postgres::Manager::from_config</span>(<span class="ident">config</span>, <span class="ident">NoTls</span>, <span class="self">self</span>.<span class="ident">manager_config</span>.<span class="ident">clone</span>());
+            <span class="kw">let </span>manager =
+                deadpool_postgres::Manager::from_config(config, NoTls, <span class="self">self</span>.manager_config.clone());
 
-            <span class="comment">// TODO: Fix error mapping</span>
-            <span class="kw">let</span> <span class="ident">pool</span> <span class="op">=</span> <span class="ident">deadpool_postgres::Pool::builder</span>(<span class="ident">manager</span>)
-                .<span class="ident">max_size</span>(<span class="number">15</span>)
-                .<span class="ident">build</span>()
-                .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">err</span><span class="op">|</span> <span class="kw">match</span> <span class="ident">err</span> {
-                    <span class="ident">deadpool::managed::BuildError::Backend</span>(<span class="ident">err</span>) =&gt; <span class="ident">PoolError::Backend</span>(<span class="ident">err</span>),
-                    <span class="ident">deadpool::managed::BuildError::NoRuntimeSpecified</span>(<span class="ident">_err</span>) =&gt; {
-                        <span class="ident">PoolError::NoRuntimeSpecified</span>
+            <span class="comment">// TODO: Fix error mapping
+            </span><span class="kw">let </span>pool = deadpool_postgres::Pool::builder(manager)
+                .max_size(<span class="number">15</span>)
+                .build()
+                .map_err(|err| <span class="kw">match </span>err {
+                    deadpool::managed::BuildError::Backend(err) =&gt; PoolError::Backend(err),
+                    deadpool::managed::BuildError::NoRuntimeSpecified(_err) =&gt; {
+                        PoolError::NoRuntimeSpecified
                     }
                 })<span class="question-mark">?</span>;
 
-            <span class="comment">// this will make sure the connection succeeds</span>
-            <span class="comment">// Instead of making a connection the Pool returns directly.</span>
-            <span class="kw">let</span> <span class="kw">_</span> <span class="op">=</span> <span class="ident">pool</span>.<span class="ident">get</span>().<span class="kw">await</span><span class="question-mark">?</span>;
+            <span class="comment">// this will make sure the connection succeeds
+            // Instead of making a connection the Pool returns directly.
+            </span><span class="kw">let _ </span>= pool.get().<span class="kw">await</span><span class="question-mark">?</span>;
 
-            <span class="prelude-val">Ok</span>(<span class="ident">Database::new</span>(<span class="ident">db_name</span>, <span class="ident">pool</span>))
+            <span class="prelude-val">Ok</span>(Database::new(db_name, pool))
         }
 
-        <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">recycle</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">database</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Database</span>) -&gt; <span class="ident">RecycleResult</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::Error</span><span class="op">&gt;</span> {
-            <span class="comment">// DROP the public schema and create it again for usage after recycling</span>
-            <span class="kw">let</span> <span class="ident">queries</span> <span class="op">=</span> <span class="string">&quot;DROP SCHEMA public CASCADE; CREATE SCHEMA public;&quot;</span>;
+        <span class="kw">async fn </span>recycle(<span class="kw-2">&amp;</span><span class="self">self</span>, database: <span class="kw-2">&amp;mut </span>Database) -&gt; RecycleResult&lt;<span class="self">Self</span>::Error&gt; {
+            <span class="comment">// DROP the public schema and create it again for usage after recycling
+            </span><span class="kw">let </span>queries = <span class="string">&quot;DROP SCHEMA public CASCADE; CREATE SCHEMA public;&quot;</span>;
 
-            <span class="ident">database</span>.<span class="ident">pool</span> <span class="op">=</span> {
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">config</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">base_config</span>.<span class="ident">clone</span>();
-                <span class="comment">// set the database in the configuration of the inside Pool (used for tests)</span>
-                <span class="ident">config</span>.<span class="ident">dbname</span>(<span class="kw-2">&amp;</span><span class="ident">database</span>.<span class="ident">name</span>);
+            database.pool = {
+                <span class="kw">let </span><span class="kw-2">mut </span>config = <span class="self">self</span>.base_config.clone();
+                <span class="comment">// set the database in the configuration of the inside Pool (used for tests)
+                </span>config.dbname(<span class="kw-2">&amp;</span>database.name);
 
-                <span class="kw">let</span> <span class="ident">manager</span> <span class="op">=</span> <span class="ident">deadpool_postgres::Manager::from_config</span>(
-                    <span class="ident">config</span>,
-                    <span class="ident">NoTls</span>,
-                    <span class="self">self</span>.<span class="ident">manager_config</span>.<span class="ident">clone</span>(),
+                <span class="kw">let </span>manager = deadpool_postgres::Manager::from_config(
+                    config,
+                    NoTls,
+                    <span class="self">self</span>.manager_config.clone(),
                 );
 
-                <span class="ident">deadpool_postgres::Pool::builder</span>(<span class="ident">manager</span>)
-                    .<span class="ident">max_size</span>(<span class="number">15</span>)
-                    .<span class="ident">build</span>()
-                    .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">err</span><span class="op">|</span> <span class="ident">RecycleError::Backend</span>(<span class="ident">Error::Build</span>(<span class="ident">err</span>)))<span class="question-mark">?</span>
-            };
+                deadpool_postgres::Pool::builder(manager)
+                    .max_size(<span class="number">15</span>)
+                    .build()
+                    .map_err(|err| RecycleError::Backend(Error::Build(err)))<span class="question-mark">?
+            </span>};
 
-            <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="ident">database</span>
-                .<span class="ident">pool</span>
-                .<span class="ident">get</span>()
-                .<span class="kw">await</span>
-                .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">err</span><span class="op">|</span> <span class="ident">RecycleError::Backend</span>(<span class="ident">Error::Pool</span>(<span class="ident">err</span>)))<span class="question-mark">?</span>
-                .<span class="ident">simple_query</span>(<span class="ident">queries</span>)
-                .<span class="kw">await</span>
-                .<span class="ident">expect</span>(<span class="string">&quot;Should not error&quot;</span>);
-            <span class="macro">assert_eq!</span>(<span class="number">2</span>, <span class="ident">result</span>.<span class="ident">len</span>());
-            <span class="macro">assert!</span>(<span class="macro">matches!</span>(<span class="ident">result</span>[<span class="number">0</span>], <span class="ident">SimpleQueryMessage::CommandComplete</span>(..)));
-            <span class="macro">assert!</span>(<span class="macro">matches!</span>(<span class="ident">result</span>[<span class="number">1</span>], <span class="ident">SimpleQueryMessage::CommandComplete</span>(..)));
+            <span class="kw">let </span>result = database
+                .pool
+                .get()
+                .<span class="kw">await
+                </span>.map_err(|err| RecycleError::Backend(Error::Pool(err)))<span class="question-mark">?
+                </span>.simple_query(queries)
+                .<span class="kw">await
+                </span>.expect(<span class="string">&quot;Should not error&quot;</span>);
+            <span class="macro">assert_eq!</span>(<span class="number">2</span>, result.len());
+            <span class="macro">assert!</span>(<span class="macro">matches!</span>(result[<span class="number">0</span>], SimpleQueryMessage::CommandComplete(..)));
+            <span class="macro">assert!</span>(<span class="macro">matches!</span>(result[<span class="number">1</span>], SimpleQueryMessage::CommandComplete(..)));
 
             <span class="prelude-val">Ok</span>(())
         }
     }
 
-    <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">setup_test_migrations</span>(<span class="ident">pool</span>: <span class="ident">DbPool</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">PoolError</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">client</span> <span class="op">=</span> <span class="ident">pool</span>.<span class="ident">get</span>().<span class="kw">await</span><span class="question-mark">?</span>;
+    <span class="kw">pub async fn </span>setup_test_migrations(pool: DbPool) -&gt; <span class="prelude-ty">Result</span>&lt;(), PoolError&gt; {
+        <span class="kw">let </span>client = pool.get().<span class="kw">await</span><span class="question-mark">?</span>;
 
-        <span class="kw">let</span> <span class="ident">full_query</span>: <span class="ident">String</span> <span class="op">=</span> <span class="ident">MIGRATIONS</span>
-            .<span class="ident">iter</span>()
-            .<span class="ident">map</span>(<span class="op">|</span><span class="ident">migration</span><span class="op">|</span> {
-                <span class="kw">use</span> <span class="ident">std</span>::{<span class="ident">env::current_dir</span>, <span class="ident">fs::read_to_string</span>};
+        <span class="kw">let </span>full_query: String = MIGRATIONS
+            .iter()
+            .map(|migration| {
+                <span class="kw">use </span>std::{env::current_dir, fs::read_to_string};
 
-                <span class="kw">let</span> <span class="ident">full_path</span> <span class="op">=</span> <span class="ident">current_dir</span>().<span class="ident">unwrap</span>();
-                <span class="comment">// it always starts in `sentry` folder because of the crate scope</span>
-                <span class="comment">// even when it&#39;s in the workspace</span>
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">file</span> <span class="op">=</span> <span class="ident">full_path</span>.<span class="ident">parent</span>().<span class="ident">unwrap</span>().<span class="ident">to_path_buf</span>();
-                <span class="ident">file</span>.<span class="ident">push</span>(<span class="macro">format!</span>(<span class="string">&quot;sentry/migrations/{}/up.sql&quot;</span>, <span class="ident">migration</span>));
+                <span class="kw">let </span>full_path = current_dir().unwrap();
+                <span class="comment">// it always starts in `sentry` folder because of the crate scope
+                // even when it&#39;s in the workspace
+                </span><span class="kw">let </span><span class="kw-2">mut </span>file = full_path.parent().unwrap().to_path_buf();
+                file.push(<span class="macro">format!</span>(<span class="string">&quot;sentry/migrations/{}/up.sql&quot;</span>, migration));
 
-                <span class="ident">read_to_string</span>(<span class="ident">file</span>).<span class="ident">expect</span>(<span class="string">&quot;File migration couldn&#39;t be read&quot;</span>)
+                read_to_string(file).expect(<span class="string">&quot;File migration couldn&#39;t be read&quot;</span>)
             })
-            .<span class="ident">collect</span>();
+            .collect();
 
-        <span class="prelude-val">Ok</span>(<span class="ident">client</span>.<span class="ident">batch_execute</span>(<span class="kw-2">&amp;</span><span class="ident">full_query</span>).<span class="kw">await</span><span class="question-mark">?</span>)
+        <span class="prelude-val">Ok</span>(client.batch_execute(<span class="kw-2">&amp;</span>full_query).<span class="kw">await</span><span class="question-mark">?</span>)
     }
 
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
-    <span class="kw">mod</span> <span class="ident">test</span> {
-        <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
+    <span class="attribute">#[cfg(test)]</span>
+    <span class="kw">mod </span>test {
+        <span class="kw">use super</span>::<span class="kw-2">*</span>;
 
-        <span class="attribute">#[<span class="ident">tokio::test</span>]</span>
-        <span class="doccomment">/// Does not use the `DATABASE_POOL` as other tests can interfere with the pool objects!</span>
-        <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">test_postgres_pool</span>() {
-            <span class="kw">let</span> <span class="ident">pool</span> <span class="op">=</span> <span class="ident">create_pool</span>(<span class="string">&quot;testing_pool&quot;</span>).<span class="ident">expect</span>(<span class="string">&quot;Should create testing_pool&quot;</span>);
+        <span class="attribute">#[tokio::test]</span>
+        <span class="doccomment">/// Does not use the `DATABASE_POOL` as other tests can interfere with the pool objects!
+        </span><span class="kw">async fn </span>test_postgres_pool() {
+            <span class="kw">let </span>pool = create_pool(<span class="string">&quot;testing_pool&quot;</span>).expect(<span class="string">&quot;Should create testing_pool&quot;</span>);
 
-            <span class="kw">let</span> <span class="ident">database_1</span> <span class="op">=</span> <span class="ident">pool</span>.<span class="ident">get</span>().<span class="kw">await</span>.<span class="ident">expect</span>(<span class="string">&quot;Should get&quot;</span>);
-            <span class="kw">let</span> <span class="ident">status</span> <span class="op">=</span> <span class="ident">pool</span>.<span class="ident">status</span>();
-            <span class="macro">assert_eq!</span>(<span class="ident">status</span>.<span class="ident">size</span>, <span class="number">1</span>);
-            <span class="macro">assert_eq!</span>(<span class="ident">status</span>.<span class="ident">available</span>, <span class="number">0</span>);
+            <span class="kw">let </span>database_1 = pool.get().<span class="kw">await</span>.expect(<span class="string">&quot;Should get&quot;</span>);
+            <span class="kw">let </span>status = pool.status();
+            <span class="macro">assert_eq!</span>(status.size, <span class="number">1</span>);
+            <span class="macro">assert_eq!</span>(status.available, <span class="number">0</span>);
 
-            <span class="kw">let</span> <span class="ident">database_2</span> <span class="op">=</span> <span class="ident">pool</span>.<span class="ident">get</span>().<span class="kw">await</span>.<span class="ident">expect</span>(<span class="string">&quot;Should get&quot;</span>);
-            <span class="kw">let</span> <span class="ident">status</span> <span class="op">=</span> <span class="ident">pool</span>.<span class="ident">status</span>();
-            <span class="macro">assert_eq!</span>(<span class="ident">status</span>.<span class="ident">size</span>, <span class="number">2</span>);
-            <span class="macro">assert_eq!</span>(<span class="ident">status</span>.<span class="ident">available</span>, <span class="number">0</span>);
+            <span class="kw">let </span>database_2 = pool.get().<span class="kw">await</span>.expect(<span class="string">&quot;Should get&quot;</span>);
+            <span class="kw">let </span>status = pool.status();
+            <span class="macro">assert_eq!</span>(status.size, <span class="number">2</span>);
+            <span class="macro">assert_eq!</span>(status.available, <span class="number">0</span>);
 
-            <span class="ident">drop</span>(<span class="ident">database_1</span>);
-            <span class="kw">let</span> <span class="ident">status</span> <span class="op">=</span> <span class="ident">pool</span>.<span class="ident">status</span>();
-            <span class="macro">assert_eq!</span>(<span class="ident">status</span>.<span class="ident">size</span>, <span class="number">2</span>);
-            <span class="macro">assert_eq!</span>(<span class="ident">status</span>.<span class="ident">available</span>, <span class="number">1</span>);
+            drop(database_1);
+            <span class="kw">let </span>status = pool.status();
+            <span class="macro">assert_eq!</span>(status.size, <span class="number">2</span>);
+            <span class="macro">assert_eq!</span>(status.available, <span class="number">1</span>);
 
-            <span class="ident">drop</span>(<span class="ident">database_2</span>);
-            <span class="kw">let</span> <span class="ident">status</span> <span class="op">=</span> <span class="ident">pool</span>.<span class="ident">status</span>();
-            <span class="macro">assert_eq!</span>(<span class="ident">status</span>.<span class="ident">size</span>, <span class="number">2</span>);
-            <span class="macro">assert_eq!</span>(<span class="ident">status</span>.<span class="ident">available</span>, <span class="number">2</span>);
+            drop(database_2);
+            <span class="kw">let </span>status = pool.status();
+            <span class="macro">assert_eq!</span>(status.size, <span class="number">2</span>);
+            <span class="macro">assert_eq!</span>(status.available, <span class="number">2</span>);
 
-            <span class="kw">let</span> <span class="ident">database_3</span> <span class="op">=</span> <span class="ident">pool</span>.<span class="ident">get</span>().<span class="kw">await</span>.<span class="ident">expect</span>(<span class="string">&quot;Should get&quot;</span>);
-            <span class="kw">let</span> <span class="ident">status</span> <span class="op">=</span> <span class="ident">pool</span>.<span class="ident">status</span>();
-            <span class="macro">assert_eq!</span>(<span class="ident">status</span>.<span class="ident">size</span>, <span class="number">2</span>);
-            <span class="macro">assert_eq!</span>(<span class="ident">status</span>.<span class="ident">available</span>, <span class="number">1</span>);
+            <span class="kw">let </span>database_3 = pool.get().<span class="kw">await</span>.expect(<span class="string">&quot;Should get&quot;</span>);
+            <span class="kw">let </span>status = pool.status();
+            <span class="macro">assert_eq!</span>(status.size, <span class="number">2</span>);
+            <span class="macro">assert_eq!</span>(status.available, <span class="number">1</span>);
 
-            <span class="kw">let</span> <span class="ident">database_4</span> <span class="op">=</span> <span class="ident">pool</span>.<span class="ident">get</span>().<span class="kw">await</span>.<span class="ident">expect</span>(<span class="string">&quot;Should get&quot;</span>);
-            <span class="kw">let</span> <span class="ident">status</span> <span class="op">=</span> <span class="ident">pool</span>.<span class="ident">status</span>();
-            <span class="macro">assert_eq!</span>(<span class="ident">status</span>.<span class="ident">size</span>, <span class="number">2</span>);
-            <span class="macro">assert_eq!</span>(<span class="ident">status</span>.<span class="ident">available</span>, <span class="number">0</span>);
+            <span class="kw">let </span>database_4 = pool.get().<span class="kw">await</span>.expect(<span class="string">&quot;Should get&quot;</span>);
+            <span class="kw">let </span>status = pool.status();
+            <span class="macro">assert_eq!</span>(status.size, <span class="number">2</span>);
+            <span class="macro">assert_eq!</span>(status.available, <span class="number">0</span>);
 
-            <span class="kw">let</span> <span class="ident">database_5</span> <span class="op">=</span> <span class="ident">pool</span>.<span class="ident">get</span>().<span class="kw">await</span>.<span class="ident">expect</span>(<span class="string">&quot;Should get&quot;</span>);
-            <span class="kw">let</span> <span class="ident">status</span> <span class="op">=</span> <span class="ident">pool</span>.<span class="ident">status</span>();
-            <span class="macro">assert_eq!</span>(<span class="ident">status</span>.<span class="ident">size</span>, <span class="number">3</span>);
-            <span class="macro">assert_eq!</span>(<span class="ident">status</span>.<span class="ident">available</span>, <span class="number">0</span>);
+            <span class="kw">let </span>database_5 = pool.get().<span class="kw">await</span>.expect(<span class="string">&quot;Should get&quot;</span>);
+            <span class="kw">let </span>status = pool.status();
+            <span class="macro">assert_eq!</span>(status.size, <span class="number">3</span>);
+            <span class="macro">assert_eq!</span>(status.available, <span class="number">0</span>);
 
-            <span class="ident">drop</span>(<span class="ident">database_3</span>);
-            <span class="ident">drop</span>(<span class="ident">database_4</span>);
-            <span class="ident">drop</span>(<span class="ident">database_5</span>);
-            <span class="kw">let</span> <span class="ident">status</span> <span class="op">=</span> <span class="ident">pool</span>.<span class="ident">status</span>();
-            <span class="macro">assert_eq!</span>(<span class="ident">status</span>.<span class="ident">size</span>, <span class="number">3</span>);
-            <span class="macro">assert_eq!</span>(<span class="ident">status</span>.<span class="ident">available</span>, <span class="number">3</span>);
+            drop(database_3);
+            drop(database_4);
+            drop(database_5);
+            <span class="kw">let </span>status = pool.status();
+            <span class="macro">assert_eq!</span>(status.size, <span class="number">3</span>);
+            <span class="macro">assert_eq!</span>(status.available, <span class="number">3</span>);
         }
     }
 }
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">any</span>(<span class="ident">test</span>, <span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;test-util&quot;</span>))]</span>
-<span class="attribute">#[<span class="ident">cfg_attr</span>(<span class="ident">docsrs</span>, <span class="ident">doc</span>(<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;test-util&quot;</span>)))]</span>
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">redis_pool</span> {
+<span class="attribute">#[cfg(any(test, feature = <span class="string">&quot;test-util&quot;</span>))]</span>
+<span class="attribute">#[cfg_attr(docsrs, doc(cfg(feature = <span class="string">&quot;test-util&quot;</span>)))]</span>
+<span class="kw">pub mod </span>redis_pool {
 
-    <span class="kw">use</span> <span class="ident">dashmap::DashMap</span>;
-    <span class="kw">use</span> <span class="ident">deadpool::managed</span>::{<span class="ident">Manager</span> <span class="kw">as</span> <span class="ident">ManagerTrait</span>, <span class="ident">RecycleResult</span>};
-    <span class="kw">use</span> <span class="ident">thiserror::Error</span>;
+    <span class="kw">use </span>dashmap::DashMap;
+    <span class="kw">use </span>deadpool::managed::{Manager <span class="kw">as </span>ManagerTrait, RecycleResult};
+    <span class="kw">use </span>thiserror::Error;
 
-    <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::db::redis_connection</span>;
-    <span class="kw">use</span> <span class="ident">async_trait::async_trait</span>;
+    <span class="kw">use </span><span class="kw">crate</span>::db::redis_connection;
+    <span class="kw">use </span>async_trait::async_trait;
 
-    <span class="kw">use</span> <span class="ident">once_cell::sync::Lazy</span>;
+    <span class="kw">use </span>once_cell::sync::Lazy;
 
-    <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
+    <span class="kw">use super</span>::<span class="kw-2">*</span>;
 
-    <span class="doccomment">/// Re-export [`redis::cmd`] for testing purposes</span>
-    <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">redis::cmd</span>;
+    <span class="doccomment">/// Re-export [`redis::cmd`] for testing purposes
+    </span><span class="kw">pub use </span>redis::cmd;
 
-    <span class="kw">pub</span> <span class="kw">type</span> <span class="ident">Pool</span> <span class="op">=</span> <span class="ident">deadpool::managed::Pool</span><span class="op">&lt;</span><span class="ident">Manager</span><span class="op">&gt;</span>;
+    <span class="kw">pub type </span>Pool = deadpool::managed::Pool&lt;Manager&gt;;
 
-    <span class="kw">pub</span> <span class="kw">static</span> <span class="ident">TESTS_POOL</span>: <span class="ident">Lazy</span><span class="op">&lt;</span><span class="ident">Pool</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Lazy::new</span>(<span class="op">|</span><span class="op">|</span> {
-        <span class="ident">Pool::builder</span>(<span class="ident">Manager::new</span>())
-            .<span class="ident">max_size</span>(<span class="ident">Manager::CONNECTIONS</span>.<span class="ident">into</span>())
-            .<span class="ident">build</span>()
-            .<span class="ident">expect</span>(<span class="string">&quot;Should build Pools for tests&quot;</span>)
+    <span class="kw">pub static </span>TESTS_POOL: Lazy&lt;Pool&gt; = Lazy::new(|| {
+        Pool::builder(Manager::new())
+            .max_size(Manager::CONNECTIONS.into())
+            .build()
+            .expect(<span class="string">&quot;Should build Pools for tests&quot;</span>)
     });
 
-    <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Database</span> {
-        <span class="ident">available</span>: <span class="ident">bool</span>,
-        <span class="ident">index</span>: <span class="ident">u8</span>,
-        <span class="kw">pub</span> <span class="ident">connection</span>: <span class="ident">MultiplexedConnection</span>,
+    <span class="attribute">#[derive(Clone)]</span>
+    <span class="kw">pub struct </span>Database {
+        available: bool,
+        index: u8,
+        <span class="kw">pub </span>connection: MultiplexedConnection,
     }
 
-    <span class="kw">impl</span> <span class="ident">std::ops::Deref</span> <span class="kw">for</span> <span class="ident">Database</span> {
-        <span class="kw">type</span> <span class="ident">Target</span> <span class="op">=</span> <span class="ident">MultiplexedConnection</span>;
+    <span class="kw">impl </span>std::ops::Deref <span class="kw">for </span>Database {
+        <span class="kw">type </span>Target = MultiplexedConnection;
 
-        <span class="kw">fn</span> <span class="ident">deref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident"><span class="self">Self</span>::Target</span> {
-            <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">connection</span>
+        <span class="kw">fn </span>deref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="self">Self</span>::Target {
+            <span class="kw-2">&amp;</span><span class="self">self</span>.connection
         }
     }
 
-    <span class="kw">impl</span> <span class="ident">std::ops::DerefMut</span> <span class="kw">for</span> <span class="ident">Database</span> {
-        <span class="kw">fn</span> <span class="ident">deref_mut</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut</span> <span class="ident"><span class="self">Self</span>::Target</span> {
-            <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">connection</span>
+    <span class="kw">impl </span>std::ops::DerefMut <span class="kw">for </span>Database {
+        <span class="kw">fn </span>deref_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span><span class="self">Self</span>::Target {
+            <span class="kw-2">&amp;mut </span><span class="self">self</span>.connection
         }
     }
 
-    <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Manager</span> {
-        <span class="ident">connections</span>: <span class="ident">DashMap</span><span class="op">&lt;</span><span class="ident">u8</span>, <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Database</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="kw">pub struct </span>Manager {
+        connections: DashMap&lt;u8, <span class="prelude-ty">Option</span>&lt;Database&gt;&gt;,
     }
 
-    <span class="kw">impl</span> <span class="ident">Default</span> <span class="kw">for</span> <span class="ident">Manager</span> {
-        <span class="kw">fn</span> <span class="ident">default</span>() -&gt; <span class="self">Self</span> {
-            <span class="ident"><span class="self">Self</span>::new</span>()
+    <span class="kw">impl </span>Default <span class="kw">for </span>Manager {
+        <span class="kw">fn </span>default() -&gt; <span class="self">Self </span>{
+            <span class="self">Self</span>::new()
         }
     }
 
-    <span class="kw">impl</span> <span class="ident">Manager</span> {
-        <span class="doccomment">/// The maximum databases that Redis has by default is 16, with DB `0` as default.</span>
-        <span class="kw">const</span> <span class="ident">CONNECTIONS</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">16</span>;
-        <span class="doccomment">/// The default URL for connecting to the different databases</span>
-        <span class="kw">const</span> <span class="ident">URL</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;redis://127.0.0.1:6379/&quot;</span>;
+    <span class="kw">impl </span>Manager {
+        <span class="doccomment">/// The maximum databases that Redis has by default is 16, with DB `0` as default.
+        </span><span class="kw">const </span>CONNECTIONS: u8 = <span class="number">16</span>;
+        <span class="doccomment">/// The default URL for connecting to the different databases
+        </span><span class="kw">const </span>URL: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str = <span class="string">&quot;redis://127.0.0.1:6379/&quot;</span>;
 
-        <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>() -&gt; <span class="self">Self</span> {
-            <span class="self">Self</span> {
-                <span class="ident">connections</span>: (<span class="number">0</span>..<span class="ident"><span class="self">Self</span>::CONNECTIONS</span>)
-                    .<span class="ident">into_iter</span>()
-                    .<span class="ident">map</span>(<span class="op">|</span><span class="ident">database_index</span><span class="op">|</span> (<span class="ident">database_index</span>, <span class="prelude-val">None</span>))
-                    .<span class="ident">collect</span>(),
+        <span class="kw">pub fn </span>new() -&gt; <span class="self">Self </span>{
+            <span class="self">Self </span>{
+                connections: (<span class="number">0</span>..<span class="self">Self</span>::CONNECTIONS)
+                    .into_iter()
+                    .map(|database_index| (database_index, <span class="prelude-val">None</span>))
+                    .collect(),
             }
         }
 
-        <span class="doccomment">/// Flushing (`FLUSHDB`) is synchronous by default in Redis</span>
-        <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">flush_db</span>(<span class="ident">connection</span>: <span class="kw-2">&amp;mut</span> <span class="ident">MultiplexedConnection</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">String</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
-            <span class="ident">redis::cmd</span>(<span class="string">&quot;FLUSHDB&quot;</span>)
-                .<span class="ident">query_async</span>::<span class="op">&lt;</span><span class="kw">_</span>, <span class="ident">String</span><span class="op">&gt;</span>(<span class="ident">connection</span>)
-                .<span class="kw">await</span>
-                .<span class="ident">map_err</span>(<span class="ident">Error::Redis</span>)
+        <span class="doccomment">/// Flushing (`FLUSHDB`) is synchronous by default in Redis
+        </span><span class="kw">pub async fn </span>flush_db(connection: <span class="kw-2">&amp;mut </span>MultiplexedConnection) -&gt; <span class="prelude-ty">Result</span>&lt;String, Error&gt; {
+            redis::cmd(<span class="string">&quot;FLUSHDB&quot;</span>)
+                .query_async::&lt;<span class="kw">_</span>, String&gt;(connection)
+                .<span class="kw">await
+                </span>.map_err(Error::Redis)
         }
     }
 
-    <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Error</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">Error</span> {
-        <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;A redis error occurred&quot;</span>)]</span>
-        <span class="ident">Redis</span>(<span class="attribute">#[<span class="ident">from</span>]</span> <span class="ident">RedisError</span>),
-        <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Creation of new database connection failed&quot;</span>)]</span>
-        <span class="ident">CreationFailed</span>,
+    <span class="attribute">#[derive(Debug, Error)]</span>
+    <span class="kw">pub enum </span>Error {
+        <span class="attribute">#[error(<span class="string">&quot;A redis error occurred&quot;</span>)]</span>
+        Redis(<span class="attribute">#[from]</span> RedisError),
+        <span class="attribute">#[error(<span class="string">&quot;Creation of new database connection failed&quot;</span>)]</span>
+        CreationFailed,
     }
 
-    <span class="attribute">#[<span class="ident">async_trait</span>]</span>
-    <span class="kw">impl</span> <span class="ident">ManagerTrait</span> <span class="kw">for</span> <span class="ident">Manager</span> {
-        <span class="kw">type</span> <span class="ident">Type</span> <span class="op">=</span> <span class="ident">Database</span>;
-        <span class="kw">type</span> <span class="ident">Error</span> <span class="op">=</span> <span class="ident">Error</span>;
+    <span class="attribute">#[async_trait]</span>
+    <span class="kw">impl </span>ManagerTrait <span class="kw">for </span>Manager {
+        <span class="kw">type </span>Type = Database;
+        <span class="kw">type </span>Error = Error;
 
-        <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">create</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::Type</span>, <span class="ident"><span class="self">Self</span>::Error</span><span class="op">&gt;</span> {
-            <span class="kw">for</span> <span class="kw-2">mut</span> <span class="ident">record</span> <span class="kw">in</span> <span class="self">self</span>.<span class="ident">connections</span>.<span class="ident">iter_mut</span>() {
-                <span class="kw">let</span> <span class="ident">database</span> <span class="op">=</span> <span class="ident">record</span>.<span class="ident">value_mut</span>().<span class="ident">as_mut</span>();
+        <span class="kw">async fn </span>create(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>::Type, <span class="self">Self</span>::Error&gt; {
+            <span class="kw">for </span><span class="kw-2">mut </span>record <span class="kw">in </span><span class="self">self</span>.connections.iter_mut() {
+                <span class="kw">let </span>database = record.value_mut().as_mut();
 
-                <span class="kw">match</span> <span class="ident">database</span> {
-                    <span class="prelude-val">Some</span>(<span class="ident">database</span>) <span class="kw">if</span> <span class="ident">database</span>.<span class="ident">available</span> =&gt; {
-                        <span class="ident">database</span>.<span class="ident">available</span> <span class="op">=</span> <span class="bool-val">false</span>;
-                        <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">database</span>.<span class="ident">clone</span>());
+                <span class="kw">match </span>database {
+                    <span class="prelude-val">Some</span>(database) <span class="kw">if </span>database.available =&gt; {
+                        database.available = <span class="bool-val">false</span>;
+                        <span class="kw">return </span><span class="prelude-val">Ok</span>(database.clone());
                     }
-                    <span class="comment">// if Some but not available, skip it</span>
-                    <span class="prelude-val">Some</span>(<span class="ident">database</span>) <span class="kw">if</span> <span class="op">!</span><span class="ident">database</span>.<span class="ident">available</span> =&gt; <span class="kw">continue</span>,
-                    <span class="comment">// if there is no connection or it&#39;s available</span>
-                    <span class="comment">// always create a new redis connection because of a known issue in redis</span>
-                    <span class="comment">// see https://github.com/mitsuhiko/redis-rs/issues/325</span>
-                    <span class="kw">_</span> =&gt; {
-                        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">redis_conn</span> <span class="op">=</span>
-                            <span class="ident">redis_connection</span>(<span class="macro">format!</span>(<span class="string">&quot;{}{}&quot;</span>, <span class="ident"><span class="self">Self</span>::URL</span>, <span class="ident">record</span>.<span class="ident">key</span>()))
-                                .<span class="kw">await</span>
-                                .<span class="ident">expect</span>(<span class="string">&quot;Should connect&quot;</span>);
+                    <span class="comment">// if Some but not available, skip it
+                    </span><span class="prelude-val">Some</span>(database) <span class="kw">if </span>!database.available =&gt; <span class="kw">continue</span>,
+                    <span class="comment">// if there is no connection or it&#39;s available
+                    // always create a new redis connection because of a known issue in redis
+                    // see https://github.com/mitsuhiko/redis-rs/issues/325
+                    </span><span class="kw">_ </span>=&gt; {
+                        <span class="kw">let </span><span class="kw-2">mut </span>redis_conn =
+                            redis_connection(<span class="macro">format!</span>(<span class="string">&quot;{}{}&quot;</span>, <span class="self">Self</span>::URL, record.key()))
+                                .<span class="kw">await
+                                </span>.expect(<span class="string">&quot;Should connect&quot;</span>);
 
-                        <span class="comment">// run `FLUSHDB` to clean any leftovers of previous tests</span>
-                        <span class="comment">// even from different test runs as there might be leftovers</span>
-                        <span class="comment">// flush never fails as an operation</span>
-                        <span class="ident"><span class="self">Self</span>::flush_db</span>(<span class="kw-2">&amp;mut</span> <span class="ident">redis_conn</span>).<span class="kw">await</span>.<span class="ident">expect</span>(<span class="string">&quot;Should flush&quot;</span>);
+                        <span class="comment">// run `FLUSHDB` to clean any leftovers of previous tests
+                        // even from different test runs as there might be leftovers
+                        // flush never fails as an operation
+                        </span><span class="self">Self</span>::flush_db(<span class="kw-2">&amp;mut </span>redis_conn).<span class="kw">await</span>.expect(<span class="string">&quot;Should flush&quot;</span>);
 
-                        <span class="kw">let</span> <span class="ident">database</span> <span class="op">=</span> <span class="ident">Database</span> {
-                            <span class="ident">available</span>: <span class="bool-val">false</span>,
-                            <span class="ident">index</span>: <span class="kw-2">*</span><span class="ident">record</span>.<span class="ident">key</span>(),
-                            <span class="ident">connection</span>: <span class="ident">redis_conn</span>,
+                        <span class="kw">let </span>database = Database {
+                            available: <span class="bool-val">false</span>,
+                            index: <span class="kw-2">*</span>record.key(),
+                            connection: redis_conn,
                         };
 
-                        <span class="kw-2">*</span><span class="ident">record</span>.<span class="ident">value_mut</span>() <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">database</span>.<span class="ident">clone</span>());
+                        <span class="kw-2">*</span>record.value_mut() = <span class="prelude-val">Some</span>(database.clone());
 
-                        <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">database</span>);
+                        <span class="kw">return </span><span class="prelude-val">Ok</span>(database);
                     }
                 }
             }
 
-            <span class="prelude-val">Err</span>(<span class="ident">Error::CreationFailed</span>)
+            <span class="prelude-val">Err</span>(Error::CreationFailed)
         }
 
-        <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">recycle</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">database</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Database</span>) -&gt; <span class="ident">RecycleResult</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::Error</span><span class="op">&gt;</span> {
-            <span class="comment">// always make a new connection because of know redis crate issue</span>
-            <span class="comment">// see https://github.com/mitsuhiko/redis-rs/issues/325</span>
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">connection</span> <span class="op">=</span> <span class="ident">redis_connection</span>(<span class="macro">format!</span>(<span class="string">&quot;{}{}&quot;</span>, <span class="ident"><span class="self">Self</span>::URL</span>, <span class="ident">database</span>.<span class="ident">index</span>))
-                .<span class="kw">await</span>
-                .<span class="ident">expect</span>(<span class="string">&quot;Should connect&quot;</span>);
-            <span class="comment">// first flush the database</span>
-            <span class="comment">// this avoids the problem of flushing after the DB is picked up again by the Pool</span>
-            <span class="kw">let</span> <span class="ident">flush_result</span> <span class="op">=</span> <span class="ident"><span class="self">Self</span>::flush_db</span>(<span class="kw-2">&amp;mut</span> <span class="ident">connection</span>).<span class="kw">await</span>;
-            <span class="comment">// make the database available</span>
-            <span class="ident">database</span>.<span class="ident">available</span> <span class="op">=</span> <span class="bool-val">true</span>;
-            <span class="ident">database</span>.<span class="ident">connection</span> <span class="op">=</span> <span class="ident">connection</span>;
+        <span class="kw">async fn </span>recycle(<span class="kw-2">&amp;</span><span class="self">self</span>, database: <span class="kw-2">&amp;mut </span>Database) -&gt; RecycleResult&lt;<span class="self">Self</span>::Error&gt; {
+            <span class="comment">// always make a new connection because of know redis crate issue
+            // see https://github.com/mitsuhiko/redis-rs/issues/325
+            </span><span class="kw">let </span><span class="kw-2">mut </span>connection = redis_connection(<span class="macro">format!</span>(<span class="string">&quot;{}{}&quot;</span>, <span class="self">Self</span>::URL, database.index))
+                .<span class="kw">await
+                </span>.expect(<span class="string">&quot;Should connect&quot;</span>);
+            <span class="comment">// first flush the database
+            // this avoids the problem of flushing after the DB is picked up again by the Pool
+            </span><span class="kw">let </span>flush_result = <span class="self">Self</span>::flush_db(<span class="kw-2">&amp;mut </span>connection).<span class="kw">await</span>;
+            <span class="comment">// make the database available
+            </span>database.available = <span class="bool-val">true</span>;
+            database.connection = connection;
 
-            <span class="ident">flush_result</span>.<span class="ident">expect</span>(<span class="string">&quot;Should have flushed the redis DB successfully&quot;</span>);
+            flush_result.expect(<span class="string">&quot;Should have flushed the redis DB successfully&quot;</span>);
 
             <span class="prelude-val">Ok</span>(())
         }
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (20ffea693 2022-08-11)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>

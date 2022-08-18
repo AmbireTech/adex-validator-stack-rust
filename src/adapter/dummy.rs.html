@@ -400,81 +400,81 @@
 <span id="400">400</span>
 <span id="401">401</span>
 <span id="402">402</span>
-</pre><pre class="rust"><code><span class="doccomment">//! The [`Dummy`] client for the [`Adapter`].</span>
-<span class="doccomment">//!</span>
-<span class="kw">use</span> <span class="kw">crate</span>::{
-    <span class="ident">prelude</span>::<span class="kw-2">*</span>,
-    <span class="ident">primitives</span>::{<span class="ident">Deposit</span>, <span class="ident">Session</span>},
-    <span class="ident">Error</span>,
+</pre><pre class="rust"><code><span class="doccomment">//! The [`Dummy`] client for the [`Adapter`].
+//!
+</span><span class="kw">use crate</span>::{
+    prelude::<span class="kw-2">*</span>,
+    primitives::{Deposit, Session},
+    Error,
 };
-<span class="kw">use</span> <span class="ident">async_trait::async_trait</span>;
+<span class="kw">use </span>async_trait::async_trait;
 
-<span class="kw">use</span> <span class="ident">parse_display</span>::{<span class="ident">Display</span>, <span class="ident">FromStr</span>};
-<span class="kw">use</span> <span class="ident">primitives</span>::{
-    <span class="ident">config::ChainInfo</span>, <span class="ident">Address</span>, <span class="ident">ChainId</span>, <span class="ident">ChainOf</span>, <span class="ident">Channel</span>, <span class="ident">ToETHChecksum</span>, <span class="ident">ValidatorId</span>,
+<span class="kw">use </span>parse_display::{Display, FromStr};
+<span class="kw">use </span>primitives::{
+    config::ChainInfo, Address, ChainId, ChainOf, Channel, ToETHChecksum, ValidatorId,
 };
-<span class="kw">use</span> <span class="ident">std::collections::HashMap</span>;
+<span class="kw">use </span>std::collections::HashMap;
 
-<span class="attribute">#[<span class="ident">doc</span>(<span class="ident">inline</span>)]</span>
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident"><span class="self">self</span>::deposit</span>::{<span class="ident">Deposits</span>, <span class="ident">Key</span>};
+<span class="attribute">#[doc(inline)]</span>
+<span class="kw">pub use </span><span class="self">self</span>::deposit::{Deposits, Key};
 
-<span class="kw">pub</span> <span class="kw">type</span> <span class="ident">Adapter</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident"><span class="kw">crate</span>::Adapter</span><span class="op">&lt;</span><span class="ident">Dummy</span>, <span class="ident">S</span><span class="op">&gt;</span>;
+<span class="kw">pub type </span>Adapter&lt;S&gt; = <span class="kw">crate</span>::Adapter&lt;Dummy, S&gt;;
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Options</span> {
-    <span class="doccomment">/// The identity used for the Adapter.</span>
-    <span class="kw">pub</span> <span class="ident">dummy_identity</span>: <span class="ident">ValidatorId</span>,
-    <span class="doccomment">/// The authentication tokens that will be used by the adapter</span>
-    <span class="doccomment">/// for returning &amp; validating authentication tokens of requests.</span>
-    <span class="kw">pub</span> <span class="ident">dummy_auth_tokens</span>: <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">Address</span>, <span class="ident">String</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// The [`ChainInfo`] that will be used for the [`Session`]s and</span>
-    <span class="doccomment">/// also for the deposits.</span>
-    <span class="kw">pub</span> <span class="ident">dummy_chains</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">ChainInfo</span><span class="op">&gt;</span>,
+<span class="attribute">#[derive(Debug, Clone)]</span>
+<span class="kw">pub struct </span>Options {
+    <span class="doccomment">/// The identity used for the Adapter.
+    </span><span class="kw">pub </span>dummy_identity: ValidatorId,
+    <span class="doccomment">/// The authentication tokens that will be used by the adapter
+    /// for returning &amp; validating authentication tokens of requests.
+    </span><span class="kw">pub </span>dummy_auth_tokens: HashMap&lt;Address, String&gt;,
+    <span class="doccomment">/// The [`ChainInfo`] that will be used for the [`Session`]s and
+    /// also for the deposits.
+    </span><span class="kw">pub </span>dummy_chains: Vec&lt;ChainInfo&gt;,
 }
 
-<span class="doccomment">/// Dummy adapter implementation intended for testing.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Dummy</span> {
-    <span class="doccomment">/// Who am I</span>
-    <span class="ident">identity</span>: <span class="ident">ValidatorId</span>,
-    <span class="doccomment">/// Static authentication tokens (address =&gt; token)</span>
-    <span class="ident">authorization_tokens</span>: <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">Address</span>, <span class="ident">String</span><span class="op">&gt;</span>,
-    <span class="ident">chains</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">ChainInfo</span><span class="op">&gt;</span>,
-    <span class="ident">deposits</span>: <span class="ident">Deposits</span>,
+<span class="doccomment">/// Dummy adapter implementation intended for testing.
+</span><span class="attribute">#[derive(Debug, Clone)]</span>
+<span class="kw">pub struct </span>Dummy {
+    <span class="doccomment">/// Who am I
+    </span>identity: ValidatorId,
+    <span class="doccomment">/// Static authentication tokens (address =&gt; token)
+    </span>authorization_tokens: HashMap&lt;Address, String&gt;,
+    chains: Vec&lt;ChainInfo&gt;,
+    deposits: Deposits,
 }
 
-<span class="kw">impl</span> <span class="ident">Dummy</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>(<span class="ident">opts</span>: <span class="ident">Options</span>) -&gt; <span class="self">Self</span> {
-        <span class="self">Self</span> {
-            <span class="ident">identity</span>: <span class="ident">opts</span>.<span class="ident">dummy_identity</span>,
-            <span class="ident">authorization_tokens</span>: <span class="ident">opts</span>.<span class="ident">dummy_auth_tokens</span>,
-            <span class="ident">chains</span>: <span class="ident">opts</span>.<span class="ident">dummy_chains</span>,
-            <span class="ident">deposits</span>: <span class="ident">Default::default</span>(),
+<span class="kw">impl </span>Dummy {
+    <span class="kw">pub fn </span>init(opts: Options) -&gt; <span class="self">Self </span>{
+        <span class="self">Self </span>{
+            identity: opts.dummy_identity,
+            authorization_tokens: opts.dummy_auth_tokens,
+            chains: opts.dummy_chains,
+            deposits: Default::default(),
         }
     }
 
-    <span class="doccomment">/// Set the deposit that you want the adapter to return every time</span>
-    <span class="doccomment">/// when the [`get_deposit()`](Locked::get_deposit) get&#39;s called</span>
-    <span class="doccomment">/// for the give [`ChannelId`](primitives::ChannelId) and [`Address`].</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// If [`Deposit`] is set to [`None`], it remove the mocked deposit.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Panics</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// When [`None`] is passed but there was no mocked deposit.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_deposit</span><span class="op">&lt;</span><span class="ident">D</span>: <span class="ident">Into</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Deposit</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>(
+    <span class="doccomment">/// Set the deposit that you want the adapter to return every time
+    /// when the [`get_deposit()`](Locked::get_deposit) get&#39;s called
+    /// for the give [`ChannelId`](primitives::ChannelId) and [`Address`].
+    ///
+    /// If [`Deposit`] is set to [`None`], it remove the mocked deposit.
+    ///
+    /// # Panics
+    ///
+    /// When [`None`] is passed but there was no mocked deposit.
+    </span><span class="kw">pub fn </span>set_deposit&lt;D: Into&lt;<span class="prelude-ty">Option</span>&lt;Deposit&gt;&gt;&gt;(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">channel_context</span>: <span class="kw-2">&amp;</span><span class="ident">ChainOf</span><span class="op">&lt;</span><span class="ident">Channel</span><span class="op">&gt;</span>,
-        <span class="ident">depositor</span>: <span class="ident">Address</span>,
-        <span class="ident">deposit</span>: <span class="ident">D</span>,
+        channel_context: <span class="kw-2">&amp;</span>ChainOf&lt;Channel&gt;,
+        depositor: Address,
+        deposit: D,
     ) {
-        <span class="kw">let</span> <span class="ident">key</span> <span class="op">=</span> <span class="ident">Key::from_chain_of</span>(<span class="ident">channel_context</span>, <span class="ident">depositor</span>);
-        <span class="kw">match</span> <span class="ident">deposit</span>.<span class="ident">into</span>() {
-            <span class="prelude-val">Some</span>(<span class="ident">deposit</span>) =&gt; {
-                <span class="self">self</span>.<span class="ident">deposits</span>.<span class="number">0</span>.<span class="ident">insert</span>(<span class="ident">key</span>, <span class="ident">deposit</span>);
+        <span class="kw">let </span>key = Key::from_chain_of(channel_context, depositor);
+        <span class="kw">match </span>deposit.into() {
+            <span class="prelude-val">Some</span>(deposit) =&gt; {
+                <span class="self">self</span>.deposits.<span class="number">0</span>.insert(key, deposit);
             }
-            <span class="prelude-val">None</span> =&gt; {
-                <span class="self">self</span>.<span class="ident">deposits</span>.<span class="number">0</span>.<span class="ident">remove</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>).<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="op">|</span> {
+            <span class="prelude-val">None </span>=&gt; {
+                <span class="self">self</span>.deposits.<span class="number">0</span>.remove(<span class="kw-2">&amp;</span>key).unwrap_or_else(|| {
                     <span class="macro">panic!</span>(<span class="string">&quot;Couldn&#39;t remove a deposit which doesn&#39;t exist for {key:?}&quot;</span>)
                 });
             }
@@ -482,325 +482,325 @@
     }
 }
 
-<span class="attribute">#[<span class="ident">async_trait</span>]</span>
-<span class="kw">impl</span> <span class="ident">Locked</span> <span class="kw">for</span> <span class="ident">Dummy</span> {
-    <span class="kw">type</span> <span class="ident">Error</span> <span class="op">=</span> <span class="ident">Error</span>;
-    <span class="doccomment">/// Get Adapter whoami</span>
-    <span class="kw">fn</span> <span class="ident">whoami</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">ValidatorId</span> {
-        <span class="self">self</span>.<span class="ident">identity</span>
+<span class="attribute">#[async_trait]</span>
+<span class="kw">impl </span>Locked <span class="kw">for </span>Dummy {
+    <span class="kw">type </span>Error = Error;
+    <span class="doccomment">/// Get Adapter whoami
+    </span><span class="kw">fn </span>whoami(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; ValidatorId {
+        <span class="self">self</span>.identity
     }
 
-    <span class="doccomment">/// Verify, based on the signature &amp; state_root, that the signer is the same</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Splits the signature by `&quot; &quot;` (whitespace) and takes</span>
-    <span class="doccomment">/// the last part of it which contains the signer [`Address`].</span>
-    <span class="kw">fn</span> <span class="ident">verify</span>(
+    <span class="doccomment">/// Verify, based on the signature &amp; state_root, that the signer is the same
+    ///
+    /// Splits the signature by `&quot; &quot;` (whitespace) and takes
+    /// the last part of it which contains the signer [`Address`].
+    </span><span class="kw">fn </span>verify(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">signer</span>: <span class="ident">ValidatorId</span>,
-        <span class="ident">_state_root</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>,
-        <span class="ident">signature</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>,
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">bool</span>, <span class="ident"><span class="kw">crate</span>::Error</span><span class="op">&gt;</span> {
-        <span class="comment">// select the `identity` and compare it to the signer</span>
-        <span class="comment">// for empty string this will return array with 1 element - an empty string `[&quot;&quot;]`</span>
-        <span class="kw">let</span> <span class="ident">is_same</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">signature</span>.<span class="ident">rsplit</span>(<span class="string">&#39; &#39;</span>).<span class="ident">take</span>(<span class="number">1</span>).<span class="ident">next</span>() {
-            <span class="prelude-val">Some</span>(<span class="ident">from</span>) =&gt; <span class="ident">from</span> <span class="op">==</span> <span class="ident">signer</span>.<span class="ident">to_checksum</span>(),
-            <span class="prelude-val">None</span> =&gt; <span class="bool-val">false</span>,
+        signer: ValidatorId,
+        _state_root: <span class="kw-2">&amp;</span>str,
+        signature: <span class="kw-2">&amp;</span>str,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;bool, <span class="kw">crate</span>::Error&gt; {
+        <span class="comment">// select the `identity` and compare it to the signer
+        // for empty string this will return array with 1 element - an empty string `[&quot;&quot;]`
+        </span><span class="kw">let </span>is_same = <span class="kw">match </span>signature.rsplit(<span class="string">&#39; &#39;</span>).take(<span class="number">1</span>).next() {
+            <span class="prelude-val">Some</span>(from) =&gt; from == signer.to_checksum(),
+            <span class="prelude-val">None </span>=&gt; <span class="bool-val">false</span>,
         };
 
-        <span class="prelude-val">Ok</span>(<span class="ident">is_same</span>)
+        <span class="prelude-val">Ok</span>(is_same)
     }
 
-    <span class="doccomment">/// Finds the authorization token from the configured values</span>
-    <span class="doccomment">/// and creates a [`Session`] out of it by using the ChainId included in the header:</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// `{Auth token}:chain_id:{ChainId}`</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Examples</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// `AUTH_awesomeLeader:chain_id:1`</span>
-    <span class="doccomment">/// `AUTH_awesomeAdvertiser:chain_id:1337`</span>
-    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">session_from_token</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">header_token</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Session</span>, <span class="ident"><span class="kw">crate</span>::Error</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">header_token</span> <span class="op">=</span> <span class="ident">header_token</span>.<span class="ident">parse</span>::<span class="op">&lt;</span><span class="ident">HeaderToken</span><span class="op">&gt;</span>().<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">_parse</span><span class="op">|</span> {
-            <span class="ident">Error::authentication</span>(<span class="macro">format!</span>(<span class="string">&quot;Dummy Authentication token format should be in the format: `{{Auth Token}}:chain_id:{{Chain Id}}` but &#39;{header_token}&#39; was provided&quot;</span>))
+    <span class="doccomment">/// Finds the authorization token from the configured values
+    /// and creates a [`Session`] out of it by using the ChainId included in the header:
+    ///
+    /// `{Auth token}:chain_id:{ChainId}`
+    ///
+    /// # Examples
+    ///
+    /// `AUTH_awesomeLeader:chain_id:1`
+    /// `AUTH_awesomeAdvertiser:chain_id:1337`
+    </span><span class="kw">async fn </span>session_from_token(<span class="kw-2">&amp;</span><span class="self">self</span>, header_token: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Result</span>&lt;Session, <span class="kw">crate</span>::Error&gt; {
+        <span class="kw">let </span>header_token = header_token.parse::&lt;HeaderToken&gt;().map_err(|_parse| {
+            Error::authentication(<span class="macro">format!</span>(<span class="string">&quot;Dummy Authentication token format should be in the format: `{{Auth Token}}:chain_id:{{Chain Id}}` but &#39;{header_token}&#39; was provided&quot;</span>))
         })<span class="question-mark">?</span>;
 
-        <span class="comment">// find the chain</span>
-        <span class="kw">let</span> <span class="ident">chain_info</span> <span class="op">=</span> <span class="self">self</span>
-            .<span class="ident">chains</span>
-            .<span class="ident">iter</span>()
-            .<span class="ident">find</span>(<span class="op">|</span><span class="ident">chain_info</span><span class="op">|</span> <span class="ident">chain_info</span>.<span class="ident">chain</span>.<span class="ident">chain_id</span> <span class="op">==</span> <span class="ident">header_token</span>.<span class="ident">chain_id</span>)
-            .<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> {
-                <span class="ident">Error::authentication</span>(<span class="macro">format!</span>(<span class="string">&quot;Unknown chain id {:?}&quot;</span>, <span class="ident">header_token</span>.<span class="ident">chain_id</span>))
+        <span class="comment">// find the chain
+        </span><span class="kw">let </span>chain_info = <span class="self">self
+            </span>.chains
+            .iter()
+            .find(|chain_info| chain_info.chain.chain_id == header_token.chain_id)
+            .ok_or_else(|| {
+                Error::authentication(<span class="macro">format!</span>(<span class="string">&quot;Unknown chain id {:?}&quot;</span>, header_token.chain_id))
             })<span class="question-mark">?</span>;
 
-        <span class="comment">// find the authentication token</span>
-        <span class="kw">let</span> (<span class="ident">identity</span>, <span class="kw">_</span>) <span class="op">=</span> <span class="self">self</span>
-            .<span class="ident">authorization_tokens</span>
-            .<span class="ident">iter</span>()
-            .<span class="ident">find</span>(<span class="op">|</span>(<span class="kw">_</span>, <span class="ident">address_token</span>)<span class="op">|</span> <span class="kw-2">*</span><span class="ident">address_token</span> <span class="op">==</span> <span class="kw-2">&amp;</span><span class="ident">header_token</span>.<span class="ident">token</span>)
-            .<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> {
-                <span class="ident">Error::authentication</span>(<span class="macro">format!</span>(
+        <span class="comment">// find the authentication token
+        </span><span class="kw">let </span>(identity, <span class="kw">_</span>) = <span class="self">self
+            </span>.authorization_tokens
+            .iter()
+            .find(|(<span class="kw">_</span>, address_token)| <span class="kw-2">*</span>address_token == <span class="kw-2">&amp;</span>header_token.token)
+            .ok_or_else(|| {
+                Error::authentication(<span class="macro">format!</span>(
                     <span class="string">&quot;No identity found that matches authentication token: {}&quot;</span>,
-                    <span class="kw-2">&amp;</span><span class="ident">header_token</span>.<span class="ident">token</span>
+                    <span class="kw-2">&amp;</span>header_token.token
                 ))
             })<span class="question-mark">?</span>;
 
-        <span class="prelude-val">Ok</span>(<span class="ident">Session</span> {
-            <span class="ident">uid</span>: <span class="kw-2">*</span><span class="ident">identity</span>,
-            <span class="ident">era</span>: <span class="number">0</span>,
-            <span class="ident">chain</span>: <span class="ident">chain_info</span>.<span class="ident">chain</span>.<span class="ident">clone</span>(),
+        <span class="prelude-val">Ok</span>(Session {
+            uid: <span class="kw-2">*</span>identity,
+            era: <span class="number">0</span>,
+            chain: chain_info.chain.clone(),
         })
     }
 
-    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">get_deposit</span>(
+    <span class="kw">async fn </span>get_deposit(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">channel_context</span>: <span class="kw-2">&amp;</span><span class="ident">ChainOf</span><span class="op">&lt;</span><span class="ident">Channel</span><span class="op">&gt;</span>,
-        <span class="ident">depositor_address</span>: <span class="ident">Address</span>,
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Deposit</span>, <span class="ident"><span class="kw">crate</span>::Error</span><span class="op">&gt;</span> {
-        <span class="comment">// validate that the same chain &amp; token are used for the Channel Context</span>
-        <span class="comment">// as the ones setup in the Dummy adapter.</span>
-        <span class="kw">if</span> <span class="ident">channel_context</span>.<span class="ident">token</span>.<span class="ident">address</span> <span class="op">!</span><span class="op">=</span> <span class="ident">channel_context</span>.<span class="ident">context</span>.<span class="ident">token</span> {
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error::adapter</span>(
-                <span class="string">&quot;Token context of channel &amp; channel token addresses are different&quot;</span>.<span class="ident">to_string</span>(),
+        channel_context: <span class="kw-2">&amp;</span>ChainOf&lt;Channel&gt;,
+        depositor_address: Address,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;Deposit, <span class="kw">crate</span>::Error&gt; {
+        <span class="comment">// validate that the same chain &amp; token are used for the Channel Context
+        // as the ones setup in the Dummy adapter.
+        </span><span class="kw">if </span>channel_context.token.address != channel_context.context.token {
+            <span class="kw">return </span><span class="prelude-val">Err</span>(Error::adapter(
+                <span class="string">&quot;Token context of channel &amp; channel token addresses are different&quot;</span>.to_string(),
             ));
         }
 
-        <span class="comment">// Check if the combination of Chain &amp; Token are set in the dummy adapter configuration</span>
-        {
-            <span class="kw">let</span> <span class="ident">found_chain</span> <span class="op">=</span> <span class="self">self</span>
-                .<span class="ident">chains</span>
-                .<span class="ident">iter</span>()
-                .<span class="ident">find</span>(<span class="op">|</span><span class="ident">chain_info</span><span class="op">|</span> <span class="ident">chain_info</span>.<span class="ident">chain</span> <span class="op">==</span> <span class="ident">channel_context</span>.<span class="ident">chain</span>)
-                .<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> {
-                    <span class="ident">Error::adapter</span>(
-                        <span class="string">&quot;Channel Chain not found in Dummy adapter&#39;s configuration&quot;</span>.<span class="ident">to_string</span>(),
+        <span class="comment">// Check if the combination of Chain &amp; Token are set in the dummy adapter configuration
+        </span>{
+            <span class="kw">let </span>found_chain = <span class="self">self
+                </span>.chains
+                .iter()
+                .find(|chain_info| chain_info.chain == channel_context.chain)
+                .ok_or_else(|| {
+                    Error::adapter(
+                        <span class="string">&quot;Channel Chain not found in Dummy adapter&#39;s configuration&quot;</span>.to_string(),
                     )
                 })<span class="question-mark">?</span>;
 
-            <span class="kw">let</span> <span class="ident">_found_token</span> <span class="op">=</span> <span class="ident">found_chain</span>
-                .<span class="ident">find_token</span>(<span class="ident">channel_context</span>.<span class="ident">context</span>.<span class="ident">token</span>)
-                .<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> {
-                    <span class="ident">Error::adapter</span>(<span class="macro">format!</span>(
+            <span class="kw">let </span>_found_token = found_chain
+                .find_token(channel_context.context.token)
+                .ok_or_else(|| {
+                    Error::adapter(<span class="macro">format!</span>(
                         <span class="string">&quot;Channel Token not found in configured adapter chain: {:?}&quot;</span>,
-                        <span class="ident">found_chain</span>.<span class="ident">chain</span>.<span class="ident">chain_id</span>
+                        found_chain.chain.chain_id
                     ))
                 })<span class="question-mark">?</span>;
         }
 
-        <span class="self">self</span>.<span class="ident">deposits</span>
-            .<span class="ident">get_deposit</span>(<span class="ident">channel_context</span>, <span class="ident">depositor_address</span>)
-            .<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> {
-                <span class="ident">Error::adapter</span>(<span class="macro">format!</span>(
+        <span class="self">self</span>.deposits
+            .get_deposit(channel_context, depositor_address)
+            .ok_or_else(|| {
+                Error::adapter(<span class="macro">format!</span>(
                     <span class="string">&quot;No mocked deposit found for {:?} &amp; depositor {:?}&quot;</span>,
-                    <span class="ident">channel_context</span>.<span class="ident">context</span>.<span class="ident">id</span>(),
-                    <span class="ident">depositor_address</span>
+                    channel_context.context.id(),
+                    depositor_address
                 ))
             })
     }
 }
 
-<span class="attribute">#[<span class="ident">async_trait</span>]</span>
-<span class="kw">impl</span> <span class="ident">Unlocked</span> <span class="kw">for</span> <span class="ident">Dummy</span> {
-    <span class="comment">// requires Unlocked</span>
-    <span class="kw">fn</span> <span class="ident">sign</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">state_root</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">String</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">signature</span> <span class="op">=</span> <span class="macro">format!</span>(
+<span class="attribute">#[async_trait]</span>
+<span class="kw">impl </span>Unlocked <span class="kw">for </span>Dummy {
+    <span class="comment">// requires Unlocked
+    </span><span class="kw">fn </span>sign(<span class="kw-2">&amp;</span><span class="self">self</span>, state_root: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Result</span>&lt;String, Error&gt; {
+        <span class="kw">let </span>signature = <span class="macro">format!</span>(
             <span class="string">&quot;Dummy adapter signature for {} by {}&quot;</span>,
-            <span class="ident">state_root</span>,
-            <span class="self">self</span>.<span class="ident">whoami</span>().<span class="ident">to_checksum</span>()
+            state_root,
+            <span class="self">self</span>.whoami().to_checksum()
         );
-        <span class="prelude-val">Ok</span>(<span class="ident">signature</span>)
+        <span class="prelude-val">Ok</span>(signature)
     }
 
-    <span class="comment">// requires Unlocked</span>
-    <span class="comment">// Builds the authentication token as:</span>
-    <span class="comment">// `{Auth token}:chain_id:{Chain Id}`</span>
-    <span class="kw">fn</span> <span class="ident">get_auth</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">for_chain</span>: <span class="ident">ChainId</span>, <span class="ident">_intended_for</span>: <span class="ident">ValidatorId</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">String</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">token</span> <span class="op">=</span> <span class="self">self</span>
-            .<span class="ident">authorization_tokens</span>
-            .<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">identity</span>.<span class="ident">to_address</span>())
-            .<span class="ident">cloned</span>()
-            .<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> {
-                <span class="ident">Error::authentication</span>(<span class="macro">format!</span>(
+    <span class="comment">// requires Unlocked
+    // Builds the authentication token as:
+    // `{Auth token}:chain_id:{Chain Id}`
+    </span><span class="kw">fn </span>get_auth(<span class="kw-2">&amp;</span><span class="self">self</span>, for_chain: ChainId, _intended_for: ValidatorId) -&gt; <span class="prelude-ty">Result</span>&lt;String, Error&gt; {
+        <span class="kw">let </span>token = <span class="self">self
+            </span>.authorization_tokens
+            .get(<span class="kw-2">&amp;</span><span class="self">self</span>.identity.to_address())
+            .cloned()
+            .ok_or_else(|| {
+                Error::authentication(<span class="macro">format!</span>(
                     <span class="string">&quot;No auth token for this identity: {}&quot;</span>,
-                    <span class="self">self</span>.<span class="ident">identity</span>
+                    <span class="self">self</span>.identity
                 ))
             })<span class="question-mark">?</span>;
 
-        <span class="prelude-val">Ok</span>(<span class="ident">HeaderToken</span> {
-            <span class="ident">token</span>,
-            <span class="ident">chain_id</span>: <span class="ident">for_chain</span>,
+        <span class="prelude-val">Ok</span>(HeaderToken {
+            token,
+            chain_id: for_chain,
         }
-        .<span class="ident">to_string</span>())
+        .to_string())
     }
 }
 
-<span class="kw">impl</span> <span class="ident">Unlockable</span> <span class="kw">for</span> <span class="ident">Dummy</span> {
-    <span class="kw">type</span> <span class="ident">Unlocked</span> <span class="op">=</span> <span class="self">Self</span>;
+<span class="kw">impl </span>Unlockable <span class="kw">for </span>Dummy {
+    <span class="kw">type </span>Unlocked = <span class="self">Self</span>;
 
-    <span class="kw">fn</span> <span class="ident">unlock</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::Unlocked</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
-        <span class="prelude-val">Ok</span>(<span class="self">self</span>.<span class="ident">clone</span>())
+    <span class="kw">fn </span>unlock(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>::Unlocked, Error&gt; {
+        <span class="prelude-val">Ok</span>(<span class="self">self</span>.clone())
     }
 }
 
-<span class="doccomment">/// The dummy Header token used for the `Bearer` `Authorization` header</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// The format for the header token is:</span>
-<span class="doccomment">/// `{Auth token}:chain_id:{Chain Id}`</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">Display</span>, <span class="ident">FromStr</span>)]</span>
-<span class="attribute">#[<span class="ident">display</span>(<span class="string">&quot;{token}:chain_id:{chain_id}&quot;</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">HeaderToken</span> {
-    <span class="doccomment">/// the Authentication Token</span>
-    <span class="kw">pub</span> <span class="ident">token</span>: <span class="ident">String</span>,
-    <span class="doccomment">/// The [`ChainId`] for which we authenticate</span>
-    <span class="kw">pub</span> <span class="ident">chain_id</span>: <span class="ident">ChainId</span>,
+<span class="doccomment">/// The dummy Header token used for the `Bearer` `Authorization` header
+///
+/// The format for the header token is:
+/// `{Auth token}:chain_id:{Chain Id}`
+</span><span class="attribute">#[derive(Debug, Clone, Display, FromStr)]</span>
+<span class="attribute">#[display(<span class="string">&quot;{token}:chain_id:{chain_id}&quot;</span>)]</span>
+<span class="kw">pub struct </span>HeaderToken {
+    <span class="doccomment">/// the Authentication Token
+    </span><span class="kw">pub </span>token: String,
+    <span class="doccomment">/// The [`ChainId`] for which we authenticate
+    </span><span class="kw">pub </span>chain_id: ChainId,
 }
 
-<span class="kw">mod</span> <span class="ident">deposit</span> {
-    <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::primitives::Deposit</span>;
-    <span class="kw">use</span> <span class="ident">dashmap::DashMap</span>;
-    <span class="kw">use</span> <span class="ident">primitives</span>::{<span class="ident">Address</span>, <span class="ident">ChainId</span>, <span class="ident">ChainOf</span>, <span class="ident">Channel</span>, <span class="ident">ChannelId</span>};
-    <span class="kw">use</span> <span class="ident">std::sync::Arc</span>;
+<span class="kw">mod </span>deposit {
+    <span class="kw">use </span><span class="kw">crate</span>::primitives::Deposit;
+    <span class="kw">use </span>dashmap::DashMap;
+    <span class="kw">use </span>primitives::{Address, ChainId, ChainOf, Channel, ChannelId};
+    <span class="kw">use </span>std::sync::Arc;
 
-    <span class="doccomment">/// The Key for deposits that are unique for retrieving a Dummy deposit.</span>
-    <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">Hash</span>, <span class="ident">Eq</span>, <span class="ident">PartialEq</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Key</span> {
-        <span class="ident">channel_id</span>: <span class="ident">ChannelId</span>,
-        <span class="ident">chain_id</span>: <span class="ident">ChainId</span>,
-        <span class="ident">depositor</span>: <span class="ident">Address</span>,
+    <span class="doccomment">/// The Key for deposits that are unique for retrieving a Dummy deposit.
+    </span><span class="attribute">#[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]</span>
+    <span class="kw">pub struct </span>Key {
+        channel_id: ChannelId,
+        chain_id: ChainId,
+        depositor: Address,
     }
 
-    <span class="kw">impl</span> <span class="ident">Key</span> {
-        <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">from_chain_of</span>(<span class="ident">channel_context</span>: <span class="kw-2">&amp;</span><span class="ident">ChainOf</span><span class="op">&lt;</span><span class="ident">Channel</span><span class="op">&gt;</span>, <span class="ident">depositor</span>: <span class="ident">Address</span>) -&gt; <span class="self">Self</span> {
-            <span class="self">Self</span> {
-                <span class="ident">channel_id</span>: <span class="ident">channel_context</span>.<span class="ident">context</span>.<span class="ident">id</span>(),
-                <span class="ident">chain_id</span>: <span class="ident">channel_context</span>.<span class="ident">chain</span>.<span class="ident">chain_id</span>,
-                <span class="ident">depositor</span>,
+    <span class="kw">impl </span>Key {
+        <span class="kw">pub fn </span>from_chain_of(channel_context: <span class="kw-2">&amp;</span>ChainOf&lt;Channel&gt;, depositor: Address) -&gt; <span class="self">Self </span>{
+            <span class="self">Self </span>{
+                channel_id: channel_context.context.id(),
+                chain_id: channel_context.chain.chain_id,
+                depositor,
             }
         }
     }
 
-    <span class="doccomment">/// Mocked deposits for the Dummy adapter.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// These deposits can be set once and the adapter will return</span>
-    <span class="doccomment">/// the set deposit on every call to [`get_deposit()`](crate::client::Locked::get_deposit).</span>
-    <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">Default</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Deposits</span>(<span class="kw">pub</span> <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">DashMap</span><span class="op">&lt;</span><span class="ident">Key</span>, <span class="ident">Deposit</span><span class="op">&gt;</span><span class="op">&gt;</span>);
+    <span class="doccomment">/// Mocked deposits for the Dummy adapter.
+    ///
+    /// These deposits can be set once and the adapter will return
+    /// the set deposit on every call to [`get_deposit()`](crate::client::Locked::get_deposit).
+    </span><span class="attribute">#[derive(Debug, Clone, Default)]</span>
+    <span class="kw">pub struct </span>Deposits(<span class="kw">pub </span>Arc&lt;DashMap&lt;Key, Deposit&gt;&gt;);
 
-    <span class="kw">impl</span> <span class="ident">Deposits</span> {
-        <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>() -&gt; <span class="self">Self</span> {
-            <span class="ident"><span class="self">Self</span>::default</span>()
+    <span class="kw">impl </span>Deposits {
+        <span class="kw">pub fn </span>new() -&gt; <span class="self">Self </span>{
+            <span class="self">Self</span>::default()
         }
 
-        <span class="doccomment">/// Get&#39;s the set deposit for the given [`Key`].</span>
-        <span class="doccomment">///</span>
-        <span class="doccomment">/// This method will return [`None`] if the deposit for the</span>
-        <span class="doccomment">/// [`Key`] was not set.</span>
-        <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_deposit</span>(
+        <span class="doccomment">/// Get&#39;s the set deposit for the given [`Key`].
+        ///
+        /// This method will return [`None`] if the deposit for the
+        /// [`Key`] was not set.
+        </span><span class="kw">pub fn </span>get_deposit(
             <span class="kw-2">&amp;</span><span class="self">self</span>,
-            <span class="ident">channel</span>: <span class="kw-2">&amp;</span><span class="ident">ChainOf</span><span class="op">&lt;</span><span class="ident">Channel</span><span class="op">&gt;</span>,
-            <span class="ident">depositor</span>: <span class="ident">Address</span>,
-        ) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Deposit</span><span class="op">&gt;</span> {
-            <span class="self">self</span>.<span class="number">0</span>
-                .<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">Key::from_chain_of</span>(<span class="ident">channel</span>, <span class="ident">depositor</span>))
-                .<span class="ident">map</span>(<span class="op">|</span><span class="ident">dashmap_ref</span><span class="op">|</span> <span class="ident">dashmap_ref</span>.<span class="ident">value</span>().<span class="ident">clone</span>())
+            channel: <span class="kw-2">&amp;</span>ChainOf&lt;Channel&gt;,
+            depositor: Address,
+        ) -&gt; <span class="prelude-ty">Option</span>&lt;Deposit&gt; {
+            <span class="self">self</span>.<span class="number">0
+                </span>.get(<span class="kw-2">&amp;</span>Key::from_chain_of(channel, depositor))
+                .map(|dashmap_ref| dashmap_ref.value().clone())
         }
     }
 }
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
-<span class="kw">mod</span> <span class="ident">test</span> {
-    <span class="kw">use</span> <span class="ident">primitives</span>::{
-        <span class="ident">config::GANACHE_CONFIG</span>,
-        <span class="ident">test_util</span>::{<span class="ident">CREATOR</span>, <span class="ident">DUMMY_CAMPAIGN</span>, <span class="ident">IDS</span>, <span class="ident">LEADER</span>, <span class="ident">PUBLISHER</span>},
-        <span class="ident">BigNum</span>, <span class="ident">ChainOf</span>,
+<span class="attribute">#[cfg(test)]</span>
+<span class="kw">mod </span>test {
+    <span class="kw">use </span>primitives::{
+        config::GANACHE_CONFIG,
+        test_util::{CREATOR, DUMMY_CAMPAIGN, IDS, LEADER, PUBLISHER},
+        BigNum, ChainOf,
     };
 
-    <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::ethereum::test_util</span>::{<span class="ident">GANACHE_1337</span>, <span class="ident">GANACHE_INFO_1337</span>};
+    <span class="kw">use </span><span class="kw">crate</span>::ethereum::test_util::{GANACHE_1337, GANACHE_INFO_1337};
 
-    <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
+    <span class="kw">use super</span>::<span class="kw-2">*</span>;
 
-    <span class="attribute">#[<span class="ident">tokio::test</span>]</span>
-    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">test_deposits_calls</span>() {
-        <span class="kw">let</span> <span class="ident">channel_context</span> <span class="op">=</span> <span class="ident">ChainOf::new</span>(
-            <span class="ident">GANACHE_1337</span>.<span class="ident">clone</span>(),
-            <span class="ident">GANACHE_INFO_1337</span>
-                .<span class="ident">find_token</span>(<span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">channel</span>.<span class="ident">token</span>)
-                .<span class="ident">cloned</span>()
-                .<span class="ident">unwrap</span>(),
+    <span class="attribute">#[tokio::test]</span>
+    <span class="kw">async fn </span>test_deposits_calls() {
+        <span class="kw">let </span>channel_context = ChainOf::new(
+            GANACHE_1337.clone(),
+            GANACHE_INFO_1337
+                .find_token(DUMMY_CAMPAIGN.channel.token)
+                .cloned()
+                .unwrap(),
         )
-        .<span class="ident">with_channel</span>(<span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">channel</span>);
+        .with_channel(DUMMY_CAMPAIGN.channel);
 
-        <span class="kw">let</span> <span class="ident">dummy_client</span> <span class="op">=</span> <span class="ident">Dummy::init</span>(<span class="ident">Options</span> {
-            <span class="ident">dummy_identity</span>: <span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="ident">LEADER</span>],
-            <span class="ident">dummy_auth_tokens</span>: <span class="ident">Default::default</span>(),
-            <span class="ident">dummy_chains</span>: <span class="ident">GANACHE_CONFIG</span>.<span class="ident">chains</span>.<span class="ident">values</span>().<span class="ident">cloned</span>().<span class="ident">collect</span>(),
+        <span class="kw">let </span>dummy_client = Dummy::init(Options {
+            dummy_identity: IDS[<span class="kw-2">&amp;</span>LEADER],
+            dummy_auth_tokens: Default::default(),
+            dummy_chains: GANACHE_CONFIG.chains.values().cloned().collect(),
         });
 
-        <span class="kw">let</span> <span class="ident">creator</span> <span class="op">=</span> <span class="kw-2">*</span><span class="ident">CREATOR</span>;
-        <span class="kw">let</span> <span class="ident">publisher</span> <span class="op">=</span> <span class="kw-2">*</span><span class="ident">PUBLISHER</span>;
+        <span class="kw">let </span>creator = <span class="kw-2">*</span>CREATOR;
+        <span class="kw">let </span>publisher = <span class="kw-2">*</span>PUBLISHER;
 
-        <span class="comment">// no mocked deposit calls should cause an Error</span>
-        {
-            <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="ident">dummy_client</span>.<span class="ident">get_deposit</span>(<span class="kw-2">&amp;</span><span class="ident">channel_context</span>, <span class="ident">creator</span>).<span class="kw">await</span>;
+        <span class="comment">// no mocked deposit calls should cause an Error
+        </span>{
+            <span class="kw">let </span>result = dummy_client.get_deposit(<span class="kw-2">&amp;</span>channel_context, creator).<span class="kw">await</span>;
 
-            <span class="macro">assert!</span>(<span class="ident">result</span>.<span class="ident">is_err</span>());
+            <span class="macro">assert!</span>(result.is_err());
         }
 
-        <span class="kw">let</span> <span class="ident">get_deposit</span> <span class="op">=</span> <span class="op">|</span><span class="ident">total</span>: <span class="ident">u64</span><span class="op">|</span> <span class="ident">Deposit</span> {
-            <span class="ident">total</span>: <span class="ident">BigNum::from</span>(<span class="ident">total</span>),
+        <span class="kw">let </span>get_deposit = |total: u64| Deposit {
+            total: BigNum::from(total),
         };
 
-        <span class="comment">// add two deposit for CREATOR &amp; PUBLISHER</span>
-        {
-            <span class="kw">let</span> <span class="ident">creator_deposit</span> <span class="op">=</span> <span class="ident">get_deposit</span>(<span class="number">6969</span>);
-            <span class="kw">let</span> <span class="ident">publisher_deposit</span> <span class="op">=</span> <span class="ident">get_deposit</span>(<span class="number">1000</span>);
+        <span class="comment">// add two deposit for CREATOR &amp; PUBLISHER
+        </span>{
+            <span class="kw">let </span>creator_deposit = get_deposit(<span class="number">6969</span>);
+            <span class="kw">let </span>publisher_deposit = get_deposit(<span class="number">1000</span>);
 
-            <span class="ident">dummy_client</span>.<span class="ident">set_deposit</span>(<span class="kw-2">&amp;</span><span class="ident">channel_context</span>, <span class="ident">creator</span>, <span class="ident">creator_deposit</span>.<span class="ident">clone</span>());
-            <span class="ident">dummy_client</span>.<span class="ident">set_deposit</span>(<span class="kw-2">&amp;</span><span class="ident">channel_context</span>, <span class="ident">publisher</span>, <span class="ident">publisher_deposit</span>.<span class="ident">clone</span>());
+            dummy_client.set_deposit(<span class="kw-2">&amp;</span>channel_context, creator, creator_deposit.clone());
+            dummy_client.set_deposit(<span class="kw-2">&amp;</span>channel_context, publisher, publisher_deposit.clone());
 
-            <span class="kw">let</span> <span class="ident">creator_actual</span> <span class="op">=</span> <span class="ident">dummy_client</span>
-                .<span class="ident">get_deposit</span>(<span class="kw-2">&amp;</span><span class="ident">channel_context</span>, <span class="ident">creator</span>)
-                .<span class="kw">await</span>
-                .<span class="ident">expect</span>(<span class="string">&quot;Should get mocked deposit&quot;</span>);
-            <span class="macro">assert_eq!</span>(<span class="kw-2">&amp;</span><span class="ident">creator_deposit</span>, <span class="kw-2">&amp;</span><span class="ident">creator_actual</span>);
+            <span class="kw">let </span>creator_actual = dummy_client
+                .get_deposit(<span class="kw-2">&amp;</span>channel_context, creator)
+                .<span class="kw">await
+                </span>.expect(<span class="string">&quot;Should get mocked deposit&quot;</span>);
+            <span class="macro">assert_eq!</span>(<span class="kw-2">&amp;</span>creator_deposit, <span class="kw-2">&amp;</span>creator_actual);
 
-            <span class="comment">// calling an non-mocked address, should cause an error</span>
-            <span class="kw">let</span> <span class="ident">different_address_call</span> <span class="op">=</span> <span class="ident">dummy_client</span>.<span class="ident">get_deposit</span>(<span class="kw-2">&amp;</span><span class="ident">channel_context</span>, <span class="kw-2">*</span><span class="ident">LEADER</span>).<span class="kw">await</span>;
-            <span class="macro">assert!</span>(<span class="ident">different_address_call</span>.<span class="ident">is_err</span>());
+            <span class="comment">// calling an non-mocked address, should cause an error
+            </span><span class="kw">let </span>different_address_call = dummy_client.get_deposit(<span class="kw-2">&amp;</span>channel_context, <span class="kw-2">*</span>LEADER).<span class="kw">await</span>;
+            <span class="macro">assert!</span>(different_address_call.is_err());
 
-            <span class="kw">let</span> <span class="ident">publisher_actual</span> <span class="op">=</span> <span class="ident">dummy_client</span>
-                .<span class="ident">get_deposit</span>(<span class="kw-2">&amp;</span><span class="ident">channel_context</span>, <span class="ident">publisher</span>)
-                .<span class="kw">await</span>
-                .<span class="ident">expect</span>(<span class="string">&quot;Should get mocked deposit&quot;</span>);
-            <span class="macro">assert_eq!</span>(<span class="kw-2">&amp;</span><span class="ident">publisher_deposit</span>, <span class="kw-2">&amp;</span><span class="ident">publisher_actual</span>);
+            <span class="kw">let </span>publisher_actual = dummy_client
+                .get_deposit(<span class="kw-2">&amp;</span>channel_context, publisher)
+                .<span class="kw">await
+                </span>.expect(<span class="string">&quot;Should get mocked deposit&quot;</span>);
+            <span class="macro">assert_eq!</span>(<span class="kw-2">&amp;</span>publisher_deposit, <span class="kw-2">&amp;</span>publisher_actual);
         }
     }
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="attribute">#[<span class="ident">should_panic</span>]</span>
-    <span class="kw">fn</span> <span class="ident">test_set_deposit_to_none_should_panic_on_non_mocked_deposits</span>() {
-        <span class="kw">let</span> <span class="ident">channel</span> <span class="op">=</span> <span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">channel</span>;
+    <span class="attribute">#[test]</span>
+    <span class="attribute">#[should_panic]</span>
+    <span class="kw">fn </span>test_set_deposit_to_none_should_panic_on_non_mocked_deposits() {
+        <span class="kw">let </span>channel = DUMMY_CAMPAIGN.channel;
 
-        <span class="kw">let</span> <span class="ident">token</span> <span class="op">=</span> <span class="ident">GANACHE_INFO_1337</span>
-            .<span class="ident">find_token</span>(<span class="ident">channel</span>.<span class="ident">token</span>)
-            .<span class="ident">cloned</span>()
-            .<span class="ident">unwrap</span>();
+        <span class="kw">let </span>token = GANACHE_INFO_1337
+            .find_token(channel.token)
+            .cloned()
+            .unwrap();
 
-        <span class="kw">let</span> <span class="ident">channel_context</span> <span class="op">=</span> <span class="ident">ChainOf</span> {
-            <span class="ident">context</span>: <span class="ident">channel</span>,
-            <span class="ident">token</span>,
-            <span class="ident">chain</span>: <span class="ident">GANACHE_1337</span>.<span class="ident">clone</span>(),
+        <span class="kw">let </span>channel_context = ChainOf {
+            context: channel,
+            token,
+            chain: GANACHE_1337.clone(),
         };
 
-        <span class="kw">let</span> <span class="ident">dummy_client</span> <span class="op">=</span> <span class="ident">Dummy::init</span>(<span class="ident">Options</span> {
-            <span class="ident">dummy_identity</span>: <span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="ident">LEADER</span>],
-            <span class="ident">dummy_auth_tokens</span>: <span class="ident">Default::default</span>(),
-            <span class="ident">dummy_chains</span>: <span class="ident">GANACHE_CONFIG</span>.<span class="ident">chains</span>.<span class="ident">values</span>().<span class="ident">cloned</span>().<span class="ident">collect</span>(),
+        <span class="kw">let </span>dummy_client = Dummy::init(Options {
+            dummy_identity: IDS[<span class="kw-2">&amp;</span>LEADER],
+            dummy_auth_tokens: Default::default(),
+            dummy_chains: GANACHE_CONFIG.chains.values().cloned().collect(),
         });
 
-        <span class="comment">// It should panic when no deposit is set and we try to set it to None</span>
-        <span class="ident">dummy_client</span>.<span class="ident">set_deposit</span>(<span class="kw-2">&amp;</span><span class="ident">channel_context</span>, <span class="kw-2">*</span><span class="ident">LEADER</span>, <span class="prelude-val">None</span>);
+        <span class="comment">// It should panic when no deposit is set and we try to set it to None
+        </span>dummy_client.set_deposit(<span class="kw-2">&amp;</span>channel_context, <span class="kw-2">*</span>LEADER, <span class="prelude-val">None</span>);
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="adapter" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (20ffea693 2022-08-11)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="adapter" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>
