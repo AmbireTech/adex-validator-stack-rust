@@ -1271,7 +1271,8 @@ mod test {
         {
             let accounting_response =
                 get_accounting_for_channel_axum(app.clone(), Extension(channel_context.clone()))
-                    .await.expect("shoul get accounting");
+                    .await
+                    .expect("shoul get accounting");
 
             assert_eq!(accounting_response.balances.earners.len(), 0);
             assert_eq!(accounting_response.balances.spenders.len(), 0);
@@ -1296,7 +1297,8 @@ mod test {
 
             let accounting_response =
                 get_accounting_for_channel_axum(app.clone(), Extension(channel_context.clone()))
-                    .await.expect("should get accounting");
+                    .await
+                    .expect("should get accounting");
 
             assert_eq!(balances, accounting_response.balances);
         }
@@ -1329,7 +1331,8 @@ mod test {
 
             let accounting_response =
                 get_accounting_for_channel_axum(app.clone(), Extension(channel_context.clone()))
-                    .await.expect("shoul get accounting");
+                    .await
+                    .expect("shoul get accounting");
 
             assert_eq!(balances, accounting_response.balances)
         }
@@ -1386,10 +1389,13 @@ mod test {
             Extension(channel_context.clone()),
             Path((channel_context.context.id(), *CREATOR)),
         )
-        .await.expect("should get spender leaf");
+        .await
+        .expect("should get spender leaf");
 
         let accounting_response =
-            get_accounting_for_channel_axum(app.clone(), Extension(channel_context.clone())).await.expect("should get accounting");
+            get_accounting_for_channel_axum(app.clone(), Extension(channel_context.clone()))
+                .await
+                .expect("should get accounting");
 
         // Making sure a new entry has been created
         assert_eq!(
@@ -1413,7 +1419,9 @@ mod test {
         .expect("should spend");
 
         let accounting_response =
-            get_accounting_for_channel_axum(app.clone(), Extension(channel_context.clone())).await.expect("should get accounting");
+            get_accounting_for_channel_axum(app.clone(), Extension(channel_context.clone()))
+                .await
+                .expect("should get accounting");
 
         assert_eq!(balances, accounting_response.balances);
 
@@ -1426,7 +1434,9 @@ mod test {
         assert!(res.is_ok());
 
         let accounting_response =
-            get_accounting_for_channel_axum(app.clone(), Extension(channel_context.clone())).await.expect("should get accounting");
+            get_accounting_for_channel_axum(app.clone(), Extension(channel_context.clone()))
+                .await
+                .expect("should get accounting");
 
         // Balances shouldn't change
         assert_eq!(
