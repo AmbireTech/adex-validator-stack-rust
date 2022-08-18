@@ -21,7 +21,11 @@ impl IntoResponse for ResponseError {
             ResponseError::NotFound => {
                 (StatusCode::NOT_FOUND, "Not found".to_string()).into_response()
             }
-            ResponseError::BadRequest(err) => (StatusCode::BAD_REQUEST, err).into_response(),
+            ResponseError::BadRequest(err) => {
+                let error_response = [("message", err)].into_iter().collect::<HashMap<_, _>>();
+
+                (StatusCode::BAD_REQUEST, Json(error_response)).into_response()
+            }
             ResponseError::Unauthorized => {
                 (StatusCode::UNAUTHORIZED, "invalid authorization").into_response()
             }
@@ -46,9 +50,7 @@ where
     T: std::error::Error + 'static,
 {
     fn from(error: T) -> Self {
-        // @TODO use a error proper logger?
-        println!("{:#?}", error);
-        ResponseError::BadRequest("Bad Request: try again later".into())
+        ResponseError::BadRequest(error.to_string())
     }
 }
 impl From<ResponseError> for Response<Body> {
