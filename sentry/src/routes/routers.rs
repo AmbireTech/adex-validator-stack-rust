@@ -139,14 +139,13 @@ pub fn channels_router_axum<C: Locked + 'static>() -> Router {
         .route(
             "/:addr",
             get(get_spender_limits_axum::<C>)
-                .post(add_spender_leaf_axum::<C>)
-                .route_layer(middleware::from_fn(authentication_required::<C, _>)),
+                .post(add_spender_leaf_axum::<C>),
         )
         .route(
             "/all",
-            get(get_all_spender_limits_axum::<C>)
-                .route_layer(middleware::from_fn(authentication_required::<C, _>)),
-        );
+            get(get_all_spender_limits_axum::<C>),
+        )
+        .layer(middleware::from_fn(authentication_required::<C, _>));
 
     let channel_routes = Router::new()
         .route(
