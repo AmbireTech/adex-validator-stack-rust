@@ -926,6 +926,13 @@ pub async fn channel_payout<C: Locked + 'static>(
     })?))
 }
 
+/// POST `/v5/channel/dummy-deposit` request
+///
+/// Full details about the route's API and intend can be found in the [`routes`](crate::routes#post-v5channeldummy-deposit-auth-required) module
+///
+/// Request body (json): [`ChannelDummyDeposit`]
+///
+/// Response: [`SuccessResponse`]
 pub async fn channel_dummy_deposit_axum<C: Locked + 'static>(
     Extension(app): Extension<Arc<Application<C>>>,
     Extension(auth): Extension<Auth>,
@@ -1016,7 +1023,10 @@ pub async fn channel_dummy_deposit<C: Locked + 'static>(
 /// starting with `/v5/channel/0xXXX.../validator-messages`
 ///
 pub mod validator_message {
+    use std::sync::Arc;
+
     use crate::{
+        application::Qs,
         db::validator_message::{get_validator_messages, insert_validator_message},
         Auth,
     };
@@ -1025,6 +1035,7 @@ pub mod validator_message {
         Application,
     };
     use adapter::client::Locked;
+    use axum::{extract::Path, Extension, Json};
     use futures::future::try_join_all;
     use hyper::{Body, Request, Response};
     use primitives::{
@@ -1032,8 +1043,9 @@ pub mod validator_message {
             SuccessResponse, ValidatorMessagesCreateRequest, ValidatorMessagesListQuery,
             ValidatorMessagesListResponse,
         },
-        ChainOf, Channel, DomainError, ValidatorId,
+        ChainOf, Channel, ChannelId, DomainError, ValidatorId,
     };
+    use serde::Deserialize;
 
     pub fn extract_params(
         from_path: &str,
@@ -1063,6 +1075,108 @@ pub mod validator_message {
             .map(|string| string.split('+').map(|s| s.to_string()).collect());
 
         Ok((validator_id, message_types.unwrap_or_default()))
+    }
+
+    #[derive(Debug, Deserialize)]
+    pub struct MessagesListParams {
+        pub id: ChannelId,
+        // Optional filtering by ValidatorId
+        #[serde(default)]
+        pub address: Option<ValidatorId>,
+        /// List of validator message types separated by `+` (urlencoded):
+        /// e.g. `ApproveState+NewState`
+        #[serde(default)]
+        pub message_types: String,
+    }
+
+    /// GET `/v5/channel/0xXXX.../validator-messages`
+    ///
+    /// Full details about the route's API and intend can be found in the [`routes`](crate::routes#get-v5channelidvalidator-messages) module
+    ///
+    /// Request query parameters: [`ValidatorMessagesListQuery`]
+    ///
+    /// Response: [`ValidatorMessagesListResponse`]
+    ///
+    pub async fn list_validator_messages_axum<C: Locked + 'static>(
+        Extension(app): Extension<Arc<Application<C>>>,
+        Extension(channel_context): Extension<ChainOf<Channel>>,
+        Path(params): Path<MessagesListParams>,
+        Qs(query): Qs<ValidatorMessagesListQuery>,
+    ) -> Result<Json<ValidatorMessagesListResponse>, ResponseError> {
+        let message_types = {
+            // We need to strip the `/` prefix from axum
+            let stripped = params
+                .message_types
+                .strip_prefix('/')
+                .unwrap_or(&params.message_types);
+
+            if !stripped.is_empty() {
+                stripped
+                    .split('+')
+                    .map(|s| s.to_string())
+                    .collect::<Vec<_>>()
+            } else {
+                vec![]
+            }
+        };
+
+        let channel = channel_context.context;
+
+        let config_limit = app.config.msgs_find_limit as u64;
+        let limit = query
+            .limit
+            .filter(|n| *n >= 1)
+            .unwrap_or(config_limit)
+            .min(config_limit);
+
+        let validator_messages = get_validator_messages(
+            &app.pool,
+            &channel.id(),
+            &params.address,
+            &message_types,
+            limit,
+        )
+        .await?;
+
+        Ok(Json(ValidatorMessagesListResponse {
+            messages: validator_messages,
+        }))
+    }
+
+    /// POST `/v5/channel/0xXXX.../validator-messages`
+    ///
+    /// Full details about the route's API and intend can be found in the [`routes`](crate::routes#post-v5channelidvalidator-messages-auth-required) module
+    ///
+    /// Request body (json): [`ValidatorMessagesCreateRequest`]
+    ///
+    /// Response: [`SuccessResponse`]
+    ///
+    /// # Examples
+    ///
+    /// Request:
+    ///
+    /// ```
+    #[doc = include_str!("../../../primitives/examples/validator_messages_create_request.rs")]
+    /// ```
+    pub async fn create_validator_messages_axum<C: Locked + 'static>(
+        Extension(app): Extension<Arc<Application<C>>>,
+        Extension(auth): Extension<Auth>,
+        Extension(channel_context): Extension<ChainOf<Channel>>,
+        Json(create_request): Json<ValidatorMessagesCreateRequest>,
+    ) -> Result<Json<SuccessResponse>, ResponseError> {
+        let channel = channel_context.context;
+
+        match channel.find_validator(auth.uid) {
+            None => Err(ResponseError::Unauthorized),
+            _ => {
+                try_join_all(create_request.messages.iter().map(|message| {
+                    insert_validator_message(&app.pool, &channel, &auth.uid, message)
+                }))
+                .await?;
+
+                Ok(Json(SuccessResponse { success: true }))
+            }
+        }
     }
 
     /// GET `/v5/channel/0xXXX.../validator-messages`

@@ -58,7 +58,10 @@ use tower::ServiceBuilder;
 
 use super::{
     analytics::{analytics_axum, GET_ANALYTICS_ALLOWED_KEYS},
-    channel::{channel_dummy_deposit_axum, channel_list_axum, channel_payout_axum},
+    channel::{
+        channel_dummy_deposit_axum, channel_list_axum, channel_payout_axum,
+        validator_message::{create_validator_messages_axum, list_validator_messages_axum},
+    },
     units_for_slot::post_units_for_slot,
 };
 
@@ -162,6 +165,20 @@ pub fn channels_router_axum<C: Locked + 'static>() -> Router {
         .route("/accounting", get(get_accounting_for_channel_axum::<C>))
         .route("/last-approved", get(last_approved_axum::<C>))
         .nest("/spender", spender_routes)
+        .route(
+            "/validator-messages",
+            post(create_validator_messages_axum::<C>)
+                .route_layer(middleware::from_fn(authentication_required::<C, _>)),
+        )
+        .route(
+            "/validator-messages",
+            get(list_validator_messages_axum::<C>),
+        )
+        // We allow Message Type filtering only when filtering by a ValidatorId
+        .route(
+            "/validator-messages/:address/*message_types",
+            get(list_validator_messages_axum::<C>),
+        )
         .layer(
             // keeps the order from top to bottom!
             ServiceBuilder::new()
