@@ -143,8 +143,7 @@ pub fn channels_router_axum<C: Locked + 'static>() -> Router {
         .route("/all", get(get_all_spender_limits_axum::<C>))
         .layer(
             // keeps the order from top to bottom!
-            ServiceBuilder::new()
-                .layer(middleware::from_fn(authentication_required::<C, _>)),
+            ServiceBuilder::new().layer(middleware::from_fn(authentication_required::<C, _>)),
         );
 
     let channel_routes = Router::new()
