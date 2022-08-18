@@ -15,15 +15,15 @@
 use std::sync::Arc;
 
 use axum::{
+    http::Request,
     middleware::{self, Next},
     routing::{get, post},
     Extension, Router,
 };
-use hyper::Request;
-use primitives::analytics::query::ALLOWED_KEYS;
 use tower::ServiceBuilder;
 
 use adapter::{prelude::*, Adapter, Dummy};
+use primitives::analytics::query::ALLOWED_KEYS;
 
 use crate::{
     middleware::{

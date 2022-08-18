@@ -3257,7 +3257,6 @@ dependencies = [
  "pretty_assertions",
  "primitives",
  "redis",
- "regex",
  "reqwest",
  "serde",
  "serde_json",

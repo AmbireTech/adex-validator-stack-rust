@@ -1,9 +1,11 @@
 use std::sync::Arc;
 
-use axum::middleware::Next;
-use hyper::{
-    header::{AUTHORIZATION, REFERER},
-    Request,
+use axum::{
+    http::{
+        header::{AUTHORIZATION, REFERER},
+        Request,
+    },
+    middleware::Next,
 };
 
 use adapter::{prelude::*, primitives::Session as AdapterSession};
@@ -193,15 +195,20 @@ fn get_request_ip<B>(req: &Request<B>) -> Option<String> {
 mod test {
     use std::collections::HashMap;
 
+    use axum::{
+        body::Body,
+        http::{Request, StatusCode},
+        middleware::from_fn,
+        routing::get,
+        Extension, Router,
+    };
+    use tower::Service;
+
     use adapter::{
         dummy::{Dummy, HeaderToken},
         ethereum::test_util::GANACHE_1,
     };
-    use axum::{body::Body, middleware::from_fn, routing::get, Extension, Router};
-    use hyper::{Request, StatusCode};
     use primitives::test_util::{DUMMY_AUTH, LEADER};
-
-    use tower::Service;
 
     use crate::{middleware::body_to_string, test_util::setup_dummy_app, Session};
 
