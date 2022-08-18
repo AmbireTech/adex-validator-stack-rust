@@ -115,6 +115,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ) {
         (Some(certs_path), Some(private_keys)) => {
             EnableTls::new_tls(certs_path, private_keys, socket_addr)
+                .await
                 .expect("Failed to load certificates & private key files")
         }
         (None, None) => EnableTls::no_tls(socket_addr),
