@@ -41,7 +41,7 @@ hex = "0.4"
 # CLI
 clap = { version = "3", features = ["cargo"] }
 # Server
-axum = { version = "0.5", features = ["http1", "http2"] }
+axum = { version = "0.5", features = ["http1", "http2", "headers"] }
 axum-server = { version = "0.4", features = ["tls-rustls"] }
 tower = "0.4"
 tower-http = { version = "0.3", features = ["cors"] }

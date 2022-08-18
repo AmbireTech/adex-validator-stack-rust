@@ -6,13 +6,12 @@ use std::{
 
 use axum::{
     extract::{FromRequest, RequestParts},
-    http::StatusCode,
+    http::{Method, StatusCode},
     middleware,
     routing::get,
     Extension, Router,
 };
 use axum_server::{tls_rustls::RustlsConfig, Handle};
-use hyper::{Body, Method, Request, Response};
 use once_cell::sync::Lazy;
 use redis::{aio::MultiplexedConnection, ConnectionInfo};
 use serde::{Deserialize, Deserializer};
@@ -25,19 +24,11 @@ use primitives::{config::Environment, ValidatorId};
 
 use crate::{
     db::{CampaignRemaining, DbPool},
-    middleware::{
-        auth::{authenticate, Authenticate},
-        cors::{cors, Cors},
-        Middleware,
-    },
+    middleware::auth::authenticate,
     platform::PlatformApi,
-    response::{map_response_error, ResponseError},
     routes::{
-        get_cfg, get_cfg_axum,
-        routers::{
-            analytics_router, analytics_router_axum, campaigns_router, campaigns_router_axum,
-            channels_router, channels_router_axum,
-        },
+        get_cfg,
+        routers::{analytics_router, campaigns_router, channels_router, units_for_slot_router},
     },
 };
 
@@ -94,9 +85,11 @@ where
 fn default_port() -> u16 {
     DEFAULT_PORT
 }
+
 fn default_ip_addr() -> IpAddr {
     DEFAULT_IP_ADDR
 }
+
 fn default_redis_url() -> ConnectionInfo {
     DEFAULT_REDIS_URL.clone()
 }
@@ -137,36 +130,7 @@ where
         }
     }
 
-    pub async fn handle_routing(&self, req: Request<Body>) -> Response<Body> {
-        let headers = match cors(&req) {
-            Some(Cors::Simple(headers)) => headers,
-            // if we have a Preflight, just return the response directly
-            Some(Cors::Preflight(response)) => return response,
-            None => Default::default(),
-        };
-
-        let req = match Authenticate.call(req, self).await {
-            Ok(req) => req,
-            Err(error) => return map_response_error(error),
-        };
-
-        let mut response = match (req.uri().path(), req.method()) {
-            ("/cfg", &Method::GET) => get_cfg(req, self).await,
-            (route, _) if route.starts_with("/v5/analytics") => analytics_router(req, self).await,
-            // This is important because it prevents us from doing
-            // expensive regex matching for routes without /channel
-            (path, _) if path.starts_with("/v5/channel") => channels_router(req, self).await,
-            (path, _) if path.starts_with("/v5/campaign") => campaigns_router(req, self).await,
-            _ => Err(ResponseError::NotFound),
-        }
-        .unwrap_or_else(map_response_error);
-
-        // extend the headers with the initial headers we have from CORS (if there are some)
-        response.headers_mut().extend(headers);
-        response
-    }
-
-    pub async fn axum_routing(&self) -> Router {
+    pub async fn routing(&self) -> Router {
         let cors = CorsLayer::new()
             // "GET,HEAD,PUT,PATCH,POST,DELETE"
             .allow_methods([
@@ -182,13 +146,14 @@ where
             .allow_origin(tower_http::cors::Any);
 
         let router = Router::new()
-            .nest("/channel", channels_router_axum::<C>())
-            .nest("/campaign", campaigns_router_axum::<C>())
-            .nest("/analytics", analytics_router_axum::<C>());
+            .nest("/channel", channels_router::<C>())
+            .nest("/campaign", campaigns_router::<C>())
+            .nest("/analytics", analytics_router::<C>())
+            .nest("/units-for-slot", units_for_slot_router::<C>());
 
         Router::new()
             .nest("/v5", router)
-            .route("/cfg", get(get_cfg_axum::<C>))
+            .route("/cfg", get(get_cfg::<C>))
             .layer(
                 // keeps the order from top to bottom!
                 ServiceBuilder::new()
@@ -208,7 +173,7 @@ impl<C: Locked + 'static> Application<C> {
         };
 
         info!(&logger, "Listening on socket address: {}!", socket_addr);
-        let router = self.axum_routing().await;
+        let router = self.routing().await;
 
         let handle = Handle::new();
 

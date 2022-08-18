@@ -1,9 +1,13 @@
 #![deny(clippy::all)]
 #![deny(rust_2018_idioms)]
 
-use adapter::{primitives::AdapterTypes, Adapter};
+use std::{env, net::SocketAddr, path::PathBuf};
+
 use clap::{crate_version, value_parser, Arg, Command};
 
+use slog::info;
+
+use adapter::{primitives::AdapterTypes, Adapter};
 use primitives::{
     config::configuration, postgres::POSTGRES_CONFIG, test_util::DUMMY_AUTH,
     util::logging::new_logger, ValidatorId,
@@ -14,8 +18,6 @@ use sentry::{
     platform::PlatformApi,
     Application,
 };
-use slog::info;
-use std::{env, net::SocketAddr, path::PathBuf};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
