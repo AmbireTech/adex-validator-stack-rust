@@ -3,22 +3,20 @@
 
 use std::{collections::HashSet, sync::Arc};
 
-use crate::{
-    application::Qs,
-    db::analytics::get_analytics,
-    response::{success_response, ResponseError},
-    Application, Auth,
-};
-use adapter::client::Locked;
 use axum::{Extension, Json};
-use hyper::{Body, Request, Response};
 use once_cell::sync::Lazy;
+
+use adapter::client::Locked;
 use primitives::{
     analytics::{
         query::{AllowedKey, ALLOWED_KEYS},
         AnalyticsQuery, AuthenticateAs,
     },
     sentry::AnalyticsResponse,
+};
+
+use crate::{
+    application::Qs, db::analytics::get_analytics, response::ResponseError, Application, Auth,
 };
 
 /// The GET `/v5/analytics` allowed keys that are applied to the route.
@@ -38,7 +36,7 @@ pub static GET_ANALYTICS_ALLOWED_KEYS: Lazy<HashSet<AllowedKey>> = Lazy::new(|| 
 /// - GET `/v5/analytics/for-publisher`
 /// - GET `/v5/analytics/for-advertiser`
 /// - GET `/v5/analytics/for-admin`
-pub async fn analytics_axum<C: Locked + 'static>(
+pub async fn analytics<C: Locked + 'static>(
     Extension(app): Extension<Arc<Application<C>>>,
     auth: Option<Extension<Auth>>,
     Extension(route_allowed_keys): Extension<HashSet<AllowedKey>>,
@@ -106,79 +104,6 @@ pub async fn analytics_axum<C: Locked + 'static>(
     };
 
     Ok(Json(analytics))
-}
-
-pub async fn analytics<C: Locked + 'static>(
-    req: Request<Body>,
-    app: &Application<C>,
-    request_allowed: Option<HashSet<AllowedKey>>,
-    authenticate_as: Option<AuthenticateAs>,
-) -> Result<Response<Body>, ResponseError> {
-    let mut query = serde_qs::from_str::<AnalyticsQuery>(req.uri().query().unwrap_or(""))?;
-    // If we have a route that requires authentication the Chain will be extracted
-    // from the sentry's authentication, which guarantees the value will exist
-    // This will also override a query parameter for the chain if it is provided
-    if let Some(auth) = req.extensions().get::<Auth>() {
-        query.chains = vec![auth.chain.chain_id]
-    }
-
-    let applied_limit = query.limit.min(app.config.analytics_find_limit);
-
-    let route_allowed_keys: HashSet<AllowedKey> =
-        request_allowed.unwrap_or_else(|| ALLOWED_KEYS.clone());
-
-    if let Some(segment_by) = query.segment_by {
-        if !route_allowed_keys.contains(&segment_by) {
-            return Err(ResponseError::Forbidden(format!(
-                "Disallowed segmentBy `{}`",
-                segment_by.to_camelCase()
-            )));
-        }
-    }
-
-    // for all `ALLOWED_KEYS` check if we have a value passed and if so,
-    // cross check it with the allowed keys for the route
-    let disallowed_key = ALLOWED_KEYS.iter().find(|allowed| {
-        let in_query = query.get_key(**allowed).is_some();
-
-        // is there a value for this key in the query
-        // but not allowed for this route
-        // return the key
-        in_query && !route_allowed_keys.contains(*allowed)
-    });
-
-    // Return a error if value passed in the query is not allowed for this route
-    if let Some(disallowed_key) = disallowed_key {
-        return Err(ResponseError::Forbidden(format!(
-            "Disallowed query key `{}`",
-            disallowed_key.to_camelCase()
-        )));
-    }
-
-    let analytics = match tokio::time::timeout(
-        app.config.analytics_maxtime,
-        get_analytics(
-            &app.pool,
-            query.clone(),
-            route_allowed_keys,
-            authenticate_as,
-            applied_limit,
-        ),
-    )
-    .await
-    {
-        Ok(Ok(analytics)) => AnalyticsResponse { analytics },
-        // Error getting the analytics
-        Ok(Err(err)) => return Err(err.into()),
-        // Timeout error
-        Err(_elapsed) => {
-            return Err(ResponseError::BadRequest(
-                "Timeout when fetching analytics data".into(),
-            ))
-        }
-    };
-
-    Ok(success_response(serde_json::to_string(&analytics)?))
 }
 
 #[cfg(test)]
@@ -476,7 +401,7 @@ mod test {
                 .await
                 .expect("Should update analytics");
 
-            let analytics_response = analytics_axum(
+            let analytics_response = analytics(
                 app.clone(),
                 None,
                 Extension(GET_ANALYTICS_ALLOWED_KEYS.clone()),
@@ -523,7 +448,7 @@ mod test {
                 ..Default::default()
             };
 
-            let analytics_response = analytics_axum(
+            let analytics_response = analytics(
                 app.clone(),
                 None,
                 Extension(GET_ANALYTICS_ALLOWED_KEYS.clone()),
@@ -560,7 +485,7 @@ mod test {
                 ..Default::default()
             };
 
-            let analytics_response = analytics_axum(
+            let analytics_response = analytics(
                 app.clone(),
                 None,
                 Extension(GET_ANALYTICS_ALLOWED_KEYS.clone()),
@@ -600,7 +525,7 @@ mod test {
                 ..Default::default()
             };
 
-            let analytics_response = analytics_axum(
+            let analytics_response = analytics(
                 app.clone(),
                 None,
                 Extension(GET_ANALYTICS_ALLOWED_KEYS.clone()),
@@ -643,7 +568,7 @@ mod test {
                 ..Default::default()
             };
 
-            let analytics_response = analytics_axum(
+            let analytics_response = analytics(
                 app.clone(),
                 None,
                 Extension(GET_ANALYTICS_ALLOWED_KEYS.clone()),
@@ -685,7 +610,7 @@ mod test {
                 ..Default::default()
             };
 
-            let analytics_response = analytics_axum(
+            let analytics_response = analytics(
                 app.clone(),
                 None,
                 Extension(GET_ANALYTICS_ALLOWED_KEYS.clone()),
@@ -711,7 +636,7 @@ mod test {
                 ..Default::default()
             };
 
-            let analytics_response = analytics_axum(
+            let analytics_response = analytics(
                 app.clone(),
                 None,
                 Extension(GET_ANALYTICS_ALLOWED_KEYS.clone()),
@@ -736,7 +661,7 @@ mod test {
                 ..Default::default()
             };
 
-            let analytics_response = analytics_axum(
+            let analytics_response = analytics(
                 app.clone(),
                 None,
                 Extension(GET_ANALYTICS_ALLOWED_KEYS.clone()),
@@ -776,7 +701,7 @@ mod test {
                 ..Default::default()
             };
 
-            let analytics_response = analytics_axum(
+            let analytics_response = analytics(
                 app.clone(),
                 None,
                 Extension(GET_ANALYTICS_ALLOWED_KEYS.clone()),
@@ -813,7 +738,7 @@ mod test {
                 ..Default::default()
             };
 
-            let analytics_response = analytics_axum(
+            let analytics_response = analytics(
                 app.clone(),
                 None,
                 Extension(GET_ANALYTICS_ALLOWED_KEYS.clone()),
@@ -852,7 +777,7 @@ mod test {
                 ..Default::default()
             };
 
-            let analytics_response = analytics_axum(
+            let analytics_response = analytics(
                 app.clone(),
                 None,
                 Extension(GET_ANALYTICS_ALLOWED_KEYS.clone()),
@@ -890,7 +815,7 @@ mod test {
                 ..Default::default()
             };
 
-            let analytics_response = analytics_axum(
+            let analytics_response = analytics(
                 app.clone(),
                 None,
                 Extension(GET_ANALYTICS_ALLOWED_KEYS.clone()),
@@ -928,7 +853,7 @@ mod test {
                 ..Default::default()
             };
 
-            let analytics_response = analytics_axum(
+            let analytics_response = analytics(
                 app.clone(),
                 None,
                 Extension(GET_ANALYTICS_ALLOWED_KEYS.clone()),
@@ -968,7 +893,7 @@ mod test {
                 ..Default::default()
             };
 
-            let analytics_response = analytics_axum(
+            let analytics_response = analytics(
                 app.clone(),
                 None,
                 Extension(GET_ANALYTICS_ALLOWED_KEYS.clone()),
@@ -1210,7 +1135,7 @@ mod test {
 
         // test for publisher
         {
-            let analytics_response = analytics_axum(
+            let analytics_response = analytics(
                 app.clone(),
                 Some(publisher_auth.clone()),
                 Extension(ALLOWED_KEYS.clone()),
@@ -1233,7 +1158,7 @@ mod test {
 
         // test for advertiser
         {
-            let analytics_response = analytics_axum(
+            let analytics_response = analytics(
                 app.clone(),
                 Some(advertiser_auth.clone()),
                 Extension(ALLOWED_KEYS.clone()),
@@ -1255,7 +1180,7 @@ mod test {
         }
         // test for admin
         {
-            let analytics_response = analytics_axum(
+            let analytics_response = analytics(
                 app.clone(),
                 Some(admin_auth.clone()),
                 Extension(ALLOWED_KEYS.clone()),
@@ -1302,7 +1227,7 @@ mod test {
                 chains: vec![GANACHE_1337.chain_id],
             };
 
-            let analytics_response = analytics_axum(
+            let analytics_response = analytics(
                 app.clone(),
                 Some(admin_auth.clone()),
                 Extension(ALLOWED_KEYS.clone()),
@@ -1323,7 +1248,7 @@ mod test {
 
         // test for admin with a different chain
         {
-            let analytics_response = analytics_axum(
+            let analytics_response = analytics(
                 app.clone(),
                 Some(admin_auth_other_chain.clone()),
                 Extension(ALLOWED_KEYS.clone()),

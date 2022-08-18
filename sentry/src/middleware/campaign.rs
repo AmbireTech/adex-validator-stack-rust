@@ -1,71 +1,21 @@
 use std::sync::Arc;
 
-use crate::{db::fetch_campaign, middleware::Middleware};
-use crate::{response::ResponseError, routes::routers::RouteParams, Application, Auth};
-use adapter::client::Locked;
-use async_trait::async_trait;
 use axum::{
     extract::{Path, RequestParts},
     middleware::Next,
 };
-use hyper::{Body, Request};
-use primitives::{campaign::Campaign, CampaignId, ChainOf};
 use serde::Deserialize;
+
+use adapter::client::Locked;
+use primitives::{campaign::Campaign, CampaignId, ChainOf};
+
+use crate::{db::fetch_campaign, response::ResponseError, Application, Auth};
 
 /// This struct is required because of routes that have more parameters
 /// apart from the `CampaignId`
 #[derive(Debug, Deserialize)]
 struct CampaignParam {
     pub id: CampaignId,
-}
-
-#[derive(Debug)]
-pub struct CampaignLoad;
-#[derive(Debug)]
-pub struct CalledByCreator;
-
-#[async_trait]
-impl<C: Locked + 'static> Middleware<C> for CampaignLoad {
-    async fn call<'a>(
-        &self,
-        mut request: Request<Body>,
-        application: &'a Application<C>,
-    ) -> Result<Request<Body>, ResponseError> {
-        let id = request
-            .extensions()
-            .get::<RouteParams>()
-            .ok_or_else(|| ResponseError::BadRequest("Route params not found".to_string()))?
-            .get(0)
-            .ok_or_else(|| ResponseError::BadRequest("No id".to_string()))?;
-
-        let campaign_id = id
-            .parse()
-            .map_err(|_| ResponseError::BadRequest("Wrong Campaign Id".to_string()))?;
-        let campaign = fetch_campaign(application.pool.clone(), &campaign_id)
-            .await?
-            .ok_or(ResponseError::NotFound)?;
-
-        let campaign_context = application
-            .config
-            .find_chain_of(campaign.channel.token)
-            .ok_or_else(|| ResponseError::BadRequest("Channel token not whitelisted".to_string()))?
-            .with_campaign(campaign);
-
-        // If this is an authenticated call
-        // Check if the Campaign's Channel context (Chain Id) aligns with the Authentication token Chain id
-        match request.extensions().get::<Auth>() {
-            // If Chain Ids differ, the requester hasn't generated Auth token
-            // to access the Channel in it's Chain Id.
-            Some(auth) if auth.chain.chain_id != campaign_context.chain.chain_id => {
-                return Err(ResponseError::Forbidden("Authentication token is generated for different Chain and differs from the Campaign's Channel Chain".into()))
-            }
-            _ => {},
-        }
-
-        request.extensions_mut().insert(campaign_context);
-
-        Ok(request)
-    }
 }
 
 pub async fn campaign_load<C: Locked + 'static, B>(
@@ -146,39 +96,14 @@ where
     Ok(next.run(request).await)
 }
 
-#[async_trait]
-impl<C: Locked + 'static> Middleware<C> for CalledByCreator {
-    async fn call<'a>(
-        &self,
-        request: Request<Body>,
-        _application: &'a Application<C>,
-    ) -> Result<Request<Body>, ResponseError> {
-        let campaign = request
-            .extensions()
-            .get::<Campaign>()
-            .expect("We must have a campaign in extensions")
-            .to_owned();
-
-        let auth = request
-            .extensions()
-            .get::<Auth>()
-            .expect("request should have session")
-            .to_owned();
-
-        if auth.uid.to_address() != campaign.creator {
-            return Err(ResponseError::Forbidden(
-                "Request not sent by campaign creator".to_string(),
-            ));
-        }
-
-        Ok(request)
-    }
-}
-
 #[cfg(test)]
 mod test {
     use axum::{
-        body::Body, http::StatusCode, middleware::from_fn, routing::get, Extension, Router,
+        body::Body,
+        http::{Request, StatusCode},
+        middleware::from_fn,
+        routing::get,
+        Extension, Router,
     };
     use tower::Service;
 

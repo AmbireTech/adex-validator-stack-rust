@@ -1,4 +1,29 @@
 //! `/v5/campaign` routes
+use std::{
+    cmp::{max, Ordering},
+    sync::Arc,
+};
+
+use axum::{Extension, Json};
+use deadpool_postgres::PoolError;
+use futures::{future::try_join_all, TryFutureExt};
+use slog::error;
+use thiserror::Error;
+use tokio_postgres::error::SqlState;
+
+use adapter::{prelude::*, Adapter, Error as AdaptorError};
+use primitives::{
+    campaign_validator::Validator,
+    sentry::{
+        campaign_create::CreateCampaign,
+        campaign_list::{CampaignListQuery, CampaignListResponse},
+        campaign_modify::ModifyCampaign,
+        SuccessResponse,
+    },
+    spender::Spendable,
+    Address, Campaign, CampaignId, ChainOf, Channel, ChannelId, Deposit, UnifiedNum,
+};
+
 use crate::{
     application::Qs,
     db::{
@@ -11,32 +36,9 @@ use crate::{
         spendable::update_spendable,
         CampaignRemaining, DbPool, RedisError,
     },
-    response::{success_response, ResponseError},
+    response::ResponseError,
     Application, Auth,
 };
-use adapter::{prelude::*, Adapter, Error as AdaptorError};
-use axum::{Extension, Json};
-use deadpool_postgres::PoolError;
-use futures::{future::try_join_all, TryFutureExt};
-use hyper::{Body, Request, Response};
-use primitives::{
-    campaign_validator::Validator,
-    sentry::{
-        campaign_create::CreateCampaign,
-        campaign_list::{CampaignListQuery, CampaignListResponse},
-        campaign_modify::ModifyCampaign,
-        SuccessResponse,
-    },
-    spender::Spendable,
-    Address, Campaign, CampaignId, ChainOf, Channel, ChannelId, Deposit, UnifiedNum,
-};
-use slog::error;
-use std::{
-    cmp::{max, Ordering},
-    sync::Arc,
-};
-use thiserror::Error;
-use tokio_postgres::error::SqlState;
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -71,6 +73,7 @@ pub enum LatestSpendableError {
     #[error("DB Pool error: {0}")]
     Pool(#[from] PoolError),
 }
+
 /// Gets the latest Spendable from the Adapter and updates it in the Database
 /// before returning it
 pub async fn update_latest_spendable<C>(
@@ -149,7 +152,12 @@ pub async fn fetch_campaign_ids_for_channel(
     }
 }
 
-pub async fn create_campaign_axum<C>(
+/// POST `/v5/campaign`
+///
+/// Request body (json): [`CreateCampaign`]
+///
+/// Response: [`Campaign`]
+pub async fn create_campaign<C>(
     Json(create_campaign): Json<CreateCampaign>,
     Extension(auth): Extension<Auth>,
     Extension(app): Extension<Arc<Application<C>>>,
@@ -276,160 +284,8 @@ where
     Ok(Json(campaign))
 }
 
-/// POST `/v5/campaign`
-///
-/// Request body (json): [`CreateCampaign`](primitives::sentry::campaign_create::CreateCampaign)
-///
-/// Response: [`Campaign`](primitives::Campaign)
-pub async fn create_campaign<C>(
-    req: Request<Body>,
-    app: &Application<C>,
-) -> Result<Response<Body>, ResponseError>
-where
-    C: Locked + 'static,
-{
-    let auth = req
-        .extensions()
-        .get::<Auth>()
-        .expect("request should have session")
-        .to_owned();
-
-    let body = hyper::body::to_bytes(req.into_body()).await?;
-
-    let campaign_context = serde_json::from_slice::<CreateCampaign>(&body)
-        .map_err(|e| ResponseError::FailedValidation(e.to_string()))?
-        // create the actual `Campaign` with a randomly generated `CampaignId` or the set `CampaignId`
-        .into_campaign()
-        // Validate the campaign as soon as a valid JSON was passed.
-        // This will validate the Context - Chain & Token are whitelisted!
-        .validate(&app.config, app.adapter.whoami())
-        .map_err(|err| ResponseError::FailedValidation(err.to_string()))?;
-    let campaign = &campaign_context.context;
-
-    if auth.uid.to_address() != campaign.creator {
-        return Err(ResponseError::Forbidden(
-            "Request not sent by campaign creator".to_string(),
-        ));
-    }
-
-    let channel_context = app
-        .config
-        .find_chain_of(campaign.channel.token)
-        .ok_or_else(|| {
-            ResponseError::FailedValidation(
-                "Channel token is not whitelisted in this validator".into(),
-            )
-        })?
-        .with_channel(campaign.channel);
-    // make sure that the Channel is available in the DB
-    // insert Channel
-    insert_channel(&app.pool, &channel_context)
-        .await
-        .map_err(|error| {
-            error!(&app.logger, "{}", &error; "module" => "create_campaign");
-
-            ResponseError::BadRequest("Failed to fetch/create Channel".to_string())
-        })?;
-
-    let total_remaining = {
-        let accounting_spent = get_accounting(
-            app.pool.clone(),
-            campaign.channel.id(),
-            campaign.creator,
-            Side::Spender,
-        )
-        .await?
-        .map(|accounting| accounting.amount)
-        .unwrap_or_default();
-
-        let latest_spendable = update_latest_spendable(
-            &app.adapter,
-            &app.pool,
-            &campaign_context.of_channel(),
-            campaign.creator,
-        )
-        .await
-        .map_err(|err| ResponseError::BadRequest(err.to_string()))?;
-        // Gets the latest Spendable for this (spender, channelId) pair
-        let total_deposited = latest_spendable.deposit.total;
-
-        total_deposited
-            .checked_sub(&accounting_spent)
-            .ok_or_else(|| {
-                ResponseError::FailedValidation("No more budget remaining".to_string())
-            })?
-    };
-
-    let channel_campaigns = fetch_campaign_ids_for_channel(
-        &app.pool,
-        campaign.channel.id(),
-        app.config.campaigns_find_limit,
-    )
-    .await?;
-
-    let campaigns_remaining_sum = app
-        .campaign_remaining
-        .get_multiple(channel_campaigns.as_slice())
-        .await?
-        .iter()
-        .sum::<Option<UnifiedNum>>()
-        .ok_or(Error::Calculation)?
-        // DO NOT FORGET to add the Campaign being created right now!
-        .checked_add(&campaign.budget)
-        .ok_or(Error::Calculation)?;
-
-    // `new_campaigns_remaining <= total_remaining` should be upheld
-    // `campaign.budget < total_remaining` should also be upheld!
-    if campaigns_remaining_sum > total_remaining || campaign.budget > total_remaining {
-        return Err(ResponseError::BadRequest(
-            "Not enough deposit left for the new campaign's budget".to_string(),
-        ));
-    }
-
-    // If the campaign is being created, the amount spent is 0, therefore remaining = budget
-    let remaining_set = CampaignRemaining::new(app.redis.clone())
-        .set_initial(campaign.id, campaign.budget)
-        .await
-        .map_err(|_| {
-            ResponseError::BadRequest("Couldn't set remaining while creating campaign".to_string())
-        })?;
-
-    // If for some reason the randomly generated `CampaignId` exists in Redis
-    // This should **NOT** happen!
-    if !remaining_set {
-        return Err(ResponseError::Conflict(
-            "The generated CampaignId already exists, please repeat the request".to_string(),
-        ));
-    }
-
-    // Channel insertion can never create a `SqlState::UNIQUE_VIOLATION`
-    // Insert the Campaign too
-    match insert_campaign(&app.pool, campaign).await {
-        Err(error) => {
-            error!(&app.logger, "{}", &error; "module" => "create_campaign");
-            match error {
-                PoolError::Backend(error) if error.code() == Some(&SqlState::UNIQUE_VIOLATION) => {
-                    Err(ResponseError::Conflict(
-                        "Campaign already exists".to_string(),
-                    ))
-                }
-                _err => Err(ResponseError::BadRequest(
-                    "Error occurred when inserting Campaign in Database; please try again later"
-                        .to_string(),
-                )),
-            }
-        }
-        Ok(false) => Err(ResponseError::BadRequest(
-            "Encountered error while creating Campaign; please try again".to_string(),
-        )),
-        _ => Ok(()),
-    }?;
-
-    Ok(success_response(serde_json::to_string(&campaign)?))
-}
-
 /// GET `/v5/campaign/list`
-pub async fn campaign_list_axum<C: Locked + 'static>(
+pub async fn campaign_list<C: Locked + 'static>(
     Extension(app): Extension<Arc<Application<C>>>,
     Qs(query): Qs<CampaignListQuery>,
 ) -> Result<Json<CampaignListResponse>, ResponseError> {
@@ -451,37 +307,12 @@ pub async fn campaign_list_axum<C: Locked + 'static>(
     Ok(Json(list_response))
 }
 
-/// GET `/v5/campaign/list`
-pub async fn campaign_list<C: Locked + 'static>(
-    req: Request<Body>,
-    app: &Application<C>,
-) -> Result<Response<Body>, ResponseError> {
-    let query = serde_qs::from_str::<CampaignListQuery>(req.uri().query().unwrap_or(""))?;
-
-    let limit = app.config.campaigns_find_limit;
-    let skip = query
-        .page
-        .checked_mul(limit.into())
-        .ok_or_else(|| ResponseError::BadRequest("Page and/or limit is too large".into()))?;
-    let list_response = list_campaigns(
-        &app.pool,
-        skip,
-        limit,
-        query.creator,
-        query.validator,
-        &query.active_to_ge,
-    )
-    .await?;
-
-    Ok(success_response(serde_json::to_string(&list_response)?))
-}
-
 /// POST `/v5/campaign/:id/close` (auth required)
 ///
 /// **Can only be called by the [`Campaign.creator`]!**
 /// To close a campaign, just set it's budget to what it's spent so far (so that remaining == 0)
 /// newBudget = totalSpent, i.e. newBudget = oldBudget - remaining
-pub async fn close_campaign_axum<C: Locked + 'static>(
+pub async fn close_campaign<C: Locked + 'static>(
     Extension(app): Extension<Arc<Application<C>>>,
     Extension(auth): Extension<Auth>,
     Extension(campaign_context): Extension<ChainOf<Campaign>>,
@@ -511,52 +342,6 @@ pub async fn close_campaign_axum<C: Locked + 'static>(
     }
 }
 
-/// POST `/v5/campaign/:id/close` (auth required)
-///
-/// **Can only be called by the [`Campaign.creator`]!**
-/// To close a campaign, just set it's budget to what it's spent so far (so that remaining == 0)
-/// newBudget = totalSpent, i.e. newBudget = oldBudget - remaining
-pub async fn close_campaign<C: Locked + 'static>(
-    req: Request<Body>,
-    app: &Application<C>,
-) -> Result<Response<Body>, ResponseError> {
-    let auth = req
-        .extensions()
-        .get::<Auth>()
-        .expect("Auth should be present");
-
-    let campaign_context = req
-        .extensions()
-        .get::<ChainOf<Campaign>>()
-        .expect("We must have a campaign in extensions")
-        .to_owned();
-    let mut campaign = campaign_context.context;
-
-    if auth.uid.to_address() != campaign.creator {
-        Err(ResponseError::Forbidden(
-            "Request not sent by campaign creator".to_string(),
-        ))
-    } else {
-        let old_remaining = app
-            .campaign_remaining
-            .getset_remaining_to_zero(campaign.id)
-            .await
-            .map_err(|e| ResponseError::BadRequest(e.to_string()))?;
-
-        campaign.budget = campaign
-            .budget
-            .checked_sub(&UnifiedNum::from(old_remaining))
-            .ok_or_else(|| {
-                ResponseError::BadRequest("Campaign budget overflow/underflow".to_string())
-            })?;
-        update_campaign(&app.pool, &campaign).await?;
-
-        Ok(success_response(serde_json::to_string(&SuccessResponse {
-            success: true,
-        })?))
-    }
-}
-
 pub mod update_campaign {
     use primitives::Config;
 
@@ -564,7 +349,16 @@ pub mod update_campaign {
 
     use super::*;
 
-    pub async fn handle_route_axum<C: Locked + 'static>(
+    /// POST `/v5/campaign/:id` (auth required)
+    ///
+    /// Request body (json): [`ModifyCampaign`](`primitives::sentry::campaign_modify::ModifyCampaign`)
+    /// consists of all of the editable fields of the [`Campaign`]
+    ///
+    /// Response[`Campaign`](`primitives::Campaign`)
+    ///
+    /// Ensures that the remaining funds for all campaigns <= total remaining funds (total deposited - total spent)
+    ///
+    pub async fn handle_route<C: Locked + 'static>(
         Json(modify_campaign_fields): Json<ModifyCampaign>,
         Extension(campaign_being_mutated): Extension<ChainOf<Campaign>>,
         Extension(app): Extension<Arc<Application<C>>>,
@@ -582,45 +376,6 @@ pub mod update_campaign {
         .map_err(|err| ResponseError::BadRequest(err.to_string()))?;
 
         Ok(Json(modified_campaign))
-    }
-
-    /// POST `/v5/campaign/:id` (auth required)
-    ///
-    /// Request body (json): [`ModifyCampaign`](`primitives::sentry::campaign_modify::ModifyCampaign`)
-    /// consists of all of the editable fields of the [`Campaign`]
-    ///
-    /// Response[`Campaign`](`primitives::Campaign`)
-    ///
-    /// Ensures that the remaining funds for all campaigns <= total remaining funds (total deposited - total spent)
-    ///
-    pub async fn handle_route<C: Locked + 'static>(
-        req: Request<Body>,
-        app: &Application<C>,
-    ) -> Result<Response<Body>, ResponseError> {
-        let campaign_being_mutated = req
-            .extensions()
-            .get::<ChainOf<Campaign>>()
-            .expect("We must have a campaign in extensions")
-            .clone();
-
-        let body = hyper::body::to_bytes(req.into_body()).await?;
-
-        let modify_campaign_fields = serde_json::from_slice::<ModifyCampaign>(&body)
-            .map_err(|e| ResponseError::FailedValidation(e.to_string()))?;
-
-        // modify Campaign
-        let modified_campaign = modify_campaign(
-            app.adapter.clone(),
-            &app.pool,
-            &app.config,
-            &app.campaign_remaining,
-            &campaign_being_mutated,
-            modify_campaign_fields,
-        )
-        .await
-        .map_err(|err| ResponseError::BadRequest(err.to_string()))?;
-
-        Ok(success_response(serde_json::to_string(&modified_campaign)?))
     }
 
     pub async fn modify_campaign<C: Locked + 'static>(
@@ -804,8 +559,18 @@ pub mod update_campaign {
 }
 
 pub mod insert_events {
-
     use std::sync::Arc;
+
+    use axum::{Extension, Json};
+    use slog::{error, Logger};
+    use thiserror::Error;
+
+    use adapter::prelude::*;
+    use primitives::{
+        balances::{Balances, CheckedState, OverflowError},
+        sentry::{Event, InsertEventsRequest, SuccessResponse},
+        Address, Campaign, CampaignId, ChainOf, DomainError, UnifiedNum, ValidatorDesc,
+    };
 
     use crate::{
         access::{self, check_access},
@@ -816,16 +581,6 @@ pub mod insert_events {
         spender::fee::calculate_fee,
         Application, Auth, Session,
     };
-    use adapter::prelude::*;
-    use axum::{Extension, Json};
-    use hyper::{Body, Request, Response};
-    use primitives::{
-        balances::{Balances, CheckedState, OverflowError},
-        sentry::{Event, InsertEventsRequest, SuccessResponse},
-        Address, Campaign, CampaignId, ChainOf, DomainError, UnifiedNum, ValidatorDesc,
-    };
-    use slog::{error, Logger};
-    use thiserror::Error;
 
     #[derive(Debug, Error)]
     pub enum Error {
@@ -858,7 +613,7 @@ pub mod insert_events {
     /// Request body (json): [`InsertEventsRequest`]
     ///
     /// Response: [`SuccessResponse`]
-    pub async fn handle_route_axum<C: Locked + 'static>(
+    pub async fn handle_route<C: Locked + 'static>(
         auth: Option<Extension<Auth>>,
         Extension(session): Extension<Session>,
         Extension(app): Extension<Arc<Application<C>>>,
@@ -875,39 +630,6 @@ pub mod insert_events {
         .await?;
 
         Ok(Json(SuccessResponse { success: true }))
-    }
-
-    /// POST `/v5/campaign/:id/events`
-    ///
-    /// Request body (json): [`InsertEventsRequest`]
-    ///
-    /// Response: [`SuccessResponse`]
-    pub async fn handle_route<C: Locked + 'static>(
-        req: Request<Body>,
-        app: &Application<C>,
-    ) -> Result<Response<Body>, ResponseError> {
-        let (req_head, req_body) = req.into_parts();
-
-        let auth = req_head.extensions.get::<Auth>();
-        let session = req_head
-            .extensions
-            .get::<Session>()
-            .expect("request should have session");
-
-        let campaign_context = req_head
-            .extensions
-            .get::<ChainOf<Campaign>>()
-            .expect("request should have a Campaign loaded");
-
-        let body_bytes = hyper::body::to_bytes(req_body).await?;
-        let request_body = serde_json::from_slice::<InsertEventsRequest>(&body_bytes)?;
-
-        process_events(app, auth, session, campaign_context, request_body.events).await?;
-
-        Ok(Response::builder()
-            .header("Content-type", "application/json")
-            .body(serde_json::to_string(&SuccessResponse { success: true })?.into())
-            .unwrap())
     }
 
     async fn process_events<C: Locked + 'static>(
@@ -1369,7 +1091,7 @@ mod test {
             let mut create = CreateCampaign::from_campaign_erased(DUMMY_CAMPAIGN.clone(), None);
             create.budget = UnifiedNum::from_whole(500);
 
-            let create_response = create_campaign_axum(Json(create), auth.clone(), app.clone())
+            let create_response = create_campaign(Json(create), auth.clone(), app.clone())
                 .await
                 .expect("Should create campaign")
                 .0;
@@ -1436,7 +1158,7 @@ mod test {
                 CreateCampaign::from_campaign_erased(DUMMY_CAMPAIGN.clone(), None);
             create_second.budget = UnifiedNum::from_whole(500);
 
-            create_campaign_axum(Json(create_second), auth.clone(), app.clone())
+            create_campaign(Json(create_second), auth.clone(), app.clone())
                 .await
                 .expect("Should create campaign")
                 .0
@@ -1450,7 +1172,7 @@ mod test {
             let mut create = CreateCampaign::from_campaign_erased(DUMMY_CAMPAIGN.clone(), None);
             create.budget = UnifiedNum::from_whole(600);
 
-            let create_err = create_campaign_axum(Json(create), auth.clone(), app.clone())
+            let create_err = create_campaign(Json(create), auth.clone(), app.clone())
                 .await
                 .expect_err("Should return Error response");
 
@@ -1499,7 +1221,7 @@ mod test {
             let mut create = CreateCampaign::from_campaign_erased(DUMMY_CAMPAIGN.clone(), None);
             create.budget = UnifiedNum::from_whole(600);
 
-            let _create_response = create_campaign_axum(Json(create), auth.clone(), app.clone())
+            let _create_response = create_campaign(Json(create), auth.clone(), app.clone())
                 .await
                 .expect("Should return create campaign");
         }
@@ -1653,7 +1375,7 @@ mod test {
                 chain: campaign_context.chain.clone(),
             });
 
-            close_campaign_axum(app.clone(), auth.clone(), campaign_context.clone())
+            close_campaign(app.clone(), auth.clone(), campaign_context.clone())
                 .await
                 .expect("Should close campaign");
 
@@ -1683,7 +1405,7 @@ mod test {
                 chain: campaign_context.chain.clone(),
             });
 
-            let res = close_campaign_axum(app.clone(), auth, campaign_context.clone())
+            let res = close_campaign(app.clone(), auth, campaign_context.clone())
                 .await
                 .expect_err("Should return error for Bad Campaign");
 
@@ -1826,7 +1548,7 @@ mod test {
                 validator: Some(ValidatorParam::Leader(DUMMY_VALIDATOR_LEADER.id)),
             };
 
-            let res = campaign_list_axum(app.clone(), Qs(query))
+            let res = campaign_list(app.clone(), Qs(query))
                 .await
                 .expect("should get campaigns")
                 .0;
@@ -1844,7 +1566,7 @@ mod test {
                 creator: None,
                 validator: Some(ValidatorParam::Leader(DUMMY_VALIDATOR_LEADER.id)),
             };
-            let res = campaign_list_axum(app.clone(), Qs(query))
+            let res = campaign_list(app.clone(), Qs(query))
                 .await
                 .expect("should get campaigns")
                 .0;
@@ -1867,7 +1589,7 @@ mod test {
                 creator: None,
                 validator: Some(ValidatorParam::Validator(DUMMY_VALIDATOR_FOLLOWER.id)),
             };
-            let res = campaign_list_axum(app.clone(), Qs(query))
+            let res = campaign_list(app.clone(), Qs(query))
                 .await
                 .expect("should get campaigns")
                 .0;
@@ -1885,7 +1607,7 @@ mod test {
                 creator: None,
                 validator: Some(ValidatorParam::Validator(DUMMY_VALIDATOR_FOLLOWER.id)),
             };
-            let res = campaign_list_axum(app.clone(), Qs(query))
+            let res = campaign_list(app.clone(), Qs(query))
                 .await
                 .expect("should get campaigns")
                 .0;
@@ -1908,7 +1630,7 @@ mod test {
                 creator: None,
                 validator: Some(ValidatorParam::Leader(dummy_leader_2.id)),
             };
-            let res = campaign_list_axum(app.clone(), Qs(query))
+            let res = campaign_list(app.clone(), Qs(query))
                 .await
                 .expect("should get campaigns")
                 .0;
@@ -1932,7 +1654,7 @@ mod test {
                 creator: None,
                 validator: Some(ValidatorParam::Validator(dummy_follower_2.id)),
             };
-            let res = campaign_list_axum(app.clone(), Qs(query))
+            let res = campaign_list(app.clone(), Qs(query))
                 .await
                 .expect("should get campaigns")
                 .0;
@@ -1956,7 +1678,7 @@ mod test {
                 creator: Some(*PUBLISHER_2),
                 validator: None,
             };
-            let res = campaign_list_axum(app.clone(), Qs(query))
+            let res = campaign_list(app.clone(), Qs(query))
                 .await
                 .expect("should get campaigns")
                 .0;
@@ -1977,7 +1699,7 @@ mod test {
                 creator: None,
                 validator: None,
             };
-            let res = campaign_list_axum(app.clone(), Qs(query))
+            let res = campaign_list(app.clone(), Qs(query))
                 .await
                 .expect("should get campaigns")
                 .0;

@@ -1,78 +1,15 @@
-use std::{error, sync::Arc};
+use std::sync::Arc;
 
-use async_trait::async_trait;
 use axum::middleware::Next;
 use hyper::{
     header::{AUTHORIZATION, REFERER},
-    Body, Request,
+    Request,
 };
-use redis::aio::MultiplexedConnection;
 
-use adapter::{prelude::*, primitives::Session as AdapterSession, Adapter};
+use adapter::{prelude::*, primitives::Session as AdapterSession};
 use primitives::{analytics::AuthenticateAs, ValidatorId};
 
-use crate::{middleware::Middleware, response::ResponseError, Application, Auth, Session};
-
-#[derive(Debug)]
-pub struct Authenticate;
-
-#[async_trait]
-impl<C: Locked + 'static> Middleware<C> for Authenticate {
-    async fn call<'a>(
-        &self,
-        request: Request<Body>,
-        application: &'a Application<C>,
-    ) -> Result<Request<Body>, ResponseError> {
-        for_request(request, &application.adapter, &application.redis.clone())
-            .await
-            .map_err(|error| {
-                slog::error!(&application.logger, "{}", &error; "module" => "middleware-auth");
-
-                ResponseError::Unauthorized
-            })
-    }
-}
-
-#[derive(Debug)]
-pub struct AuthRequired;
-
-#[async_trait]
-impl<C: Locked + 'static> Middleware<C> for AuthRequired {
-    async fn call<'a>(
-        &self,
-        request: Request<Body>,
-        _application: &'a Application<C>,
-    ) -> Result<Request<Body>, ResponseError> {
-        if request.extensions().get::<Auth>().is_some() {
-            Ok(request)
-        } else {
-            Err(ResponseError::Unauthorized)
-        }
-    }
-}
-
-#[derive(Debug)]
-pub struct IsAdmin;
-
-#[async_trait]
-impl<C: Locked + 'static> Middleware<C> for IsAdmin {
-    async fn call<'a>(
-        &self,
-        request: Request<Body>,
-        application: &'a Application<C>,
-    ) -> Result<Request<Body>, ResponseError> {
-        let auth = request
-            .extensions()
-            .get::<Auth>()
-            .expect("request should have session")
-            .to_owned();
-
-        if !application.config.admins.contains(auth.uid.as_address()) {
-            return Err(ResponseError::Unauthorized);
-        }
-        Ok(request)
-    }
-}
+use crate::{response::ResponseError, Application, Auth, Session};
 
 pub async fn is_admin<C: Locked + 'static, B>(
     request: axum::http::Request<B>,
@@ -107,6 +44,9 @@ pub async fn authentication_required<C: Locked + 'static, B>(
 }
 
 /// Creates a [`Session`] and additionally [`Auth`] if a Bearer token was provided.
+///
+/// Check `Authorization` header for `Bearer` scheme with `Adapter::session_from_token`.
+/// If the `Adapter` fails to create an `AdapterSession`, `ResponseError::BadRequest` will be returned.
 pub async fn authenticate<C: Locked + 'static, B>(
     mut request: axum::http::Request<B>,
     next: Next<B>,
@@ -226,75 +166,6 @@ pub async fn authenticate_as_publisher<B>(
     Ok(next.run(request).await)
 }
 
-/// Check `Authorization` header for `Bearer` scheme with `Adapter::session_from_token`.
-/// If the `Adapter` fails to create an `AdapterSession`, `ResponseError::BadRequest` will be returned.
-async fn for_request<C: Locked>(
-    mut req: Request<Body>,
-    adapter: &Adapter<C>,
-    redis: &MultiplexedConnection,
-) -> Result<Request<Body>, Box<dyn error::Error>> {
-    let referrer = req
-        .headers()
-        .get(REFERER)
-        .and_then(|hv| hv.to_str().ok().map(ToString::to_string));
-
-    let session = Session {
-        ip: get_request_ip(&req),
-        country: None,
-        referrer_header: referrer,
-        os: None,
-    };
-    req.extensions_mut().insert(session);
-
-    let authorization = req.headers().get(AUTHORIZATION);
-
-    let prefix = "Bearer ";
-
-    let token = authorization
-        .and_then(|hv| {
-            hv.to_str()
-                .map(|token_str| token_str.strip_prefix(prefix))
-                .transpose()
-        })
-        .transpose()?;
-
-    if let Some(token) = token {
-        let adapter_session = match redis::cmd("GET")
-            .arg(token)
-            .query_async::<_, Option<String>>(&mut redis.clone())
-            .await?
-            .and_then(|session_str| serde_json::from_str::<AdapterSession>(&session_str).ok())
-        {
-            Some(adapter_session) => adapter_session,
-            None => {
-                // If there was a problem with the Session or the Token, this will error
-                // and a BadRequest response will be returned
-                let adapter_session = adapter.session_from_token(token).await?;
-
-                // save the Adapter Session to Redis for the next request
-                // if serde errors on deserialization this will override the value inside
-                redis::cmd("SET")
-                    .arg(token)
-                    .arg(serde_json::to_string(&adapter_session)?)
-                    .query_async(&mut redis.clone())
-                    .await?;
-
-                adapter_session
-            }
-        };
-
-        let auth = Auth {
-            era: adapter_session.era,
-            uid: ValidatorId::from(adapter_session.uid),
-            chain: adapter_session.chain,
-        };
-
-        req.extensions_mut().insert(auth);
-    }
-
-    Ok(req)
-}
-
 /// Get's the Request IP from either `true-client-ip` or `x-forwarded-for`,
 /// splits the IPs separated by `,` (comma) and returns the first one.
 fn get_request_ip<B>(req: &Request<B>) -> Option<String> {
@@ -320,11 +191,13 @@ fn get_request_ip<B>(req: &Request<B>) -> Option<String> {
 
 #[cfg(test)]
 mod test {
+    use std::collections::HashMap;
+
     use adapter::{
         dummy::{Dummy, HeaderToken},
         ethereum::test_util::GANACHE_1,
     };
-    use axum::{middleware::from_fn, routing::get, Extension, Router};
+    use axum::{body::Body, middleware::from_fn, routing::get, Extension, Router};
     use hyper::{Request, StatusCode};
     use primitives::test_util::{DUMMY_AUTH, LEADER};
 
@@ -397,8 +270,10 @@ mod test {
                 .expect("Handling the Request shouldn't have failed");
 
             assert_eq!(response.status(), StatusCode::BAD_REQUEST);
-            let response_body = body_to_string(response).await;
-            assert_eq!("Authentication: Dummy Authentication token format should be in the format: `{Auth Token}:chain_id:{Chain Id}` but 'wrong-token' was provided", response_body)
+            let response_body =
+                serde_json::from_str::<HashMap<String, String>>(&body_to_string(response).await)
+                    .expect("Should deserialize");
+            assert_eq!("Authentication: Dummy Authentication token format should be in the format: `{Auth Token}:chain_id:{Chain Id}` but 'wrong-token' was provided", response_body["message"])
         }
     }
 
