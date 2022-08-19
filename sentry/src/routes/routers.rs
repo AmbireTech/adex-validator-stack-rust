@@ -39,7 +39,8 @@ use crate::{
         campaign,
         channel::{
             add_spender_leaf, channel_dummy_deposit, channel_list, channel_payout,
-            get_accounting_for_channel, get_all_spender_limits, get_spender_limits, last_approved, get_spender_leaf, get_earner_leaf,
+            get_accounting_for_channel, get_all_spender_limits, get_earner_leaf, get_spender_leaf,
+            get_spender_limits, last_approved,
             validator_message::{create_validator_messages, list_validator_messages},
         },
         units_for_slot::post_units_for_slot,

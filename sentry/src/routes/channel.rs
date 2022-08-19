@@ -13,7 +13,7 @@ use crate::{
         DbPool,
     },
     response::ResponseError,
-    routes::{campaign::fetch_campaign_ids_for_channel},
+    routes::campaign::fetch_campaign_ids_for_channel,
     Application, Auth,
 };
 use adapter::{
@@ -23,9 +23,6 @@ use adapter::{
 };
 use axum::{extract::Path, Extension, Json};
 use futures::future::try_join_all;
-use serde::{Deserialize, Serialize};
-use slog::{error, Logger};
-use std::{any::Any, collections::HashMap, sync::Arc};
 use primitives::{
     balances::{Balances, CheckedState, UncheckedState},
     merkle_tree::MerkleTree,
@@ -39,6 +36,9 @@ use primitives::{
     validator::NewState,
     Address, ChainOf, Channel, ChannelId, Deposit, UnifiedNum,
 };
+use serde::{Deserialize, Serialize};
+use slog::{error, Logger};
+use std::{any::Any, collections::HashMap, sync::Arc};
 
 /// Request body for Channel deposit when using the Dummy adapter.
 ///
@@ -522,9 +522,7 @@ pub async fn get_spender_leaf<C: Locked + 'static>(
 
     let new_state = latest_new_state(&app.pool, &channel, &state_root)
         .await?
-        .ok_or(ResponseError::BadRequest(
-            "No NewState message for spender".to_string(),
-        ))?;
+        .ok_or_else(|| ResponseError::BadRequest("No NewState message for spender".to_string()))?;
 
     let spender = params.1;
     let amount = new_state
@@ -532,9 +530,7 @@ pub async fn get_spender_leaf<C: Locked + 'static>(
         .balances
         .spenders
         .get(&spender)
-        .ok_or(ResponseError::BadRequest(
-            "No balance entry for spender!".to_string(),
-        ))?;
+        .ok_or_else(|| ResponseError::BadRequest("No balance entry for spender!".to_string()))?;
     let element = get_balance_leaf(
         true,
         &spender,
@@ -572,9 +568,7 @@ pub async fn get_earner_leaf<C: Locked + 'static>(
 
     let new_state = latest_new_state(&app.pool, &channel, &state_root)
         .await?
-        .ok_or(ResponseError::BadRequest(
-            "No NewState message for earner".to_string(),
-        ))?;
+        .ok_or_else(|| ResponseError::BadRequest("No NewState message for earner".to_string()))?;
 
     let earner = params.1;
     let amount = new_state
@@ -582,9 +576,7 @@ pub async fn get_earner_leaf<C: Locked + 'static>(
         .balances
         .earners
         .get(&earner)
-        .ok_or(ResponseError::BadRequest(
-            "No balance entry for earner!".to_string(),
-        ))?;
+        .ok_or_else(|| ResponseError::BadRequest("No balance entry for earner!".to_string()))?;
     let element = get_balance_leaf(
         false,
         &earner,
