@@ -107,6 +107,20 @@ pub struct Time {
     // #[serde(default = "default_timezone_utc")]
     // pub timezone: Tz,//: chrono::TimeZone,
 }
+
+impl Default for Time {
+    fn default() -> Self {
+        let timeframe = Timeframe::Day;
+        let start = DateHour::now() - &timeframe;
+
+        Self {
+            timeframe,
+            start,
+            end: None,
+        }
+    }
+}
+
 mod de {
     use crate::{analytics::Timeframe, sentry::DateHour};
 
@@ -211,6 +225,12 @@ mod test {
             let empty = json!({});
 
             let time = from_value::<Time>(empty).expect("Should use defaults on empty JSON");
+            let default = Time::default();
+            pretty_assertions::assert_eq!(
+                time,
+                default,
+                "Default should generate the same as the default deserialization values!"
+            );
             pretty_assertions::assert_eq!(
                 time,
                 Time {

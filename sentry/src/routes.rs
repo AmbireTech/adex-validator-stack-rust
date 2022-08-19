@@ -499,7 +499,6 @@
 pub use analytics::analytics as get_analytics;
 
 pub use cfg::config as get_cfg;
-pub use cfg::config_axum as get_cfg_axum;
 
 // `analytics` module has single request, so we only export this request
 mod analytics;

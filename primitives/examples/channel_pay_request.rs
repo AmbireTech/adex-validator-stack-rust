@@ -1,6 +1,5 @@
 use primitives::sentry::ChannelPayRequest;
 use serde_json::json;
-use std::str::FromStr;
 
 fn main() {
     let channel_pay_json = json!({

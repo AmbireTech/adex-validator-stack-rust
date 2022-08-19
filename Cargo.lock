@@ -329,6 +329,7 @@ dependencies = [
  "bitflags",
  "bytes",
  "futures-util",
+ "headers",
  "http",
  "http-body",
  "hyper",
@@ -3256,12 +3257,10 @@ dependencies = [
  "pretty_assertions",
  "primitives",
  "redis",
- "regex",
  "reqwest",
  "serde",
  "serde_json",
  "serde_qs 0.10.1",
- "simple-hyper-server-tls",
  "slog",
  "thiserror",
  "tokio",
@@ -3488,19 +3487,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e51e73328dc4ac0c7ccbda3a494dfa03df1de2f46018127f60c693f2648455b0"
 dependencies = [
  "libc",
-]
-
-[[package]]
-name = "simple-hyper-server-tls"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a30c66830bf6f2b3fbe9c32df33bb5369d4f12eddd7aae41dd084237bece485b"
-dependencies = [
- "hyper",
- "rustls",
- "rustls-pemfile",
- "tls-listener",
- "tokio-rustls",
 ]
 
 [[package]]
@@ -3868,20 +3854,6 @@ name = "tinyvec_macros"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cda74da7e1a664f795bb1f8a87ec406fb89a02522cf6e50620d016add6dbbf5c"
-
-[[package]]
-name = "tls-listener"
-version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c9d4ff21187d434ac7709bfc7441ca88f63681247e5ad99f0f08c8c91ddc103d"
-dependencies = [
- "futures-util",
- "hyper",
- "pin-project-lite",
- "thiserror",
- "tokio",
- "tokio-rustls",
-]
 
 [[package]]
 name = "tokio"
