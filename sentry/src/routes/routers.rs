@@ -29,8 +29,8 @@ use crate::{
         channel::{
             add_spender_leaf, add_spender_leaf_axum, channel_dummy_deposit, channel_list,
             channel_payout, get_accounting_for_channel, get_accounting_for_channel_axum,
-            get_all_spender_limits, get_all_spender_limits_axum, get_spender_limits,
-            get_spender_limits_axum, last_approved, last_approved_axum,
+            get_all_spender_limits, get_all_spender_limits_axum, get_earner_leaf, get_spender_leaf,
+            get_spender_limits, get_spender_limits_axum, last_approved, last_approved_axum,
             validator_message::{
                 create_validator_messages, extract_params, list_validator_messages,
             },
@@ -146,6 +146,10 @@ pub fn channels_router_axum<C: Locked + 'static>() -> Router {
             ServiceBuilder::new().layer(middleware::from_fn(authentication_required::<C, _>)),
         );
 
+    let get_leaf_routes = Router::new()
+        .route("/spender/:addr", get(get_spender_leaf::<C>))
+        .route("/earner/:addr", get(get_earner_leaf::<C>));
+
     let channel_routes = Router::new()
         .route(
             "/pay",
@@ -155,6 +159,7 @@ pub fn channels_router_axum<C: Locked + 'static>() -> Router {
         .route("/accounting", get(get_accounting_for_channel_axum::<C>))
         .route("/last-approved", get(last_approved_axum::<C>))
         .nest("/spender", spender_routes)
+        .nest("/get-leaf", get_leaf_routes)
         .layer(
             // keeps the order from top to bottom!
             ServiceBuilder::new()

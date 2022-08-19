@@ -18,16 +18,22 @@ use crate::{
     routes::{campaign::fetch_campaign_ids_for_channel, routers::RouteParams},
     Application, Auth,
 };
-use adapter::{client::Locked, Adapter, Dummy};
+use adapter::{
+    client::Locked,
+    util::{get_balance_leaf, get_signable_state_root},
+    Adapter, Dummy,
+};
 use axum::{extract::Path, Extension, Json};
 use futures::future::try_join_all;
 use hyper::{Body, Request, Response};
 use primitives::{
     balances::{Balances, CheckedState, UncheckedState},
+    merkle_tree::MerkleTree,
     sentry::{
         channel_list::{ChannelListQuery, ChannelListResponse},
-        AccountingResponse, AllSpendersQuery, AllSpendersResponse, ChannelPayRequest, LastApproved,
-        LastApprovedQuery, LastApprovedResponse, SpenderResponse, SuccessResponse,
+        AccountingResponse, AllSpendersQuery, AllSpendersResponse, ChannelPayRequest,
+        GetLeafResponse, LastApproved, LastApprovedQuery, LastApprovedResponse, SpenderResponse,
+        SuccessResponse,
     },
     spender::{Spendable, Spender},
     validator::NewState,
@@ -799,6 +805,106 @@ pub async fn channel_payout_axum<C: Locked + 'static>(
     Ok(Json(SuccessResponse { success: true }))
 }
 
+pub async fn get_spender_leaf<C: Locked + 'static>(
+    Extension(app): Extension<Arc<Application<C>>>,
+    Extension(channel_context): Extension<ChainOf<Channel>>,
+    Path(params): Path<(ChannelId, Address)>,
+) -> Result<Json<GetLeafResponse>, ResponseError> {
+    let channel = channel_context.context;
+
+    let approve_state = match latest_approve_state(&app.pool, &channel).await? {
+        Some(approve_state) => approve_state,
+        None => {
+            return Err(ResponseError::BadRequest(
+                "No ApproveState message for spender".to_string(),
+            ))
+        }
+    };
+
+    let state_root = approve_state.msg.state_root.clone();
+
+    let new_state = latest_new_state(&app.pool, &channel, &state_root)
+        .await?
+        .ok_or(ResponseError::BadRequest(
+            "No NewState message for spender".to_string(),
+        ))?;
+
+    let spender = params.1;
+    let amount = new_state
+        .msg
+        .balances
+        .spenders
+        .get(&spender)
+        .ok_or(ResponseError::BadRequest(
+            "No balance entry for spender!".to_string(),
+        ))?;
+    let element = get_balance_leaf(
+        true,
+        &spender,
+        &amount.to_precision(channel_context.token.precision.get()),
+    )
+    .map_err(|err| ResponseError::BadRequest(err.to_string()))?;
+
+    let merkle_tree =
+        MerkleTree::new(&[element]).map_err(|err| ResponseError::BadRequest(err.to_string()))?;
+
+    let signable_state_root = get_signable_state_root(&*channel.id(), &merkle_tree.root());
+
+    let res = hex::encode(signable_state_root);
+
+    Ok(Json(GetLeafResponse { merkle_proof: res }))
+}
+
+pub async fn get_earner_leaf<C: Locked + 'static>(
+    Extension(app): Extension<Arc<Application<C>>>,
+    Extension(channel_context): Extension<ChainOf<Channel>>,
+    Path(params): Path<(ChannelId, Address)>,
+) -> Result<Json<GetLeafResponse>, ResponseError> {
+    let channel = channel_context.context;
+
+    let approve_state = match latest_approve_state(&app.pool, &channel).await? {
+        Some(approve_state) => approve_state,
+        None => {
+            return Err(ResponseError::BadRequest(
+                "No ApproveState message for earner".to_string(),
+            ))
+        }
+    };
+
+    let state_root = approve_state.msg.state_root.clone();
+
+    let new_state = latest_new_state(&app.pool, &channel, &state_root)
+        .await?
+        .ok_or(ResponseError::BadRequest(
+            "No NewState message for earner".to_string(),
+        ))?;
+
+    let earner = params.1;
+    let amount = new_state
+        .msg
+        .balances
+        .earners
+        .get(&earner)
+        .ok_or(ResponseError::BadRequest(
+            "No balance entry for earner!".to_string(),
+        ))?;
+    let element = get_balance_leaf(
+        false,
+        &earner,
+        &amount.to_precision(channel_context.token.precision.get()),
+    )
+    .map_err(|err| ResponseError::BadRequest(err.to_string()))?;
+
+    let merkle_tree =
+        MerkleTree::new(&[element]).map_err(|err| ResponseError::BadRequest(err.to_string()))?;
+
+    let signable_state_root = get_signable_state_root(&*channel.id(), &merkle_tree.root());
+
+    let res = hex::encode(signable_state_root);
+
+    Ok(Json(GetLeafResponse { merkle_proof: res }))
+}
+
 /// POST `/v5/channel/0xXXX.../pay` request
 ///
 /// Body: [`ChannelPayRequest`]
@@ -1163,7 +1269,10 @@ pub mod validator_message {
 mod test {
     use super::*;
     use crate::{
-        db::{insert_campaign, insert_channel, CampaignRemaining},
+        db::{
+            insert_campaign, insert_channel, validator_message::insert_validator_message,
+            CampaignRemaining,
+        },
         test_util::setup_dummy_app,
     };
     use adapter::{
@@ -1171,12 +1280,14 @@ mod test {
         primitives::Deposit as AdapterDeposit,
     };
     use primitives::{
+        balances::UncheckedState,
         channel::Nonce,
         test_util::{
             ADVERTISER, CREATOR, DUMMY_CAMPAIGN, FOLLOWER, GUARDIAN, IDS, LEADER, LEADER_2,
             PUBLISHER, PUBLISHER_2,
         },
-        BigNum, ChainId, Deposit, UnifiedMap, ValidatorId,
+        validator::{ApproveState, MessageTypes, NewState},
+        BigNum, ChainId, Deposit, ToETHChecksum, UnifiedMap, ValidatorId,
     };
 
     #[tokio::test]
@@ -1896,5 +2007,120 @@ mod test {
                 "Failed validation because the campaign has remaining funds"
             );
         }
+    }
+
+    #[tokio::test]
+    async fn get_spender_and_earner_leafs() {
+        let mut balances: Balances<CheckedState> = Balances::new();
+        balances
+            .spend(*ADVERTISER, *PUBLISHER, UnifiedNum::from_u64(1000))
+            .expect("should spend");
+        balances
+            .spend(*ADVERTISER, *PUBLISHER_2, UnifiedNum::from_u64(1000))
+            .expect("should spend");
+        balances
+            .spend(*CREATOR, *PUBLISHER, UnifiedNum::from_u64(1000))
+            .expect("should spend");
+        balances
+            .spend(*CREATOR, *PUBLISHER_2, UnifiedNum::from_u64(1000))
+            .expect("should spend");
+
+        let app_guard = setup_dummy_app().await;
+        let app = Extension(Arc::new(app_guard.app.clone()));
+
+        let channel_context = Extension(
+            app.config
+                .find_chain_of(DUMMY_CAMPAIGN.channel.token)
+                .expect("Dummy channel Token should be present in config!")
+                .with(DUMMY_CAMPAIGN.channel),
+        );
+        let channel = channel_context.context;
+
+        insert_channel(&app.pool, &channel_context)
+            .await
+            .expect("should insert channel");
+
+        // Setting up the validator messages
+        let state_root = balances
+            .encode(channel.id(), channel_context.token.precision.get())
+            .expect("should encode");
+        let new_state: NewState<UncheckedState> = NewState {
+            state_root: state_root.clone(),
+            signature: IDS[&*LEADER].to_checksum(),
+            balances: balances.into_unchecked(),
+        };
+        let approve_state = ApproveState {
+            state_root,
+            signature: IDS[&*FOLLOWER].to_checksum(),
+            is_healthy: true,
+        };
+
+        insert_validator_message(
+            &app.pool,
+            &channel,
+            &channel.leader,
+            &MessageTypes::NewState(new_state),
+        )
+        .await
+        .expect("Should insert NewState msg");
+        insert_validator_message(
+            &app.pool,
+            &channel,
+            &channel.follower,
+            &MessageTypes::ApproveState(approve_state),
+        )
+        .await
+        .expect("Should insert NewState msg");
+
+        // generate proofs
+        let spender_proof = {
+            let element = get_balance_leaf(
+                true,
+                &*ADVERTISER,
+                &UnifiedNum::from_u64(2_000).to_precision(channel_context.token.precision.get()),
+            )
+            .expect("should get");
+
+            let merkle_tree = MerkleTree::new(&[element]).expect("Should build MerkleTree");
+
+            let signable_state_root = get_signable_state_root(&*channel.id(), &merkle_tree.root());
+
+            hex::encode(signable_state_root)
+        };
+
+        let earner_proof = {
+            let element = get_balance_leaf(
+                false,
+                &*PUBLISHER,
+                &UnifiedNum::from_u64(2_000).to_precision(channel_context.token.precision.get()),
+            )
+            .expect("should get balance leaf");
+
+            let merkle_tree = MerkleTree::new(&[element]).expect("Should build MerkleTree");
+
+            let signable_state_root = get_signable_state_root(&*channel.id(), &merkle_tree.root());
+
+            hex::encode(signable_state_root)
+        };
+
+        // call functions
+        let spender_leaf = get_spender_leaf(
+            app.clone(),
+            channel_context.clone(),
+            Path((channel.id(), *ADVERTISER)),
+        )
+        .await
+        .expect("should get spender leaf");
+        let earner_leaf = get_earner_leaf(
+            app.clone(),
+            channel_context.clone(),
+            Path((channel.id(), *PUBLISHER)),
+        )
+        .await
+        .expect("should get earner leaf");
+
+        // compare results
+        assert_eq!(spender_proof, spender_leaf.merkle_proof);
+        assert_eq!(earner_proof, earner_leaf.merkle_proof);
     }
 }
