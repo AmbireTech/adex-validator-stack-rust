@@ -1,6 +1,26 @@
 //! `/v5/channel` routes
 //!
 
+use axum::{extract::Path, Extension, Json};
+use futures::future::try_join_all;
+use serde::{Deserialize, Serialize};
+use slog::{error, Logger};
+use std::{any::Any, collections::HashMap, sync::Arc};
+
+use adapter::{client::Locked, Adapter, Dummy, util::{get_balance_leaf, get_signable_state_root}};
+use primitives::{
+    balances::{Balances, CheckedState, UncheckedState},
+    merkle_tree::MerkleTree,
+    sentry::{
+        channel_list::{ChannelListQuery, ChannelListResponse},
+        AccountingResponse, AllSpendersQuery, AllSpendersResponse, ChannelPayRequest, GetLeafResponse, LastApproved,
+        LastApprovedQuery, LastApprovedResponse, SpenderResponse, SuccessResponse,
+    },
+    spender::{Spendable, Spender},
+    validator::NewState,
+    Address, ChainOf, Channel, ChannelId, Deposit, UnifiedNum,
+};
+
 use crate::{
     application::Qs,
     db::{
@@ -13,32 +33,9 @@ use crate::{
         DbPool,
     },
     response::ResponseError,
-    routes::campaign::fetch_campaign_ids_for_channel,
+    routes::{campaign::fetch_campaign_ids_for_channel, routers::LeafFor},
     Application, Auth,
 };
-use adapter::{
-    client::Locked,
-    util::{get_balance_leaf, get_signable_state_root},
-    Adapter, Dummy,
-};
-use axum::{extract::Path, Extension, Json};
-use futures::future::try_join_all;
-use primitives::{
-    balances::{Balances, CheckedState, UncheckedState},
-    merkle_tree::MerkleTree,
-    sentry::{
-        channel_list::{ChannelListQuery, ChannelListResponse},
-        AccountingResponse, AllSpendersQuery, AllSpendersResponse, ChannelPayRequest,
-        GetLeafResponse, LastApproved, LastApprovedQuery, LastApprovedResponse, SpenderResponse,
-        SuccessResponse,
-    },
-    spender::{Spendable, Spender},
-    validator::NewState,
-    Address, ChainOf, Channel, ChannelId, Deposit, UnifiedNum,
-};
-use serde::{Deserialize, Serialize};
-use slog::{error, Logger};
-use std::{any::Any, collections::HashMap, sync::Arc};
 
 /// Request body for Channel deposit when using the Dummy adapter.
 ///
@@ -502,9 +499,10 @@ pub async fn channel_payout<C: Locked + 'static>(
     Ok(Json(SuccessResponse { success: true }))
 }
 
-pub async fn get_spender_leaf<C: Locked + 'static>(
+pub async fn get_leaf<C: Locked + 'static>(
     Extension(app): Extension<Arc<Application<C>>>,
     Extension(channel_context): Extension<ChainOf<Channel>>,
+    Extension(leaf_for): Extension<LeafFor>,
     Path(params): Path<(ChannelId, Address)>,
 ) -> Result<Json<GetLeafResponse>, ResponseError> {
     let channel = channel_context.context;
@@ -524,66 +522,40 @@ pub async fn get_spender_leaf<C: Locked + 'static>(
         .await?
         .ok_or_else(|| ResponseError::BadRequest("No NewState message for spender".to_string()))?;
 
-    let spender = params.1;
-    let amount = new_state
-        .msg
-        .balances
-        .spenders
-        .get(&spender)
-        .ok_or_else(|| ResponseError::BadRequest("No balance entry for spender!".to_string()))?;
-    let element = get_balance_leaf(
-        true,
-        &spender,
-        &amount.to_precision(channel_context.token.precision.get()),
-    )
-    .map_err(|err| ResponseError::BadRequest(err.to_string()))?;
+    let addr = params.1;
 
-    let merkle_tree =
-        MerkleTree::new(&[element]).map_err(|err| ResponseError::BadRequest(err.to_string()))?;
+    let element = match leaf_for {
+        LeafFor::Spender => {
+            let amount = new_state
+                .msg
+                .balances
+                .spenders
+                .get(&addr)
+                .ok_or_else(|| ResponseError::BadRequest("No balance entry for spender!".to_string()))?;
 
-    let signable_state_root = get_signable_state_root(&*channel.id(), &merkle_tree.root());
+            get_balance_leaf(
+                true,
+                &addr,
+                &amount.to_precision(channel_context.token.precision.get()),
+            )
+            .map_err(|err| ResponseError::BadRequest(err.to_string()))?
+        },
+        LeafFor::Earner => {
+            let amount = new_state
+                .msg
+                .balances
+                .earners
+                .get(&addr)
+                .ok_or_else(|| ResponseError::BadRequest("No balance entry for spender!".to_string()))?;
 
-    let res = hex::encode(signable_state_root);
-
-    Ok(Json(GetLeafResponse { merkle_proof: res }))
-}
-
-pub async fn get_earner_leaf<C: Locked + 'static>(
-    Extension(app): Extension<Arc<Application<C>>>,
-    Extension(channel_context): Extension<ChainOf<Channel>>,
-    Path(params): Path<(ChannelId, Address)>,
-) -> Result<Json<GetLeafResponse>, ResponseError> {
-    let channel = channel_context.context;
-
-    let approve_state = match latest_approve_state(&app.pool, &channel).await? {
-        Some(approve_state) => approve_state,
-        None => {
-            return Err(ResponseError::BadRequest(
-                "No ApproveState message for earner".to_string(),
-            ))
+            get_balance_leaf(
+                    false,
+                    &addr,
+                    &amount.to_precision(channel_context.token.precision.get()),
+                )
+                .map_err(|err| ResponseError::BadRequest(err.to_string()))?
         }
     };
-
-    let state_root = approve_state.msg.state_root.clone();
-
-    let new_state = latest_new_state(&app.pool, &channel, &state_root)
-        .await?
-        .ok_or_else(|| ResponseError::BadRequest("No NewState message for earner".to_string()))?;
-
-    let earner = params.1;
-    let amount = new_state
-        .msg
-        .balances
-        .earners
-        .get(&earner)
-        .ok_or_else(|| ResponseError::BadRequest("No balance entry for earner!".to_string()))?;
-    let element = get_balance_leaf(
-        false,
-        &earner,
-        &amount.to_precision(channel_context.token.precision.get()),
-    )
-    .map_err(|err| ResponseError::BadRequest(err.to_string()))?;
-
     let merkle_tree =
         MerkleTree::new(&[element]).map_err(|err| ResponseError::BadRequest(err.to_string()))?;
 
@@ -765,17 +737,11 @@ pub mod validator_message {
 
 #[cfg(test)]
 mod test {
-    use super::*;
-    use crate::{
-        db::{
-            insert_campaign, insert_channel, validator_message::insert_validator_message,
-            CampaignRemaining,
-        },
-        test_util::setup_dummy_app,
-    };
+    use std::str::FromStr;
     use adapter::{
         ethereum::test_util::{GANACHE_INFO_1, GANACHE_INFO_1337},
         primitives::Deposit as AdapterDeposit,
+        prelude::Unlocked,
     };
     use primitives::{
         balances::UncheckedState,
@@ -785,9 +751,16 @@ mod test {
             PUBLISHER, PUBLISHER_2,
         },
         validator::{ApproveState, MessageTypes, NewState},
-        BigNum, ChainId, Deposit, ToETHChecksum, UnifiedMap, ValidatorId,
+        BigNum, ChainId, Deposit, UnifiedMap, ValidatorId,
     };
-    use std::str::FromStr;
+    use super::*;
+    use crate::{
+        db::{
+            insert_campaign, insert_channel, validator_message::insert_validator_message,
+            CampaignRemaining,
+        },
+        test_util::setup_dummy_app,
+    };
 
     #[tokio::test]
     async fn create_and_fetch_spendable() {
@@ -1539,17 +1512,16 @@ mod test {
             .expect("should insert channel");
 
         // Setting up the validator messages
-        let state_root = balances
-            .encode(channel.id(), channel_context.token.precision.get())
-            .expect("should encode");
+        let state_root = "b1a4fc6c1a1e1ab908a487e504006edcebea297f61b4b8ce6cad3b29e29454cc".to_string();
+        let signature = app.adapter.clone().unlock().expect("should unlock").sign(&state_root.clone()).expect("should sign");
         let new_state: NewState<UncheckedState> = NewState {
             state_root: state_root.clone(),
-            signature: IDS[&*LEADER].to_checksum(),
+            signature: signature.clone(),
             balances: balances.into_unchecked(),
         };
         let approve_state = ApproveState {
             state_root,
-            signature: IDS[&*FOLLOWER].to_checksum(),
+            signature,
             is_healthy: true,
         };
 
@@ -1570,48 +1542,23 @@ mod test {
         .await
         .expect("Should insert NewState msg");
 
-        // generate proofs
-        let spender_proof = {
-            let element = get_balance_leaf(
-                true,
-                &*ADVERTISER,
-                &UnifiedNum::from_u64(2_000).to_precision(channel_context.token.precision.get()),
-            )
-            .expect("should get");
-
-            let merkle_tree = MerkleTree::new(&[element]).expect("Should build MerkleTree");
-
-            let signable_state_root = get_signable_state_root(&*channel.id(), &merkle_tree.root());
-
-            hex::encode(signable_state_root)
-        };
-
-        let earner_proof = {
-            let element = get_balance_leaf(
-                false,
-                &*PUBLISHER,
-                &UnifiedNum::from_u64(2_000).to_precision(channel_context.token.precision.get()),
-            )
-            .expect("should get balance leaf");
-
-            let merkle_tree = MerkleTree::new(&[element]).expect("Should build MerkleTree");
-
-            let signable_state_root = get_signable_state_root(&*channel.id(), &merkle_tree.root());
-
-            hex::encode(signable_state_root)
-        };
+        // hardcoded proofs
+        let spender_proof = "8ea7760ca2dbbe00673372afbf8b05048717ce8a305f1f853afac8c244182e0c".to_string();
+        let earner_proof = "dc94141cb41550df047ba3a965ce36d98eb6098eb952ca3cb6fd9682e5810b51".to_string();
 
         // call functions
-        let spender_leaf = get_spender_leaf(
+        let spender_leaf = get_leaf(
             app.clone(),
             channel_context.clone(),
+            Extension(LeafFor::Spender),
             Path((channel.id(), *ADVERTISER)),
         )
         .await
         .expect("should get spender leaf");
-        let earner_leaf = get_earner_leaf(
+        let earner_leaf = get_leaf(
             app.clone(),
             channel_context.clone(),
+            Extension(LeafFor::Earner),
             Path((channel.id(), *PUBLISHER)),
         )
         .await
