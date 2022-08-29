@@ -7,14 +7,19 @@ use serde::{Deserialize, Serialize};
 use slog::{error, Logger};
 use std::{any::Any, collections::HashMap, sync::Arc};
 
-use adapter::{client::Locked, Adapter, Dummy, util::{get_balance_leaf, get_signable_state_root}};
+use adapter::{
+    client::Locked,
+    util::{get_balance_leaf, get_signable_state_root},
+    Adapter, Dummy,
+};
 use primitives::{
     balances::{Balances, CheckedState, UncheckedState},
     merkle_tree::MerkleTree,
     sentry::{
         channel_list::{ChannelListQuery, ChannelListResponse},
-        AccountingResponse, AllSpendersQuery, AllSpendersResponse, ChannelPayRequest, GetLeafResponse, LastApproved,
-        LastApprovedQuery, LastApprovedResponse, SpenderResponse, SuccessResponse,
+        AccountingResponse, AllSpendersQuery, AllSpendersResponse, ChannelPayRequest,
+        GetLeafResponse, LastApproved, LastApprovedQuery, LastApprovedResponse, SpenderResponse,
+        SuccessResponse,
     },
     spender::{Spendable, Spender},
     validator::NewState,
@@ -526,12 +531,9 @@ pub async fn get_leaf<C: Locked + 'static>(
 
     let element = match leaf_for {
         LeafFor::Spender => {
-            let amount = new_state
-                .msg
-                .balances
-                .spenders
-                .get(&addr)
-                .ok_or_else(|| ResponseError::BadRequest("No balance entry for spender!".to_string()))?;
+            let amount = new_state.msg.balances.spenders.get(&addr).ok_or_else(|| {
+                ResponseError::BadRequest("No balance entry for spender!".to_string())
+            })?;
 
             get_balance_leaf(
                 true,
@@ -539,21 +541,18 @@ pub async fn get_leaf<C: Locked + 'static>(
                 &amount.to_precision(channel_context.token.precision.get()),
             )
             .map_err(|err| ResponseError::BadRequest(err.to_string()))?
-        },
+        }
         LeafFor::Earner => {
-            let amount = new_state
-                .msg
-                .balances
-                .earners
-                .get(&addr)
-                .ok_or_else(|| ResponseError::BadRequest("No balance entry for spender!".to_string()))?;
+            let amount = new_state.msg.balances.earners.get(&addr).ok_or_else(|| {
+                ResponseError::BadRequest("No balance entry for spender!".to_string())
+            })?;
 
             get_balance_leaf(
-                    false,
-                    &addr,
-                    &amount.to_precision(channel_context.token.precision.get()),
-                )
-                .map_err(|err| ResponseError::BadRequest(err.to_string()))?
+                false,
+                &addr,
+                &amount.to_precision(channel_context.token.precision.get()),
+            )
+            .map_err(|err| ResponseError::BadRequest(err.to_string()))?
         }
     };
     let merkle_tree =
@@ -737,11 +736,18 @@ pub mod validator_message {
 
 #[cfg(test)]
 mod test {
-    use std::str::FromStr;
+    use super::*;
+    use crate::{
+        db::{
+            insert_campaign, insert_channel, validator_message::insert_validator_message,
+            CampaignRemaining,
+        },
+        test_util::setup_dummy_app,
+    };
     use adapter::{
         ethereum::test_util::{GANACHE_INFO_1, GANACHE_INFO_1337},
-        primitives::Deposit as AdapterDeposit,
         prelude::Unlocked,
+        primitives::Deposit as AdapterDeposit,
     };
     use primitives::{
         balances::UncheckedState,
@@ -753,14 +759,7 @@ mod test {
         validator::{ApproveState, MessageTypes, NewState},
         BigNum, ChainId, Deposit, UnifiedMap, ValidatorId,
     };
-    use super::*;
-    use crate::{
-        db::{
-            insert_campaign, insert_channel, validator_message::insert_validator_message,
-            CampaignRemaining,
-        },
-        test_util::setup_dummy_app,
-    };
+    use std::str::FromStr;
 
     #[tokio::test]
     async fn create_and_fetch_spendable() {
@@ -1512,8 +1511,15 @@ mod test {
             .expect("should insert channel");
 
         // Setting up the validator messages
-        let state_root = "b1a4fc6c1a1e1ab908a487e504006edcebea297f61b4b8ce6cad3b29e29454cc".to_string();
-        let signature = app.adapter.clone().unlock().expect("should unlock").sign(&state_root.clone()).expect("should sign");
+        let state_root =
+            "b1a4fc6c1a1e1ab908a487e504006edcebea297f61b4b8ce6cad3b29e29454cc".to_string();
+        let signature = app
+            .adapter
+            .clone()
+            .unlock()
+            .expect("should unlock")
+            .sign(&state_root.clone())
+            .expect("should sign");
         let new_state: NewState<UncheckedState> = NewState {
             state_root: state_root.clone(),
             signature: signature.clone(),
@@ -1543,8 +1549,10 @@ mod test {
         .expect("Should insert NewState msg");
 
         // hardcoded proofs
-        let spender_proof = "8ea7760ca2dbbe00673372afbf8b05048717ce8a305f1f853afac8c244182e0c".to_string();
-        let earner_proof = "dc94141cb41550df047ba3a965ce36d98eb6098eb952ca3cb6fd9682e5810b51".to_string();
+        let spender_proof =
+            "8ea7760ca2dbbe00673372afbf8b05048717ce8a305f1f853afac8c244182e0c".to_string();
+        let earner_proof =
+            "dc94141cb41550df047ba3a965ce36d98eb6098eb952ca3cb6fd9682e5810b51".to_string();
 
         // call functions
         let spender_leaf = get_leaf(
