@@ -539,8 +539,7 @@ pub async fn get_leaf<C: Locked + 'static>(
                 true,
                 &addr,
                 &amount.to_precision(channel_context.token.precision.get()),
-            )
-            .map_err(|err| ResponseError::BadRequest(err.to_string()))?
+            )?
         }
         LeafFor::Earner => {
             let amount = new_state.msg.balances.earners.get(&addr).ok_or_else(|| {
@@ -551,14 +550,13 @@ pub async fn get_leaf<C: Locked + 'static>(
                 false,
                 &addr,
                 &amount.to_precision(channel_context.token.precision.get()),
-            )
-            .map_err(|err| ResponseError::BadRequest(err.to_string()))?
+            )?
         }
     };
     let merkle_tree =
-        MerkleTree::new(&[element]).map_err(|err| ResponseError::BadRequest(err.to_string()))?;
+        MerkleTree::new(&[element])?;
 
-    let signable_state_root = get_signable_state_root(&*channel.id(), &merkle_tree.root());
+    let signable_state_root = get_signable_state_root(channel.id().as_bytes(), &merkle_tree.root());
 
     let res = hex::encode(signable_state_root);
 
