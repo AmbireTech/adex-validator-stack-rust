@@ -557,8 +557,7 @@ pub async fn get_leaf<C: Locked + 'static>(
             )?
         }
     };
-    let merkle_tree =
-        MerkleTree::new(&[element])?;
+    let merkle_tree = MerkleTree::new(&[element])?;
 
     let signable_state_root = get_signable_state_root(channel.id().as_bytes(), &merkle_tree.root());
 
