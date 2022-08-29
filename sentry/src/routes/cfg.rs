@@ -9,7 +9,9 @@ use primitives::Config;
 
 use crate::Application;
 
-/// `GET /cfg` request
+/// GET `/cfg` request
+///
+/// Response: [`Config`]
 pub async fn config<C: Locked + 'static>(
     Extension(app): Extension<Arc<Application<C>>>,
 ) -> Json<Config> {

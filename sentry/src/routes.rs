@@ -466,6 +466,22 @@
 //!
 //! See [GET `/v5/analytics`](#get-v5analytics)
 //!
+//! #### GET `/cfg`
+//!
+//! Gets the config that the validator is running on.
+//!
+//! The route is handled by [`sentry::routes::cfg::get_config()`]
+//!
+//! Response: [`Config`](primitives::Config)
+//!
+//! ##### Examples
+//!
+//! Response:
+//!
+//! ```
+#![doc = include_str!("../../primitives/examples/get_cfg_response.rs")]
+//! ```
+//!
 //! [`Adapter`]: adapter::Adapter
 //! [`Address`]: primitives::Address
 //! [`AllowedKey`]: primitives::analytics::query::AllowedKey

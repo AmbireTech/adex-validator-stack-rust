@@ -47,6 +47,10 @@ impl Default for Environment {
     }
 }
 
+/// Examples:
+/// ```
+#[doc = include_str!("../../primitives/examples/get_cfg_response.rs")]
+/// ```
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Config {
     /// The maximum number of [`Channel`](crate::Channel)s that the worker
