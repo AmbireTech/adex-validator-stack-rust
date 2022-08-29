@@ -504,6 +504,10 @@ pub async fn channel_payout<C: Locked + 'static>(
     Ok(Json(SuccessResponse { success: true }))
 }
 
+/// GET `/v5/channel/0xXXX.../get-leaf/spender` request and
+/// GET `/v5/channel/0xXXX.../get-leaf/earner` request
+///
+/// Response: [`GetLeafResponse`]
 pub async fn get_leaf<C: Locked + 'static>(
     Extension(app): Extension<Arc<Application<C>>>,
     Extension(channel_context): Extension<ChainOf<Channel>>,

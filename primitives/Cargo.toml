@@ -64,6 +64,9 @@ name = "modify_campaign_request"
 name = "spender_response"
 
 [[example]]
+name = "get_leaf_response"
+
+[[example]]
 name = "validator_messages_create_request"
 
 [[example]]

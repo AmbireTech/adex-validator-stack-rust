@@ -237,27 +237,32 @@
 //! ```
 //!
 //!
-//! #### GET `/v5/channel/:id/get-leaf`
-//!
-//! TODO: implement and document as part of issue #382
+//! #### GET `/v5/channel/:id/get-leaf/spender` and GET `/v5/channel/:id/get-leaf/earner`
 //!
 //! This route gets the latest approved state ([`NewState`]/[`ApproveState`] pair),
 //! and finds the given `spender`/`earner` in the balances tree, and produce a merkle proof for it.
 //! This is useful for the Platform to verify if a spender leaf really exists.
 //!
-//! The route is handled by `todo`.
-//!
-//! Request query parameters:
-//!
-//! - `spender=[0x...]` or `earner=[0x...]` (required)
+//! The route is handled by [`channel::get_leaf()`].
 //!
 //! Example Spender:
 //!
-//! `/get-leaf?spender=0x...`
+//! `/get-leaf/spender/0x...`
 //!
 //! Example Earner:
 //!
-//! `/get-leaf?earner=0x....`
+//! `/get-leaf/earner/0x....`
+//!
+//! Response: [`GetLeafResponse`](primitives::sentry::GetLeafResponse)
+//!
+//! ##### Examples:
+//!
+//! Response:
+//!
+//! ```
+#![doc = include_str!("../../primitives/examples/spender_response.rs")]
+//! ```
+//!
 //! This module includes all routes for `Sentry` and the documentation of each Request/Response.
 //!
 //! #### POST `/v5/channel/dummy-deposit` (auth required)

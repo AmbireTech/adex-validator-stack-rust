@@ -722,6 +722,13 @@ pub struct ValidationErrorResponse {
     pub validation: Vec<String>,
 }
 
+/// Returns the merkle_proof for the spender/earner
+///
+/// # Examples
+///
+/// ```
+#[doc = include_str!("../examples/get_leaf_response.rs")]
+/// ```
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct GetLeafResponse {
