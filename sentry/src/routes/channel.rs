@@ -504,8 +504,11 @@ pub async fn channel_payout<C: Locked + 'static>(
     Ok(Json(SuccessResponse { success: true }))
 }
 
-/// GET `/v5/channel/0xXXX.../get-leaf/spender` request and
-/// GET `/v5/channel/0xXXX.../get-leaf/earner` request
+/// GET `/v5/channel/0xXXX.../get-leaf/` request
+///
+/// Subroutes:
+/// - /v5/channel/0xXXX.../get-leaf/spender
+/// - /v5/channel/0xXXX.../get-leaf/earner
 ///
 /// Response: [`GetLeafResponse`]
 pub async fn get_leaf<C: Locked + 'static>(
@@ -518,11 +521,7 @@ pub async fn get_leaf<C: Locked + 'static>(
 
     let approve_state = match latest_approve_state(&app.pool, &channel).await? {
         Some(approve_state) => approve_state,
-        None => {
-            return Err(ResponseError::BadRequest(
-                "No ApproveState message for spender".to_string(),
-            ))
-        }
+        None => return Err(ResponseError::NotFound),
     };
 
     let state_root = approve_state.msg.state_root.clone();
@@ -535,9 +534,12 @@ pub async fn get_leaf<C: Locked + 'static>(
 
     let element = match leaf_for {
         LeafFor::Spender => {
-            let amount = new_state.msg.balances.spenders.get(&addr).ok_or_else(|| {
-                ResponseError::BadRequest("No balance entry for spender!".to_string())
-            })?;
+            let amount = new_state
+                .msg
+                .balances
+                .spenders
+                .get(&addr)
+                .ok_or(ResponseError::NotFound)?;
 
             get_balance_leaf(
                 true,
@@ -546,9 +548,12 @@ pub async fn get_leaf<C: Locked + 'static>(
             )?
         }
         LeafFor::Earner => {
-            let amount = new_state.msg.balances.earners.get(&addr).ok_or_else(|| {
-                ResponseError::BadRequest("No balance entry for spender!".to_string())
-            })?;
+            let amount = new_state
+                .msg
+                .balances
+                .earners
+                .get(&addr)
+                .ok_or(ResponseError::NotFound)?;
 
             get_balance_leaf(
                 false,

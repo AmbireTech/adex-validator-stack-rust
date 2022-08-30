@@ -237,7 +237,7 @@
 //! ```
 //!
 //!
-//! #### GET `/v5/channel/:id/get-leaf/spender` and GET `/v5/channel/:id/get-leaf/earner`
+//! #### GET `/v5/channel/:id/get-leaf
 //!
 //! This route gets the latest approved state ([`NewState`]/[`ApproveState`] pair),
 //! and finds the given `spender`/`earner` in the balances tree, and produce a merkle proof for it.
@@ -247,11 +247,11 @@
 //!
 //! Example Spender:
 //!
-//! `/get-leaf/spender/0x...`
+//! `/get-leaf/spender/0xDd589B43793934EF6Ad266067A0d1D4896b0dff0`
 //!
 //! Example Earner:
 //!
-//! `/get-leaf/earner/0x....`
+//! `/get-leaf/earner/0xE882ebF439207a70dDcCb39E13CA8506c9F45fD9`
 //!
 //! Response: [`GetLeafResponse`](primitives::sentry::GetLeafResponse)
 //!
@@ -262,6 +262,10 @@
 //! ```
 #![doc = include_str!("../../primitives/examples/spender_response.rs")]
 //! ```
+//!
+//! #### Subroutes:
+//! - GET `/v5/channel/:id/get-leaf/spender`
+//! - GET `/v5/channel/:id/get-leaf/earner`
 //!
 //! This module includes all routes for `Sentry` and the documentation of each Request/Response.
 //!
