@@ -61,6 +61,5 @@ fn main() {
             }
         }
     });
-    let val = from_value::<Config>(json).expect("should convert");
-    // assert!(from_value::<Config>(json).is_ok());
+    assert!(from_value::<Config>(json).is_ok());
 }
