@@ -7,17 +7,17 @@ fn main() {
         "channels_find_limit":200,
         "campaigns_find_limit":200,
         "spendable_find_limit":200,
-        "wait_time":{"secs":0,"nanos":500000000},
+        "wait_time":500,
         "msgs_find_limit":10,
         "analytics_find_limit":5000,
-        "analytics_maxtime":{"secs":20,"nanos":0},
-        "heartbeat_time":{"secs":30,"nanos":0},
+        "analytics_maxtime":20000,
+        "heartbeat_time":30000,
         "health_threshold_promilles":950,
         "health_unsignable_promilles":750,
-        "propagation_timeout":{"secs":2,"nanos":0},
-        "fetch_timeout":{"secs":5,"nanos":0},
-        "all_campaigns_timeout":{"secs":5,"nanos":0},
-        "channel_tick_timeout":{"secs":8,"nanos":0},
+        "propagation_timeout":2000,
+        "fetch_timeout":5000,
+        "all_campaigns_timeout":5000,
+        "channel_tick_timeout":8000,
         "ip_rate_limit":{"type":"ip","timeframe":1200000},
         "creators_whitelist":[],
         "validators_whitelist":[],
@@ -52,7 +52,7 @@ fn main() {
         },
         "platform":{
             "url":"https://platform.adex.network/",
-            "keep_alive_interval":{"secs":1200,"nanos":0}
+            "keep_alive_interval":1200000
         },
         "limits":{
             "units_for_slot":{
