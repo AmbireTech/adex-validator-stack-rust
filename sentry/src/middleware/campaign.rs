@@ -124,7 +124,7 @@ mod test {
 
         let build_request = |id: CampaignId| {
             Request::builder()
-                .uri(format!("/{id}"))
+                .uri(format!("/{id}/test"))
                 .extension(app.clone())
                 .body(Body::empty())
                 .expect("Should build Request")
@@ -132,12 +132,17 @@ mod test {
 
         let campaign = DUMMY_CAMPAIGN.clone();
 
-        async fn handle(Extension(_campaign_context): Extension<ChainOf<Campaign>>) -> String {
+        async fn handle(
+            Extension(campaign_context): Extension<ChainOf<Campaign>>,
+            Path((id, another)): Path<(CampaignId, String)>,
+        ) -> String {
+            assert_eq!(id, campaign_context.context.id);
+            assert_eq!(another, "test");
             "Ok".into()
         }
 
         let mut router = Router::new()
-            .route("/:id", get(handle))
+            .route("/:id/:another", get(handle))
             .layer(from_fn(campaign_load::<Dummy, _>));
 
         // bad CampaignId
