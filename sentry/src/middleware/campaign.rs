@@ -108,7 +108,7 @@ mod test {
     use tower::Service;
 
     use adapter::Dummy;
-    use primitives::{test_util::DUMMY_CAMPAIGN, Campaign, ChainOf};
+    use primitives::{test_util::CAMPAIGNS, Campaign, ChainOf};
 
     use crate::{
         db::{insert_campaign, insert_channel},
@@ -130,7 +130,7 @@ mod test {
                 .expect("Should build Request")
         };
 
-        let campaign = DUMMY_CAMPAIGN.clone();
+        let campaign_context = CAMPAIGNS[0].clone();
 
         async fn handle(
             Extension(campaign_context): Extension<ChainOf<Campaign>>,
@@ -147,7 +147,7 @@ mod test {
 
         // bad CampaignId
         {
-            let mut request = build_request(campaign.id);
+            let mut request = build_request(campaign_context.context.id);
             *request.uri_mut() = "/WrongCampaignId".parse().unwrap();
 
             let response = router
@@ -162,9 +162,9 @@ mod test {
             );
         }
 
-        // non-existent campaign
+        // non-existent Campaign
         {
-            let request = build_request(campaign.id);
+            let request = build_request(campaign_context.context.id);
 
             let response = router
                 .call(request)
@@ -176,21 +176,18 @@ mod test {
 
         // existing Campaign
         {
-            let channel_chain = app
-                .config
-                .find_chain_of(DUMMY_CAMPAIGN.channel.token)
-                .expect("Channel token should be whitelisted in config!");
-            let channel_context = channel_chain.with_channel(DUMMY_CAMPAIGN.channel);
+            let channel_context = campaign_context.of_channel();
+
             // insert Channel
             insert_channel(&app.pool, &channel_context)
                 .await
                 .expect("Should insert Channel");
             // insert Campaign
-            assert!(insert_campaign(&app.pool, &campaign)
+            assert!(insert_campaign(&app.pool, &campaign_context.context)
                 .await
                 .expect("Should insert Campaign"));
 
-            let request = build_request(campaign.id);
+            let request = build_request(campaign_context.context.id);
 
             let response = router
                 .call(request)
