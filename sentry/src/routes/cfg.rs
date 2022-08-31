@@ -12,7 +12,7 @@ use crate::Application;
 /// GET `/cfg` request
 ///
 /// Response: [`Config`]
-pub async fn config<C: Locked + 'static>(
+pub async fn get_cfg<C: Locked + 'static>(
     Extension(app): Extension<Arc<Application<C>>>,
 ) -> Json<Config> {
     Json(app.config.clone())

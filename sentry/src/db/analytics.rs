@@ -9,7 +9,7 @@ use tokio_postgres::{types::ToSql, Row};
 
 use super::{DbPool, PoolError};
 
-pub async fn get_analytics(
+pub async fn fetch_analytics(
     pool: &DbPool,
     query: AnalyticsQuery,
     allowed_keys: HashSet<AllowedKey>,
@@ -180,7 +180,7 @@ mod test {
     use crate::db::tests_postgres::{setup_test_migrations, DATABASE_POOL};
 
     #[tokio::test]
-    async fn insert_update_and_get_analytics() {
+    async fn insert_update_and_fetch_analytics() {
         let database = DATABASE_POOL.get().await.expect("Should get a DB pool");
 
         let ad_unit = DUMMY_AD_UNITS[0].clone();
@@ -393,7 +393,7 @@ mod test {
 
         // Impression query - should count all inserted Analytics
         {
-            let count_impressions = get_analytics(
+            let count_impressions = fetch_analytics(
                 &database.pool,
                 impression_query.clone(),
                 ALLOWED_KEYS.clone(),
@@ -436,7 +436,7 @@ mod test {
             let mut paid_impressions_query = impression_query.clone();
             paid_impressions_query.metric = Metric::Paid;
 
-            let paid_impressions = get_analytics(
+            let paid_impressions = fetch_analytics(
                 &database.pool,
                 paid_impressions_query,
                 ALLOWED_KEYS.clone(),
@@ -498,7 +498,7 @@ mod test {
 
         // Click query - should count all inserted Analytics
         {
-            let count_clicks = get_analytics(
+            let count_clicks = fetch_analytics(
                 &database.pool,
                 click_query.clone(),
                 ALLOWED_KEYS.clone(),
@@ -541,7 +541,7 @@ mod test {
             let mut paid_clicks_query = impression_query.clone();
             paid_clicks_query.metric = Metric::Paid;
 
-            let paid_impressions = get_analytics(
+            let paid_impressions = fetch_analytics(
                 &database.pool,
                 paid_clicks_query,
                 ALLOWED_KEYS.clone(),
@@ -595,7 +595,7 @@ mod test {
             };
             click_germany_query.country = Some("Germany".into());
 
-            let count_clicks = get_analytics(
+            let count_clicks = fetch_analytics(
                 &database.pool,
                 click_germany_query.clone(),
                 ALLOWED_KEYS.clone(),
@@ -646,7 +646,7 @@ mod test {
                 chains: vec![],
             };
 
-            let count_impressions = get_analytics(
+            let count_impressions = fetch_analytics(
                 &database.pool,
                 ad_unit_2_query.clone(),
                 ALLOWED_KEYS.clone(),
@@ -702,7 +702,7 @@ mod test {
                 chains: vec![],
             };
 
-            let count_impressions = get_analytics(
+            let count_impressions = fetch_analytics(
                 &database.pool,
                 filter_by_publisher_2_query.clone(),
                 ALLOWED_KEYS.clone(),
@@ -758,7 +758,7 @@ mod test {
                 chains: vec![],
             };
 
-            let count_impressions = get_analytics(
+            let count_impressions = fetch_analytics(
                 &database.pool,
                 authenticate_as_publisher_2_query.clone(),
                 ALLOWED_KEYS.clone(),
@@ -814,7 +814,7 @@ mod test {
                 chains: vec![],
             };
 
-            let count_impressions = get_analytics(
+            let count_impressions = fetch_analytics(
                 &database.pool,
                 segment_ad_units_query.clone(),
                 ALLOWED_KEYS.clone(),
