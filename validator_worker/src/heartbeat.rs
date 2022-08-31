@@ -4,7 +4,7 @@ use adapter::{prelude::*, util::get_signable_state_root, Error as AdapterError};
 use byteorder::{BigEndian, ByteOrder};
 use primitives::{
     merkle_tree::MerkleTree,
-    validator::{Heartbeat, MessageTypes},
+    validator::{Heartbeat, MessageType, MessageTypes},
     ChainOf, Channel,
 };
 use thiserror::Error;
@@ -28,7 +28,7 @@ pub async fn heartbeat<C: Unlocked + 'static>(
     channel_context: &ChainOf<Channel>,
 ) -> Result<HeartbeatStatus, Error> {
     let validator_message_response = iface
-        .get_our_latest_msg(channel_context.context.id(), &["Heartbeat"])
+        .get_our_latest_msg(channel_context.context.id(), &[MessageType::Heartbeat])
         .await?;
     let heartbeat_msg = match validator_message_response {
         Some(MessageTypes::Heartbeat(heartbeat)) => Some(heartbeat),
@@ -85,7 +85,10 @@ mod test {
     use chrono::{Duration, Utc};
     use primitives::{
         config::GANACHE_CONFIG,
-        sentry::{SuccessResponse, ValidatorMessage, ValidatorMessagesListResponse},
+        sentry::{
+            validator_messages::{ValidatorMessage, ValidatorMessagesListResponse},
+            SuccessResponse,
+        },
         test_util::{
             discard_logger, DUMMY_AUTH, DUMMY_CAMPAIGN, DUMMY_VALIDATOR_FOLLOWER,
             DUMMY_VALIDATOR_LEADER, FOLLOWER, IDS, LEADER,

@@ -11,12 +11,14 @@ use adapter::{prelude::*, Adapter};
 use primitives::{
     balances::{CheckedState, UncheckedState},
     sentry::{
+        validator_messages::{
+            MessageTypesFilter, ValidatorMessagesCreateRequest, ValidatorMessagesListResponse,
+        },
         AccountingResponse, AllSpendersResponse, LastApprovedResponse, SuccessResponse,
-        ValidatorMessagesCreateRequest, ValidatorMessagesListResponse,
     },
     spender::Spender,
     util::ApiUrl,
-    validator::MessageTypes,
+    validator::{MessageType, MessageTypes},
     Address, ChainId, ChainOf, Channel, ChannelId, Config, ValidatorId,
 };
 use thiserror::Error;
@@ -196,15 +198,16 @@ impl<C: Unlocked + 'static, P> SentryApi<C, P> {
         &self,
         channel: ChannelId,
         from: ValidatorId,
-        message_types: &[&str],
+        message_types: &[MessageType],
     ) -> Result<Option<MessageTypes>, Error> {
-        let message_type = message_types.join("+");
+        let messages_filter = MessageTypesFilter(message_types.to_vec());
+        let messages_encoded = urlencoding::Encoded(messages_filter.to_string());
 
         let endpoint = self
             .sentry_url
             .join(&format!(
                 "v5/channel/{}/validator-messages/{}/{}?limit=1",
-                channel, from, message_type
+                channel, from, messages_encoded
             ))
             .expect("Should not error when creating endpoint url");
 
@@ -222,7 +225,7 @@ impl<C: Unlocked + 'static, P> SentryApi<C, P> {
     pub async fn get_our_latest_msg(
         &self,
         channel: ChannelId,
-        message_types: &[&str],
+        message_types: &[MessageType],
     ) -> Result<Option<MessageTypes>, Error> {
         self.get_latest_msg(channel, self.adapter.whoami(), message_types)
             .await
@@ -641,6 +644,33 @@ mod test {
         matchers::{method, path, query_param},
         Mock, MockServer, ResponseTemplate,
     };
+
+    #[test]
+    fn test_message_types_filter_encoding() {
+        let cases = [
+            ("", vec![]),
+            (
+                "NewState%2BApproveState",
+                vec![MessageType::NewState, MessageType::ApproveState],
+            ),
+            (
+                "NewState%2BApproveState%2BRejectState",
+                vec![
+                    MessageType::NewState,
+                    MessageType::ApproveState,
+                    MessageType::RejectState,
+                ],
+            ),
+        ];
+
+        for (expected_urlencoded, message_types) in cases {
+            let filter = MessageTypesFilter(message_types);
+            let message_types_filter = urlencoding::Encoded(filter.to_string());
+
+            assert_eq!(expected_urlencoded, message_types_filter.to_str());
+            assert_eq!(expected_urlencoded, format!("{message_types_filter}"));
+        }
+    }
 
     /// Uses the [`Dummy`] adapter with [`DUMMY_AUTH`] as the authentication tokens.
     /// Sentry url can be provided, for `wiremock` to be able to mock the calls in [`SentryApi`].

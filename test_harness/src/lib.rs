@@ -243,7 +243,7 @@ mod tests {
         },
         unified_num::FromWhole,
         util::{logging::new_logger, ApiUrl},
-        validator::{ApproveState, Heartbeat, NewState, RejectState},
+        validator::{ApproveState, Heartbeat, MessageType, NewState, RejectState},
         Balances, BigNum, Campaign, CampaignId, ChainId, Channel, ChannelId, UnifiedNum,
     };
     use reqwest::{Client, StatusCode};
@@ -1252,7 +1252,7 @@ mod tests {
         // Total: 5.00075 TOKENs
         {
             let latest_new_state_leader = follower_sentry
-                .get_our_latest_msg(CAMPAIGN_2.channel.id(), &["NewState"])
+                .get_our_latest_msg(CAMPAIGN_2.channel.id(), &[MessageType::NewState])
                 .await
                 .expect("Should fetch NewState from Channel's Leader (Who am I) in FOLLOWER sentry")
                 .map(|message| {
@@ -1262,7 +1262,7 @@ mod tests {
                 .expect("Should have a NewState in Channel's Leader for the Campaign 2 channel");
 
             let latest_reject_state_follower = leader_sentry
-                .get_our_latest_msg(CAMPAIGN_2.channel.id(), &["RejectState"])
+                .get_our_latest_msg(CAMPAIGN_2.channel.id(), &[MessageType::RejectState])
                 .await
                 .expect(
                     "Should successfully try to fetch a RejectState from Channel's Follower (Who am I) in LEADER sentry",
@@ -1306,7 +1306,7 @@ mod tests {
         {
             // Channel 1
             let _channel_1_heartbeat = leader_sentry
-                .get_our_latest_msg(CAMPAIGN_1.channel.id(), &["Heartbeat"])
+                .get_our_latest_msg(CAMPAIGN_1.channel.id(), &[MessageType::Heartbeat])
                 .await
                 .expect("Should fetch Heartbeat from Leader")
                 .map(|message| Heartbeat::try_from(message).expect("Should be Heartbeat"))
@@ -1314,7 +1314,7 @@ mod tests {
 
             // Channel 2
             let _channel_2_heartbeat = leader_sentry
-                .get_our_latest_msg(CAMPAIGN_2.channel.id(), &["Heartbeat"])
+                .get_our_latest_msg(CAMPAIGN_2.channel.id(), &[MessageType::Heartbeat])
                 .await
                 .expect("Should fetch Heartbeat from Leader")
                 .map(|message| Heartbeat::try_from(message).expect("Should be Heartbeat"))
@@ -1322,7 +1322,7 @@ mod tests {
 
             // Channel 3
             let _channel_3_heartbeat = leader_sentry
-                .get_our_latest_msg(CAMPAIGN_3.channel.id(), &["Heartbeat"])
+                .get_our_latest_msg(CAMPAIGN_3.channel.id(), &[MessageType::Heartbeat])
                 .await
                 .expect("Should fetch Heartbeat from Leader")
                 .map(|message| Heartbeat::try_from(message).expect("Should be Heartbeat"))
@@ -1597,7 +1597,7 @@ mod tests {
         // Assert that it exists in both validators
         {
             let latest_new_state_leader = leader_sentry
-                .get_our_latest_msg(CAMPAIGN_1.channel.id(), &["NewState"])
+                .get_our_latest_msg(CAMPAIGN_1.channel.id(), &[MessageType::NewState])
                 .await
                 .expect("Should fetch NewState from Leader (Who am I) in Leader sentry")
                 .map(|message| {
@@ -1767,7 +1767,7 @@ mod tests {
         // Ganache health_unsignable_promilles = 750
         {
             let latest_reject_state_follower = leader_sentry
-                .get_our_latest_msg(CAMPAIGN_2.channel.id(), &["RejectState"])
+                .get_our_latest_msg(CAMPAIGN_2.channel.id(), &[MessageType::RejectState])
                 .await
                 .expect(
                     "Should fetch RejectState from Channel's Follower (Who am I) in Leader sentry",
@@ -1804,7 +1804,7 @@ mod tests {
         // Assert that it exists in both validators
         {
             let latest_new_state_leader = leader_sentry
-                .get_our_latest_msg(CAMPAIGN_3.channel.id(), &["NewState"])
+                .get_our_latest_msg(CAMPAIGN_3.channel.id(), &[MessageType::NewState])
                 .await
                 .expect("Should fetch NewState from Leader (Who am I) in Leader sentry")
                 .map(|message| {
@@ -2034,7 +2034,7 @@ mod tests {
 
         {
             let latest_approve_state_follower = leader_sentry
-                .get_our_latest_msg(CAMPAIGN_2.channel.id(), &["ApproveState"])
+                .get_our_latest_msg(CAMPAIGN_2.channel.id(), &[MessageType::ApproveState])
                 .await
                 .expect(
                     "Should fetch ApproveState from Channel's Follower (Who am I) from LEADER sentry",
@@ -2046,7 +2046,7 @@ mod tests {
                 .expect("Should have a ApproveState in Channel's Follower for the Campaign 2 channel");
 
             let latest_new_state_leader = follower_sentry
-                .get_our_latest_msg(CAMPAIGN_2.channel.id(), &["NewState"])
+                .get_our_latest_msg(CAMPAIGN_2.channel.id(), &[MessageType::NewState])
                 .await
                 .expect(
                     "Should fetch NewState from Channel's Leader (Who am I) from FOLLOWER sentry",
@@ -2126,7 +2126,7 @@ mod tests {
         //
         {
             let latest_approve_state_follower = leader_sentry
-                .get_our_latest_msg(CAMPAIGN_2.channel.id(), &["ApproveState"])
+                .get_our_latest_msg(CAMPAIGN_2.channel.id(), &[MessageType::ApproveState])
                 .await
                 .expect(
                     "Should fetch ApproveState from Channel's Follower (Who am I) from LEADER sentry",
@@ -2143,7 +2143,7 @@ mod tests {
             );
 
             let latest_new_state_leader = follower_sentry
-                .get_our_latest_msg(CAMPAIGN_2.channel.id(), &["NewState"])
+                .get_our_latest_msg(CAMPAIGN_2.channel.id(), &[MessageType::NewState])
                 .await
                 .expect(
                     "Should fetch NewState from Channel's Leader (Who am I) from FOLLOWER sentry",

@@ -163,6 +163,8 @@ impl<T> Borrow<T> for Validator<T> {
 /// Validator Message Types
 pub mod messages {
     use std::{any::type_name, fmt, marker::PhantomData};
+
+    use parse_display::{Display, FromStr};
     use thiserror::Error;
 
     use crate::balances::{Balances, BalancesState, CheckedState, UncheckedState};
@@ -397,10 +399,63 @@ pub mod messages {
         RejectState(RejectState<UncheckedState>),
         Heartbeat(Heartbeat),
     }
+
+    /// All available message type names.
+    #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, FromStr, Display)]
+    #[display(style = "CamelCase")]
+    pub enum MessageType {
+        ApproveState,
+        NewState,
+        RejectState,
+        Heartbeat,
+    }
+
+    /// This ensures that all [`MessageTypes`] are also listed in the enum [`MessageType`]!
+    impl From<&MessageTypes> for MessageType {
+        fn from(message_types: &MessageTypes) -> Self {
+            match message_types {
+                MessageTypes::ApproveState(_) => Self::ApproveState,
+                MessageTypes::NewState(_) => Self::NewState,
+                MessageTypes::RejectState(_) => Self::RejectState,
+                MessageTypes::Heartbeat(_) => Self::Heartbeat,
+            }
+        }
+    }
+
+    impl From<MessageTypes> for MessageType {
+        fn from(message_types: MessageTypes) -> Self {
+            Self::from(&message_types)
+        }
+    }
+
+    #[cfg(test)]
+    mod test {
+        use super::MessageType;
+
+        #[test]
+        fn test_message_type_from_and_to_string() {
+            let cases = [
+                ("ApproveState", MessageType::ApproveState),
+                ("NewState", MessageType::NewState),
+                ("RejectState", MessageType::RejectState),
+                ("Heartbeat", MessageType::Heartbeat),
+            ];
+
+            for (expected, value) in cases {
+                assert_eq!(expected, value.to_string());
+                assert_eq!(
+                    expected
+                        .parse::<MessageType>()
+                        .expect("Should parse string"),
+                    value
+                );
+            }
+        }
+    }
 }
 #[cfg(feature = "postgres")]
 mod postgres {
-    use super::ValidatorId;
+    use super::{MessageType, ValidatorId};
     use crate::ToETHChecksum;
     use bytes::BytesMut;
     use std::error::Error;
@@ -442,6 +497,40 @@ mod postgres {
             let string = self.to_checksum();
 
             <String as ToSql>::to_sql_checked(&string, ty, out)
+        }
+    }
+
+    impl<'a> FromSql<'a> for MessageType {
+        fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
+            let str_slice = <&str as FromSql>::from_sql(ty, raw)?;
+
+            Ok(str_slice.parse()?)
+        }
+
+        fn accepts(ty: &Type) -> bool {
+            matches!(*ty, Type::TEXT | Type::VARCHAR)
+        }
+    }
+
+    impl ToSql for MessageType {
+        fn to_sql(
+            &self,
+            ty: &Type,
+            w: &mut BytesMut,
+        ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
+            <String as ToSql>::to_sql(&self.to_string(), ty, w)
+        }
+
+        fn accepts(ty: &Type) -> bool {
+            <String as ToSql>::accepts(ty)
+        }
+
+        fn to_sql_checked(
+            &self,
+            ty: &Type,
+            out: &mut BytesMut,
+        ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
+            <String as ToSql>::to_sql_checked(&self.to_string(), ty, out)
         }
     }
 }

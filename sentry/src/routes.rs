@@ -139,9 +139,9 @@
 //!
 //! The route is handled by [`channel::validator_message::list_validator_messages()`].
 //!
-//! Request query parameters: [`ValidatorMessagesListQuery`](primitives::sentry::ValidatorMessagesListQuery)
+//! Request query parameters: [`ValidatorMessagesListQuery`](primitives::sentry::validator_messages::ValidatorMessagesListQuery)
 //!
-//! Response: [`ValidatorMessagesListResponse`](primitives::sentry::ValidatorMessagesListResponse)
+//! Response: [`ValidatorMessagesListResponse`](primitives::sentry::validator_messages::ValidatorMessagesListResponse)
 //!
 //! ##### Examples
 //!
@@ -167,7 +167,7 @@
 //!
 //! The route is handled by [`channel::validator_message::create_validator_messages()`].
 //!
-//! Request body (json): [`ValidatorMessagesCreateRequest`](primitives::sentry::ValidatorMessagesCreateRequest)
+//! Request body (json): [`ValidatorMessagesCreateRequest`](primitives::sentry::validator_messages::ValidatorMessagesCreateRequest)
 //!
 //! Response: [`SuccessResponse`]
 //!

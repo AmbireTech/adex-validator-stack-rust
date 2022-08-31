@@ -1,10 +1,3 @@
-use crate::{
-    analytics::{OperatingSystem, Timeframe},
-    balances::BalancesState,
-    spender::Spender,
-    validator::{ApproveState, Heartbeat, MessageTypes, NewState, Type as MessageType},
-    Address, Balances, CampaignId, ChainId, UnifiedMap, UnifiedNum, ValidatorId, IPFS,
-};
 use chrono::{
     serde::ts_milliseconds, Date, DateTime, Datelike, Duration, NaiveDate, TimeZone, Timelike, Utc,
 };
@@ -19,6 +12,15 @@ use std::{
 use thiserror::Error;
 
 pub use event::{Event, EventType, CLICK, IMPRESSION};
+
+use self::message::MessageResponse;
+use crate::{
+    analytics::{OperatingSystem, Timeframe},
+    balances::BalancesState,
+    spender::Spender,
+    validator::{ApproveState, Heartbeat, NewState},
+    Address, Balances, CampaignId, ChainId, UnifiedMap, UnifiedNum, IPFS,
+};
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -47,18 +49,19 @@ pub struct LastApproved<S: BalancesState> {
     pub approve_state: Option<MessageResponse<ApproveState>>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-pub struct MessageResponse<T: MessageType> {
-    pub from: ValidatorId,
-    pub received: DateTime<Utc>,
-    pub msg: message::Message<T>,
-}
-
 pub mod message {
     use std::ops::Deref;
 
-    use crate::validator::messages::*;
+    use crate::{validator::messages::*, ValidatorId};
+    use chrono::{DateTime, Utc};
     use serde::{Deserialize, Serialize};
+
+    #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+    pub struct MessageResponse<T: Type> {
+        pub from: ValidatorId,
+        pub received: DateTime<Utc>,
+        pub msg: Message<T>,
+    }
 
     #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
     #[serde(try_from = "MessageTypes", into = "MessageTypes")]
@@ -682,39 +685,6 @@ pub struct ChannelPayRequest {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct ValidatorMessage {
-    pub from: ValidatorId,
-    pub received: DateTime<Utc>,
-    pub msg: MessageTypes,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct ValidatorMessagesListResponse {
-    pub messages: Vec<ValidatorMessage>,
-}
-
-/// Contains all the different validator messages to be created.
-///
-/// # Examples
-///
-/// ```
-#[doc = include_str!("../examples/validator_messages_create_request.rs")]
-/// ```
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct ValidatorMessagesCreateRequest {
-    pub messages: Vec<MessageTypes>,
-}
-
-#[derive(Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct ValidatorMessagesListQuery {
-    /// Will apply the lower limit of: `query.limit` and `Config::msgs_find_limit`
-    pub limit: Option<u64>,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct ValidationErrorResponse {
     pub status_code: u64,
@@ -773,6 +743,123 @@ pub mod channel_list {
         /// Returns only the Channels from the specified [`ChainId`]s.
         #[serde(default)]
         pub chains: Vec<ChainId>,
+    }
+}
+
+pub mod validator_messages {
+    use std::{fmt, str::FromStr};
+
+    use chrono::{DateTime, Utc};
+    use parse_display::ParseError;
+    use serde::{Deserialize, Serialize};
+
+    use crate::{
+        validator::{MessageType, MessageTypes},
+        ValidatorId,
+    };
+
+    #[derive(Serialize, Deserialize, Debug)]
+    pub struct ValidatorMessage {
+        pub from: ValidatorId,
+        pub received: DateTime<Utc>,
+        pub msg: MessageTypes,
+    }
+
+    #[derive(Serialize, Deserialize, Debug)]
+    #[serde(rename_all = "camelCase")]
+    pub struct ValidatorMessagesListResponse {
+        pub messages: Vec<ValidatorMessage>,
+    }
+
+    #[derive(Deserialize, Debug)]
+    #[serde(rename_all = "camelCase")]
+    pub struct ValidatorMessagesListQuery {
+        /// Will apply the lower limit of: `query.limit` and `Config::msgs_find_limit`
+        pub limit: Option<u64>,
+    }
+
+    /// Message type filter (used in path)
+    ///
+    /// Expects url decoded string with [`MessageType`]s separated by `+`.
+    ///
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use primitives::{validator::MessageType, sentry::validator_messages::MessageTypesFilter};
+    ///
+    /// let path_filter = "NewState+ApproveState+Heartbeat";
+    ///
+    /// let expected = MessageTypesFilter(vec![MessageType::NewState, MessageType::ApproveState, MessageType::Heartbeat]);
+    ///
+    /// assert_eq!(path_filter.parse::<MessageTypesFilter>().expect("Should deserialize"), expected);
+    /// assert_eq!(path_filter, String::from(expected));
+    /// ```
+    #[derive(Serialize, Deserialize, Debug, Default, PartialEq, Eq, Clone)]
+    #[serde(try_from = "String", into = "String")]
+    pub struct MessageTypesFilter(pub Vec<MessageType>);
+
+    impl fmt::Display for MessageTypesFilter {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.write_str(
+                &self
+                    .0
+                    .iter()
+                    .map(|message_type| message_type.to_string())
+                    .collect::<Vec<_>>()
+                    .join("+"),
+            )
+        }
+    }
+
+    impl FromStr for MessageTypesFilter {
+        type Err = ParseError;
+
+        fn from_str(filter: &str) -> Result<Self, Self::Err> {
+            let message_types = if !filter.is_empty() {
+                filter
+                    .split('+')
+                    .map(|s| s.parse())
+                    .collect::<Result<_, _>>()?
+            } else {
+                vec![]
+            };
+
+            Ok(MessageTypesFilter(message_types))
+        }
+    }
+
+    impl TryFrom<String> for MessageTypesFilter {
+        type Error = ParseError;
+
+        fn try_from(url_decoded_string: String) -> Result<Self, Self::Error> {
+            url_decoded_string.parse()
+        }
+    }
+
+    impl From<MessageTypesFilter> for String {
+        fn from(message_types: MessageTypesFilter) -> Self {
+            message_types.to_string()
+        }
+    }
+
+    impl AsRef<[MessageType]> for MessageTypesFilter {
+        fn as_ref(&self) -> &[MessageType] {
+            &self.0
+        }
+    }
+
+    /// Contains all the different validator messages to be created.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    #[doc = include_str!("../examples/validator_messages_create_request.rs")]
+    /// ```
+    #[derive(Serialize, Deserialize, Debug)]
+    #[serde(rename_all = "camelCase")]
+    pub struct ValidatorMessagesCreateRequest {
+        pub messages: Vec<MessageTypes>,
     }
 }
 
@@ -1065,21 +1152,22 @@ pub mod campaign_modify {
 
 #[cfg(feature = "postgres")]
 mod postgres {
-    use super::{
-        Analytics, DateHour, EventType, FetchedAnalytics, FetchedMetric, MessageResponse,
-        ValidatorMessage,
-    };
-    use crate::{
-        analytics::{AnalyticsQuery, Metric},
-        validator::{messages::Type as MessageType, MessageTypes},
-        IPFS,
-    };
     use bytes::BytesMut;
     use chrono::{DateTime, Timelike, Utc};
     use serde::Deserialize;
     use tokio_postgres::{
-        types::{accepts, to_sql_checked, FromSql, IsNull, Json, ToSql, Type},
+        types::{accepts, to_sql_checked, FromSql, IsNull, Json, ToSql, Type as PgType},
         Error, Row,
+    };
+
+    use super::{
+        message::MessageResponse, validator_messages::ValidatorMessage, Analytics, DateHour,
+        EventType, FetchedAnalytics, FetchedMetric,
+    };
+    use crate::{
+        analytics::{AnalyticsQuery, Metric},
+        validator::{MessageTypes, Type},
+        IPFS,
     };
 
     impl From<&Row> for ValidatorMessage {
@@ -1094,7 +1182,7 @@ mod postgres {
 
     impl<T> TryFrom<&Row> for MessageResponse<T>
     where
-        T: MessageType,
+        T: Type,
         for<'de> T: Deserialize<'de>,
     {
         type Error = Error;
@@ -1112,7 +1200,7 @@ mod postgres {
     impl ToSql for MessageTypes {
         fn to_sql(
             &self,
-            ty: &Type,
+            ty: &PgType,
             w: &mut BytesMut,
         ) -> Result<IsNull, Box<dyn std::error::Error + Sync + Send>> {
             Json(self).to_sql(ty, w)
@@ -1160,7 +1248,7 @@ mod postgres {
 
     impl<'a> FromSql<'a> for DateHour<Utc> {
         fn from_sql(
-            ty: &Type,
+            ty: &PgType,
             raw: &'a [u8],
         ) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {
             let datetime = <DateTime<Utc> as FromSql>::from_sql(ty, raw)?;
@@ -1179,7 +1267,7 @@ mod postgres {
     impl ToSql for DateHour<Utc> {
         fn to_sql(
             &self,
-            ty: &Type,
+            ty: &PgType,
             w: &mut BytesMut,
         ) -> Result<IsNull, Box<dyn std::error::Error + Sync + Send>> {
             self.date.and_hms(self.hour, 0, 0).to_sql(ty, w)
@@ -1191,7 +1279,7 @@ mod postgres {
 
     impl<'a> FromSql<'a> for EventType {
         fn from_sql(
-            ty: &Type,
+            ty: &PgType,
             raw: &'a [u8],
         ) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {
             let event_string = <&str as FromSql>::from_sql(ty, raw)?;
@@ -1204,7 +1292,7 @@ mod postgres {
     impl ToSql for EventType {
         fn to_sql(
             &self,
-            ty: &Type,
+            ty: &PgType,
             w: &mut BytesMut,
         ) -> Result<IsNull, Box<dyn std::error::Error + Sync + Send>> {
             self.as_str().to_sql(ty, w)

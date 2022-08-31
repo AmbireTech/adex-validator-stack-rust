@@ -5,7 +5,7 @@ use primitives::{
     balances,
     balances::{Balances, CheckedState, UncheckedState},
     spender::Spender,
-    validator::{ApproveState, MessageTypes, NewState, RejectState},
+    validator::{ApproveState, MessageType, MessageTypes, NewState, RejectState},
     Address, ChainOf, Channel, UnifiedNum,
 };
 
@@ -100,14 +100,17 @@ pub async fn tick<C: Unlocked + 'static>(
 
     // if we don't have a `NewState` return `None`
     let new_msg = sentry
-        .get_latest_msg(channel_id, from, &["NewState"])
+        .get_latest_msg(channel_id, from, &[MessageType::NewState])
         .await?
         .map(NewState::try_from)
         .transpose()
         .expect("Should always return a NewState message");
 
     let our_latest_msg_response = sentry
-        .get_our_latest_msg(channel_id, &["ApproveState", "RejectState"])
+        .get_our_latest_msg(
+            channel_id,
+            &[MessageType::ApproveState, MessageType::RejectState],
+        )
         .await?;
 
     let our_latest_msg_state_root = match our_latest_msg_response {
@@ -345,8 +348,9 @@ mod test {
         campaign::Validators,
         config::GANACHE_CONFIG,
         sentry::{
-            message::Message, LastApproved, LastApprovedResponse, MessageResponse, SuccessResponse,
-            ValidatorMessage, ValidatorMessagesListResponse,
+            message::{Message, MessageResponse},
+            validator_messages::{ValidatorMessage, ValidatorMessagesListResponse},
+            LastApproved, LastApprovedResponse, SuccessResponse,
         },
         test_util::{
             discard_logger, ADVERTISER, CREATOR, DUMMY_AUTH, DUMMY_CAMPAIGN,
@@ -488,7 +492,7 @@ mod test {
                 "/follower/v5/channel/{}/validator-messages/{}/{}",
                 DUMMY_CAMPAIGN.channel.id(),
                 DUMMY_CAMPAIGN.channel.leader,
-                "ApproveState+RejectState",
+                "ApproveState%2BRejectState",
             )))
             .and(query_param("limit", "1"))
             .respond_with(ResponseTemplate::new(200).set_body_json(&approve_state_res))
@@ -519,7 +523,7 @@ mod test {
                 "/follower/v5/channel/{}/validator-messages/{}/{}",
                 DUMMY_CAMPAIGN.channel.id(),
                 DUMMY_CAMPAIGN.channel.leader,
-                "ApproveState+RejectState",
+                "ApproveState%2BRejectState",
             )))
             .and(query_param("limit", "1"))
             .respond_with(ResponseTemplate::new(200).set_body_json(&reject_state_res))
