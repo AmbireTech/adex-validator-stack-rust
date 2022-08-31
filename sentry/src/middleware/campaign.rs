@@ -80,16 +80,16 @@ where
     let campaign_context = request
         .extensions()
         .get::<ChainOf<Campaign>>()
-        .expect("We must have a campaign in extensions");
+        .expect("We must have a Campaign in extensions");
 
     let auth = request
         .extensions()
         .get::<Auth>()
-        .expect("request should have session");
+        .expect("request should have an Authentication");
 
     if auth.uid.to_address() != campaign_context.context.creator {
         return Err(ResponseError::Forbidden(
-            "Request not sent by campaign creator".to_string(),
+            "Request not sent by Campaign's creator".to_string(),
         ));
     }
 
@@ -107,8 +107,11 @@ mod test {
     };
     use tower::Service;
 
-    use adapter::Dummy;
-    use primitives::{test_util::DUMMY_CAMPAIGN, Campaign, ChainOf};
+    use adapter::{ethereum::test_util::GANACHE_1, Dummy};
+    use primitives::{
+        test_util::{CAMPAIGNS, CREATOR, IDS, PUBLISHER},
+        Campaign, ChainOf,
+    };
 
     use crate::{
         db::{insert_campaign, insert_channel},
@@ -122,27 +125,32 @@ mod test {
         let app_guard = setup_dummy_app().await;
         let app = Arc::new(app_guard.app);
 
-        let build_request = |id: CampaignId| {
+        let campaign_context = CAMPAIGNS[0].clone();
+
+        let build_request = || {
             Request::builder()
-                .uri(format!("/{id}"))
+                .uri(format!("/{id}/test", id = campaign_context.context.id))
                 .extension(app.clone())
                 .body(Body::empty())
                 .expect("Should build Request")
         };
 
-        let campaign = DUMMY_CAMPAIGN.clone();
-
-        async fn handle(Extension(_campaign_context): Extension<ChainOf<Campaign>>) -> String {
+        async fn handle(
+            Extension(campaign_context): Extension<ChainOf<Campaign>>,
+            Path((id, another)): Path<(CampaignId, String)>,
+        ) -> String {
+            assert_eq!(id, campaign_context.context.id);
+            assert_eq!(another, "test");
             "Ok".into()
         }
 
         let mut router = Router::new()
-            .route("/:id", get(handle))
+            .route("/:id/:another", get(handle))
             .layer(from_fn(campaign_load::<Dummy, _>));
 
         // bad CampaignId
         {
-            let mut request = build_request(campaign.id);
+            let mut request = build_request();
             *request.uri_mut() = "/WrongCampaignId".parse().unwrap();
 
             let response = router
@@ -157,9 +165,9 @@ mod test {
             );
         }
 
-        // non-existent campaign
+        // non-existent Campaign
         {
-            let request = build_request(campaign.id);
+            let request = build_request();
 
             let response = router
                 .call(request)
@@ -171,21 +179,18 @@ mod test {
 
         // existing Campaign
         {
-            let channel_chain = app
-                .config
-                .find_chain_of(DUMMY_CAMPAIGN.channel.token)
-                .expect("Channel token should be whitelisted in config!");
-            let channel_context = channel_chain.with_channel(DUMMY_CAMPAIGN.channel);
+            let channel_context = campaign_context.of_channel();
+
             // insert Channel
             insert_channel(&app.pool, &channel_context)
                 .await
                 .expect("Should insert Channel");
             // insert Campaign
-            assert!(insert_campaign(&app.pool, &campaign)
+            assert!(insert_campaign(&app.pool, &campaign_context.context)
                 .await
                 .expect("Should insert Campaign"));
 
-            let request = build_request(campaign.id);
+            let request = build_request();
 
             let response = router
                 .call(request)
@@ -194,5 +199,145 @@ mod test {
 
             assert_eq!(response.status(), StatusCode::OK);
         }
+    }
+
+    #[tokio::test]
+    async fn test_called_by_creator() {
+        let app_guard = setup_dummy_app().await;
+        let app = Arc::new(app_guard.app);
+
+        let campaign_context = CAMPAIGNS[0].clone();
+
+        // insert Channel
+        insert_channel(&app.pool, &campaign_context.of_channel())
+            .await
+            .expect("Should insert Channel");
+        // insert Campaign
+        assert!(insert_campaign(&app.pool, &campaign_context.context)
+            .await
+            .expect("Should insert Campaign"));
+
+        let build_request = |auth: Auth| {
+            Request::builder()
+                .extension(app.clone())
+                .extension(campaign_context.clone())
+                .extension(auth)
+                .body(Body::empty())
+                .expect("Should build Request")
+        };
+
+        async fn handle(Extension(_campaign_context): Extension<ChainOf<Campaign>>) -> String {
+            "Ok".into()
+        }
+
+        let mut router = Router::new()
+            .route("/", get(handle))
+            .layer(from_fn(called_by_creator::<Dummy, _>));
+
+        // Not the Creator - Forbidden
+        {
+            let not_creator = Auth {
+                era: 1,
+                uid: IDS[&PUBLISHER],
+                chain: campaign_context.chain.clone(),
+            };
+            assert_ne!(
+                not_creator.uid.to_address(),
+                campaign_context.context.creator,
+                "The Auth address should not be the Campaign creator for this test!"
+            );
+            let request = build_request(not_creator);
+
+            let response = router
+                .call(request)
+                .await
+                .expect("Should make request to Router");
+
+            assert_eq!(response.status(), StatusCode::FORBIDDEN);
+        }
+
+        // The Campaign Creator - Ok
+        {
+            let the_creator = Auth {
+                era: 1,
+                uid: IDS[&campaign_context.context.creator],
+                chain: campaign_context.chain.clone(),
+            };
+
+            assert_eq!(
+                the_creator.uid.to_address(),
+                campaign_context.context.creator,
+                "The Auth address should be the Campaign creator for this test!"
+            );
+            let request = build_request(the_creator);
+
+            let response = router
+                .call(request)
+                .await
+                .expect("Should make request to Router");
+
+            assert_eq!(response.status(), StatusCode::OK);
+        }
+    }
+
+    #[tokio::test]
+    #[should_panic]
+    async fn test_called_by_creator_no_auth() {
+        let app_guard = setup_dummy_app().await;
+        let app = Arc::new(app_guard.app);
+
+        let campaign_context = CAMPAIGNS[0].clone();
+
+        async fn handle(Extension(_campaign_context): Extension<ChainOf<Campaign>>) -> String {
+            "Ok".into()
+        }
+
+        let mut router = Router::new()
+            .route("/", get(handle))
+            .layer(from_fn(called_by_creator::<Dummy, _>));
+
+        // No Auth - Unauthorized
+        let request = Request::builder()
+            .extension(app.clone())
+            .extension(campaign_context.clone())
+            .body(Body::empty())
+            .expect("Should build Request");
+
+        let _response = router
+            .call(request)
+            .await
+            .expect("Should make request to Router");
+    }
+
+    #[tokio::test]
+    #[should_panic]
+    async fn test_called_by_creator_no_campaign() {
+        let app_guard = setup_dummy_app().await;
+        let app = Arc::new(app_guard.app);
+
+        let auth = Auth {
+            era: 1,
+            uid: IDS[&CREATOR],
+            chain: GANACHE_1.clone(),
+        };
+
+        let request = Request::builder()
+            .extension(app.clone())
+            .extension(auth)
+            .body(Body::empty())
+            .expect("Should build Request");
+
+        async fn handle(Extension(_campaign_context): Extension<ChainOf<Campaign>>) -> String {
+            "Ok".into()
+        }
+
+        let mut router = Router::new()
+            .route("/", get(handle))
+            .layer(from_fn(called_by_creator::<Dummy, _>));
+
+        let _response = router
+            .call(request)
+            .await
+            .expect("Should make request to Router");
     }
 }

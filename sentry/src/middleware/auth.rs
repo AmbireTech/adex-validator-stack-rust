@@ -202,17 +202,100 @@ mod test {
         routing::get,
         Extension, Router,
     };
-    use tower::Service;
+    use tower::{Service, ServiceBuilder};
 
     use adapter::{
         dummy::{Dummy, HeaderToken},
         ethereum::test_util::GANACHE_1,
     };
-    use primitives::test_util::{DUMMY_AUTH, LEADER};
+    use primitives::test_util::{ADVERTISER, DUMMY_AUTH, FOLLOWER, IDS, LEADER, PUBLISHER};
 
     use crate::{middleware::body_to_string, test_util::setup_dummy_app, Session};
 
     use super::*;
+
+    #[tokio::test]
+    async fn test_is_admin() {
+        let app_guard = setup_dummy_app().await;
+        let app = Arc::new(app_guard.app);
+
+        let admin = {
+            assert!(
+                app.config.admins.contains(&LEADER),
+                "Should contain the Leader as an Admin for this test!"
+            );
+            IDS[&LEADER]
+        };
+
+        let not_admin = {
+            assert!(
+                !app.config.admins.contains(&FOLLOWER),
+                "Should not contain the Follower as an Admin for this test!"
+            );
+
+            IDS[&FOLLOWER]
+        };
+
+        async fn handle() -> String {
+            "Ok".into()
+        }
+
+        let mut router = Router::new()
+            .route("/", get(handle))
+            .layer(from_fn(is_admin::<Dummy, _>));
+
+        // No Auth - Unauthorized
+        {
+            let no_auth = Request::builder()
+                .extension(app.clone())
+                .body(Body::empty())
+                .expect("should never fail!");
+
+            let response = router
+                .call(no_auth)
+                .await
+                .expect("Should make request to Router");
+            assert_eq!(StatusCode::UNAUTHORIZED, response.status());
+        }
+
+        // Not an Admin - Unauthorized
+        {
+            let not_admin_request = Request::builder()
+                .extension(app.clone())
+                .extension(Auth {
+                    era: 1,
+                    uid: not_admin,
+                    chain: GANACHE_1.clone(),
+                })
+                .body(Body::empty())
+                .expect("should never fail!");
+
+            let response = router
+                .call(not_admin_request)
+                .await
+                .expect("Should make request to Router");
+            assert_eq!(StatusCode::UNAUTHORIZED, response.status());
+        }
+
+        // An Admin - Ok
+        {
+            let not_admin_request = Request::builder()
+                .extension(app.clone())
+                .extension(Auth {
+                    era: 1,
+                    uid: admin,
+                    chain: GANACHE_1.clone(),
+                })
+                .body(Body::empty())
+                .expect("should never fail!");
+
+            let response = router
+                .call(not_admin_request)
+                .await
+                .expect("Should make request to Router");
+            assert_eq!(StatusCode::OK, response.status());
+        }
+    }
 
     #[tokio::test]
     async fn no_authentication_or_incorrect_value_should_not_add_session() {
@@ -382,5 +465,193 @@ mod test {
 
             assert_eq!(Some("192.168.0.1".to_string()), actual_ips);
         }
+    }
+
+    #[tokio::test]
+    async fn test_authenticate_as_advertiser_and_publisher() {
+        let build_request = |auth: Option<Auth>| {
+            let mut request = Request::builder().uri(format!("/"));
+
+            if let Some(auth) = auth {
+                request = request.extension(auth);
+            }
+
+            request.body(Body::empty()).expect("Should build Request")
+        };
+
+        #[derive(Debug, Clone, Copy)]
+        pub enum TestFor {
+            Advertiser,
+            Publisher,
+        }
+
+        async fn handle(
+            Extension(auth_as): Extension<AuthenticateAs>,
+            Extension(test_for): Extension<TestFor>,
+        ) -> StatusCode {
+            match (auth_as, test_for) {
+                (AuthenticateAs::Advertiser(_addr), TestFor::Advertiser)
+                | (AuthenticateAs::Publisher(_addr), TestFor::Publisher) => StatusCode::OK,
+                _ => StatusCode::BAD_REQUEST,
+            }
+        }
+
+        // Advertiser
+        {
+            let mut router = Router::new().route(
+                "/",
+                get(handle).route_layer(
+                    ServiceBuilder::new()
+                        .layer(Extension(TestFor::Advertiser))
+                        .layer(from_fn(authenticate_as_advertiser)),
+                ),
+            );
+
+            // No Auth, should return Unauthorized
+            {
+                let request = build_request(None);
+
+                let response = router
+                    .call(request)
+                    .await
+                    .expect("Should make request to Router");
+
+                assert_eq!(
+                    StatusCode::UNAUTHORIZED,
+                    response.status(),
+                    "Should be unauthorized"
+                )
+            }
+
+            // AuthenticateAs::Advertiser - OK
+            {
+                let request = build_request(Some(Auth {
+                    era: 1,
+                    uid: IDS[&ADVERTISER],
+                    chain: GANACHE_1.clone(),
+                }));
+
+                let response = router
+                    .call(request)
+                    .await
+                    .expect("Should make request to Router");
+
+                assert_eq!(
+                    StatusCode::OK,
+                    response.status(),
+                    "Should be authenticated as Advertiser!"
+                )
+            }
+        }
+
+        // Publisher
+        {
+            let mut router = Router::new().route(
+                "/",
+                get(handle).route_layer(
+                    ServiceBuilder::new()
+                        .layer(Extension(TestFor::Publisher))
+                        .layer(from_fn(authenticate_as_publisher)),
+                ),
+            );
+
+            // No Auth, should return Unauthorized
+            {
+                let request = build_request(None);
+
+                let response = router
+                    .call(request)
+                    .await
+                    .expect("Should make request to Router");
+
+                assert_eq!(
+                    StatusCode::UNAUTHORIZED,
+                    response.status(),
+                    "Should be unauthorized"
+                )
+            }
+
+            // AuthenticateAs::Publisher - OK
+            {
+                let request = build_request(Some(Auth {
+                    era: 1,
+                    uid: IDS[&PUBLISHER],
+                    chain: GANACHE_1.clone(),
+                }));
+
+                let response = router
+                    .call(request)
+                    .await
+                    .expect("Should make request to Router");
+
+                assert_eq!(
+                    StatusCode::OK,
+                    response.status(),
+                    "Should be authenticated as Publisher!"
+                )
+            }
+        }
+    }
+
+    #[tokio::test]
+    #[should_panic]
+    async fn test_authenticate_as_advertiser_panic() {
+        async fn handle(Extension(_auth_as): Extension<AuthenticateAs>) -> String {
+            "It should have panicked at this point".into()
+        }
+
+        let mut router = Router::new().route(
+            "/",
+            get(handle).route_layer(from_fn(authenticate_as_advertiser)),
+        );
+
+        let auth = Auth {
+            era: 1,
+            uid: IDS[&ADVERTISER],
+            chain: GANACHE_1.clone(),
+        };
+
+        let request = Request::builder()
+            .uri(format!("/"))
+            .extension(auth.clone())
+            .extension(AuthenticateAs::Advertiser(auth.uid))
+            .body(Body::empty())
+            .expect("Should build Request");
+
+        let _response = router
+            .call(request)
+            .await
+            .expect("Should make request to Router");
+    }
+
+    #[tokio::test]
+    #[should_panic]
+    async fn test_authenticate_as_publisher_panic() {
+        async fn handle(Extension(_auth_as): Extension<AuthenticateAs>) -> String {
+            "It should have panicked at this point".into()
+        }
+
+        let mut router = Router::new().route(
+            "/",
+            get(handle).route_layer(from_fn(authenticate_as_publisher)),
+        );
+
+        let auth = Auth {
+            era: 1,
+            uid: IDS[&PUBLISHER],
+            chain: GANACHE_1.clone(),
+        };
+
+        let request = Request::builder()
+            .uri(format!("/"))
+            .extension(auth.clone())
+            .extension(AuthenticateAs::Publisher(auth.uid))
+            .body(Body::empty())
+            .expect("Should build Request");
+
+        let _response = router
+            .call(request)
+            .await
+            .expect("Should make request to Router");
     }
 }
