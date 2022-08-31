@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `sentry/src/routes/campaign.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>campaign.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script defer src="../../../source-script.js"></script><script defer src="../../../source-files.js"></script><script defer src="../../../main.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../../sentry/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div></a><h2 class="location"></h2></nav><nav class="sidebar"><a class="sidebar-logo" href="../../../sentry/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div></a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../sentry/index.html"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../wheel.svg"></a></div></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `sentry/src/routes/campaign.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>campaign.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../../normalize.css"><link rel="stylesheet" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../../ayu.css" disabled><link rel="stylesheet" href="../../../dark.css" disabled><link rel="stylesheet" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script defer src="../../../source-script.js"></script><script defer src="../../../source-files.js"></script><script defer src="../../../main.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../../sentry/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div></a><h2 class="location"></h2></nav><nav class="sidebar"><a class="sidebar-logo" href="../../../sentry/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div></a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../sentry/index.html"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../wheel.svg"></a></div></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -1755,38 +1755,38 @@
     Application, Auth,
 };
 
-<span class="attribute">#[derive(Debug, Error)]</span>
-<span class="kw">pub enum </span>Error {
-    <span class="attribute">#[error(<span class="string">&quot;Error while updating campaign: {0}&quot;</span>)]</span>
-    FailedUpdate(String),
-    <span class="attribute">#[error(<span class="string">&quot;Error while performing calculations&quot;</span>)]</span>
-    Calculation,
-    <span class="attribute">#[error(<span class="string">&quot;Error: Budget has been exceeded&quot;</span>)]</span>
-    BudgetExceeded,
-    <span class="attribute">#[error(<span class="string">&quot;Error with new budget: {0}&quot;</span>)]</span>
-    NewBudget(String),
-    <span class="attribute">#[error(<span class="string">&quot;Spendable amount for campaign creator {0} not found&quot;</span>)]</span>
-    SpenderNotFound(Address),
-    <span class="attribute">#[error(<span class="string">&quot;Channel token is not whitelisted&quot;</span>)]</span>
-    ChannelTokenNotWhitelisted,
-    <span class="attribute">#[error(<span class="string">&quot;Campaign was not modified because of spending constraints&quot;</span>)]</span>
-    CampaignNotModified,
-    <span class="attribute">#[error(<span class="string">&quot;Error while updating spendable for creator: {0}&quot;</span>)]</span>
-    LatestSpendable(<span class="attribute">#[from]</span> LatestSpendableError),
-    <span class="attribute">#[error(<span class="string">&quot;Redis error: {0}&quot;</span>)]</span>
-    Redis(<span class="attribute">#[from]</span> RedisError),
-    <span class="attribute">#[error(<span class="string">&quot;DB Pool error: {0}&quot;</span>)]</span>
-    Pool(<span class="attribute">#[from]</span> PoolError),
+<span class="attribute">#[derive(Debug, Error)]
+</span><span class="kw">pub enum </span>Error {
+    <span class="attribute">#[error(<span class="string">&quot;Error while updating campaign: {0}&quot;</span>)]
+    </span>FailedUpdate(String),
+    <span class="attribute">#[error(<span class="string">&quot;Error while performing calculations&quot;</span>)]
+    </span>Calculation,
+    <span class="attribute">#[error(<span class="string">&quot;Error: Budget has been exceeded&quot;</span>)]
+    </span>BudgetExceeded,
+    <span class="attribute">#[error(<span class="string">&quot;Error with new budget: {0}&quot;</span>)]
+    </span>NewBudget(String),
+    <span class="attribute">#[error(<span class="string">&quot;Spendable amount for campaign creator {0} not found&quot;</span>)]
+    </span>SpenderNotFound(Address),
+    <span class="attribute">#[error(<span class="string">&quot;Channel token is not whitelisted&quot;</span>)]
+    </span>ChannelTokenNotWhitelisted,
+    <span class="attribute">#[error(<span class="string">&quot;Campaign was not modified because of spending constraints&quot;</span>)]
+    </span>CampaignNotModified,
+    <span class="attribute">#[error(<span class="string">&quot;Error while updating spendable for creator: {0}&quot;</span>)]
+    </span>LatestSpendable(<span class="attribute">#[from] </span>LatestSpendableError),
+    <span class="attribute">#[error(<span class="string">&quot;Redis error: {0}&quot;</span>)]
+    </span>Redis(<span class="attribute">#[from] </span>RedisError),
+    <span class="attribute">#[error(<span class="string">&quot;DB Pool error: {0}&quot;</span>)]
+    </span>Pool(<span class="attribute">#[from] </span>PoolError),
 }
 
-<span class="attribute">#[derive(Debug, Error)]</span>
-<span class="kw">pub enum </span>LatestSpendableError {
-    <span class="attribute">#[error(<span class="string">&quot;Adapter: {0}&quot;</span>)]</span>
-    Adapter(<span class="attribute">#[from]</span> AdaptorError),
-    <span class="attribute">#[error(<span class="string">&quot;Overflow occurred while converting native token precision to unified precision&quot;</span>)]</span>
-    Overflow,
-    <span class="attribute">#[error(<span class="string">&quot;DB Pool error: {0}&quot;</span>)]</span>
-    Pool(<span class="attribute">#[from]</span> PoolError),
+<span class="attribute">#[derive(Debug, Error)]
+</span><span class="kw">pub enum </span>LatestSpendableError {
+    <span class="attribute">#[error(<span class="string">&quot;Adapter: {0}&quot;</span>)]
+    </span>Adapter(<span class="attribute">#[from] </span>AdaptorError),
+    <span class="attribute">#[error(<span class="string">&quot;Overflow occurred while converting native token precision to unified precision&quot;</span>)]
+    </span>Overflow,
+    <span class="attribute">#[error(<span class="string">&quot;DB Pool error: {0}&quot;</span>)]
+    </span>Pool(<span class="attribute">#[from] </span>PoolError),
 }
 
 <span class="doccomment">/// Gets the latest Spendable from the Adapter and updates it in the Database
@@ -2202,8 +2202,8 @@
     /// It is used to decrease or increase the remaining budget instead of setting it up directly
     /// This way if a new event alters the remaining budget in Redis while the modification of campaign hasn&#39;t finished
     /// it will correctly update the remaining using an atomic redis operation with `INCRBY` or `DECRBY` instead of using `SET`
-    </span><span class="attribute">#[derive(Debug, Clone, PartialEq)]</span>
-    <span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">enum </span>DeltaBudget&lt;T&gt; {
+    </span><span class="attribute">#[derive(Debug, Clone, PartialEq)]
+    </span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">enum </span>DeltaBudget&lt;T&gt; {
         Increase(T),
         Decrease(T),
     }
@@ -2297,30 +2297,30 @@
         Application, Auth, Session,
     };
 
-    <span class="attribute">#[derive(Debug, Error)]</span>
-    <span class="kw">pub enum </span>Error {
-        <span class="attribute">#[error(transparent)]</span>
-        Event(<span class="attribute">#[from]</span> EventError),
-        <span class="attribute">#[error(transparent)]</span>
-        Redis(<span class="attribute">#[from]</span> RedisError),
-        <span class="attribute">#[error(transparent)]</span>
-        Postgres(<span class="attribute">#[from]</span> PoolError),
-        <span class="attribute">#[error(transparent)]</span>
-        Overflow(<span class="attribute">#[from]</span> OverflowError),
+    <span class="attribute">#[derive(Debug, Error)]
+    </span><span class="kw">pub enum </span>Error {
+        <span class="attribute">#[error(transparent)]
+        </span>Event(<span class="attribute">#[from] </span>EventError),
+        <span class="attribute">#[error(transparent)]
+        </span>Redis(<span class="attribute">#[from] </span>RedisError),
+        <span class="attribute">#[error(transparent)]
+        </span>Postgres(<span class="attribute">#[from] </span>PoolError),
+        <span class="attribute">#[error(transparent)]
+        </span>Overflow(<span class="attribute">#[from] </span>OverflowError),
     }
 
-    <span class="attribute">#[derive(Debug, Error, PartialEq, Eq)]</span>
-    <span class="kw">pub enum </span>EventError {
-        <span class="attribute">#[error(<span class="string">&quot;Overflow when calculating Event payout for Event&quot;</span>)]</span>
-        EventPayoutOverflow,
-        <span class="attribute">#[error(<span class="string">&quot;Validator Fee calculation: {0}&quot;</span>)]</span>
-        FeeCalculation(<span class="attribute">#[from]</span> DomainError),
+    <span class="attribute">#[derive(Debug, Error, PartialEq, Eq)]
+    </span><span class="kw">pub enum </span>EventError {
+        <span class="attribute">#[error(<span class="string">&quot;Overflow when calculating Event payout for Event&quot;</span>)]
+        </span>EventPayoutOverflow,
+        <span class="attribute">#[error(<span class="string">&quot;Validator Fee calculation: {0}&quot;</span>)]
+        </span>FeeCalculation(<span class="attribute">#[from] </span>DomainError),
         <span class="attribute">#[error(
             <span class="string">&quot;The Campaign&#39;s remaining budget left to spend is not enough to cover the Event payout&quot;
-        </span>)]</span>
-        CampaignRemainingNotEnoughForPayout,
-        <span class="attribute">#[error(<span class="string">&quot;Campaign ran out of remaining budget to spend&quot;</span>)]</span>
-        CampaignOutOfBudget,
+        </span>)]
+        </span>CampaignRemainingNotEnoughForPayout,
+        <span class="attribute">#[error(<span class="string">&quot;Campaign ran out of remaining budget to spend&quot;</span>)]
+        </span>CampaignOutOfBudget,
     }
 
     <span class="doccomment">/// POST `/v5/campaign/:id/events`
@@ -2537,8 +2537,8 @@
         <span class="prelude-val">Ok</span>(remaining &gt; <span class="number">0 </span>&amp;&amp; remaining.unsigned_abs() &gt; amount.to_u64())
     }
 
-    <span class="attribute">#[cfg(test)]</span>
-    <span class="kw">mod </span>test {
+    <span class="attribute">#[cfg(test)]
+    </span><span class="kw">mod </span>test {
         <span class="kw">use </span>primitives::{
             campaign::Pricing,
             sentry::IMPRESSION,
@@ -2570,8 +2570,8 @@
                 </span>.expect(<span class="string">&quot;Should set Campaign remaining key&quot;</span>);
         }
 
-        <span class="attribute">#[tokio::test]</span>
-        <span class="kw">async fn </span>test_has_enough_remaining_budget() {
+        <span class="attribute">#[tokio::test]
+        </span><span class="kw">async fn </span>test_has_enough_remaining_budget() {
             <span class="kw">let </span><span class="kw-2">mut </span>redis = TESTS_POOL.get().<span class="kw">await</span>.expect(<span class="string">&quot;Should get redis connection&quot;</span>);
             <span class="kw">let </span>campaign_remaining = CampaignRemaining::new(redis.connection.clone());
             <span class="kw">let </span>campaign = DUMMY_CAMPAIGN.id;
@@ -2610,8 +2610,8 @@
             </span>);
         }
 
-        <span class="attribute">#[tokio::test]</span>
-        <span class="kw">async fn </span>test_decreasing_remaining_budget() {
+        <span class="attribute">#[tokio::test]
+        </span><span class="kw">async fn </span>test_decreasing_remaining_budget() {
             <span class="kw">let </span><span class="kw-2">mut </span>redis = TESTS_POOL.get().<span class="kw">await</span>.expect(<span class="string">&quot;Should get redis connection&quot;</span>);
             <span class="kw">let </span>campaign = DUMMY_CAMPAIGN.id;
             <span class="kw">let </span>campaign_remaining = CampaignRemaining::new(redis.connection.clone());
@@ -2638,8 +2638,8 @@
             </span>);
         }
 
-        <span class="attribute">#[tokio::test]</span>
-        <span class="kw">async fn </span>test_spending_for_events_with_enough_remaining_budget() {
+        <span class="attribute">#[tokio::test]
+        </span><span class="kw">async fn </span>test_spending_for_events_with_enough_remaining_budget() {
             <span class="kw">let </span><span class="kw-2">mut </span>app = setup_dummy_app().<span class="kw">await</span>;
 
             <span class="kw">let </span>campaign = Campaign {
@@ -2742,8 +2742,8 @@
     }
 }
 
-<span class="attribute">#[cfg(test)]</span>
-<span class="kw">mod </span>test {
+<span class="attribute">#[cfg(test)]
+</span><span class="kw">mod </span>test {
     <span class="kw">use super</span>::{
         update_campaign::{get_delta_budget, modify_campaign, DeltaBudget},
         <span class="kw-2">*</span>,
@@ -2769,8 +2769,8 @@
     <span class="doccomment">/// Test single campaign creation and modification
     /// &amp;
     /// Test with multiple campaigns (because of Budget) and modifications
-    </span><span class="attribute">#[tokio::test]</span>
-    <span class="kw">async fn </span>create_and_modify_with_multiple_campaigns() {
+    </span><span class="attribute">#[tokio::test]
+    </span><span class="kw">async fn </span>create_and_modify_with_multiple_campaigns() {
         <span class="kw">let </span>app_guard = setup_dummy_app().<span class="kw">await</span>;
         <span class="kw">let </span>app = Extension(Arc::new(app_guard.app.clone()));
 
@@ -2975,8 +2975,8 @@
         }
     }
 
-    <span class="attribute">#[tokio::test]</span>
-    <span class="kw">async fn </span>delta_budgets_are_calculated_correctly() {
+    <span class="attribute">#[tokio::test]
+    </span><span class="kw">async fn </span>delta_budgets_are_calculated_correctly() {
         <span class="kw">let </span>redis = TESTS_POOL.get().<span class="kw">await</span>.expect(<span class="string">&quot;Should return Object&quot;</span>);
         <span class="kw">let </span>campaign_remaining = CampaignRemaining::new(redis.connection.clone());
 
@@ -3046,8 +3046,8 @@
         }
     }
 
-    <span class="attribute">#[tokio::test]</span>
-    <span class="kw">async fn </span>campaign_is_closed_properly() {
+    <span class="attribute">#[tokio::test]
+    </span><span class="kw">async fn </span>campaign_is_closed_properly() {
         <span class="comment">// create a new campaign with a new CampaignId
         </span><span class="kw">let </span>campaign =
             CreateCampaign::from_campaign_erased(DUMMY_CAMPAIGN.clone(), <span class="prelude-val">None</span>).into_campaign();
@@ -3131,8 +3131,8 @@
         }
     }
 
-    <span class="attribute">#[tokio::test]</span>
-    <span class="kw">async fn </span>test_campaign_list() {
+    <span class="attribute">#[tokio::test]
+    </span><span class="kw">async fn </span>test_campaign_list() {
         <span class="kw">let </span><span class="kw-2">mut </span>app_guard = setup_dummy_app().<span class="kw">await</span>;
         app_guard.config.campaigns_find_limit = <span class="number">2</span>;
         <span class="kw">let </span>app = Extension(Arc::new(app_guard.app.clone()));
@@ -3429,4 +3429,4 @@
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (02654a084 2022-08-30)" ></div></body></html>

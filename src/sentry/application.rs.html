@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `sentry/src/application.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>application.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../sentry/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div></a><h2 class="location"></h2></nav><nav class="sidebar"><a class="sidebar-logo" href="../../sentry/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div></a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../sentry/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `sentry/src/application.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>application.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../sentry/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div></a><h2 class="location"></h2></nav><nav class="sidebar"><a class="sidebar-logo" href="../../sentry/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div></a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../sentry/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -370,26 +370,26 @@
         .expect(<span class="string">&quot;Valid URL&quot;</span>)
 });
 <span class="doccomment">/// Sentry Application config set by environment variables
-</span><span class="attribute">#[derive(Debug, Deserialize, Clone)]</span>
-<span class="kw">pub struct </span>EnvConfig {
+</span><span class="attribute">#[derive(Debug, Deserialize, Clone)]
+</span><span class="kw">pub struct </span>EnvConfig {
     <span class="doccomment">/// Defaults to `Development`: [`Environment::default()`]
-    </span><span class="attribute">#[serde(default)]</span>
-    <span class="kw">pub </span>env: Environment,
+    </span><span class="attribute">#[serde(default)]
+    </span><span class="kw">pub </span>env: Environment,
     <span class="doccomment">/// The port on which the Sentry REST API will be accessible.
     ///
     /// Defaults to `8005`: [`DEFAULT_PORT`]
-    </span><span class="attribute">#[serde(default = <span class="string">&quot;default_port&quot;</span>)]</span>
-    <span class="kw">pub </span>port: u16,
+    </span><span class="attribute">#[serde(default = <span class="string">&quot;default_port&quot;</span>)]
+    </span><span class="kw">pub </span>port: u16,
     <span class="doccomment">/// The address on which the Sentry REST API will be accessible.
     /// `0.0.0.0` can be used for Docker.
     /// `127.0.0.1` can be used for locally running servers.
     ///
     /// Defaults to `0.0.0.0`: [`DEFAULT_IP_ADDR`]
-    </span><span class="attribute">#[serde(default = <span class="string">&quot;default_ip_addr&quot;</span>)]</span>
-    <span class="kw">pub </span>ip_addr: IpAddr,
+    </span><span class="attribute">#[serde(default = <span class="string">&quot;default_ip_addr&quot;</span>)]
+    </span><span class="kw">pub </span>ip_addr: IpAddr,
     <span class="doccomment">/// Defaults to locally running Redis server: [`DEFAULT_REDIS_URL`]
-    </span><span class="attribute">#[serde(deserialize_with = <span class="string">&quot;redis_url&quot;</span>, default = <span class="string">&quot;default_redis_url&quot;</span>)]</span>
-    <span class="kw">pub </span>redis_url: ConnectionInfo,
+    </span><span class="attribute">#[serde(deserialize_with = <span class="string">&quot;redis_url&quot;</span>, default = <span class="string">&quot;default_redis_url&quot;</span>)]
+    </span><span class="kw">pub </span>redis_url: ConnectionInfo,
 }
 
 <span class="kw">impl </span>EnvConfig {
@@ -582,8 +582,8 @@
 }
 
 <span class="doccomment">/// Sentry [`Application`] Session
-</span><span class="attribute">#[derive(Debug, Clone)]</span>
-<span class="kw">pub struct </span>Session {
+</span><span class="attribute">#[derive(Debug, Clone)]
+</span><span class="kw">pub struct </span>Session {
     <span class="kw">pub </span>ip: <span class="prelude-ty">Option</span>&lt;String&gt;,
     <span class="kw">pub </span>country: <span class="prelude-ty">Option</span>&lt;String&gt;,
     <span class="kw">pub </span>referrer_header: <span class="prelude-ty">Option</span>&lt;String&gt;,
@@ -591,8 +591,8 @@
 }
 
 <span class="doccomment">/// Validated Authentication for the Sentry [`Application`].
-</span><span class="attribute">#[derive(Debug, Clone)]</span>
-<span class="kw">pub struct </span>Auth {
+</span><span class="attribute">#[derive(Debug, Clone)]
+</span><span class="kw">pub struct </span>Auth {
     <span class="kw">pub </span>era: i64,
     <span class="kw">pub </span>uid: ValidatorId,
     <span class="doccomment">/// The Chain for which this authentication was validated
@@ -602,8 +602,8 @@
 <span class="doccomment">/// A query string deserialized using `serde_qs` instead of axum&#39;s `serde_urlencoded`
 </span><span class="kw">pub struct </span>Qs&lt;T&gt;(<span class="kw">pub </span>T);
 
-<span class="attribute">#[axum::async_trait]</span>
-<span class="kw">impl</span>&lt;T, B&gt; FromRequest&lt;B&gt; <span class="kw">for </span>Qs&lt;T&gt;
+<span class="attribute">#[axum::async_trait]
+</span><span class="kw">impl</span>&lt;T, B&gt; FromRequest&lt;B&gt; <span class="kw">for </span>Qs&lt;T&gt;
 <span class="kw">where
     </span>T: serde::de::DeserializeOwned,
     B: Send,
@@ -633,14 +633,14 @@
     <span class="macro">info!</span>(<span class="kw-2">&amp;</span>logger, <span class="string">&quot;Received Ctrl+C signal. Shutting down..&quot;</span>)
 }
 
-<span class="attribute">#[cfg(test)]</span>
-<span class="kw">mod </span>test {
+<span class="attribute">#[cfg(test)]
+</span><span class="kw">mod </span>test {
     <span class="kw">use </span>serde_json::json;
 
     <span class="kw">use super</span>::<span class="kw-2">*</span>;
 
-    <span class="attribute">#[test]</span>
-    <span class="kw">fn </span>environment() {
+    <span class="attribute">#[test]
+    </span><span class="kw">fn </span>environment() {
         <span class="kw">let </span>development = serde_json::from_value::&lt;Environment&gt;(<span class="macro">json!</span>(<span class="string">&quot;development&quot;</span>))
             .expect(<span class="string">&quot;Should deserialize&quot;</span>);
         <span class="kw">let </span>production =
@@ -651,4 +651,4 @@
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (02654a084 2022-08-30)" ></div></body></html>

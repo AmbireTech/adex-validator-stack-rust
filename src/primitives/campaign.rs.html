@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `primitives/src/campaign.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>campaign.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../primitives/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div></a><h2 class="location"></h2></nav><nav class="sidebar"><a class="sidebar-logo" href="../../primitives/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div></a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../primitives/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `primitives/src/campaign.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>campaign.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../primitives/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div></a><h2 class="location"></h2></nav><nav class="sidebar"><a class="sidebar-logo" href="../../primitives/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div></a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../primitives/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -501,8 +501,8 @@
 };
 <span class="kw">use </span>serde::{Deserialize, Serialize};
 
-<span class="attribute">#[doc(inline)]</span>
-<span class="kw">pub use </span>{
+<span class="attribute">#[doc(inline)]
+</span><span class="kw">pub use </span>{
     campaign_id::CampaignId,
     pricing::{Pricing, PricingBounds},
     validators::Validators,
@@ -519,8 +519,8 @@
     <span class="kw">use </span>thiserror::Error;
     <span class="kw">use </span>uuid::Uuid;
 
-    <span class="attribute">#[derive(Clone, Copy, PartialEq, Eq, Hash)]</span>
-    <span class="doccomment">/// an Id of 16 bytes, (de)serialized as a `0x` prefixed hex
+    <span class="attribute">#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+    </span><span class="doccomment">/// an Id of 16 bytes, (de)serialized as a `0x` prefixed hex
     ///
     /// In this implementation of the `CampaignId` the value is generated from a `Uuid::new_v4().to_simple()`
     </span><span class="kw">pub struct </span>CampaignId([u8; <span class="number">16</span>]);
@@ -564,13 +564,13 @@
         </span>}
     }
 
-    <span class="attribute">#[derive(Debug, Error)]</span>
-    <span class="kw">pub enum </span>Error {
+    <span class="attribute">#[derive(Debug, Error)]
+    </span><span class="kw">pub enum </span>Error {
         <span class="doccomment">/// the `0x` prefix is missing
-        </span><span class="attribute">#[error(<span class="string">&quot;Expected a `0x` prefix&quot;</span>)]</span>
-        ExpectedPrefix,
-        <span class="attribute">#[error(transparent)]</span>
-        InvalidHex(<span class="attribute">#[from]</span> FromHexError),
+        </span><span class="attribute">#[error(<span class="string">&quot;Expected a `0x` prefix&quot;</span>)]
+        </span>ExpectedPrefix,
+        <span class="attribute">#[error(transparent)]
+        </span>InvalidHex(<span class="attribute">#[from] </span>FromHexError),
     }
 
     <span class="kw">impl </span>FromStr <span class="kw">for </span>CampaignId {
@@ -634,14 +634,14 @@
         }
     }
 
-    <span class="attribute">#[cfg(test)]</span>
-    <span class="kw">mod </span>test {
+    <span class="attribute">#[cfg(test)]
+    </span><span class="kw">mod </span>test {
         <span class="kw">use </span>serde_json::{to_value, Value};
 
         <span class="kw">use super</span>::<span class="kw-2">*</span>;
 
-        <span class="attribute">#[test]</span>
-        <span class="kw">fn </span>parse_and_display_campaign_id() {
+        <span class="attribute">#[test]
+        </span><span class="kw">fn </span>parse_and_display_campaign_id() {
             <span class="kw">let </span>str_id = <span class="string">&quot;0x936da01f9abd4d9d80c702af85c822a8&quot;</span>;
 
             <span class="kw">let </span>campaign_id: CampaignId = str_id.parse().expect(<span class="string">&quot;Should parse&quot;</span>);
@@ -649,8 +649,8 @@
             <span class="macro">assert_eq!</span>(str_id, <span class="kw-2">&amp;</span>campaign_id.to_string())
         }
 
-        <span class="attribute">#[test]</span>
-        <span class="kw">fn </span>de_serializes_campaign_id() {
+        <span class="attribute">#[test]
+        </span><span class="kw">fn </span>de_serializes_campaign_id() {
             <span class="kw">let </span>id = CampaignId::new();
 
             <span class="macro">assert_eq!</span>(
@@ -661,33 +661,33 @@
     }
 }
 
-<span class="attribute">#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]</span>
-<span class="attribute">#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]</span>
-<span class="kw">pub struct </span>Campaign {
+<span class="attribute">#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]
+</span><span class="kw">pub struct </span>Campaign {
     <span class="kw">pub </span>id: CampaignId,
     <span class="kw">pub </span>channel: Channel,
     <span class="kw">pub </span>creator: Address,
     <span class="kw">pub </span>budget: UnifiedNum,
     <span class="kw">pub </span>validators: Validators,
-    <span class="attribute">#[serde(default, skip_serializing_if = <span class="string">&quot;Option::is_none&quot;</span>)]</span>
-    <span class="kw">pub </span>title: <span class="prelude-ty">Option</span>&lt;String&gt;,
+    <span class="attribute">#[serde(default, skip_serializing_if = <span class="string">&quot;Option::is_none&quot;</span>)]
+    </span><span class="kw">pub </span>title: <span class="prelude-ty">Option</span>&lt;String&gt;,
     <span class="doccomment">/// Events pricing bounds
-    </span><span class="attribute">#[serde(default, skip_serializing_if = <span class="string">&quot;PricingBounds::is_empty&quot;</span>)]</span>
-    <span class="kw">pub </span>pricing_bounds: PricingBounds,
+    </span><span class="attribute">#[serde(default, skip_serializing_if = <span class="string">&quot;PricingBounds::is_empty&quot;</span>)]
+    </span><span class="kw">pub </span>pricing_bounds: PricingBounds,
     <span class="doccomment">/// EventSubmission object, applied to event submission
-    </span><span class="attribute">#[serde(default, skip_serializing_if = <span class="string">&quot;Option::is_none&quot;</span>)]</span>
-    <span class="kw">pub </span>event_submission: <span class="prelude-ty">Option</span>&lt;EventSubmission&gt;,
+    </span><span class="attribute">#[serde(default, skip_serializing_if = <span class="string">&quot;Option::is_none&quot;</span>)]
+    </span><span class="kw">pub </span>event_submission: <span class="prelude-ty">Option</span>&lt;EventSubmission&gt;,
     <span class="doccomment">/// An array of AdUnit (optional)
-    </span><span class="attribute">#[serde(default, skip_serializing_if = <span class="string">&quot;Vec::is_empty&quot;</span>)]</span>
-    <span class="kw">pub </span>ad_units: Vec&lt;AdUnit&gt;,
-    <span class="attribute">#[serde(default)]</span>
-    <span class="kw">pub </span>targeting_rules: Rules,
+    </span><span class="attribute">#[serde(default, skip_serializing_if = <span class="string">&quot;Vec::is_empty&quot;</span>)]
+    </span><span class="kw">pub </span>ad_units: Vec&lt;AdUnit&gt;,
+    <span class="attribute">#[serde(default)]
+    </span><span class="kw">pub </span>targeting_rules: Rules,
     <span class="doccomment">/// A millisecond timestamp of when the campaign was created
-    </span><span class="attribute">#[serde(with = <span class="string">&quot;ts_milliseconds&quot;</span>)]</span>
-    <span class="kw">pub </span>created: DateTime&lt;Utc&gt;,
+    </span><span class="attribute">#[serde(with = <span class="string">&quot;ts_milliseconds&quot;</span>)]
+    </span><span class="kw">pub </span>created: DateTime&lt;Utc&gt;,
     <span class="doccomment">/// Used by the AdViewManager &amp; Targeting AIP#31
-    </span><span class="attribute">#[serde(flatten)]</span>
-    <span class="kw">pub </span>active: Active,
+    </span><span class="attribute">#[serde(flatten)]
+    </span><span class="kw">pub </span>active: Active,
 }
 
 <span class="kw">impl </span>Campaign {
@@ -717,8 +717,8 @@
     }
 }
 
-<span class="attribute">#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]</span>
-<span class="kw">pub struct </span>Active {
+<span class="attribute">#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+</span><span class="kw">pub struct </span>Active {
     <span class="doccomment">/// Campaign active from in a milliseconds timestamp
     ///
     /// The time at which you want this campaign to become active (optional)
@@ -727,13 +727,13 @@
         skip_serializing_if = <span class="string">&quot;Option::is_none&quot;</span>,
         with = <span class="string">&quot;ts_milliseconds_option&quot;</span>,
         rename = <span class="string">&quot;activeFrom&quot;
-    </span>)]</span>
-    <span class="kw">pub </span>from: <span class="prelude-ty">Option</span>&lt;DateTime&lt;Utc&gt;&gt;,
+    </span>)]
+    </span><span class="kw">pub </span>from: <span class="prelude-ty">Option</span>&lt;DateTime&lt;Utc&gt;&gt;,
     <span class="doccomment">/// Campaign active to in a milliseconds timestamp
     ///
     /// The time at which you want this campaign to become inactive (mandatory)
-    </span><span class="attribute">#[serde(with = <span class="string">&quot;ts_milliseconds&quot;</span>, rename = <span class="string">&quot;activeTo&quot;</span>)]</span>
-    <span class="kw">pub </span>to: DateTime&lt;Utc&gt;,
+    </span><span class="attribute">#[serde(with = <span class="string">&quot;ts_milliseconds&quot;</span>, rename = <span class="string">&quot;activeTo&quot;</span>)]
+    </span><span class="kw">pub </span>to: DateTime&lt;Utc&gt;,
 }
 
 <span class="kw">mod </span>pricing {
@@ -745,15 +745,15 @@
     <span class="kw">use crate</span>::{sentry::EventType, UnifiedNum};
     <span class="kw">use </span>serde::{Deserialize, Serialize};
 
-    <span class="attribute">#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]</span>
-    <span class="kw">pub struct </span>Pricing {
+    <span class="attribute">#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
+    </span><span class="kw">pub struct </span>Pricing {
         <span class="kw">pub </span>min: UnifiedNum,
         <span class="kw">pub </span>max: UnifiedNum,
     }
 
-    <span class="attribute">#[derive(Default, Debug, PartialEq, Eq, Serialize, Deserialize, Clone)]</span>
-    <span class="attribute">#[serde(transparent)]</span>
-    <span class="kw">pub struct </span>PricingBounds(HashMap&lt;EventType, Pricing&gt;);
+    <span class="attribute">#[derive(Default, Debug, PartialEq, Eq, Serialize, Deserialize, Clone)]
+    #[serde(transparent)]
+    </span><span class="kw">pub struct </span>PricingBounds(HashMap&lt;EventType, Pricing&gt;);
 
     <span class="kw">impl </span>PricingBounds {
         <span class="kw">pub fn </span>is_empty(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
@@ -790,8 +790,8 @@
     <span class="kw">use </span>serde::{Deserialize, Serialize};
 
     <span class="doccomment">/// Unordered list of the validators representing the leader &amp; follower
-    </span><span class="attribute">#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]</span>
-    <span class="kw">pub struct </span>Validators(ValidatorDesc, ValidatorDesc);
+    </span><span class="attribute">#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
+    </span><span class="kw">pub struct </span>Validators(ValidatorDesc, ValidatorDesc);
 
     <span class="kw">impl </span>Validators {
         <span class="kw">pub fn </span>new(validators: (ValidatorDesc, ValidatorDesc)) -&gt; <span class="self">Self </span>{
@@ -875,8 +875,8 @@
     }
 }
 
-<span class="attribute">#[cfg(feature = <span class="string">&quot;postgres&quot;</span>)]</span>
-<span class="kw">mod </span>postgres {
+<span class="attribute">#[cfg(feature = <span class="string">&quot;postgres&quot;</span>)]
+</span><span class="kw">mod </span>postgres {
     <span class="kw">use </span><span class="kw">crate</span>::Channel;
 
     <span class="kw">use super</span>::{Active, Campaign, CampaignId, PricingBounds, Validators};
@@ -983,4 +983,4 @@
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="primitives" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="primitives" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (02654a084 2022-08-30)" ></div></body></html>

@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `primitives/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../primitives/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div></a><h2 class="location"></h2></nav><nav class="sidebar"><a class="sidebar-logo" href="../../primitives/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div></a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../primitives/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `primitives/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../primitives/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div></a><h2 class="location"></h2></nav><nav class="sidebar"><a class="sidebar-logo" href="../../primitives/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div></a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../primitives/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -237,16 +237,16 @@
 <span id="237">237</span>
 <span id="238">238</span>
 <span id="239">239</span>
-</pre><pre class="rust"><code><span class="attribute">#![deny(rust_2018_idioms)]</span>
-<span class="attribute">#![deny(clippy::all)]</span>
-<span class="attribute">#![deny(rustdoc::broken_intra_doc_links)]</span>
-<span class="attribute">#![cfg_attr(docsrs, feature(doc_cfg))]</span>
-<span class="comment">// TODO: Remove once stabled and upstream num::Integer::div_floor(...) is fixed
-</span><span class="attribute">#![allow(unstable_name_collisions)]</span>
-<span class="kw">use </span>std::{error, fmt};
+</pre><pre class="rust"><code><span class="attribute">#![deny(rust_2018_idioms)]
+#![deny(clippy::all)]
+#![deny(rustdoc::broken_intra_doc_links)]
+#![cfg_attr(docsrs, feature(doc_cfg))]
+</span><span class="comment">// TODO: Remove once stabled and upstream num::Integer::div_floor(...) is fixed
+</span><span class="attribute">#![allow(unstable_name_collisions)]
+</span><span class="kw">use </span>std::{error, fmt};
 
-<span class="attribute">#[doc(inline)]</span>
-<span class="kw">pub use </span><span class="self">self</span>::{
+<span class="attribute">#[doc(inline)]
+</span><span class="kw">pub use </span><span class="self">self</span>::{
     ad_slot::AdSlot,
     ad_unit::AdUnit,
     address::Address,
@@ -290,9 +290,9 @@
 // `cargo test --doc --all-features`
 //
 // See issue: &lt;https://github.com/rust-lang/rust/issues/67295&gt;
-</span><span class="attribute">#[cfg(any(test, feature = <span class="string">&quot;test-util&quot;</span>))]</span>
-<span class="attribute">#[cfg_attr(docsrs, doc(cfg(feature = <span class="string">&quot;test-util&quot;</span>)))]</span>
-<span class="kw">pub mod </span>test_util;
+</span><span class="attribute">#[cfg(any(test, feature = <span class="string">&quot;test-util&quot;</span>))]
+#[cfg_attr(docsrs, doc(cfg(feature = <span class="string">&quot;test-util&quot;</span>)))]
+</span><span class="kw">pub mod </span>test_util;
 <span class="kw">pub mod </span>unified_num;
 <span class="kw">pub mod </span>validator;
 
@@ -300,9 +300,9 @@
 ///
 /// Other places where you&#39;d find `mod postgres` implementations is for many of the structs in the crate
 /// all of which implement [`tokio_postgres::types::FromSql`], [`tokio_postgres::types::ToSql`] or [`From&lt;&amp;tokio_postgres::Row&gt;`]
-</span><span class="attribute">#[cfg(feature = <span class="string">&quot;postgres&quot;</span>)]</span>
-<span class="attribute">#[cfg_attr(docsrs, doc(cfg(feature = <span class="string">&quot;postgres&quot;</span>)))]</span>
-<span class="kw">pub mod </span>postgres {
+</span><span class="attribute">#[cfg(feature = <span class="string">&quot;postgres&quot;</span>)]
+#[cfg_attr(docsrs, doc(cfg(feature = <span class="string">&quot;postgres&quot;</span>)))]
+</span><span class="kw">pub mod </span>postgres {
     <span class="kw">use </span>std::env::{<span class="self">self</span>, VarError};
 
     <span class="kw">use </span>deadpool_postgres::{Manager, ManagerConfig, Pool, RecyclingMethod};
@@ -380,9 +380,9 @@
     <span class="kw">use crate</span>::{BigNum, UnifiedNum};
     <span class="kw">use </span>serde::{Deserialize, Serialize};
 
-    <span class="attribute">#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]</span>
-    <span class="attribute">#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]</span>
-    <span class="kw">pub struct </span>Deposit&lt;N&gt; {
+    <span class="attribute">#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+    #[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]
+    </span><span class="kw">pub struct </span>Deposit&lt;N&gt; {
         <span class="kw">pub </span>total: N,
     }
 
@@ -413,16 +413,16 @@
 }
 
 <span class="kw">pub mod </span>util {
-    <span class="attribute">#[doc(inline)]</span>
-    <span class="kw">pub use </span>api::ApiUrl;
+    <span class="attribute">#[doc(inline)]
+    </span><span class="kw">pub use </span>api::ApiUrl;
 
     <span class="kw">pub mod </span>api;
 
     <span class="kw">pub mod </span>logging;
 }
 
-<span class="attribute">#[derive(Debug, PartialEq, Eq)]</span>
-<span class="kw">pub enum </span>DomainError {
+<span class="attribute">#[derive(Debug, PartialEq, Eq)]
+</span><span class="kw">pub enum </span>DomainError {
     InvalidArgument(String),
     RuleViolation(String),
 }
@@ -449,8 +449,8 @@
 }
 
 <span class="doccomment">/// Trait that creates a String which is `0x` prefixed and encodes the bytes by `eth_checksum`
-</span><span class="attribute">#[allow(clippy::upper_case_acronyms)]</span>
-<span class="kw">pub trait </span>ToETHChecksum: AsRef&lt;[u8]&gt; {
+</span><span class="attribute">#[allow(clippy::upper_case_acronyms)]
+</span><span class="kw">pub trait </span>ToETHChecksum: AsRef&lt;[u8]&gt; {
     <span class="kw">fn </span>to_checksum(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; String {
         <span class="comment">// checksum replaces `0x` prefix and adds one itself
         </span>eth_checksum::checksum(<span class="kw-2">&amp;</span>hex::encode(<span class="self">self</span>.as_ref()))
@@ -477,4 +477,4 @@
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="primitives" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="primitives" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (02654a084 2022-08-30)" ></div></body></html>

@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `primitives/src/channel.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>channel.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../primitives/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div></a><h2 class="location"></h2></nav><nav class="sidebar"><a class="sidebar-logo" href="../../primitives/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div></a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../primitives/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `primitives/src/channel.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>channel.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../primitives/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div></a><h2 class="location"></h2></nav><nav class="sidebar"><a class="sidebar-logo" href="../../primitives/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div></a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../primitives/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -373,14 +373,14 @@
 
 <span class="kw">use crate</span>::{Address, Validator, ValidatorId};
 
-<span class="attribute">#[derive(Serialize, Deserialize, PartialEq, Eq, Copy, Clone, Hash)]</span>
-<span class="attribute">#[serde(transparent)]</span>
-<span class="kw">pub struct </span>ChannelId(
+<span class="attribute">#[derive(Serialize, Deserialize, PartialEq, Eq, Copy, Clone, Hash)]
+#[serde(transparent)]
+</span><span class="kw">pub struct </span>ChannelId(
     <span class="attribute">#[serde(
         deserialize_with = <span class="string">&quot;deserialize_channel_id&quot;</span>,
         serialize_with = <span class="string">&quot;SerHex::&lt;StrictPfx&gt;::serialize&quot;
-    </span>)]</span>
-    [u8; <span class="number">32</span>],
+    </span>)]
+    </span>[u8; <span class="number">32</span>],
 );
 
 <span class="kw">impl </span>ChannelId {
@@ -454,9 +454,9 @@
     }
 }
 
-<span class="attribute">#[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Eq, Hash)]</span>
-<span class="attribute">#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]</span>
-<span class="kw">pub struct </span>Channel {
+<span class="attribute">#[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]
+</span><span class="kw">pub struct </span>Channel {
     <span class="kw">pub </span>leader: ValidatorId,
     <span class="kw">pub </span>follower: ValidatorId,
     <span class="kw">pub </span>guardian: Address,
@@ -495,8 +495,8 @@
 }
 
 <span class="doccomment">/// The nonce is an Unsigned 256 number
-</span><span class="attribute">#[derive(Clone, Copy, PartialEq, Eq, Hash)]</span>
-<span class="kw">pub struct </span>Nonce(<span class="kw">pub </span>U256);
+</span><span class="attribute">#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+</span><span class="kw">pub struct </span>Nonce(<span class="kw">pub </span>U256);
 
 <span class="kw">impl </span>Nonce {
     <span class="doccomment">/// In Big-Endian
@@ -556,14 +556,14 @@
     }
 }
 
-<span class="attribute">#[cfg(test)]</span>
-<span class="kw">mod </span>test {
+<span class="attribute">#[cfg(test)]
+</span><span class="kw">mod </span>test {
     <span class="kw">use super</span>::<span class="kw-2">*</span>;
 
     <span class="kw">use </span>serde_json::{from_value, to_value, Value};
 
-    <span class="attribute">#[test]</span>
-    <span class="kw">fn </span>test_channel_id_() {
+    <span class="attribute">#[test]
+    </span><span class="kw">fn </span>test_channel_id_() {
         <span class="kw">let </span>hex_string = <span class="string">&quot;061d5e2a67d0a9a10f1c732bca12a676d83f79663a396f7d87b3e30b9b411088&quot;</span>;
         <span class="kw">let </span>prefixed_string = <span class="macro">format!</span>(<span class="string">&quot;0x{}&quot;</span>, hex_string);
 
@@ -598,8 +598,8 @@
         )
     }
 
-    <span class="attribute">#[test]</span>
-    <span class="kw">fn </span>de_serializes_nonce() {
+    <span class="attribute">#[test]
+    </span><span class="kw">fn </span>de_serializes_nonce() {
         <span class="kw">let </span>nonce_str = <span class="string">&quot;12345&quot;</span>;
         <span class="kw">let </span>json = Value::String(nonce_str.into());
 
@@ -613,8 +613,8 @@
     }
 }
 
-<span class="attribute">#[cfg(feature = <span class="string">&quot;postgres&quot;</span>)]</span>
-<span class="kw">mod </span>postgres {
+<span class="attribute">#[cfg(feature = <span class="string">&quot;postgres&quot;</span>)]
+</span><span class="kw">mod </span>postgres {
     <span class="kw">use super</span>::{Channel, ChannelId, Nonce};
     <span class="kw">use </span>bytes::BytesMut;
     <span class="kw">use </span>hex::FromHex;
@@ -693,11 +693,11 @@
         }
     }
 
-    <span class="attribute">#[cfg(test)]</span>
-    <span class="kw">mod </span>test {
+    <span class="attribute">#[cfg(test)]
+    </span><span class="kw">mod </span>test {
         <span class="kw">use crate</span>::{channel::Nonce, postgres::POSTGRES_POOL};
-        <span class="attribute">#[tokio::test]</span>
-        <span class="kw">async fn </span>nonce_to_from_sql() {
+        <span class="attribute">#[tokio::test]
+        </span><span class="kw">async fn </span>nonce_to_from_sql() {
             <span class="kw">let </span>client = POSTGRES_POOL.get().<span class="kw">await</span>.unwrap();
 
             <span class="kw">let </span>nonce = Nonce::from(<span class="number">123_456_789_u64</span>);
@@ -727,4 +727,4 @@
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="primitives" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="primitives" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (02654a084 2022-08-30)" ></div></body></html>

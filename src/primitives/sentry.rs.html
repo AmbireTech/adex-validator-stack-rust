@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `primitives/src/sentry.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>sentry.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../primitives/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div></a><h2 class="location"></h2></nav><nav class="sidebar"><a class="sidebar-logo" href="../../primitives/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div></a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../primitives/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `primitives/src/sentry.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>sentry.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../primitives/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div></a><h2 class="location"></h2></nav><nav class="sidebar"><a class="sidebar-logo" href="../../primitives/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div></a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../primitives/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -1385,6 +1385,19 @@
 <span id="1385">1385</span>
 <span id="1386">1386</span>
 <span id="1387">1387</span>
+<span id="1388">1388</span>
+<span id="1389">1389</span>
+<span id="1390">1390</span>
+<span id="1391">1391</span>
+<span id="1392">1392</span>
+<span id="1393">1393</span>
+<span id="1394">1394</span>
+<span id="1395">1395</span>
+<span id="1396">1396</span>
+<span id="1397">1397</span>
+<span id="1398">1398</span>
+<span id="1399">1399</span>
+<span id="1400">1400</span>
 </pre><pre class="rust"><code><span class="kw">use crate</span>::{
     analytics::{OperatingSystem, Timeframe},
     balances::BalancesState,
@@ -1407,35 +1420,35 @@
 
 <span class="kw">pub use </span>event::{Event, EventType, CLICK, IMPRESSION};
 
-<span class="attribute">#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]</span>
-<span class="attribute">#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]</span>
-<span class="doccomment">/// Channel Accounting response
+<span class="attribute">#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]
+</span><span class="doccomment">/// Channel Accounting response
 ///
 /// A collection of all `Accounting`s for a specific [`Channel`](crate::Channel)
 ///
 /// # Examples
 ///
 /// ```
-</span><span class="attribute">#[doc = <span class="macro">include_str!</span>(<span class="string">&quot;../examples/accounting_response.rs&quot;</span>)]</span>
-<span class="doccomment">/// ```
+</span><span class="attribute">#[doc = <span class="macro">include_str!</span>(<span class="string">&quot;../examples/accounting_response.rs&quot;</span>)]
+</span><span class="doccomment">/// ```
 </span><span class="kw">pub struct </span>AccountingResponse&lt;S: BalancesState&gt; {
-    <span class="attribute">#[serde(flatten, bound = <span class="string">&quot;S: BalancesState&quot;</span>)]</span>
-    <span class="kw">pub </span>balances: Balances&lt;S&gt;,
+    <span class="attribute">#[serde(flatten, bound = <span class="string">&quot;S: BalancesState&quot;</span>)]
+    </span><span class="kw">pub </span>balances: Balances&lt;S&gt;,
 }
 
 <span class="doccomment">/// The last approved [`NewState`] and [`ApproveState`] accordingly to the validator.
-</span><span class="attribute">#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]</span>
-<span class="attribute">#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]</span>
-<span class="kw">pub struct </span>LastApproved&lt;S: BalancesState&gt; {
+</span><span class="attribute">#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]
+</span><span class="kw">pub struct </span>LastApproved&lt;S: BalancesState&gt; {
     <span class="doccomment">/// [`NewState`] can be `None` if the [`Channel`](crate::Channel) is brand new.
-    </span><span class="attribute">#[serde(bound = <span class="string">&quot;S: BalancesState&quot;</span>)]</span>
-    <span class="kw">pub </span>new_state: <span class="prelude-ty">Option</span>&lt;MessageResponse&lt;NewState&lt;S&gt;&gt;&gt;,
+    </span><span class="attribute">#[serde(bound = <span class="string">&quot;S: BalancesState&quot;</span>)]
+    </span><span class="kw">pub </span>new_state: <span class="prelude-ty">Option</span>&lt;MessageResponse&lt;NewState&lt;S&gt;&gt;&gt;,
     <span class="doccomment">/// [`ApproveState`] can be `None` if the [`Channel`](crate::Channel) is brand new.
     </span><span class="kw">pub </span>approve_state: <span class="prelude-ty">Option</span>&lt;MessageResponse&lt;ApproveState&gt;&gt;,
 }
 
-<span class="attribute">#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]</span>
-<span class="kw">pub struct </span>MessageResponse&lt;T: MessageType&gt; {
+<span class="attribute">#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+</span><span class="kw">pub struct </span>MessageResponse&lt;T: MessageType&gt; {
     <span class="kw">pub </span>from: ValidatorId,
     <span class="kw">pub </span>received: DateTime&lt;Utc&gt;,
     <span class="kw">pub </span>msg: message::Message&lt;T&gt;,
@@ -1447,9 +1460,9 @@
     <span class="kw">use </span><span class="kw">crate</span>::validator::messages::<span class="kw-2">*</span>;
     <span class="kw">use </span>serde::{Deserialize, Serialize};
 
-    <span class="attribute">#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]</span>
-    <span class="attribute">#[serde(try_from = <span class="string">&quot;MessageTypes&quot;</span>, into = <span class="string">&quot;MessageTypes&quot;</span>)]</span>
-    <span class="kw">pub struct </span>Message&lt;T: Type&gt;(<span class="kw">pub </span>T);
+    <span class="attribute">#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+    #[serde(try_from = <span class="string">&quot;MessageTypes&quot;</span>, into = <span class="string">&quot;MessageTypes&quot;</span>)]
+    </span><span class="kw">pub struct </span>Message&lt;T: Type&gt;(<span class="kw">pub </span>T);
 
     <span class="kw">impl</span>&lt;T: Type&gt; Message&lt;T&gt; {
         <span class="kw">pub fn </span>new(message: T) -&gt; <span class="self">Self </span>{
@@ -1483,15 +1496,15 @@
         }
     }
 
-    <span class="attribute">#[cfg(test)]</span>
-    <span class="kw">mod </span>test {
+    <span class="attribute">#[cfg(test)]
+    </span><span class="kw">mod </span>test {
         <span class="kw">use super</span>::<span class="kw-2">*</span>;
         <span class="kw">use </span><span class="kw">crate</span>::sentry::MessageResponse;
         <span class="kw">use </span>chrono::{TimeZone, Utc};
         <span class="kw">use </span>serde_json::{from_value, json, to_value};
 
-        <span class="attribute">#[test]</span>
-        <span class="kw">fn </span>de_serialization_of_a_message() {
+        <span class="attribute">#[test]
+        </span><span class="kw">fn </span>de_serialization_of_a_message() {
             <span class="kw">let </span>approve_state_message = <span class="macro">json!</span>({
                 <span class="string">&quot;from&quot;</span>:<span class="string">&quot;0x2892f6C41E0718eeeDd49D98D648C789668cA67d&quot;</span>,
                 <span class="string">&quot;msg&quot;</span>: {
@@ -1543,10 +1556,10 @@
     </span><span class="kw">static </span>IMPRESSION_STRING: Lazy&lt;String&gt; = Lazy::new(|| EventType::Impression.to_string());
     <span class="kw">static </span>CLICK_STRING: Lazy&lt;String&gt; = Lazy::new(|| EventType::Click.to_string());
 
-    <span class="attribute">#[derive(Debug, Display, FromStr, Serialize, Deserialize, Ord, Eq, PartialOrd, Clone, Copy)]</span>
-    <span class="attribute">#[display(style = <span class="string">&quot;SNAKE_CASE&quot;</span>)]</span>
-    <span class="attribute">#[serde(rename_all = <span class="string">&quot;SCREAMING_SNAKE_CASE&quot;</span>)]</span>
-    <span class="kw">pub enum </span>EventType {
+    <span class="attribute">#[derive(Debug, Display, FromStr, Serialize, Deserialize, Ord, Eq, PartialOrd, Clone, Copy)]
+    #[display(style = <span class="string">&quot;SNAKE_CASE&quot;</span>)]
+    #[serde(rename_all = <span class="string">&quot;SCREAMING_SNAKE_CASE&quot;</span>)]
+    </span><span class="kw">pub enum </span>EventType {
         Impression,
         Click,
     }
@@ -1588,18 +1601,18 @@
     }
 
     <span class="doccomment">/// All the [`Event`]s available in the validator stack.
-    </span><span class="attribute">#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]</span>
-    <span class="attribute">#[serde(tag = <span class="string">&quot;type&quot;</span>, rename_all = <span class="string">&quot;SCREAMING_SNAKE_CASE&quot;</span>)]</span>
-    <span class="kw">pub enum </span>Event {
-        <span class="attribute">#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]</span>
-        Impression {
+    </span><span class="attribute">#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
+    #[serde(tag = <span class="string">&quot;type&quot;</span>, rename_all = <span class="string">&quot;SCREAMING_SNAKE_CASE&quot;</span>)]
+    </span><span class="kw">pub enum </span>Event {
+        <span class="attribute">#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]
+        </span>Impression {
             publisher: Address,
             ad_unit: IPFS,
             ad_slot: IPFS,
             referrer: <span class="prelude-ty">Option</span>&lt;String&gt;,
         },
-        <span class="attribute">#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]</span>
-        Click {
+        <span class="attribute">#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]
+        </span>Click {
             publisher: Address,
             ad_unit: IPFS,
             ad_slot: IPFS,
@@ -1649,16 +1662,16 @@
         }
     }
 
-    <span class="attribute">#[cfg(test)]</span>
-    <span class="kw">mod </span>test {
+    <span class="attribute">#[cfg(test)]
+    </span><span class="kw">mod </span>test {
         <span class="kw">use </span>std::borrow::Borrow;
 
         <span class="kw">use </span><span class="kw">crate</span>::sentry::event::{CLICK_STRING, IMPRESSION_STRING};
 
         <span class="kw">use </span><span class="kw">super</span>::EventType;
 
-        <span class="attribute">#[test]</span>
-        <span class="kw">fn </span>test_event_type_parsing_and_de_serialization() {
+        <span class="attribute">#[test]
+        </span><span class="kw">fn </span>test_event_type_parsing_and_de_serialization() {
             <span class="kw">let </span>impression_parse = <span class="string">&quot;IMPRESSION&quot;
                 </span>.parse::&lt;EventType&gt;()
                 .expect(<span class="string">&quot;Should parse IMPRESSION&quot;</span>);
@@ -1682,9 +1695,9 @@
     }
 }
 
-<span class="attribute">#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]</span>
-<span class="attribute">#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]</span>
-<span class="kw">pub struct </span>UpdateAnalytics {
+<span class="attribute">#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]
+</span><span class="kw">pub struct </span>UpdateAnalytics {
     <span class="kw">pub </span>time: DateHour&lt;Utc&gt;,
     <span class="kw">pub </span>campaign_id: CampaignId,
     <span class="kw">pub </span>ad_unit: IPFS,
@@ -1701,9 +1714,9 @@
     <span class="kw">pub </span>count_to_add: i32,
 }
 
-<span class="attribute">#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]</span>
-<span class="attribute">#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]</span>
-<span class="kw">pub struct </span>Analytics {
+<span class="attribute">#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]
+</span><span class="kw">pub struct </span>Analytics {
     <span class="kw">pub </span>time: DateHour&lt;Utc&gt;,
     <span class="kw">pub </span>campaign_id: CampaignId,
     <span class="kw">pub </span>ad_unit: IPFS,
@@ -1719,12 +1732,12 @@
     <span class="kw">pub </span>payout_count: u32,
 }
 
-<span class="attribute">#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]</span>
-<span class="attribute">#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]</span>
-<span class="kw">pub struct </span>FetchedAnalytics {
+<span class="attribute">#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]
+</span><span class="kw">pub struct </span>FetchedAnalytics {
     <span class="comment">// time is represented as a timestamp
-    </span><span class="attribute">#[serde(with = <span class="string">&quot;ts_milliseconds&quot;</span>)]</span>
-    <span class="kw">pub </span>time: DateTime&lt;Utc&gt;,
+    </span><span class="attribute">#[serde(with = <span class="string">&quot;ts_milliseconds&quot;</span>)]
+    </span><span class="kw">pub </span>time: DateTime&lt;Utc&gt;,
     <span class="kw">pub </span>value: FetchedMetric,
     <span class="comment">// We can&#39;t know the exact segment type but it can always be represented as a string
     </span><span class="kw">pub </span>segment: <span class="prelude-ty">Option</span>&lt;String&gt;,
@@ -1735,18 +1748,18 @@
 /// # Examples
 ///
 /// ```
-</span><span class="attribute">#[doc = <span class="macro">include_str!</span>(<span class="string">&quot;../examples/analytics_response.rs&quot;</span>)]</span>
-<span class="doccomment">/// ```
-</span><span class="attribute">#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]</span>
-<span class="attribute">#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]</span>
-<span class="kw">pub struct </span>AnalyticsResponse {
+</span><span class="attribute">#[doc = <span class="macro">include_str!</span>(<span class="string">&quot;../examples/analytics_response.rs&quot;</span>)]
+</span><span class="doccomment">/// ```
+</span><span class="attribute">#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]
+</span><span class="kw">pub struct </span>AnalyticsResponse {
     <span class="kw">pub </span>analytics: Vec&lt;FetchedAnalytics&gt;,
 }
 
 <span class="doccomment">/// The value of the requested analytics [`crate::analytics::Metric`].
-</span><span class="attribute">#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]</span>
-<span class="attribute">#[serde(untagged)]</span>
-<span class="kw">pub enum </span>FetchedMetric {
+</span><span class="attribute">#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
+#[serde(untagged)]
+</span><span class="kw">pub enum </span>FetchedMetric {
     Count(u32),
     Paid(UnifiedNum),
 }
@@ -1769,16 +1782,16 @@
     }
 }
 
-<span class="attribute">#[derive(Debug, Error, PartialEq, Eq)]</span>
-<span class="attribute">#[error(<span class="string">&quot;Minutes ({minutes}), seconds ({seconds}) &amp; nanoseconds ({nanoseconds}) should all be set to 0 (zero)&quot;</span>)]</span>
-<span class="kw">pub struct </span>DateHourError {
+<span class="attribute">#[derive(Debug, Error, PartialEq, Eq)]
+#[error(<span class="string">&quot;Minutes ({minutes}), seconds ({seconds}) &amp; nanoseconds ({nanoseconds}) should all be set to 0 (zero)&quot;</span>)]
+</span><span class="kw">pub struct </span>DateHourError {
     <span class="kw">pub </span>minutes: u32,
     <span class="kw">pub </span>seconds: u32,
     <span class="kw">pub </span>nanoseconds: u32,
 }
 
-<span class="attribute">#[derive(Clone, Hash)]</span>
-<span class="doccomment">/// [`DateHour`] holds the date and hour (only).
+<span class="attribute">#[derive(Clone, Hash)]
+</span><span class="doccomment">/// [`DateHour`] holds the date and hour (only).
 ///
 /// It uses [`chrono::DateTime`] when serializing and deserializing.
 /// When serializing it always sets minutes and seconds to `0` (zero).
@@ -1971,9 +1984,9 @@
     }
 }
 
-<span class="attribute">#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]</span>
-<span class="attribute">#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]</span>
-<span class="kw">pub struct </span>Pagination {
+<span class="attribute">#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]
+</span><span class="kw">pub struct </span>Pagination {
     <span class="doccomment">/// The total amount of pages available for this request
     </span><span class="kw">pub </span>total_pages: u64,
     <span class="doccomment">/// The current page number returned from this request
@@ -1986,18 +1999,18 @@
 /// # Examples
 ///
 /// ```
-</span><span class="attribute">#[doc = <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/channel_last_approved_response.rs&quot;</span>)]</span>
-<span class="doccomment">/// ```
-</span><span class="attribute">#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]</span>
-<span class="attribute">#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]</span>
-<span class="kw">pub struct </span>LastApprovedResponse&lt;S: BalancesState&gt; {
+</span><span class="attribute">#[doc = <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/channel_last_approved_response.rs&quot;</span>)]
+</span><span class="doccomment">/// ```
+</span><span class="attribute">#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]
+</span><span class="kw">pub struct </span>LastApprovedResponse&lt;S: BalancesState&gt; {
     <span class="doccomment">/// The last approved [`NewState`] and [`ApproveState`] accordingly to the validator.
-    </span><span class="attribute">#[serde(bound = <span class="string">&quot;S: BalancesState&quot;</span>)]</span>
-    <span class="kw">pub </span>last_approved: <span class="prelude-ty">Option</span>&lt;LastApproved&lt;S&gt;&gt;,
+    </span><span class="attribute">#[serde(bound = <span class="string">&quot;S: BalancesState&quot;</span>)]
+    </span><span class="kw">pub </span>last_approved: <span class="prelude-ty">Option</span>&lt;LastApproved&lt;S&gt;&gt;,
     <span class="doccomment">/// - None -&gt; `withHeartbeat=true` wasn&#39;t passed
     /// - `Some(vec![])` (empty vec) or `Some(heartbeats)` - `withHeartbeat=true` was passed
-    </span><span class="attribute">#[serde(default, skip_serializing_if = <span class="string">&quot;Option::is_none&quot;</span>)]</span>
-    <span class="kw">pub </span>heartbeats: <span class="prelude-ty">Option</span>&lt;Vec&lt;MessageResponse&lt;Heartbeat&gt;&gt;&gt;,
+    </span><span class="attribute">#[serde(default, skip_serializing_if = <span class="string">&quot;Option::is_none&quot;</span>)]
+    </span><span class="kw">pub </span>heartbeats: <span class="prelude-ty">Option</span>&lt;Vec&lt;MessageResponse&lt;Heartbeat&gt;&gt;&gt;,
 }
 
 <span class="doccomment">/// GET `/v5/channel/0xXXX.../last-approved` query parameters
@@ -2005,19 +2018,19 @@
 /// # Examples
 ///
 /// ```
-</span><span class="attribute">#[doc = <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/channel_last_approved_query.rs&quot;</span>)]</span>
-<span class="doccomment">/// ```
-</span><span class="attribute">#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]</span>
-<span class="attribute">#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]</span>
-<span class="kw">pub struct </span>LastApprovedQuery {
+</span><span class="attribute">#[doc = <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/channel_last_approved_query.rs&quot;</span>)]
+</span><span class="doccomment">/// ```
+</span><span class="attribute">#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]
+</span><span class="kw">pub struct </span>LastApprovedQuery {
     <span class="doccomment">/// Whether or not to return the latest 2 [`Heartbeat`] validator messages
     /// from each of the [`Channel`](crate::Channel) validators.
-    </span><span class="attribute">#[serde(default)]</span>
-    <span class="kw">pub </span>with_heartbeat: <span class="prelude-ty">Option</span>&lt;bool&gt;,
+    </span><span class="attribute">#[serde(default)]
+    </span><span class="kw">pub </span>with_heartbeat: <span class="prelude-ty">Option</span>&lt;bool&gt;,
 }
 
-<span class="attribute">#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]</span>
-<span class="kw">pub struct </span>SuccessResponse {
+<span class="attribute">#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+</span><span class="kw">pub struct </span>SuccessResponse {
     <span class="kw">pub </span>success: bool,
 }
 
@@ -2026,11 +2039,11 @@
 /// # Examples
 ///
 /// ```
-</span><span class="attribute">#[doc = <span class="macro">include_str!</span>(<span class="string">&quot;../examples/spender_response.rs&quot;</span>)]</span>
-<span class="doccomment">/// ```
-</span><span class="attribute">#[derive(Serialize, Deserialize, Debug)]</span>
-<span class="attribute">#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]</span>
-<span class="kw">pub struct </span>SpenderResponse {
+</span><span class="attribute">#[doc = <span class="macro">include_str!</span>(<span class="string">&quot;../examples/spender_response.rs&quot;</span>)]
+</span><span class="doccomment">/// ```
+</span><span class="attribute">#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]
+</span><span class="kw">pub struct </span>SpenderResponse {
     <span class="kw">pub </span>spender: Spender,
 }
 
@@ -2039,21 +2052,21 @@
 /// # Examples
 ///
 /// ```
-</span><span class="attribute">#[doc = <span class="macro">include_str!</span>(<span class="string">&quot;../examples/all_spenders_response.rs&quot;</span>)]</span>
-<span class="doccomment">/// ```
-</span><span class="attribute">#[derive(Serialize, Deserialize, Debug)]</span>
-<span class="attribute">#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]</span>
-<span class="kw">pub struct </span>AllSpendersResponse {
+</span><span class="attribute">#[doc = <span class="macro">include_str!</span>(<span class="string">&quot;../examples/all_spenders_response.rs&quot;</span>)]
+</span><span class="doccomment">/// ```
+</span><span class="attribute">#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]
+</span><span class="kw">pub struct </span>AllSpendersResponse {
     <span class="kw">pub </span>spenders: HashMap&lt;Address, Spender&gt;,
-    <span class="attribute">#[serde(flatten)]</span>
-    <span class="kw">pub </span>pagination: Pagination,
+    <span class="attribute">#[serde(flatten)]
+    </span><span class="kw">pub </span>pagination: Pagination,
 }
 
-<span class="attribute">#[derive(Debug, Serialize, Deserialize)]</span>
-<span class="kw">pub struct </span>AllSpendersQuery {
+<span class="attribute">#[derive(Debug, Serialize, Deserialize)]
+</span><span class="kw">pub struct </span>AllSpendersQuery {
     <span class="comment">// default is `u64::default()` = `0`
-    </span><span class="attribute">#[serde(default)]</span>
-    <span class="kw">pub </span>page: u64,
+    </span><span class="attribute">#[serde(default)]
+    </span><span class="kw">pub </span>page: u64,
 }
 
 <span class="doccomment">/// Payouts to be performed for the given [`Channel`](crate::Channel).
@@ -2061,23 +2074,23 @@
 /// # Examples
 ///
 /// ```
-</span><span class="attribute">#[doc = <span class="macro">include_str!</span>(<span class="string">&quot;../examples/channel_pay_request.rs&quot;</span>)]</span>
-<span class="doccomment">/// ```
-</span><span class="attribute">#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]</span>
-<span class="kw">pub struct </span>ChannelPayRequest {
+</span><span class="attribute">#[doc = <span class="macro">include_str!</span>(<span class="string">&quot;../examples/channel_pay_request.rs&quot;</span>)]
+</span><span class="doccomment">/// ```
+</span><span class="attribute">#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+</span><span class="kw">pub struct </span>ChannelPayRequest {
     <span class="kw">pub </span>payouts: UnifiedMap,
 }
 
-<span class="attribute">#[derive(Serialize, Deserialize, Debug)]</span>
-<span class="kw">pub struct </span>ValidatorMessage {
+<span class="attribute">#[derive(Serialize, Deserialize, Debug)]
+</span><span class="kw">pub struct </span>ValidatorMessage {
     <span class="kw">pub </span>from: ValidatorId,
     <span class="kw">pub </span>received: DateTime&lt;Utc&gt;,
     <span class="kw">pub </span>msg: MessageTypes,
 }
 
-<span class="attribute">#[derive(Serialize, Deserialize, Debug)]</span>
-<span class="attribute">#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]</span>
-<span class="kw">pub struct </span>ValidatorMessagesListResponse {
+<span class="attribute">#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]
+</span><span class="kw">pub struct </span>ValidatorMessagesListResponse {
     <span class="kw">pub </span>messages: Vec&lt;ValidatorMessage&gt;,
 }
 
@@ -2086,33 +2099,46 @@
 /// # Examples
 ///
 /// ```
-</span><span class="attribute">#[doc = <span class="macro">include_str!</span>(<span class="string">&quot;../examples/validator_messages_create_request.rs&quot;</span>)]</span>
-<span class="doccomment">/// ```
-</span><span class="attribute">#[derive(Serialize, Deserialize, Debug)]</span>
-<span class="attribute">#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]</span>
-<span class="kw">pub struct </span>ValidatorMessagesCreateRequest {
+</span><span class="attribute">#[doc = <span class="macro">include_str!</span>(<span class="string">&quot;../examples/validator_messages_create_request.rs&quot;</span>)]
+</span><span class="doccomment">/// ```
+</span><span class="attribute">#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]
+</span><span class="kw">pub struct </span>ValidatorMessagesCreateRequest {
     <span class="kw">pub </span>messages: Vec&lt;MessageTypes&gt;,
 }
 
-<span class="attribute">#[derive(Deserialize, Debug)]</span>
-<span class="attribute">#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]</span>
-<span class="kw">pub struct </span>ValidatorMessagesListQuery {
+<span class="attribute">#[derive(Deserialize, Debug)]
+#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]
+</span><span class="kw">pub struct </span>ValidatorMessagesListQuery {
     <span class="doccomment">/// Will apply the lower limit of: `query.limit` and `Config::msgs_find_limit`
     </span><span class="kw">pub </span>limit: <span class="prelude-ty">Option</span>&lt;u64&gt;,
 }
 
-<span class="attribute">#[derive(Serialize, Deserialize, Debug)]</span>
-<span class="attribute">#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]</span>
-<span class="kw">pub struct </span>ValidationErrorResponse {
+<span class="attribute">#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]
+</span><span class="kw">pub struct </span>ValidationErrorResponse {
     <span class="kw">pub </span>status_code: u64,
     <span class="kw">pub </span>message: String,
     <span class="kw">pub </span>validation: Vec&lt;String&gt;,
 }
 
+<span class="doccomment">/// Get leaf response with the Merkle proof for the requested spender/earner.
+///
+/// # Examples
+///
+/// ```
+</span><span class="attribute">#[doc = <span class="macro">include_str!</span>(<span class="string">&quot;../examples/get_leaf_response.rs&quot;</span>)]
+</span><span class="doccomment">/// ```
+</span><span class="attribute">#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]
+</span><span class="kw">pub struct </span>GetLeafResponse {
+    <span class="kw">pub </span>merkle_proof: String,
+}
+
 <span class="doccomment">/// Request body for posting new [`Event`]s to a [`Campaign`](crate::Campaign).
-</span><span class="attribute">#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]</span>
-<span class="attribute">#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]</span>
-<span class="kw">pub struct </span>InsertEventsRequest {
+</span><span class="attribute">#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]
+</span><span class="kw">pub struct </span>InsertEventsRequest {
     <span class="kw">pub </span>events: Vec&lt;Event&gt;,
 }
 
@@ -2122,12 +2148,12 @@
 
     <span class="kw">use </span><span class="kw">super</span>::Pagination;
 
-    <span class="attribute">#[derive(Debug, Serialize, Deserialize)]</span>
-    <span class="attribute">#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]</span>
-    <span class="kw">pub struct </span>ChannelListResponse {
+    <span class="attribute">#[derive(Debug, Serialize, Deserialize)]
+    #[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]
+    </span><span class="kw">pub struct </span>ChannelListResponse {
         <span class="kw">pub </span>channels: Vec&lt;Channel&gt;,
-        <span class="attribute">#[serde(flatten)]</span>
-        <span class="kw">pub </span>pagination: Pagination,
+        <span class="attribute">#[serde(flatten)]
+        </span><span class="kw">pub </span>pagination: Pagination,
     }
 
     <span class="doccomment">/// `GET /v5/channel/list` query
@@ -2135,18 +2161,18 @@
     /// # Examples
     ///
     /// ```
-    </span><span class="attribute">#[doc = <span class="macro">include_str!</span>(<span class="string">&quot;../examples/channel_list_query.rs&quot;</span>)]</span>
-    <span class="doccomment">/// ```
-    </span><span class="attribute">#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]</span>
-    <span class="kw">pub struct </span>ChannelListQuery {
+    </span><span class="attribute">#[doc = <span class="macro">include_str!</span>(<span class="string">&quot;../examples/channel_list_query.rs&quot;</span>)]
+    </span><span class="doccomment">/// ```
+    </span><span class="attribute">#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+    </span><span class="kw">pub struct </span>ChannelListQuery {
         <span class="doccomment">/// default is `u64::default()` = `0`
-        </span><span class="attribute">#[serde(default)]</span>
-        <span class="kw">pub </span>page: u64,
+        </span><span class="attribute">#[serde(default)]
+        </span><span class="kw">pub </span>page: u64,
         <span class="doccomment">/// Returns only the [`Channel`]s containing a specified validator if provided.
         </span><span class="kw">pub </span>validator: <span class="prelude-ty">Option</span>&lt;ValidatorId&gt;,
         <span class="doccomment">/// Returns only the Channels from the specified [`ChainId`]s.
-        </span><span class="attribute">#[serde(default)]</span>
-        <span class="kw">pub </span>chains: Vec&lt;ChainId&gt;,
+        </span><span class="attribute">#[serde(default)]
+        </span><span class="kw">pub </span>chains: Vec&lt;ChainId&gt;,
     }
 }
 
@@ -2162,14 +2188,14 @@
     /// # Examples
     ///
     /// ```
-    </span><span class="attribute">#[doc = <span class="macro">include_str!</span>(<span class="string">&quot;../examples/campaign_list_response.rs&quot;</span>)]</span>
-    <span class="doccomment">/// ```
-    </span><span class="attribute">#[derive(Debug, Serialize, Deserialize)]</span>
-    <span class="attribute">#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]</span>
-    <span class="kw">pub struct </span>CampaignListResponse {
+    </span><span class="attribute">#[doc = <span class="macro">include_str!</span>(<span class="string">&quot;../examples/campaign_list_response.rs&quot;</span>)]
+    </span><span class="doccomment">/// ```
+    </span><span class="attribute">#[derive(Debug, Serialize, Deserialize)]
+    #[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]
+    </span><span class="kw">pub struct </span>CampaignListResponse {
         <span class="kw">pub </span>campaigns: Vec&lt;Campaign&gt;,
-        <span class="attribute">#[serde(flatten)]</span>
-        <span class="kw">pub </span>pagination: Pagination,
+        <span class="attribute">#[serde(flatten)]
+        </span><span class="kw">pub </span>pagination: Pagination,
     }
 
     <span class="doccomment">/// `GET /v5/campaign/list` query
@@ -2177,45 +2203,45 @@
     /// # Examples
     ///
     /// ```
-    </span><span class="attribute">#[doc = <span class="macro">include_str!</span>(<span class="string">&quot;../examples/campaign_list_query.rs&quot;</span>)]</span>
-    <span class="doccomment">/// ```
-    </span><span class="attribute">#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]</span>
-    <span class="kw">pub struct </span>CampaignListQuery {
+    </span><span class="attribute">#[doc = <span class="macro">include_str!</span>(<span class="string">&quot;../examples/campaign_list_query.rs&quot;</span>)]
+    </span><span class="doccomment">/// ```
+    </span><span class="attribute">#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+    </span><span class="kw">pub struct </span>CampaignListQuery {
         <span class="doccomment">/// Default is `u64::default()` = `0`.
-        </span><span class="attribute">#[serde(default)]</span>
-        <span class="kw">pub </span>page: u64,
+        </span><span class="attribute">#[serde(default)]
+        </span><span class="kw">pub </span>page: u64,
         <span class="doccomment">/// Filters the list on `Campaign.active.to &gt;= active_to_ge`.
         ///
         /// It should be the same timestamp format as the `Campaign.active.to`: **seconds**
         ///
         /// **Note:** This field is deserialized from `activeTo`.
-        </span><span class="attribute">#[serde(with = <span class="string">&quot;ts_seconds&quot;</span>, default = <span class="string">&quot;Utc::now&quot;</span>, rename = <span class="string">&quot;activeTo&quot;</span>)]</span>
-        <span class="kw">pub </span>active_to_ge: DateTime&lt;Utc&gt;,
+        </span><span class="attribute">#[serde(with = <span class="string">&quot;ts_seconds&quot;</span>, default = <span class="string">&quot;Utc::now&quot;</span>, rename = <span class="string">&quot;activeTo&quot;</span>)]
+        </span><span class="kw">pub </span>active_to_ge: DateTime&lt;Utc&gt;,
         <span class="doccomment">/// Returns only the [`Campaign`]s containing a specified creator if provided.
         </span><span class="kw">pub </span>creator: <span class="prelude-ty">Option</span>&lt;Address&gt;,
         <span class="doccomment">/// Returns only the [`Campaign`]s containing a specified validator if provided.
-        </span><span class="attribute">#[serde(flatten)]</span>
-        <span class="kw">pub </span>validator: <span class="prelude-ty">Option</span>&lt;ValidatorParam&gt;,
+        </span><span class="attribute">#[serde(flatten)]
+        </span><span class="kw">pub </span>validator: <span class="prelude-ty">Option</span>&lt;ValidatorParam&gt;,
     }
 
     <span class="doccomment">/// The `validator` query parameter for [`CampaignListQuery`].
-    </span><span class="attribute">#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]</span>
-    <span class="attribute">#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]</span>
-    <span class="kw">pub enum </span>ValidatorParam {
+    </span><span class="attribute">#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
+    #[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]
+    </span><span class="kw">pub enum </span>ValidatorParam {
         <span class="doccomment">/// Results will include all campaigns that have the provided address as a leader
         </span>Leader(ValidatorId),
         <span class="doccomment">/// Results will include all campaigns that have either a leader or follower with the provided address
         </span>Validator(ValidatorId),
     }
 
-    <span class="attribute">#[cfg(test)]</span>
-    <span class="kw">mod </span>test {
+    <span class="attribute">#[cfg(test)]
+    </span><span class="kw">mod </span>test {
         <span class="kw">use super</span>::<span class="kw-2">*</span>;
         <span class="kw">use </span><span class="kw">crate</span>::test_util::{CREATOR, FOLLOWER, IDS, LEADER};
         <span class="kw">use </span>chrono::TimeZone;
 
-        <span class="attribute">#[test]</span>
-        <span class="kw">pub fn </span>deserialize_campaign_list_query() {
+        <span class="attribute">#[test]
+        </span><span class="kw">pub fn </span>deserialize_campaign_list_query() {
             <span class="kw">let </span>query_leader = CampaignListQuery {
                 page: <span class="number">0</span>,
                 active_to_ge: Utc.ymd(<span class="number">2021</span>, <span class="number">2</span>, <span class="number">1</span>).and_hms(<span class="number">7</span>, <span class="number">0</span>, <span class="number">0</span>),
@@ -2283,36 +2309,36 @@
     /// # Examples
     ///
     /// ```
-    </span><span class="attribute">#[doc = <span class="macro">include_str!</span>(<span class="string">&quot;../examples/create_campaign_request.rs&quot;</span>)]</span>
-    <span class="doccomment">/// ```
-    </span><span class="attribute">#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]</span>
-    <span class="attribute">#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]</span>
-    <span class="kw">pub struct </span>CreateCampaign {
+    </span><span class="attribute">#[doc = <span class="macro">include_str!</span>(<span class="string">&quot;../examples/create_campaign_request.rs&quot;</span>)]
+    </span><span class="doccomment">/// ```
+    </span><span class="attribute">#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+    #[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]
+    </span><span class="kw">pub struct </span>CreateCampaign {
         <span class="kw">pub </span>id: <span class="prelude-ty">Option</span>&lt;CampaignId&gt;,
         <span class="kw">pub </span>channel: Channel,
         <span class="kw">pub </span>creator: Address,
         <span class="kw">pub </span>budget: UnifiedNum,
         <span class="kw">pub </span>validators: Validators,
-        <span class="attribute">#[serde(default, skip_serializing_if = <span class="string">&quot;Option::is_none&quot;</span>)]</span>
-        <span class="kw">pub </span>title: <span class="prelude-ty">Option</span>&lt;String&gt;,
+        <span class="attribute">#[serde(default, skip_serializing_if = <span class="string">&quot;Option::is_none&quot;</span>)]
+        </span><span class="kw">pub </span>title: <span class="prelude-ty">Option</span>&lt;String&gt;,
         <span class="doccomment">/// Event pricing bounds
-        </span><span class="attribute">#[serde(default, skip_serializing_if = <span class="string">&quot;PricingBounds::is_empty&quot;</span>)]</span>
-        <span class="kw">pub </span>pricing_bounds: PricingBounds,
+        </span><span class="attribute">#[serde(default, skip_serializing_if = <span class="string">&quot;PricingBounds::is_empty&quot;</span>)]
+        </span><span class="kw">pub </span>pricing_bounds: PricingBounds,
         <span class="doccomment">/// EventSubmission object, applies to event submission (POST /channel/:id/events)
-        </span><span class="attribute">#[serde(default, skip_serializing_if = <span class="string">&quot;Option::is_none&quot;</span>)]</span>
-        <span class="kw">pub </span>event_submission: <span class="prelude-ty">Option</span>&lt;EventSubmission&gt;,
+        </span><span class="attribute">#[serde(default, skip_serializing_if = <span class="string">&quot;Option::is_none&quot;</span>)]
+        </span><span class="kw">pub </span>event_submission: <span class="prelude-ty">Option</span>&lt;EventSubmission&gt;,
         <span class="doccomment">/// An array of AdUnit (optional)
-        </span><span class="attribute">#[serde(default, skip_serializing_if = <span class="string">&quot;Vec::is_empty&quot;</span>)]</span>
-        <span class="kw">pub </span>ad_units: Vec&lt;AdUnit&gt;,
-        <span class="attribute">#[serde(default)]</span>
-        <span class="kw">pub </span>targeting_rules: Rules,
+        </span><span class="attribute">#[serde(default, skip_serializing_if = <span class="string">&quot;Vec::is_empty&quot;</span>)]
+        </span><span class="kw">pub </span>ad_units: Vec&lt;AdUnit&gt;,
+        <span class="attribute">#[serde(default)]
+        </span><span class="kw">pub </span>targeting_rules: Rules,
         <span class="doccomment">/// A millisecond timestamp of when the campaign was created
-        </span><span class="attribute">#[serde(with = <span class="string">&quot;ts_milliseconds&quot;</span>)]</span>
-        <span class="kw">pub </span>created: DateTime&lt;Utc&gt;,
+        </span><span class="attribute">#[serde(with = <span class="string">&quot;ts_milliseconds&quot;</span>)]
+        </span><span class="kw">pub </span>created: DateTime&lt;Utc&gt;,
         <span class="doccomment">/// A millisecond timestamp representing the time you want this campaign to become active (optional)
         /// Used by the AdViewManager &amp; Targeting AIP#31
-        </span><span class="attribute">#[serde(flatten)]</span>
-        <span class="kw">pub </span>active: Active,
+        </span><span class="attribute">#[serde(flatten)]
+        </span><span class="kw">pub </span>active: Active,
     }
 
     <span class="kw">impl </span>CreateCampaign {
@@ -2376,10 +2402,10 @@
     ///
     /// # Examples:
     /// ```
-    </span><span class="attribute">#[doc = <span class="macro">include_str!</span>(<span class="string">&quot;../examples/modify_campaign_request.rs&quot;</span>)]</span>
-    <span class="doccomment">/// ```
-    </span><span class="attribute">#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]</span>
-    <span class="kw">pub struct </span>ModifyCampaign {
+    </span><span class="attribute">#[doc = <span class="macro">include_str!</span>(<span class="string">&quot;../examples/modify_campaign_request.rs&quot;</span>)]
+    </span><span class="doccomment">/// ```
+    </span><span class="attribute">#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+    </span><span class="kw">pub struct </span>ModifyCampaign {
         <span class="kw">pub </span>budget: <span class="prelude-ty">Option</span>&lt;UnifiedNum&gt;,
         <span class="kw">pub </span>validators: <span class="prelude-ty">Option</span>&lt;Validators&gt;,
         <span class="kw">pub </span>title: <span class="prelude-ty">Option</span>&lt;String&gt;,
@@ -2437,8 +2463,8 @@
     }
 }
 
-<span class="attribute">#[cfg(feature = <span class="string">&quot;postgres&quot;</span>)]</span>
-<span class="kw">mod </span>postgres {
+<span class="attribute">#[cfg(feature = <span class="string">&quot;postgres&quot;</span>)]
+</span><span class="kw">mod </span>postgres {
     <span class="kw">use super</span>::{
         Analytics, DateHour, EventType, FetchedAnalytics, FetchedMetric, MessageResponse,
         ValidatorMessage,
@@ -2618,14 +2644,14 @@
         }
     }
 
-    <span class="attribute">#[cfg(test)]</span>
-    <span class="kw">mod </span>test {
+    <span class="attribute">#[cfg(test)]
+    </span><span class="kw">mod </span>test {
         <span class="kw">use </span>chrono::{TimeZone, Utc};
 
         <span class="kw">use crate</span>::{postgres::POSTGRES_POOL, sentry::DateHour};
 
-        <span class="attribute">#[tokio::test]</span>
-        <span class="kw">pub async fn </span>datehour_from_to_sql() {
+        <span class="attribute">#[tokio::test]
+        </span><span class="kw">pub async fn </span>datehour_from_to_sql() {
             <span class="kw">let </span>client = POSTGRES_POOL.get().<span class="kw">await</span>.unwrap();
             <span class="kw">let </span>sql_type = <span class="string">&quot;TIMESTAMPTZ&quot;</span>;
 
@@ -2661,15 +2687,15 @@
     }
 }
 
-<span class="attribute">#[cfg(test)]</span>
-<span class="kw">mod </span>test {
+<span class="attribute">#[cfg(test)]
+</span><span class="kw">mod </span>test {
     <span class="kw">use super</span>::<span class="kw-2">*</span>;
     <span class="kw">use </span><span class="kw">crate</span>::test_util::{DUMMY_IPFS, PUBLISHER};
 
     <span class="kw">use </span>serde_json::{json, Value};
 
-    <span class="attribute">#[test]</span>
-    <span class="kw">pub fn </span>test_de_serialize_events() {
+    <span class="attribute">#[test]
+    </span><span class="kw">pub fn </span>test_de_serialize_events() {
         <span class="kw">let </span>click = Event::Click {
             publisher: <span class="kw-2">*</span>PUBLISHER,
             ad_unit: DUMMY_IPFS[<span class="number">0</span>],
@@ -2691,8 +2717,8 @@
         );
     }
 
-    <span class="attribute">#[test]</span>
-    <span class="kw">fn </span>test_datehour_subtract_timeframe() {
+    <span class="attribute">#[test]
+    </span><span class="kw">fn </span>test_datehour_subtract_timeframe() {
         <span class="comment">// test with End of year
         </span>{
             <span class="kw">let </span>datehour = DateHour::from_ymdh(<span class="number">2021</span>, <span class="number">12</span>, <span class="number">31</span>, <span class="number">22</span>);
@@ -2714,8 +2740,8 @@
         </span><span class="macro">pretty_assertions::assert_eq!</span>(DateHour::from_ymdh(<span class="number">2021</span>, <span class="number">11</span>, <span class="number">14</span>, <span class="number">2</span>), middle_of_month);
     }
 
-    <span class="attribute">#[test]</span>
-    <span class="kw">fn </span>test_datehour_de_serialize_partial_ord_and_eq() {
+    <span class="attribute">#[test]
+    </span><span class="kw">fn </span>test_datehour_de_serialize_partial_ord_and_eq() {
         <span class="kw">let </span>earlier = DateHour::from_ymdh(<span class="number">2021</span>, <span class="number">12</span>, <span class="number">1</span>, <span class="number">16</span>);
         <span class="kw">let </span>later = DateHour::from_ymdh(<span class="number">2021</span>, <span class="number">12</span>, <span class="number">31</span>, <span class="number">16</span>);
 
@@ -2746,8 +2772,8 @@
         </span>);
     }
 
-    <span class="attribute">#[test]</span>
-    <span class="kw">fn </span>test_partial_eq_with_same_datehour_but_different_zones() {
+    <span class="attribute">#[test]
+    </span><span class="kw">fn </span>test_partial_eq_with_same_datehour_but_different_zones() {
         <span class="comment">// Eq &amp; PartialEq with different timezones
         </span><span class="kw">let </span>json = <span class="macro">json!</span>({
             <span class="string">&quot;UTC+0&quot;</span>: <span class="string">&quot;2021-12-16T14:00:00+00:00&quot;</span>,
@@ -2773,4 +2799,4 @@
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="primitives" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="primitives" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (02654a084 2022-08-30)" ></div></body></html>

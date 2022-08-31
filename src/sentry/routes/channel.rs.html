@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `sentry/src/routes/channel.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>channel.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script defer src="../../../source-script.js"></script><script defer src="../../../source-files.js"></script><script defer src="../../../main.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../../sentry/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div></a><h2 class="location"></h2></nav><nav class="sidebar"><a class="sidebar-logo" href="../../../sentry/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div></a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../sentry/index.html"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../wheel.svg"></a></div></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `sentry/src/routes/channel.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>channel.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../../normalize.css"><link rel="stylesheet" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../../ayu.css" disabled><link rel="stylesheet" href="../../../dark.css" disabled><link rel="stylesheet" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script defer src="../../../source-script.js"></script><script defer src="../../../source-files.js"></script><script defer src="../../../main.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../../sentry/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div></a><h2 class="location"></h2></nav><nav class="sidebar"><a class="sidebar-logo" href="../../../sentry/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div></a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../sentry/index.html"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../wheel.svg"></a></div></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -1408,6 +1408,181 @@
 <span id="1408">1408</span>
 <span id="1409">1409</span>
 <span id="1410">1410</span>
+<span id="1411">1411</span>
+<span id="1412">1412</span>
+<span id="1413">1413</span>
+<span id="1414">1414</span>
+<span id="1415">1415</span>
+<span id="1416">1416</span>
+<span id="1417">1417</span>
+<span id="1418">1418</span>
+<span id="1419">1419</span>
+<span id="1420">1420</span>
+<span id="1421">1421</span>
+<span id="1422">1422</span>
+<span id="1423">1423</span>
+<span id="1424">1424</span>
+<span id="1425">1425</span>
+<span id="1426">1426</span>
+<span id="1427">1427</span>
+<span id="1428">1428</span>
+<span id="1429">1429</span>
+<span id="1430">1430</span>
+<span id="1431">1431</span>
+<span id="1432">1432</span>
+<span id="1433">1433</span>
+<span id="1434">1434</span>
+<span id="1435">1435</span>
+<span id="1436">1436</span>
+<span id="1437">1437</span>
+<span id="1438">1438</span>
+<span id="1439">1439</span>
+<span id="1440">1440</span>
+<span id="1441">1441</span>
+<span id="1442">1442</span>
+<span id="1443">1443</span>
+<span id="1444">1444</span>
+<span id="1445">1445</span>
+<span id="1446">1446</span>
+<span id="1447">1447</span>
+<span id="1448">1448</span>
+<span id="1449">1449</span>
+<span id="1450">1450</span>
+<span id="1451">1451</span>
+<span id="1452">1452</span>
+<span id="1453">1453</span>
+<span id="1454">1454</span>
+<span id="1455">1455</span>
+<span id="1456">1456</span>
+<span id="1457">1457</span>
+<span id="1458">1458</span>
+<span id="1459">1459</span>
+<span id="1460">1460</span>
+<span id="1461">1461</span>
+<span id="1462">1462</span>
+<span id="1463">1463</span>
+<span id="1464">1464</span>
+<span id="1465">1465</span>
+<span id="1466">1466</span>
+<span id="1467">1467</span>
+<span id="1468">1468</span>
+<span id="1469">1469</span>
+<span id="1470">1470</span>
+<span id="1471">1471</span>
+<span id="1472">1472</span>
+<span id="1473">1473</span>
+<span id="1474">1474</span>
+<span id="1475">1475</span>
+<span id="1476">1476</span>
+<span id="1477">1477</span>
+<span id="1478">1478</span>
+<span id="1479">1479</span>
+<span id="1480">1480</span>
+<span id="1481">1481</span>
+<span id="1482">1482</span>
+<span id="1483">1483</span>
+<span id="1484">1484</span>
+<span id="1485">1485</span>
+<span id="1486">1486</span>
+<span id="1487">1487</span>
+<span id="1488">1488</span>
+<span id="1489">1489</span>
+<span id="1490">1490</span>
+<span id="1491">1491</span>
+<span id="1492">1492</span>
+<span id="1493">1493</span>
+<span id="1494">1494</span>
+<span id="1495">1495</span>
+<span id="1496">1496</span>
+<span id="1497">1497</span>
+<span id="1498">1498</span>
+<span id="1499">1499</span>
+<span id="1500">1500</span>
+<span id="1501">1501</span>
+<span id="1502">1502</span>
+<span id="1503">1503</span>
+<span id="1504">1504</span>
+<span id="1505">1505</span>
+<span id="1506">1506</span>
+<span id="1507">1507</span>
+<span id="1508">1508</span>
+<span id="1509">1509</span>
+<span id="1510">1510</span>
+<span id="1511">1511</span>
+<span id="1512">1512</span>
+<span id="1513">1513</span>
+<span id="1514">1514</span>
+<span id="1515">1515</span>
+<span id="1516">1516</span>
+<span id="1517">1517</span>
+<span id="1518">1518</span>
+<span id="1519">1519</span>
+<span id="1520">1520</span>
+<span id="1521">1521</span>
+<span id="1522">1522</span>
+<span id="1523">1523</span>
+<span id="1524">1524</span>
+<span id="1525">1525</span>
+<span id="1526">1526</span>
+<span id="1527">1527</span>
+<span id="1528">1528</span>
+<span id="1529">1529</span>
+<span id="1530">1530</span>
+<span id="1531">1531</span>
+<span id="1532">1532</span>
+<span id="1533">1533</span>
+<span id="1534">1534</span>
+<span id="1535">1535</span>
+<span id="1536">1536</span>
+<span id="1537">1537</span>
+<span id="1538">1538</span>
+<span id="1539">1539</span>
+<span id="1540">1540</span>
+<span id="1541">1541</span>
+<span id="1542">1542</span>
+<span id="1543">1543</span>
+<span id="1544">1544</span>
+<span id="1545">1545</span>
+<span id="1546">1546</span>
+<span id="1547">1547</span>
+<span id="1548">1548</span>
+<span id="1549">1549</span>
+<span id="1550">1550</span>
+<span id="1551">1551</span>
+<span id="1552">1552</span>
+<span id="1553">1553</span>
+<span id="1554">1554</span>
+<span id="1555">1555</span>
+<span id="1556">1556</span>
+<span id="1557">1557</span>
+<span id="1558">1558</span>
+<span id="1559">1559</span>
+<span id="1560">1560</span>
+<span id="1561">1561</span>
+<span id="1562">1562</span>
+<span id="1563">1563</span>
+<span id="1564">1564</span>
+<span id="1565">1565</span>
+<span id="1566">1566</span>
+<span id="1567">1567</span>
+<span id="1568">1568</span>
+<span id="1569">1569</span>
+<span id="1570">1570</span>
+<span id="1571">1571</span>
+<span id="1572">1572</span>
+<span id="1573">1573</span>
+<span id="1574">1574</span>
+<span id="1575">1575</span>
+<span id="1576">1576</span>
+<span id="1577">1577</span>
+<span id="1578">1578</span>
+<span id="1579">1579</span>
+<span id="1580">1580</span>
+<span id="1581">1581</span>
+<span id="1582">1582</span>
+<span id="1583">1583</span>
+<span id="1584">1584</span>
+<span id="1585">1585</span>
 </pre><pre class="rust"><code><span class="doccomment">//! `/v5/channel` routes
 //!
 
@@ -1417,13 +1592,19 @@
 <span class="kw">use </span>slog::{error, Logger};
 <span class="kw">use </span>std::{any::Any, collections::HashMap, sync::Arc};
 
-<span class="kw">use </span>adapter::{client::Locked, Adapter, Dummy};
+<span class="kw">use </span>adapter::{
+    client::Locked,
+    util::{get_balance_leaf, get_signable_state_root},
+    Adapter, Dummy,
+};
 <span class="kw">use </span>primitives::{
     balances::{Balances, CheckedState, UncheckedState},
+    merkle_tree::MerkleTree,
     sentry::{
         channel_list::{ChannelListQuery, ChannelListResponse},
-        AccountingResponse, AllSpendersQuery, AllSpendersResponse, ChannelPayRequest, LastApproved,
-        LastApprovedQuery, LastApprovedResponse, SpenderResponse, SuccessResponse,
+        AccountingResponse, AllSpendersQuery, AllSpendersResponse, ChannelPayRequest,
+        GetLeafResponse, LastApproved, LastApprovedQuery, LastApprovedResponse, SpenderResponse,
+        SuccessResponse,
     },
     spender::{Spendable, Spender},
     validator::NewState,
@@ -1442,15 +1623,15 @@
         DbPool,
     },
     response::ResponseError,
-    routes::campaign::fetch_campaign_ids_for_channel,
+    routes::{campaign::fetch_campaign_ids_for_channel, routers::LeafFor},
     Application, Auth,
 };
 
 <span class="doccomment">/// Request body for Channel deposit when using the Dummy adapter.
 ///
 /// **NOTE:** available **only** when using the Dummy adapter!
-</span><span class="attribute">#[derive(Debug, Serialize, Deserialize)]</span>
-<span class="kw">pub struct </span>ChannelDummyDeposit {
+</span><span class="attribute">#[derive(Debug, Serialize, Deserialize)]
+</span><span class="kw">pub struct </span>ChannelDummyDeposit {
     <span class="kw">pub </span>channel: Channel,
     <span class="kw">pub </span>deposit: Deposit&lt;UnifiedNum&gt;,
 }
@@ -1908,6 +2089,73 @@
     <span class="prelude-val">Ok</span>(Json(SuccessResponse { success: <span class="bool-val">true </span>}))
 }
 
+<span class="doccomment">/// GET `/v5/channel/0xXXX.../get-leaf` requests
+///
+/// # Routes:
+///
+/// - GET `/v5/channel/:id/get-leaf/spender/:addr`
+/// - GET `/v5/channel/:id/get-leaf/earner/:addr`
+///
+/// Response: [`GetLeafResponse`]
+</span><span class="kw">pub async fn </span>get_leaf&lt;C: Locked + <span class="lifetime">&#39;static</span>&gt;(
+    Extension(app): Extension&lt;Arc&lt;Application&lt;C&gt;&gt;&gt;,
+    Extension(channel_context): Extension&lt;ChainOf&lt;Channel&gt;&gt;,
+    Extension(leaf_for): Extension&lt;LeafFor&gt;,
+    Path(params): Path&lt;(ChannelId, Address)&gt;,
+) -&gt; <span class="prelude-ty">Result</span>&lt;Json&lt;GetLeafResponse&gt;, ResponseError&gt; {
+    <span class="kw">let </span>channel = channel_context.context;
+
+    <span class="kw">let </span>approve_state = latest_approve_state(<span class="kw-2">&amp;</span>app.pool, <span class="kw-2">&amp;</span>channel)
+        .<span class="kw">await</span><span class="question-mark">?
+        </span>.ok_or(ResponseError::NotFound)<span class="question-mark">?</span>;
+
+    <span class="kw">let </span>state_root = approve_state.msg.state_root.clone();
+
+    <span class="kw">let </span>new_state = latest_new_state(<span class="kw-2">&amp;</span>app.pool, <span class="kw-2">&amp;</span>channel, <span class="kw-2">&amp;</span>state_root)
+        .<span class="kw">await</span><span class="question-mark">?
+        </span>.ok_or_else(|| ResponseError::BadRequest(<span class="string">&quot;No NewState message for spender&quot;</span>.to_string()))<span class="question-mark">?</span>;
+
+    <span class="kw">let </span>addr = params.<span class="number">1</span>;
+
+    <span class="kw">let </span>element = <span class="kw">match </span>leaf_for {
+        LeafFor::Spender =&gt; {
+            <span class="kw">let </span>amount = new_state
+                .msg
+                .balances
+                .spenders
+                .get(<span class="kw-2">&amp;</span>addr)
+                .ok_or(ResponseError::NotFound)<span class="question-mark">?</span>;
+
+            get_balance_leaf(
+                <span class="bool-val">true</span>,
+                <span class="kw-2">&amp;</span>addr,
+                <span class="kw-2">&amp;</span>amount.to_precision(channel_context.token.precision.get()),
+            )<span class="question-mark">?
+        </span>}
+        LeafFor::Earner =&gt; {
+            <span class="kw">let </span>amount = new_state
+                .msg
+                .balances
+                .earners
+                .get(<span class="kw-2">&amp;</span>addr)
+                .ok_or(ResponseError::NotFound)<span class="question-mark">?</span>;
+
+            get_balance_leaf(
+                <span class="bool-val">false</span>,
+                <span class="kw-2">&amp;</span>addr,
+                <span class="kw-2">&amp;</span>amount.to_precision(channel_context.token.precision.get()),
+            )<span class="question-mark">?
+        </span>}
+    };
+    <span class="kw">let </span>merkle_tree = MerkleTree::new(<span class="kw-2">&amp;</span>[element])<span class="question-mark">?</span>;
+
+    <span class="kw">let </span>signable_state_root = get_signable_state_root(channel.id().as_bytes(), <span class="kw-2">&amp;</span>merkle_tree.root());
+
+    <span class="kw">let </span>merkle_proof = hex::encode(signable_state_root);
+
+    <span class="prelude-val">Ok</span>(Json(GetLeafResponse { merkle_proof }))
+}
+
 <span class="doccomment">/// POST `/v5/channel/dummy-deposit` request
 ///
 /// Full details about the route&#39;s API and intend can be found in the [`routes`](crate::routes#post-v5channeldummy-deposit-auth-required) module
@@ -1974,16 +2222,16 @@
         Application, Auth,
     };
 
-    <span class="attribute">#[derive(Debug, Deserialize)]</span>
-    <span class="kw">pub struct </span>MessagesListParams {
+    <span class="attribute">#[derive(Debug, Deserialize)]
+    </span><span class="kw">pub struct </span>MessagesListParams {
         <span class="kw">pub </span>id: ChannelId,
         <span class="comment">// Optional filtering by ValidatorId
-        </span><span class="attribute">#[serde(default)]</span>
-        <span class="kw">pub </span>address: <span class="prelude-ty">Option</span>&lt;ValidatorId&gt;,
+        </span><span class="attribute">#[serde(default)]
+        </span><span class="kw">pub </span>address: <span class="prelude-ty">Option</span>&lt;ValidatorId&gt;,
         <span class="doccomment">/// List of validator message types separated by `+` (urlencoded):
         /// e.g. `ApproveState+NewState`
-        </span><span class="attribute">#[serde(default)]</span>
-        <span class="kw">pub </span>message_types: String,
+        </span><span class="attribute">#[serde(default)]
+        </span><span class="kw">pub </span>message_types: String,
     }
 
     <span class="doccomment">/// GET `/v5/channel/0xXXX.../validator-messages`
@@ -2053,8 +2301,8 @@
     /// Request:
     ///
     /// ```
-    </span><span class="attribute">#[doc = <span class="macro">include_str!</span>(<span class="string">&quot;../../../primitives/examples/validator_messages_create_request.rs&quot;</span>)]</span>
-    <span class="doccomment">/// ```
+    </span><span class="attribute">#[doc = <span class="macro">include_str!</span>(<span class="string">&quot;../../../primitives/examples/validator_messages_create_request.rs&quot;</span>)]
+    </span><span class="doccomment">/// ```
     </span><span class="kw">pub async fn </span>create_validator_messages&lt;C: Locked + <span class="lifetime">&#39;static</span>&gt;(
         Extension(app): Extension&lt;Arc&lt;Application&lt;C&gt;&gt;&gt;,
         Extension(auth): Extension&lt;Auth&gt;,
@@ -2077,31 +2325,35 @@
     }
 }
 
-<span class="attribute">#[cfg(test)]</span>
-<span class="kw">mod </span>test {
-    <span class="kw">use </span>std::str::FromStr;
-
+<span class="attribute">#[cfg(test)]
+</span><span class="kw">mod </span>test {
+    <span class="kw">use super</span>::<span class="kw-2">*</span>;
+    <span class="kw">use crate</span>::{
+        db::{
+            insert_campaign, insert_channel, validator_message::insert_validator_message,
+            CampaignRemaining,
+        },
+        test_util::setup_dummy_app,
+    };
     <span class="kw">use </span>adapter::{
         ethereum::test_util::{GANACHE_INFO_1, GANACHE_INFO_1337},
+        prelude::Unlocked,
         primitives::Deposit <span class="kw">as </span>AdapterDeposit,
     };
     <span class="kw">use </span>primitives::{
+        balances::UncheckedState,
         channel::Nonce,
         test_util::{
             ADVERTISER, CREATOR, DUMMY_CAMPAIGN, FOLLOWER, GUARDIAN, IDS, LEADER, LEADER_2,
             PUBLISHER, PUBLISHER_2,
         },
+        validator::{ApproveState, MessageTypes, NewState},
         BigNum, ChainId, Deposit, UnifiedMap, ValidatorId,
     };
+    <span class="kw">use </span>std::str::FromStr;
 
-    <span class="kw">use super</span>::<span class="kw-2">*</span>;
-    <span class="kw">use crate</span>::{
-        db::{insert_campaign, insert_channel, CampaignRemaining},
-        test_util::setup_dummy_app,
-    };
-
-    <span class="attribute">#[tokio::test]</span>
-    <span class="kw">async fn </span>create_and_fetch_spendable() {
+    <span class="attribute">#[tokio::test]
+    </span><span class="kw">async fn </span>create_and_fetch_spendable() {
         <span class="kw">let </span>app = setup_dummy_app().<span class="kw">await</span>;
 
         <span class="kw">let </span>(channel_context, channel) = {
@@ -2173,8 +2425,8 @@
         <span class="macro">assert_eq!</span>(updated_spendable.spender, <span class="kw-2">*</span>CREATOR);
     }
 
-    <span class="attribute">#[tokio::test]</span>
-    <span class="kw">async fn </span>get_accountings_for_channel() {
+    <span class="attribute">#[tokio::test]
+    </span><span class="kw">async fn </span>get_accountings_for_channel() {
         <span class="kw">let </span>app_guard = setup_dummy_app().<span class="kw">await</span>;
 
         <span class="kw">let </span>app = Extension(Arc::new(app_guard.app.clone()));
@@ -2280,8 +2532,8 @@
         }
     }
 
-    <span class="attribute">#[tokio::test]</span>
-    <span class="kw">async fn </span>adds_and_retrieves_spender_leaf() {
+    <span class="attribute">#[tokio::test]
+    </span><span class="kw">async fn </span>adds_and_retrieves_spender_leaf() {
         <span class="kw">let </span>app_guard = setup_dummy_app().<span class="kw">await</span>;
 
         <span class="kw">let </span>app = Extension(Arc::new(app_guard.app.clone()));
@@ -2365,8 +2617,8 @@
         );
     }
 
-    <span class="attribute">#[tokio::test]</span>
-    <span class="kw">async fn </span>get_channels_list() {
+    <span class="attribute">#[tokio::test]
+    </span><span class="kw">async fn </span>get_channels_list() {
         <span class="kw">let </span><span class="kw-2">mut </span>app_guard = setup_dummy_app().<span class="kw">await</span>;
         app_guard.config.channels_find_limit = <span class="number">2</span>;
 
@@ -2582,8 +2834,8 @@
         }
     }
 
-    <span class="attribute">#[tokio::test]</span>
-    <span class="kw">async fn </span>payouts_for_earners_test() {
+    <span class="attribute">#[tokio::test]
+    </span><span class="kw">async fn </span>payouts_for_earners_test() {
         <span class="kw">let </span>app_guard = setup_dummy_app().<span class="kw">await</span>;
         <span class="kw">let </span>app = Extension(Arc::new(app_guard.app.clone()));
 
@@ -2817,6 +3069,104 @@
             </span>);
         }
     }
+
+    <span class="attribute">#[tokio::test]
+    </span><span class="kw">async fn </span>get_spender_and_earner_leafs() {
+        <span class="kw">let </span><span class="kw-2">mut </span>balances: Balances&lt;CheckedState&gt; = Balances::new();
+        balances
+            .spend(<span class="kw-2">*</span>ADVERTISER, <span class="kw-2">*</span>PUBLISHER, UnifiedNum::from_u64(<span class="number">1000</span>))
+            .expect(<span class="string">&quot;should spend&quot;</span>);
+        balances
+            .spend(<span class="kw-2">*</span>ADVERTISER, <span class="kw-2">*</span>PUBLISHER_2, UnifiedNum::from_u64(<span class="number">1000</span>))
+            .expect(<span class="string">&quot;should spend&quot;</span>);
+        balances
+            .spend(<span class="kw-2">*</span>CREATOR, <span class="kw-2">*</span>PUBLISHER, UnifiedNum::from_u64(<span class="number">1000</span>))
+            .expect(<span class="string">&quot;should spend&quot;</span>);
+        balances
+            .spend(<span class="kw-2">*</span>CREATOR, <span class="kw-2">*</span>PUBLISHER_2, UnifiedNum::from_u64(<span class="number">1000</span>))
+            .expect(<span class="string">&quot;should spend&quot;</span>);
+
+        <span class="kw">let </span>app_guard = setup_dummy_app().<span class="kw">await</span>;
+        <span class="kw">let </span>app = Extension(Arc::new(app_guard.app.clone()));
+
+        <span class="kw">let </span>channel_context = Extension(
+            app.config
+                .find_chain_of(DUMMY_CAMPAIGN.channel.token)
+                .expect(<span class="string">&quot;Dummy channel Token should be present in config!&quot;</span>)
+                .with(DUMMY_CAMPAIGN.channel),
+        );
+        <span class="kw">let </span>channel = channel_context.context;
+
+        insert_channel(<span class="kw-2">&amp;</span>app.pool, <span class="kw-2">&amp;</span>channel_context)
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;should insert channel&quot;</span>);
+
+        <span class="comment">// Setting up the validator messages
+        </span><span class="kw">let </span>state_root =
+            <span class="string">&quot;b1a4fc6c1a1e1ab908a487e504006edcebea297f61b4b8ce6cad3b29e29454cc&quot;</span>.to_string();
+        <span class="kw">let </span>signature = app
+            .adapter
+            .clone()
+            .unlock()
+            .expect(<span class="string">&quot;should unlock&quot;</span>)
+            .sign(<span class="kw-2">&amp;</span>state_root.clone())
+            .expect(<span class="string">&quot;should sign&quot;</span>);
+        <span class="kw">let </span>new_state: NewState&lt;UncheckedState&gt; = NewState {
+            state_root: state_root.clone(),
+            signature: signature.clone(),
+            balances: balances.into_unchecked(),
+        };
+        <span class="kw">let </span>approve_state = ApproveState {
+            state_root,
+            signature,
+            is_healthy: <span class="bool-val">true</span>,
+        };
+
+        insert_validator_message(
+            <span class="kw-2">&amp;</span>app.pool,
+            <span class="kw-2">&amp;</span>channel,
+            <span class="kw-2">&amp;</span>channel.leader,
+            <span class="kw-2">&amp;</span>MessageTypes::NewState(new_state),
+        )
+        .<span class="kw">await
+        </span>.expect(<span class="string">&quot;Should insert NewState msg&quot;</span>);
+        insert_validator_message(
+            <span class="kw-2">&amp;</span>app.pool,
+            <span class="kw-2">&amp;</span>channel,
+            <span class="kw-2">&amp;</span>channel.follower,
+            <span class="kw-2">&amp;</span>MessageTypes::ApproveState(approve_state),
+        )
+        .<span class="kw">await
+        </span>.expect(<span class="string">&quot;Should insert NewState msg&quot;</span>);
+
+        <span class="comment">// hardcoded proofs
+        </span><span class="kw">let </span>spender_proof =
+            <span class="string">&quot;8ea7760ca2dbbe00673372afbf8b05048717ce8a305f1f853afac8c244182e0c&quot;</span>.to_string();
+        <span class="kw">let </span>earner_proof =
+            <span class="string">&quot;dc94141cb41550df047ba3a965ce36d98eb6098eb952ca3cb6fd9682e5810b51&quot;</span>.to_string();
+
+        <span class="comment">// call functions
+        </span><span class="kw">let </span>spender_leaf = get_leaf(
+            app.clone(),
+            channel_context.clone(),
+            Extension(LeafFor::Spender),
+            Path((channel.id(), <span class="kw-2">*</span>ADVERTISER)),
+        )
+        .<span class="kw">await
+        </span>.expect(<span class="string">&quot;should get spender leaf&quot;</span>);
+        <span class="kw">let </span>earner_leaf = get_leaf(
+            app.clone(),
+            channel_context.clone(),
+            Extension(LeafFor::Earner),
+            Path((channel.id(), <span class="kw-2">*</span>PUBLISHER)),
+        )
+        .<span class="kw">await
+        </span>.expect(<span class="string">&quot;should get earner leaf&quot;</span>);
+
+        <span class="comment">// compare results
+        </span><span class="macro">assert_eq!</span>(spender_proof, spender_leaf.merkle_proof);
+        <span class="macro">assert_eq!</span>(earner_proof, earner_leaf.merkle_proof);
+    }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (02654a084 2022-08-30)" ></div></body></html>

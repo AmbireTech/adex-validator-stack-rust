@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `primitives/src/validator.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>validator.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../primitives/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div></a><h2 class="location"></h2></nav><nav class="sidebar"><a class="sidebar-logo" href="../../primitives/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div></a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../primitives/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `primitives/src/validator.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>validator.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../primitives/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div></a><h2 class="location"></h2></nav><nav class="sidebar"><a class="sidebar-logo" href="../../primitives/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div></a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../primitives/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -472,12 +472,12 @@
     Address, DomainError, ToETHChecksum, ToHex, UnifiedNum,
 };
 
-<span class="attribute">#[doc(inline)]</span>
-<span class="kw">pub use </span>messages::<span class="kw-2">*</span>;
+<span class="attribute">#[doc(inline)]
+</span><span class="kw">pub use </span>messages::<span class="kw-2">*</span>;
 
-<span class="attribute">#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]</span>
-<span class="attribute">#[serde(transparent)]</span>
-<span class="kw">pub struct </span>ValidatorId(Address);
+<span class="attribute">#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[serde(transparent)]
+</span><span class="kw">pub struct </span>ValidatorId(Address);
 
 <span class="kw">impl </span>fmt::Debug <span class="kw">for </span>ValidatorId {
     <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; fmt::Result {
@@ -574,9 +574,9 @@
     }
 }
 
-<span class="attribute">#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]</span>
-<span class="attribute">#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]</span>
-<span class="doccomment">/// A Validator description which includes the identity, fee (pro milles) and the Sentry URL.
+<span class="attribute">#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
+#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]
+</span><span class="doccomment">/// A Validator description which includes the identity, fee (pro milles) and the Sentry URL.
 </span><span class="kw">pub struct </span>ValidatorDesc {
     <span class="kw">pub </span>id: ValidatorId,
     <span class="doccomment">/// The validator fee in pro milles (per 1000)
@@ -585,8 +585,8 @@
     ///
     /// payout * fee / 1000 = event fee payout
     </span><span class="kw">pub </span>fee: UnifiedNum,
-    <span class="attribute">#[serde(default, skip_serializing_if = <span class="string">&quot;Option::is_none&quot;</span>)]</span>
-    <span class="doccomment">/// The address which will receive the fees
+    <span class="attribute">#[serde(default, skip_serializing_if = <span class="string">&quot;Option::is_none&quot;</span>)]
+    </span><span class="doccomment">/// The address which will receive the fees
     </span><span class="kw">pub </span>fee_addr: <span class="prelude-ty">Option</span>&lt;Address&gt;,
     <span class="doccomment">/// The url of the Validator where Sentry API is running
     </span><span class="kw">pub </span>url: String,
@@ -599,8 +599,8 @@
     }
 }
 
-<span class="attribute">#[derive(Debug, PartialEq, Eq, Clone)]</span>
-<span class="kw">pub enum </span>Validator&lt;T&gt; {
+<span class="attribute">#[derive(Debug, PartialEq, Eq, Clone)]
+</span><span class="kw">pub enum </span>Validator&lt;T&gt; {
     Leader(T),
     Follower(T),
 }
@@ -632,12 +632,12 @@
     <span class="kw">use </span>chrono::{DateTime, Utc};
     <span class="kw">use </span>serde::{Deserialize, Serialize};
 
-    <span class="attribute">#[derive(Error, Debug)]</span>
-    <span class="kw">pub enum </span>MessageError&lt;T: Type&gt; {
-        <span class="attribute">#[error(transparent)]</span>
-        Balances(<span class="attribute">#[from]</span> <span class="kw">crate</span>::balances::Error),
-        <span class="attribute">#[error(<span class="string">&quot;Expected {} message type but the actual is {actual}&quot;</span>, type_name::&lt;T&gt;(), )]</span>
-        Type {
+    <span class="attribute">#[derive(Error, Debug)]
+    </span><span class="kw">pub enum </span>MessageError&lt;T: Type&gt; {
+        <span class="attribute">#[error(transparent)]
+        </span>Balances(<span class="attribute">#[from] </span><span class="kw">crate</span>::balances::Error),
+        <span class="attribute">#[error(<span class="string">&quot;Expected {} message type but the actual is {actual}&quot;</span>, type_name::&lt;T&gt;(), )]
+        </span>Type {
             expected: PhantomData&lt;T&gt;,
             actual: String,
         },
@@ -773,9 +773,9 @@
 
     <span class="doccomment">/// Generated by the follower when a [`NewState`]
     /// is generated by the leader and the state is signable and correct.
-    </span><span class="attribute">#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]</span>
-    <span class="attribute">#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]</span>
-    <span class="kw">pub struct </span>ApproveState {
+    </span><span class="attribute">#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+    #[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]
+    </span><span class="kw">pub struct </span>ApproveState {
         <span class="kw">pub </span>state_root: String,
         <span class="kw">pub </span>signature: String,
         <span class="kw">pub </span>is_healthy: bool,
@@ -783,13 +783,13 @@
 
     <span class="doccomment">/// Generated by the [`Channel.leader`](crate::Channel::leader)
     /// on changed balances for the [`Channel`](crate::Channel).
-    </span><span class="attribute">#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]</span>
-    <span class="attribute">#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]</span>
-    <span class="kw">pub struct </span>NewState&lt;S: BalancesState&gt; {
+    </span><span class="attribute">#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+    #[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]
+    </span><span class="kw">pub struct </span>NewState&lt;S: BalancesState&gt; {
         <span class="kw">pub </span>state_root: String,
         <span class="kw">pub </span>signature: String,
-        <span class="attribute">#[serde(flatten, bound = <span class="string">&quot;S: BalancesState&quot;</span>)]</span>
-        <span class="kw">pub </span>balances: Balances&lt;S&gt;,
+        <span class="attribute">#[serde(flatten, bound = <span class="string">&quot;S: BalancesState&quot;</span>)]
+        </span><span class="kw">pub </span>balances: Balances&lt;S&gt;,
     }
 
     <span class="kw">impl </span>NewState&lt;UncheckedState&gt; {
@@ -814,14 +814,14 @@
     /// [`Channel.follower`]: crate::Channel::follower
     /// [`Channel.leader`]: crate::Channel::leader
     /// [`Config.health_unsignable_promilles`]: crate::Config::health_unsignable_promilles
-    </span><span class="attribute">#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]</span>
-    <span class="attribute">#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]</span>
-    <span class="kw">pub struct </span>RejectState&lt;S: BalancesState&gt; {
+    </span><span class="attribute">#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+    #[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]
+    </span><span class="kw">pub struct </span>RejectState&lt;S: BalancesState&gt; {
         <span class="kw">pub </span>reason: String,
         <span class="kw">pub </span>state_root: String,
         <span class="kw">pub </span>signature: String,
-        <span class="attribute">#[serde(flatten, bound = <span class="string">&quot;S: BalancesState&quot;</span>)]</span>
-        <span class="kw">pub </span>balances: <span class="prelude-ty">Option</span>&lt;Balances&lt;S&gt;&gt;,
+        <span class="attribute">#[serde(flatten, bound = <span class="string">&quot;S: BalancesState&quot;</span>)]
+        </span><span class="kw">pub </span>balances: <span class="prelude-ty">Option</span>&lt;Balances&lt;S&gt;&gt;,
         <span class="doccomment">/// The timestamp when the [`NewState`] was rejected.
         </span><span class="kw">pub </span>timestamp: DateTime&lt;Utc&gt;,
     }
@@ -833,9 +833,9 @@
     ///
     /// [`Channel`]: crate::Channel
     /// [`Config.heartbeat_time`]: crate::Config::heartbeat_time
-    </span><span class="attribute">#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]</span>
-    <span class="attribute">#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]</span>
-    <span class="kw">pub struct </span>Heartbeat {
+    </span><span class="attribute">#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+    #[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]
+    </span><span class="kw">pub struct </span>Heartbeat {
         <span class="kw">pub </span>signature: String,
         <span class="kw">pub </span>state_root: String,
         <span class="kw">pub </span>timestamp: DateTime&lt;Utc&gt;,
@@ -852,17 +852,17 @@
     }
 
     <span class="doccomment">/// The message types used by validator.
-    </span><span class="attribute">#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]</span>
-    <span class="attribute">#[serde(tag = <span class="string">&quot;type&quot;</span>)]</span>
-    <span class="kw">pub enum </span>MessageTypes {
+    </span><span class="attribute">#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+    #[serde(tag = <span class="string">&quot;type&quot;</span>)]
+    </span><span class="kw">pub enum </span>MessageTypes {
         ApproveState(ApproveState),
         NewState(NewState&lt;UncheckedState&gt;),
         RejectState(RejectState&lt;UncheckedState&gt;),
         Heartbeat(Heartbeat),
     }
 }
-<span class="attribute">#[cfg(feature = <span class="string">&quot;postgres&quot;</span>)]</span>
-<span class="kw">mod </span>postgres {
+<span class="attribute">#[cfg(feature = <span class="string">&quot;postgres&quot;</span>)]
+</span><span class="kw">mod </span>postgres {
     <span class="kw">use </span><span class="kw">super</span>::ValidatorId;
     <span class="kw">use </span><span class="kw">crate</span>::ToETHChecksum;
     <span class="kw">use </span>bytes::BytesMut;
@@ -909,12 +909,12 @@
     }
 }
 
-<span class="attribute">#[cfg(test)]</span>
-<span class="kw">mod </span>test {
+<span class="attribute">#[cfg(test)]
+</span><span class="kw">mod </span>test {
     <span class="kw">use super</span>::<span class="kw-2">*</span>;
 
-    <span class="attribute">#[test]</span>
-    <span class="kw">fn </span>validator_id_is_checksummed_when_serialized() {
+    <span class="attribute">#[test]
+    </span><span class="kw">fn </span>validator_id_is_checksummed_when_serialized() {
         <span class="kw">let </span>validator_id_checksum_str = <span class="string">&quot;0xce07CbB7e054514D590a0262C93070D838bFBA2e&quot;</span>;
 
         <span class="kw">let </span>validator_id =
@@ -925,4 +925,4 @@
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="primitives" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="primitives" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (02654a084 2022-08-30)" ></div></body></html>

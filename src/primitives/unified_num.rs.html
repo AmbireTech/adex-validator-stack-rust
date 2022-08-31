@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `primitives/src/unified_num.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>unified_num.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../primitives/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div></a><h2 class="location"></h2></nav><nav class="sidebar"><a class="sidebar-logo" href="../../primitives/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div></a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../primitives/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `primitives/src/unified_num.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>unified_num.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../primitives/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div></a><h2 class="location"></h2></nav><nav class="sidebar"><a class="sidebar-logo" href="../../primitives/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div></a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../primitives/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -1097,14 +1097,14 @@
         }
     }
 
-    <span class="attribute">#[cfg(test)]</span>
-    <span class="kw">mod </span>test {
+    <span class="attribute">#[cfg(test)]
+    </span><span class="kw">mod </span>test {
         <span class="kw">use </span><span class="kw">crate</span>::UnifiedNum;
 
         <span class="kw">use </span><span class="kw">super</span>::FromWhole;
 
-        <span class="attribute">#[test]</span>
-        <span class="kw">fn </span>test_whole_number_impl_for_f64() {
+        <span class="attribute">#[test]
+        </span><span class="kw">fn </span>test_whole_number_impl_for_f64() {
             <span class="macro">assert_eq!</span>(
                 UnifiedNum::from(<span class="number">800_000_000_u64</span>),
                 UnifiedNum::from_whole(<span class="number">8.0_f64</span>)
@@ -1184,9 +1184,9 @@
     Serialize,
     Deserialize,
     Hash,
-)]</span>
-<span class="attribute">#[serde(into = <span class="string">&quot;String&quot;</span>, try_from = <span class="string">&quot;String&quot;</span>)]</span>
-<span class="kw">pub struct </span>UnifiedNum(u64);
+)]
+#[serde(into = <span class="string">&quot;String&quot;</span>, try_from = <span class="string">&quot;String&quot;</span>)]
+</span><span class="kw">pub struct </span>UnifiedNum(u64);
 
 <span class="kw">impl </span>From&lt;UnifiedNum&gt; <span class="kw">for </span>String {
     <span class="kw">fn </span>from(unified_num: UnifiedNum) -&gt; <span class="self">Self </span>{
@@ -1458,8 +1458,8 @@
 <span class="kw">impl </span>Div&lt;<span class="kw-2">&amp;</span>UnifiedNum&gt; <span class="kw">for </span>UnifiedNum {
     <span class="kw">type </span>Output = UnifiedNum;
 
-    <span class="attribute">#[allow(clippy::op_ref)]</span>
-    <span class="kw">fn </span>div(<span class="self">self</span>, rhs: <span class="kw-2">&amp;</span>UnifiedNum) -&gt; <span class="self">Self</span>::Output {
+    <span class="attribute">#[allow(clippy::op_ref)]
+    </span><span class="kw">fn </span>div(<span class="self">self</span>, rhs: <span class="kw-2">&amp;</span>UnifiedNum) -&gt; <span class="self">Self</span>::Output {
         <span class="comment">// use &amp;UnifiedNum / &amp;UnifiedNum
         </span><span class="kw-2">&amp;</span><span class="self">self </span>/ rhs
     }
@@ -1488,8 +1488,8 @@
 <span class="kw">impl </span>Mul&lt;<span class="kw-2">&amp;</span>UnifiedNum&gt; <span class="kw">for </span>UnifiedNum {
     <span class="kw">type </span>Output = UnifiedNum;
 
-    <span class="attribute">#[allow(clippy::op_ref)]</span>
-    <span class="kw">fn </span>mul(<span class="self">self</span>, rhs: <span class="kw-2">&amp;</span>UnifiedNum) -&gt; <span class="self">Self</span>::Output {
+    <span class="attribute">#[allow(clippy::op_ref)]
+    </span><span class="kw">fn </span>mul(<span class="self">self</span>, rhs: <span class="kw-2">&amp;</span>UnifiedNum) -&gt; <span class="self">Self</span>::Output {
         <span class="comment">// Use &amp;UnifiedNum * &amp;UnifiedNum
         </span><span class="kw-2">&amp;</span><span class="self">self </span>* rhs
     }
@@ -1579,13 +1579,13 @@
     Ratio::new(lhs.<span class="number">0</span>, rhs.<span class="number">0</span>).checked_mul(<span class="kw-2">&amp;</span>Ratio::new(UnifiedNum::MULTIPLIER, <span class="number">1</span>))
 }
 
-<span class="attribute">#[cfg(test)]</span>
-<span class="kw">mod </span>test {
+<span class="attribute">#[cfg(test)]
+</span><span class="kw">mod </span>test {
     <span class="kw">use super</span>::<span class="kw-2">*</span>;
     <span class="kw">use </span>num::Zero;
 
-    <span class="attribute">#[test]</span>
-    <span class="kw">fn </span>unified_num_sum() {
+    <span class="attribute">#[test]
+    </span><span class="kw">fn </span>unified_num_sum() {
         <span class="kw">let </span>num_max = UnifiedNum(u64::MAX);
         <span class="kw">let </span>num_1 = UnifiedNum(<span class="number">1</span>);
         <span class="kw">let </span>num_5 = UnifiedNum(<span class="number">5</span>);
@@ -1597,8 +1597,8 @@
         <span class="macro">assert_eq!</span>(<span class="prelude-val">None</span>, overflow_sum);
     }
 
-    <span class="attribute">#[test]</span>
-    <span class="kw">fn </span>test_unified_num_div_to_u64_ratio() {
+    <span class="attribute">#[test]
+    </span><span class="kw">fn </span>test_unified_num_div_to_u64_ratio() {
         <span class="kw">let </span>one = UnifiedNum::one();
         <span class="kw">let </span>two = one + one;
         <span class="kw">let </span>twenty = UnifiedNum::from_whole(<span class="number">20</span>);
@@ -1724,8 +1724,8 @@
         }
     }
 
-    <span class="attribute">#[test]</span>
-    <span class="kw">fn </span>test_unified_num_displays_debug_and_de_serializes_correctly() {
+    <span class="attribute">#[test]
+    </span><span class="kw">fn </span>test_unified_num_displays_debug_and_de_serializes_correctly() {
         <span class="kw">let </span>zero = UnifiedNum::zero();
         <span class="kw">let </span>one = {
             <span class="kw">let </span>manual_one = UnifiedNum::from(<span class="number">100_000_000</span>);
@@ -1755,8 +1755,8 @@
         )
     }
 
-    <span class="attribute">#[test]</span>
-    <span class="kw">fn </span>test_unified_num_convert_to_new_precision_and_from_precision() {
+    <span class="attribute">#[test]
+    </span><span class="kw">fn </span>test_unified_num_convert_to_new_precision_and_from_precision() {
         <span class="kw">let </span>dai_precision: u8 = <span class="number">18</span>;
         <span class="kw">let </span>usdt_precision: u8 = <span class="number">6</span>;
         <span class="kw">let </span>same_precision = UnifiedNum::PRECISION;
@@ -1806,8 +1806,8 @@
         </span>);
     }
 
-    <span class="attribute">#[test]</span>
-    <span class="kw">fn </span>test_unified_num_mul_and_div_and_div_floor() {
+    <span class="attribute">#[test]
+    </span><span class="kw">fn </span>test_unified_num_mul_and_div_and_div_floor() {
         <span class="comment">// 0.0003
         </span><span class="kw">let </span>three_ten_thousands = UnifiedNum::from(<span class="number">30_000_u64</span>);
         <span class="comment">// 0.1
@@ -1913,8 +1913,8 @@
         }
     }
 
-    <span class="attribute">#[test]</span>
-    <span class="kw">fn </span>test_unified_num_rem_and_checked_rem_and_with_whole() {
+    <span class="attribute">#[test]
+    </span><span class="kw">fn </span>test_unified_num_rem_and_checked_rem_and_with_whole() {
         <span class="comment">// 10.0 % 3.0 = 1.0
         </span>{
             <span class="macro">assert_eq!</span>(
@@ -1997,8 +1997,8 @@
     }
 }
 
-<span class="attribute">#[cfg(feature = <span class="string">&quot;postgres&quot;</span>)]</span>
-<span class="kw">mod </span>postgres {
+<span class="attribute">#[cfg(feature = <span class="string">&quot;postgres&quot;</span>)]
+</span><span class="kw">mod </span>postgres {
     <span class="kw">use </span><span class="kw">super</span>::UnifiedNum;
     <span class="kw">use </span>bytes::BytesMut;
     <span class="kw">use </span>std::error::Error;
@@ -2028,13 +2028,13 @@
         <span class="macro">to_sql_checked!</span>();
     }
 
-    <span class="attribute">#[cfg(test)]</span>
-    <span class="kw">mod </span>test {
+    <span class="attribute">#[cfg(test)]
+    </span><span class="kw">mod </span>test {
         <span class="kw">use super</span>::<span class="kw-2">*</span>;
         <span class="kw">use </span><span class="kw">crate</span>::postgres::POSTGRES_POOL;
 
-        <span class="attribute">#[tokio::test]</span>
-        <span class="kw">async fn </span>from_and_to_sql() {
+        <span class="attribute">#[tokio::test]
+        </span><span class="kw">async fn </span>from_and_to_sql() {
             <span class="kw">let </span>client = POSTGRES_POOL.get().<span class="kw">await</span>.unwrap();
 
             <span class="kw">let </span>sql_type = <span class="string">&quot;BIGINT&quot;</span>;
@@ -2067,4 +2067,4 @@
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="primitives" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="primitives" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (02654a084 2022-08-30)" ></div></body></html>

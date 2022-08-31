@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `sentry/src/routes.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>routes.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../sentry/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div></a><h2 class="location"></h2></nav><nav class="sidebar"><a class="sidebar-logo" href="../../sentry/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div></a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../sentry/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `sentry/src/routes.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>routes.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../sentry/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div></a><h2 class="location"></h2></nav><nav class="sidebar"><a class="sidebar-logo" href="../../sentry/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div></a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../sentry/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -510,8 +510,19 @@
 <span id="510">510</span>
 <span id="511">511</span>
 <span id="512">512</span>
+<span id="513">513</span>
+<span id="514">514</span>
+<span id="515">515</span>
+<span id="516">516</span>
+<span id="517">517</span>
+<span id="518">518</span>
+<span id="519">519</span>
+<span id="520">520</span>
+<span id="521">521</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Sentry REST API documentation
 //!
+//! This module includes the documentation for all routes of the `Sentry`
+//! REST API and the corresponding requests, responses and parameters.
 //!
 //! All routes are listed below. Here is an overview and links to all of them:
 //! - [Channel](#channel) routes
@@ -566,8 +577,8 @@
 //! Query:
 //!
 //! ```
-</span><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/channel_list_query.rs&quot;</span>)]</span>
-<span class="doccomment">//! ```
+</span><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/channel_list_query.rs&quot;</span>)]
+</span><span class="doccomment">//! ```
 //!
 //! #### GET `/v5/channel/:id/accounting`
 //!
@@ -582,8 +593,8 @@
 //! Response:
 //!
 //! ```
-</span><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/accounting_response.rs&quot;</span>)]</span>
-<span class="doccomment">//! ```
+</span><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/accounting_response.rs&quot;</span>)]
+</span><span class="doccomment">//! ```
 //!
 //! #### GET `/v5/channel/:id/spender/:addr` (auth required)
 //!
@@ -601,8 +612,8 @@
 //! Response:
 //!
 //! ```
-</span><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/spender_response.rs&quot;</span>)]</span>
-<span class="doccomment">//! ```
+</span><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/spender_response.rs&quot;</span>)]
+</span><span class="doccomment">//! ```
 //!
 //! #### POST `/v5/channel/:id/spender/:addr` (auth required)
 //!
@@ -627,8 +638,8 @@
 //! Response:
 //!
 //! ```
-</span><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/all_spenders_response.rs&quot;</span>)]</span>
-<span class="doccomment">//! ```
+</span><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/all_spenders_response.rs&quot;</span>)]
+</span><span class="doccomment">//! ```
 //!
 //! #### GET `/v5/channel/:id/validator-messages`
 //!
@@ -658,14 +669,14 @@
 //! Query:
 //!
 //! ```
-</span><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/validator_messages_list_query.rs&quot;</span>)]</span>
-<span class="doccomment">//! ```
+</span><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/validator_messages_list_query.rs&quot;</span>)]
+</span><span class="doccomment">//! ```
 //!
 //! Response:
 //!
 //! ```
-</span><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/validator_messages_list_response.rs&quot;</span>)]</span>
-<span class="doccomment">//! ```
+</span><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/validator_messages_list_response.rs&quot;</span>)]
+</span><span class="doccomment">//! ```
 //!
 //! #### POST `/v5/channel/:id/validator-messages` (auth required)
 //!
@@ -686,8 +697,8 @@
 //! Request:
 //!
 //! ```
-</span><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/validator_messages_create_request.rs&quot;</span>)]</span>
-<span class="doccomment">//! ```
+</span><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/validator_messages_create_request.rs&quot;</span>)]
+</span><span class="doccomment">//! ```
 //!
 //! #### GET `/v5/channel/:id/last-approved`
 //!
@@ -716,14 +727,14 @@
 //! Query:
 //!
 //! ```
-</span><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/channel_last_approved_query.rs&quot;</span>)]</span>
-<span class="doccomment">//! ```
+</span><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/channel_last_approved_query.rs&quot;</span>)]
+</span><span class="doccomment">//! ```
 //!
 //! Response:
 //!
 //! ```
-</span><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/channel_last_approved_response.rs&quot;</span>)]</span>
-<span class="doccomment">//! ```
+</span><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/channel_last_approved_response.rs&quot;</span>)]
+</span><span class="doccomment">//! ```
 //!
 //! #### POST `/v5/channel/:id/pay` (auth required)
 //!
@@ -745,32 +756,39 @@
 //! Request (json):
 //!
 //! ```
-</span><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/channel_pay_request.rs&quot;</span>)]</span>
-<span class="doccomment">//! ```
+</span><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/channel_pay_request.rs&quot;</span>)]
+</span><span class="doccomment">//! ```
 //!
-//!
-//! #### GET `/v5/channel/:id/get-leaf`
-//!
-//! TODO: implement and document as part of issue #382
+//! #### GET `/v5/channel/:id/get-leaf
 //!
 //! This route gets the latest approved state ([`NewState`]/[`ApproveState`] pair),
-//! and finds the given `spender`/`earner` in the balances tree, and produce a merkle proof for it.
+//! finds the given `spender` or `earner` in the balances tree and produces a Merkle proof for it.
 //! This is useful for the Platform to verify if a spender leaf really exists.
 //!
-//! The route is handled by `todo`.
+//! The route is handled by [`channel::get_leaf()`].
 //!
-//! Request query parameters:
+//! Response: [`GetLeafResponse`](primitives::sentry::GetLeafResponse)
 //!
-//! - `spender=[0x...]` or `earner=[0x...]` (required)
+//! ##### Routes:
 //!
-//! Example Spender:
+//! - GET `/v5/channel/:id/get-leaf/spender/:addr`
+//! - GET `/v5/channel/:id/get-leaf/earner/:addr`
 //!
-//! `/get-leaf?spender=0x...`
+//! ##### Examples:
 //!
-//! Example Earner:
+//! URI for retrieving leaf of a Spender:
 //!
-//! `/get-leaf?earner=0x....`
-//! This module includes all routes for `Sentry` and the documentation of each Request/Response.
+//! `/v5/channel/0xf147fa3f1c5e5e06d359c15aa082442cc3e0380f306306022d1e9047c565a0f9/get-leaf/spender/0xDd589B43793934EF6Ad266067A0d1D4896b0dff0`
+//!
+//! URI for retrieving leaf of an Earner:
+//!
+//! `/v5/channel/0xf147fa3f1c5e5e06d359c15aa082442cc3e0380f306306022d1e9047c565a0f9/get-leaf/earner/0xE882ebF439207a70dDcCb39E13CA8506c9F45fD9`
+//!
+//! Response:
+//!
+//! ```
+</span><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/get_leaf_response.rs&quot;</span>)]
+</span><span class="doccomment">//! ```
 //!
 //! #### POST `/v5/channel/dummy-deposit` (auth required)
 //!
@@ -790,8 +808,8 @@
 //! Request:
 //!
 //! ```
-</span><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;../examples/channel_dummy_deposit.rs&quot;</span>)]</span>
-<span class="doccomment">//! ```
+</span><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;../examples/channel_dummy_deposit.rs&quot;</span>)]
+</span><span class="doccomment">//! ```
 //!
 //! ## Campaign
 //!
@@ -831,14 +849,14 @@
 //! Query:
 //!
 //! ```
-</span><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/campaign_list_query.rs&quot;</span>)]</span>
-<span class="doccomment">//! ```
+</span><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/campaign_list_query.rs&quot;</span>)]
+</span><span class="doccomment">//! ```
 //!
 //! Response:
 //!
 //! ```
-</span><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/campaign_list_response.rs&quot;</span>)]</span>
-<span class="doccomment">//! ```
+</span><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/campaign_list_response.rs&quot;</span>)]
+</span><span class="doccomment">//! ```
 //!
 //! #### POST `/v5/campaign` (auth required)
 //!
@@ -858,8 +876,8 @@
 //! ##### Examples
 //!
 //! ```
-</span><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/create_campaign_request.rs&quot;</span>)]</span>
-<span class="doccomment">//! ```
+</span><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/create_campaign_request.rs&quot;</span>)]
+</span><span class="doccomment">//! ```
 //!
 //! #### POST `/v5/campaign/:id` (auth required)
 //!
@@ -876,8 +894,8 @@
 //! ##### Examples
 //!
 //! ```
-</span><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/modify_campaign_request.rs&quot;</span>)]</span>
-<span class="doccomment">//! ```
+</span><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/modify_campaign_request.rs&quot;</span>)]
+</span><span class="doccomment">//! ```
 //!
 //! #### POST `/v5/campaign/:id/events`
 //!
@@ -919,14 +937,14 @@
 //! Query:
 //!
 //! ```
-</span><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/analytics_query.rs&quot;</span>)]</span>
-<span class="doccomment">//! ```
+</span><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/analytics_query.rs&quot;</span>)]
+</span><span class="doccomment">//! ```
 //!
 //! Response:
 //!
 //! ```
-</span><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/analytics_response.rs&quot;</span>)]</span>
-<span class="doccomment">//! ```
+</span><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/analytics_response.rs&quot;</span>)]
+</span><span class="doccomment">//! ```
 //!
 //! #### GET `/v5/analytics/for-publisher` (auth required)
 //!
@@ -1023,4 +1041,4 @@
 
 <span class="kw">mod </span>units_for_slot;
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (02654a084 2022-08-30)" ></div></body></html>

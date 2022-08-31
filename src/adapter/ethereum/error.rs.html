@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `adapter/src/ethereum/error.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>error.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script defer src="../../../source-script.js"></script><script defer src="../../../source-files.js"></script><script defer src="../../../main.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../../adapter/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div></a><h2 class="location"></h2></nav><nav class="sidebar"><a class="sidebar-logo" href="../../../adapter/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div></a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../adapter/index.html"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../wheel.svg"></a></div></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `adapter/src/ethereum/error.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>error.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../../normalize.css"><link rel="stylesheet" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../../ayu.css" disabled><link rel="stylesheet" href="../../../dark.css" disabled><link rel="stylesheet" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script defer src="../../../source-script.js"></script><script defer src="../../../source-files.js"></script><script defer src="../../../main.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../../adapter/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div></a><h2 class="location"></h2></nav><nav class="sidebar"><a class="sidebar-logo" href="../../../adapter/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div></a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../adapter/index.html"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../wheel.svg"></a></div></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -199,133 +199,133 @@
     }
 }
 
-<span class="attribute">#[derive(Debug, Error)]</span>
-<span class="kw">pub enum </span>Error {
-    <span class="attribute">#[error(<span class="string">&quot;Keystore: {0}&quot;</span>)]</span>
-    Keystore(<span class="attribute">#[from]</span> KeystoreError),
-    <span class="attribute">#[error(<span class="string">&quot;Wallet unlocking: {0}&quot;</span>)]</span>
-    WalletUnlock(<span class="attribute">#[from]</span> ethsign::Error),
-    <span class="attribute">#[error(<span class="string">&quot;Web3: {0}&quot;</span>)]</span>
-    Web3(<span class="attribute">#[from]</span> web3::Error),
+<span class="attribute">#[derive(Debug, Error)]
+</span><span class="kw">pub enum </span>Error {
+    <span class="attribute">#[error(<span class="string">&quot;Keystore: {0}&quot;</span>)]
+    </span>Keystore(<span class="attribute">#[from] </span>KeystoreError),
+    <span class="attribute">#[error(<span class="string">&quot;Wallet unlocking: {0}&quot;</span>)]
+    </span>WalletUnlock(<span class="attribute">#[from] </span>ethsign::Error),
+    <span class="attribute">#[error(<span class="string">&quot;Web3: {0}&quot;</span>)]
+    </span>Web3(<span class="attribute">#[from] </span>web3::Error),
     <span class="doccomment">/// When the ChannelId that we get from hashing the EthereumChannel with the contract address
     /// does not align with the provided Channel
-    </span><span class="attribute">#[error(<span class="string">&quot;The hashed EthereumChannel.id ({expected}) is not the same as the Channel.id ({actual}) that was provided&quot;</span>)]</span>
-    InvalidChannelId {
+    </span><span class="attribute">#[error(<span class="string">&quot;The hashed EthereumChannel.id ({expected}) is not the same as the Channel.id ({actual}) that was provided&quot;</span>)]
+    </span>InvalidChannelId {
         expected: ChannelId,
         actual: ChannelId,
     },
-    <span class="attribute">#[error(<span class="string">&quot;Channel ({0}) is not Active on the ethereum network&quot;</span>)]</span>
-    ChannelInactive(ChannelId),
+    <span class="attribute">#[error(<span class="string">&quot;Channel ({0}) is not Active on the ethereum network&quot;</span>)]
+    </span>ChannelInactive(ChannelId),
     <span class="doccomment">/// Signing of the message failed
-    </span><span class="attribute">#[error(<span class="string">&quot;Signing message: {0}&quot;</span>)]</span>
-    SignMessage(<span class="attribute">#[from]</span> EwtSigningError),
-    <span class="attribute">#[error(<span class="string">&quot;Verifying message: {0}&quot;</span>)]</span>
-    VerifyMessage(<span class="attribute">#[from]</span> EwtVerifyError),
-    <span class="attribute">#[error(<span class="string">&quot;Contract initialization: {0}&quot;</span>)]</span>
-    ContractInitialization(web3::ethabi::Error),
-    <span class="attribute">#[error(<span class="string">&quot;Contract querying: {0}&quot;</span>)]</span>
-    ContractQuerying(web3::contract::Error),
+    </span><span class="attribute">#[error(<span class="string">&quot;Signing message: {0}&quot;</span>)]
+    </span>SignMessage(<span class="attribute">#[from] </span>EwtSigningError),
+    <span class="attribute">#[error(<span class="string">&quot;Verifying message: {0}&quot;</span>)]
+    </span>VerifyMessage(<span class="attribute">#[from] </span>EwtVerifyError),
+    <span class="attribute">#[error(<span class="string">&quot;Contract initialization: {0}&quot;</span>)]
+    </span>ContractInitialization(web3::ethabi::Error),
+    <span class="attribute">#[error(<span class="string">&quot;Contract querying: {0}&quot;</span>)]
+    </span>ContractQuerying(web3::contract::Error),
     <span class="doccomment">/// Error occurred during verification of Signature and/or StateRoot and/or Address
-    </span><span class="attribute">#[error(<span class="string">&quot;Verifying address: {0}&quot;</span>)]</span>
-    VerifyAddress(<span class="attribute">#[from]</span> VerifyError),
-    <span class="attribute">#[error(<span class="string">&quot;The intended {0:?} in the authentication token in not whitelisted&quot;</span>)]</span>
-    ChainNotWhitelisted(ChainId),
-    <span class="attribute">#[error(<span class="string">&quot;Deposit asset {0} is invalid&quot;</span>)]</span>
-    InvalidDepositAsset(<span class="attribute">#[from]</span> AddressError),
-    <span class="attribute">#[error(<span class="string">&quot;Parsing BigNum: {0}&quot;</span>)]</span>
-    BigNumParsing(<span class="attribute">#[from]</span> ParseBigIntError),
-    <span class="attribute">#[error(<span class="string">&quot;Token Payload.id({}) !== whoami({whoami}): token was not intended for us&quot;</span>, .payload.id)]</span>
-    AuthenticationTokenNotIntendedForUs {
+    </span><span class="attribute">#[error(<span class="string">&quot;Verifying address: {0}&quot;</span>)]
+    </span>VerifyAddress(<span class="attribute">#[from] </span>VerifyError),
+    <span class="attribute">#[error(<span class="string">&quot;The intended {0:?} in the authentication token in not whitelisted&quot;</span>)]
+    </span>ChainNotWhitelisted(ChainId),
+    <span class="attribute">#[error(<span class="string">&quot;Deposit asset {0} is invalid&quot;</span>)]
+    </span>InvalidDepositAsset(<span class="attribute">#[from] </span>AddressError),
+    <span class="attribute">#[error(<span class="string">&quot;Parsing BigNum: {0}&quot;</span>)]
+    </span>BigNumParsing(<span class="attribute">#[from] </span>ParseBigIntError),
+    <span class="attribute">#[error(<span class="string">&quot;Token Payload.id({}) !== whoami({whoami}): token was not intended for us&quot;</span>, .payload.id)]
+    </span>AuthenticationTokenNotIntendedForUs {
         payload: Payload,
         whoami: ValidatorId,
     },
-    <span class="attribute">#[error(<span class="string">&quot;Insufficient privilege&quot;</span>)]</span>
-    InsufficientAuthorizationPrivilege,
+    <span class="attribute">#[error(<span class="string">&quot;Insufficient privilege&quot;</span>)]
+    </span>InsufficientAuthorizationPrivilege,
 }
 
-<span class="attribute">#[derive(Debug, Error)]</span>
-<span class="doccomment">/// Error returned on `eth_adapter.verify()` when the combination of
+<span class="attribute">#[derive(Debug, Error)]
+</span><span class="doccomment">/// Error returned on `eth_adapter.verify()` when the combination of
 /// (signer, state_root, signature) **doesn&#39;t align**.
 </span><span class="kw">pub enum </span>VerifyError {
-    <span class="attribute">#[error(<span class="string">&quot;Recovering the public key from the signature: {0}&quot;</span>)]</span>
-    <span class="doccomment">/// `secp256k1` error
+    <span class="attribute">#[error(<span class="string">&quot;Recovering the public key from the signature: {0}&quot;</span>)]
+    </span><span class="doccomment">/// `secp256k1` error
     </span>PublicKeyRecovery(String),
-    <span class="attribute">#[error(<span class="string">&quot;Decoding state root: {0}&quot;</span>)]</span>
-    StateRootDecoding(<span class="attribute">#[source]</span> hex::FromHexError),
-    <span class="attribute">#[error(<span class="string">&quot;Decoding signature: {0}&quot;</span>)]</span>
-    SignatureDecoding(<span class="attribute">#[source]</span> hex::FromHexError),
-    <span class="attribute">#[error(<span class="string">&quot;Signature is not prefixed with `0x`&quot;</span>)]</span>
-    SignatureNotPrefixed,
-    <span class="attribute">#[error(<span class="string">&quot;Signature length or V component of the Signature was incorrect&quot;</span>)]</span>
-    SignatureInvalid,
+    <span class="attribute">#[error(<span class="string">&quot;Decoding state root: {0}&quot;</span>)]
+    </span>StateRootDecoding(<span class="attribute">#[source] </span>hex::FromHexError),
+    <span class="attribute">#[error(<span class="string">&quot;Decoding signature: {0}&quot;</span>)]
+    </span>SignatureDecoding(<span class="attribute">#[source] </span>hex::FromHexError),
+    <span class="attribute">#[error(<span class="string">&quot;Signature is not prefixed with `0x`&quot;</span>)]
+    </span>SignatureNotPrefixed,
+    <span class="attribute">#[error(<span class="string">&quot;Signature length or V component of the Signature was incorrect&quot;</span>)]
+    </span>SignatureInvalid,
 }
 
-<span class="attribute">#[derive(Debug, Error)]</span>
-<span class="kw">pub enum </span>KeystoreError {
+<span class="attribute">#[derive(Debug, Error)]
+</span><span class="kw">pub enum </span>KeystoreError {
     <span class="doccomment">/// `address` key is missing from the keystore file
-    </span><span class="attribute">#[error(<span class="string">&quot;\&quot;address\&quot; key missing in keystore file&quot;</span>)]</span>
-    AddressMissing,
+    </span><span class="attribute">#[error(<span class="string">&quot;\&quot;address\&quot; key missing in keystore file&quot;</span>)]
+    </span>AddressMissing,
     <span class="doccomment">/// The `address` key in the keystore file is not a valid `ValidatorId`
-    </span><span class="attribute">#[error(<span class="string">&quot;\&quot;address\&quot; length should be 20 bytes&quot;</span>)]</span>
-    AddressLength,
+    </span><span class="attribute">#[error(<span class="string">&quot;\&quot;address\&quot; length should be 20 bytes&quot;</span>)]
+    </span>AddressLength,
     <span class="doccomment">/// reading the keystore file failed
-    </span><span class="attribute">#[error(<span class="string">&quot;Reading keystore file: {0}&quot;</span>)]</span>
-    ReadingFile(<span class="attribute">#[source]</span> std::io::Error),
+    </span><span class="attribute">#[error(<span class="string">&quot;Reading keystore file: {0}&quot;</span>)]
+    </span>ReadingFile(<span class="attribute">#[source] </span>std::io::Error),
     <span class="doccomment">/// Deserializing the keystore file failed
-    </span><span class="attribute">#[error(<span class="string">&quot;Deserializing keystore file: {0}&quot;</span>)]</span>
-    Deserialization(<span class="attribute">#[source]</span> serde_json::Error),
+    </span><span class="attribute">#[error(<span class="string">&quot;Deserializing keystore file: {0}&quot;</span>)]
+    </span>Deserialization(<span class="attribute">#[source] </span>serde_json::Error),
 }
 
-<span class="attribute">#[derive(Debug, Error)]</span>
-<span class="kw">pub enum </span>EwtSigningError {
-    <span class="attribute">#[error(<span class="string">&quot;Header serialization: {0}&quot;</span>)]</span>
-    HeaderSerialization(<span class="attribute">#[source]</span> serde_json::Error),
-    <span class="attribute">#[error(<span class="string">&quot;Payload serialization: {0}&quot;</span>)]</span>
-    PayloadSerialization(<span class="attribute">#[source]</span> serde_json::Error),
+<span class="attribute">#[derive(Debug, Error)]
+</span><span class="kw">pub enum </span>EwtSigningError {
+    <span class="attribute">#[error(<span class="string">&quot;Header serialization: {0}&quot;</span>)]
+    </span>HeaderSerialization(<span class="attribute">#[source] </span>serde_json::Error),
+    <span class="attribute">#[error(<span class="string">&quot;Payload serialization: {0}&quot;</span>)]
+    </span>PayloadSerialization(<span class="attribute">#[source] </span>serde_json::Error),
     <span class="doccomment">/// we must use a [`String`] since [`ethsign`] does not export the error from
     /// the `secp256k1` crate which is returned in the [`ethsign::SecretKey::sign()`] method.
-    </span><span class="attribute">#[error(<span class="string">&quot;Signing message: {0}&quot;</span>)]</span>
-    SigningMessage(String),
-    <span class="attribute">#[error(<span class="string">&quot;Decoding hex of Signature: {0}&quot;</span>)]</span>
-    DecodingHexSignature(<span class="attribute">#[from]</span> hex::FromHexError),
+    </span><span class="attribute">#[error(<span class="string">&quot;Signing message: {0}&quot;</span>)]
+    </span>SigningMessage(String),
+    <span class="attribute">#[error(<span class="string">&quot;Decoding hex of Signature: {0}&quot;</span>)]
+    </span>DecodingHexSignature(<span class="attribute">#[from] </span>hex::FromHexError),
 }
 
-<span class="attribute">#[derive(Debug, Error)]</span>
-<span class="kw">pub enum </span>EwtVerifyError {
-    <span class="attribute">#[error(<span class="string">&quot;The Ethereum Web Token header is invalid&quot;</span>)]</span>
-    InvalidHeader,
-    <span class="attribute">#[error(<span class="string">&quot;The token length should be at least 16 characters of length&quot;</span>)]</span>
-    InvalidTokenLength,
-    <span class="attribute">#[error(<span class="string">&quot;The token does not comply to the format of header.payload.signature&quot;</span>)]</span>
-    InvalidToken,
+<span class="attribute">#[derive(Debug, Error)]
+</span><span class="kw">pub enum </span>EwtVerifyError {
+    <span class="attribute">#[error(<span class="string">&quot;The Ethereum Web Token header is invalid&quot;</span>)]
+    </span>InvalidHeader,
+    <span class="attribute">#[error(<span class="string">&quot;The token length should be at least 16 characters of length&quot;</span>)]
+    </span>InvalidTokenLength,
+    <span class="attribute">#[error(<span class="string">&quot;The token does not comply to the format of header.payload.signature&quot;</span>)]
+    </span>InvalidToken,
     <span class="doccomment">/// We use a `String` because [`ethsign::Signature::recover()`] returns `secp256k1` error
     /// which is not exported in `ethsign`.
-    </span><span class="attribute">#[error(<span class="string">&quot;Address recovery: {0}&quot;</span>)]</span>
-    AddressRecovery(String),
-    <span class="attribute">#[error(<span class="string">&quot;Signature decoding: {0}&quot;</span>)]</span>
-    SignatureDecoding(<span class="attribute">#[source]</span> base64::DecodeError),
+    </span><span class="attribute">#[error(<span class="string">&quot;Address recovery: {0}&quot;</span>)]
+    </span>AddressRecovery(String),
+    <span class="attribute">#[error(<span class="string">&quot;Signature decoding: {0}&quot;</span>)]
+    </span>SignatureDecoding(<span class="attribute">#[source] </span>base64::DecodeError),
     <span class="doccomment">/// If there is no suffix in the signature for the mode
     /// or if Signature length is not 65 bytes
     /// or if Signature V component is not in &quot;Electrum&quot; notation (`&lt; 27`).
-    </span><span class="attribute">#[error(<span class="string">&quot;Error when decoding token signature&quot;</span>)]</span>
-    InvalidSignature,
-    <span class="attribute">#[error(<span class="string">&quot;Payload decoding: {0}&quot;</span>)]</span>
-    PayloadDecoding(<span class="attribute">#[source]</span> base64::DecodeError),
-    <span class="attribute">#[error(<span class="string">&quot;Payload deserialization: {0}&quot;</span>)]</span>
-    PayloadDeserialization(<span class="attribute">#[from]</span> serde_json::Error),
-    <span class="attribute">#[error(<span class="string">&quot;Payload is not a valid UTF-8 string: {0}&quot;</span>)]</span>
-    PayloadUtf8(<span class="attribute">#[from]</span> std::str::Utf8Error),
+    </span><span class="attribute">#[error(<span class="string">&quot;Error when decoding token signature&quot;</span>)]
+    </span>InvalidSignature,
+    <span class="attribute">#[error(<span class="string">&quot;Payload decoding: {0}&quot;</span>)]
+    </span>PayloadDecoding(<span class="attribute">#[source] </span>base64::DecodeError),
+    <span class="attribute">#[error(<span class="string">&quot;Payload deserialization: {0}&quot;</span>)]
+    </span>PayloadDeserialization(<span class="attribute">#[from] </span>serde_json::Error),
+    <span class="attribute">#[error(<span class="string">&quot;Payload is not a valid UTF-8 string: {0}&quot;</span>)]
+    </span>PayloadUtf8(<span class="attribute">#[from] </span>std::str::Utf8Error),
 }
 
-<span class="attribute">#[cfg(test)]</span>
-<span class="kw">mod </span>test {
+<span class="attribute">#[cfg(test)]
+</span><span class="kw">mod </span>test {
     <span class="kw">use super</span>::<span class="kw-2">*</span>;
 
     <span class="kw">fn </span>assert_send&lt;T: Send&gt;() {}
     <span class="kw">fn </span>assert_sync&lt;T: Sync&gt;() {}
 
-    <span class="attribute">#[test]</span>
-    <span class="kw">fn </span>a_correct_error() {
+    <span class="attribute">#[test]
+    </span><span class="kw">fn </span>a_correct_error() {
         <span class="comment">// Ethereum adapter should be Send!
         </span>assert_send::&lt;Error&gt;();
         <span class="comment">// Ethereum adapter should be Sync!
@@ -333,4 +333,4 @@
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="adapter" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9c20b2a8c 2022-08-17)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="adapter" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (02654a084 2022-08-30)" ></div></body></html>
