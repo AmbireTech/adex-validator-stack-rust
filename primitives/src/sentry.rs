@@ -722,6 +722,19 @@ pub struct ValidationErrorResponse {
     pub validation: Vec<String>,
 }
 
+/// Get leaf response with the Merkle proof for the requested spender/earner.
+///
+/// # Examples
+///
+/// ```
+#[doc = include_str!("../examples/get_leaf_response.rs")]
+/// ```
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct GetLeafResponse {
+    pub merkle_proof: String,
+}
+
 /// Request body for posting new [`Event`]s to a [`Campaign`](crate::Campaign).
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]

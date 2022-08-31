@@ -39,7 +39,8 @@ use crate::{
         campaign,
         channel::{
             add_spender_leaf, channel_dummy_deposit, channel_list, channel_payout,
-            get_accounting_for_channel, get_all_spender_limits, get_spender_limits, last_approved,
+            get_accounting_for_channel, get_all_spender_limits, get_leaf, get_spender_limits,
+            last_approved,
             validator_message::{create_validator_messages, list_validator_messages},
         },
         units_for_slot::post_units_for_slot,
@@ -66,6 +67,12 @@ async fn if_dummy_adapter<C: Locked + 'static, B>(
     }
 }
 
+#[derive(Clone)]
+pub enum LeafFor {
+    Earner,
+    Spender,
+}
+
 /// `/v5/channel` router
 pub fn channels_router<C: Locked + 'static>() -> Router {
     let spender_routes = Router::new()
@@ -79,6 +86,12 @@ pub fn channels_router<C: Locked + 'static>() -> Router {
             ServiceBuilder::new().layer(middleware::from_fn(authentication_required::<C, _>)),
         );
 
+    let get_leaf_routes = Router::new()
+        .route("/spender/:addr", get(get_leaf::<C>))
+        .route_layer(Extension(LeafFor::Spender))
+        .route("/earner/:addr", get(get_leaf::<C>))
+        .route_layer(Extension(LeafFor::Earner));
+
     let channel_routes = Router::new()
         .route(
             "/pay",
@@ -88,6 +101,7 @@ pub fn channels_router<C: Locked + 'static>() -> Router {
         .route("/accounting", get(get_accounting_for_channel::<C>))
         .route("/last-approved", get(last_approved::<C>))
         .nest("/spender", spender_routes)
+        .nest("/get-leaf", get_leaf_routes)
         .route(
             "/validator-messages",
             post(create_validator_messages::<C>)
