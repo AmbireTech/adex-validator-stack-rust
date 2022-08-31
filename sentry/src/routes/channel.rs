@@ -7,13 +7,19 @@ use serde::{Deserialize, Serialize};
 use slog::{error, Logger};
 use std::{any::Any, collections::HashMap, sync::Arc};
 
-use adapter::{client::Locked, Adapter, Dummy};
+use adapter::{
+    client::Locked,
+    util::{get_balance_leaf, get_signable_state_root},
+    Adapter, Dummy,
+};
 use primitives::{
     balances::{Balances, CheckedState, UncheckedState},
+    merkle_tree::MerkleTree,
     sentry::{
         channel_list::{ChannelListQuery, ChannelListResponse},
-        AccountingResponse, AllSpendersQuery, AllSpendersResponse, ChannelPayRequest, LastApproved,
-        LastApprovedQuery, LastApprovedResponse, SpenderResponse, SuccessResponse,
+        AccountingResponse, AllSpendersQuery, AllSpendersResponse, ChannelPayRequest,
+        GetLeafResponse, LastApproved, LastApprovedQuery, LastApprovedResponse, SpenderResponse,
+        SuccessResponse,
     },
     spender::{Spendable, Spender},
     validator::NewState,
@@ -32,7 +38,7 @@ use crate::{
         DbPool,
     },
     response::ResponseError,
-    routes::campaign::fetch_campaign_ids_for_channel,
+    routes::{campaign::fetch_campaign_ids_for_channel, routers::LeafFor},
     Application, Auth,
 };
 
@@ -498,6 +504,73 @@ pub async fn channel_payout<C: Locked + 'static>(
     Ok(Json(SuccessResponse { success: true }))
 }
 
+/// GET `/v5/channel/0xXXX.../get-leaf` requests
+///
+/// # Routes:
+///
+/// - GET `/v5/channel/:id/get-leaf/spender/:addr`
+/// - GET `/v5/channel/:id/get-leaf/earner/:addr`
+///
+/// Response: [`GetLeafResponse`]
+pub async fn get_leaf<C: Locked + 'static>(
+    Extension(app): Extension<Arc<Application<C>>>,
+    Extension(channel_context): Extension<ChainOf<Channel>>,
+    Extension(leaf_for): Extension<LeafFor>,
+    Path(params): Path<(ChannelId, Address)>,
+) -> Result<Json<GetLeafResponse>, ResponseError> {
+    let channel = channel_context.context;
+
+    let approve_state = latest_approve_state(&app.pool, &channel)
+        .await?
+        .ok_or(ResponseError::NotFound)?;
+
+    let state_root = approve_state.msg.state_root.clone();
+
+    let new_state = latest_new_state(&app.pool, &channel, &state_root)
+        .await?
+        .ok_or_else(|| ResponseError::BadRequest("No NewState message for spender".to_string()))?;
+
+    let addr = params.1;
+
+    let element = match leaf_for {
+        LeafFor::Spender => {
+            let amount = new_state
+                .msg
+                .balances
+                .spenders
+                .get(&addr)
+                .ok_or(ResponseError::NotFound)?;
+
+            get_balance_leaf(
+                true,
+                &addr,
+                &amount.to_precision(channel_context.token.precision.get()),
+            )?
+        }
+        LeafFor::Earner => {
+            let amount = new_state
+                .msg
+                .balances
+                .earners
+                .get(&addr)
+                .ok_or(ResponseError::NotFound)?;
+
+            get_balance_leaf(
+                false,
+                &addr,
+                &amount.to_precision(channel_context.token.precision.get()),
+            )?
+        }
+    };
+    let merkle_tree = MerkleTree::new(&[element])?;
+
+    let signable_state_root = get_signable_state_root(channel.id().as_bytes(), &merkle_tree.root());
+
+    let merkle_proof = hex::encode(signable_state_root);
+
+    Ok(Json(GetLeafResponse { merkle_proof }))
+}
+
 /// POST `/v5/channel/dummy-deposit` request
 ///
 /// Full details about the route's API and intend can be found in the [`routes`](crate::routes#post-v5channeldummy-deposit-auth-required) module
@@ -669,26 +742,30 @@ pub mod validator_message {
 
 #[cfg(test)]
 mod test {
-    use std::str::FromStr;
-
+    use super::*;
+    use crate::{
+        db::{
+            insert_campaign, insert_channel, validator_message::insert_validator_message,
+            CampaignRemaining,
+        },
+        test_util::setup_dummy_app,
+    };
     use adapter::{
         ethereum::test_util::{GANACHE_INFO_1, GANACHE_INFO_1337},
+        prelude::Unlocked,
         primitives::Deposit as AdapterDeposit,
     };
     use primitives::{
+        balances::UncheckedState,
         channel::Nonce,
         test_util::{
             ADVERTISER, CREATOR, DUMMY_CAMPAIGN, FOLLOWER, GUARDIAN, IDS, LEADER, LEADER_2,
             PUBLISHER, PUBLISHER_2,
         },
+        validator::{ApproveState, MessageTypes, NewState},
         BigNum, ChainId, Deposit, UnifiedMap, ValidatorId,
     };
-
-    use super::*;
-    use crate::{
-        db::{insert_campaign, insert_channel, CampaignRemaining},
-        test_util::setup_dummy_app,
-    };
+    use std::str::FromStr;
 
     #[tokio::test]
     async fn create_and_fetch_spendable() {
@@ -1406,5 +1483,103 @@ mod test {
                 "Failed validation because the campaign has remaining funds"
             );
         }
+    }
+
+    #[tokio::test]
+    async fn get_spender_and_earner_leafs() {
+        let mut balances: Balances<CheckedState> = Balances::new();
+        balances
+            .spend(*ADVERTISER, *PUBLISHER, UnifiedNum::from_u64(1000))
+            .expect("should spend");
+        balances
+            .spend(*ADVERTISER, *PUBLISHER_2, UnifiedNum::from_u64(1000))
+            .expect("should spend");
+        balances
+            .spend(*CREATOR, *PUBLISHER, UnifiedNum::from_u64(1000))
+            .expect("should spend");
+        balances
+            .spend(*CREATOR, *PUBLISHER_2, UnifiedNum::from_u64(1000))
+            .expect("should spend");
+
+        let app_guard = setup_dummy_app().await;
+        let app = Extension(Arc::new(app_guard.app.clone()));
+
+        let channel_context = Extension(
+            app.config
+                .find_chain_of(DUMMY_CAMPAIGN.channel.token)
+                .expect("Dummy channel Token should be present in config!")
+                .with(DUMMY_CAMPAIGN.channel),
+        );
+        let channel = channel_context.context;
+
+        insert_channel(&app.pool, &channel_context)
+            .await
+            .expect("should insert channel");
+
+        // Setting up the validator messages
+        let state_root =
+            "b1a4fc6c1a1e1ab908a487e504006edcebea297f61b4b8ce6cad3b29e29454cc".to_string();
+        let signature = app
+            .adapter
+            .clone()
+            .unlock()
+            .expect("should unlock")
+            .sign(&state_root.clone())
+            .expect("should sign");
+        let new_state: NewState<UncheckedState> = NewState {
+            state_root: state_root.clone(),
+            signature: signature.clone(),
+            balances: balances.into_unchecked(),
+        };
+        let approve_state = ApproveState {
+            state_root,
+            signature,
+            is_healthy: true,
+        };
+
+        insert_validator_message(
+            &app.pool,
+            &channel,
+            &channel.leader,
+            &MessageTypes::NewState(new_state),
+        )
+        .await
+        .expect("Should insert NewState msg");
+        insert_validator_message(
+            &app.pool,
+            &channel,
+            &channel.follower,
+            &MessageTypes::ApproveState(approve_state),
+        )
+        .await
+        .expect("Should insert NewState msg");
+
+        // hardcoded proofs
+        let spender_proof =
+            "8ea7760ca2dbbe00673372afbf8b05048717ce8a305f1f853afac8c244182e0c".to_string();
+        let earner_proof =
+            "dc94141cb41550df047ba3a965ce36d98eb6098eb952ca3cb6fd9682e5810b51".to_string();
+
+        // call functions
+        let spender_leaf = get_leaf(
+            app.clone(),
+            channel_context.clone(),
+            Extension(LeafFor::Spender),
+            Path((channel.id(), *ADVERTISER)),
+        )
+        .await
+        .expect("should get spender leaf");
+        let earner_leaf = get_leaf(
+            app.clone(),
+            channel_context.clone(),
+            Extension(LeafFor::Earner),
+            Path((channel.id(), *PUBLISHER)),
+        )
+        .await
+        .expect("should get earner leaf");
+
+        // compare results
+        assert_eq!(spender_proof, spender_leaf.merkle_proof);
+        assert_eq!(earner_proof, earner_leaf.merkle_proof);
     }
 }
