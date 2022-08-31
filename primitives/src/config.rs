@@ -5,9 +5,10 @@ use crate::{
     Address, BigNum, ChainOf, ValidatorId,
 };
 use once_cell::sync::Lazy;
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, num::NonZeroU8, time::Duration};
 use thiserror::Error;
+use duration::{milliseconds_to_std_duration, std_duration_to_milliseconds};
 
 pub use toml::de::Error as TomlError;
 
@@ -77,7 +78,7 @@ pub struct Config {
     /// finish before running a new tick in the Validator Worker.
     ///
     /// In milliseconds
-    #[serde(deserialize_with = "milliseconds_to_std_duration")]
+    #[serde(deserialize_with = "milliseconds_to_std_duration", serialize_with = "std_duration_to_milliseconds")]
     pub wait_time: Duration,
     /// The maximum allowed limit of [`ValidatorMessage`](crate::sentry::ValidatorMessage)s per page
     /// returned by Sentry's GET `/v5/channel/0xXXX.../validator-messages` route.
@@ -108,12 +109,12 @@ pub struct Config {
     /// - GET `/v5/analytics/for-admin`
     ///
     /// In milliseconds
-    #[serde(deserialize_with = "milliseconds_to_std_duration")]
+    #[serde(deserialize_with = "milliseconds_to_std_duration", serialize_with = "std_duration_to_milliseconds")]
     pub analytics_maxtime: Duration,
     /// The amount of time that should have passed before sending a new heartbeat.
     ///
     /// In milliseconds
-    #[serde(deserialize_with = "milliseconds_to_std_duration")]
+    #[serde(deserialize_with = "milliseconds_to_std_duration", serialize_with = "std_duration_to_milliseconds")]
     pub heartbeat_time: Duration,
     /// The pro miles below which the [`ApproveState`](crate::validator::ApproveState)
     /// becomes **unhealthy** in the [`Channel`](crate::Channel)'s Follower.
@@ -132,7 +133,7 @@ pub struct Config {
     /// to a validator.
     ///
     /// In milliseconds
-    #[serde(deserialize_with = "milliseconds_to_std_duration")]
+    #[serde(deserialize_with = "milliseconds_to_std_duration", serialize_with = "std_duration_to_milliseconds")]
     pub propagation_timeout: Duration,
     /// The Client timeout for `SentryApi`.
     ///
@@ -142,20 +143,20 @@ pub struct Config {
     /// [`Config.propagation_timeout`](Config::propagation_timeout).
     ///
     /// In milliseconds
-    #[serde(deserialize_with = "milliseconds_to_std_duration")]
+    #[serde(deserialize_with = "milliseconds_to_std_duration", serialize_with = "std_duration_to_milliseconds")]
     pub fetch_timeout: Duration,
     /// The Client timeout for `SentryApi` when collecting all channels
     /// and Validators using the `/campaign/list` route.
     ///
     /// In milliseconds
-    #[serde(deserialize_with = "milliseconds_to_std_duration")]
+    #[serde(deserialize_with = "milliseconds_to_std_duration", serialize_with = "std_duration_to_milliseconds")]
     pub all_campaigns_timeout: Duration,
     /// The timeout for a single tick of a [`Channel`](crate::Channel) in
     /// the Validator Worker.
     /// This timeout is applied to both the leader and follower ticks.
     ///
     /// In milliseconds
-    #[serde(deserialize_with = "milliseconds_to_std_duration")]
+    #[serde(deserialize_with = "milliseconds_to_std_duration", serialize_with = "std_duration_to_milliseconds")]
     pub channel_tick_timeout: Duration,
     /// The default IP rate limit that will be imposed if
     /// [`Campaign.event_submission`](crate::Campaign::event_submission) is [`None`].
@@ -214,7 +215,7 @@ impl Config {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct PlatformConfig {
     pub url: ApiUrl,
-    #[serde(deserialize_with = "milliseconds_to_std_duration")]
+    #[serde(deserialize_with = "milliseconds_to_std_duration", serialize_with = "std_duration_to_milliseconds")]
     pub keep_alive_interval: Duration,
 }
 
@@ -252,21 +253,34 @@ pub struct Limits {
     pub units_for_slot: limits::UnitsForSlot,
 }
 
-fn milliseconds_to_std_duration<'de, D>(deserializer: D) -> Result<Duration, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    use serde::de::Error;
-    use toml::Value;
 
-    let toml_value: Value = Value::deserialize(deserializer)?;
+pub mod duration {
+    use std::time::Duration;
+    use serde::{Serializer, Deserializer, Deserialize};
 
-    let milliseconds = match toml_value {
-        Value::Integer(mills) => u64::try_from(mills).map_err(Error::custom),
-        _ => Err(Error::custom("Only integers allowed for this value")),
-    }?;
+    pub fn milliseconds_to_std_duration<'de, D>(deserializer: D) -> Result<Duration, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        use serde::de::Error;
+        use toml::Value;
 
-    Ok(Duration::from_millis(milliseconds))
+        let toml_value: Value = Value::deserialize(deserializer)?;
+
+        let milliseconds = match toml_value {
+            Value::Integer(mills) => u64::try_from(mills).map_err(Error::custom),
+            _ => Err(Error::custom("Only integers allowed for this value")),
+        }?;
+
+        Ok(Duration::from_millis(milliseconds))
+    }
+
+    pub fn std_duration_to_milliseconds<S>(duration: &Duration, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&duration.as_millis().to_string())
+    }
 }
 
 pub mod limits {
