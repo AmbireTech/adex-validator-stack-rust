@@ -470,7 +470,7 @@
 //!
 //! Gets the config that the validator is running on.
 //!
-//! The route is handled by [`get_config()`](sentry::routes::cfg::get_config())
+//! The route is handled by [`config()`](crate::routes::get_cfg())
 //!
 //! Response: [`Config`](primitives::Config)
 //!
