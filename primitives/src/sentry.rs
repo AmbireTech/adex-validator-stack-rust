@@ -722,7 +722,7 @@ pub struct ValidationErrorResponse {
     pub validation: Vec<String>,
 }
 
-/// Returns the merkle_proof for the spender/earner
+/// Get leaf response with the Merkle proof for the requested spender/earner.
 ///
 /// # Examples
 ///

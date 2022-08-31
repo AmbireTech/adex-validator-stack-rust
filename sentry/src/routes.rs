@@ -1,5 +1,7 @@
 //! Sentry REST API documentation
 //!
+//! This module includes the documentation for all routes of the `Sentry`
+//! REST API and the corresponding requests, responses and parameters.
 //!
 //! All routes are listed below. Here is an overview and links to all of them:
 //! - [Channel](#channel) routes
@@ -236,38 +238,36 @@
 #![doc = include_str!("../../primitives/examples/channel_pay_request.rs")]
 //! ```
 //!
-//!
 //! #### GET `/v5/channel/:id/get-leaf
 //!
 //! This route gets the latest approved state ([`NewState`]/[`ApproveState`] pair),
-//! and finds the given `spender`/`earner` in the balances tree, and produce a merkle proof for it.
+//! finds the given `spender` or `earner` in the balances tree and produces a Merkle proof for it.
 //! This is useful for the Platform to verify if a spender leaf really exists.
 //!
 //! The route is handled by [`channel::get_leaf()`].
 //!
-//! Example Spender:
-//!
-//! `/get-leaf/spender/0xDd589B43793934EF6Ad266067A0d1D4896b0dff0`
-//!
-//! Example Earner:
-//!
-//! `/get-leaf/earner/0xE882ebF439207a70dDcCb39E13CA8506c9F45fD9`
-//!
 //! Response: [`GetLeafResponse`](primitives::sentry::GetLeafResponse)
 //!
+//! ##### Routes:
+//!
+//! - GET `/v5/channel/:id/get-leaf/spender/:addr`
+//! - GET `/v5/channel/:id/get-leaf/earner/:addr`
+//!
 //! ##### Examples:
+//!
+//! URI for retrieving leaf of a Spender:
+//!
+//! `/v5/channel/0xf147fa3f1c5e5e06d359c15aa082442cc3e0380f306306022d1e9047c565a0f9/get-leaf/spender/0xDd589B43793934EF6Ad266067A0d1D4896b0dff0`
+//!
+//! URI for retrieving leaf of an Earner:
+//!
+//! `/v5/channel/0xf147fa3f1c5e5e06d359c15aa082442cc3e0380f306306022d1e9047c565a0f9/get-leaf/earner/0xE882ebF439207a70dDcCb39E13CA8506c9F45fD9`
 //!
 //! Response:
 //!
 //! ```
-#![doc = include_str!("../../primitives/examples/spender_response.rs")]
+#![doc = include_str!("../../primitives/examples/get_leaf_response.rs")]
 //! ```
-//!
-//! #### Subroutes:
-//! - GET `/v5/channel/:id/get-leaf/spender`
-//! - GET `/v5/channel/:id/get-leaf/earner`
-//!
-//! This module includes all routes for `Sentry` and the documentation of each Request/Response.
 //!
 //! #### POST `/v5/channel/dummy-deposit` (auth required)
 //!

@@ -504,11 +504,12 @@ pub async fn channel_payout<C: Locked + 'static>(
     Ok(Json(SuccessResponse { success: true }))
 }
 
-/// GET `/v5/channel/0xXXX.../get-leaf/` request
+/// GET `/v5/channel/0xXXX.../get-leaf` requests
 ///
-/// Subroutes:
-/// - /v5/channel/0xXXX.../get-leaf/spender
-/// - /v5/channel/0xXXX.../get-leaf/earner
+/// # Routes:
+///
+/// - GET `/v5/channel/:id/get-leaf/spender/:addr`
+/// - GET `/v5/channel/:id/get-leaf/earner/:addr`
 ///
 /// Response: [`GetLeafResponse`]
 pub async fn get_leaf<C: Locked + 'static>(
@@ -519,10 +520,9 @@ pub async fn get_leaf<C: Locked + 'static>(
 ) -> Result<Json<GetLeafResponse>, ResponseError> {
     let channel = channel_context.context;
 
-    let approve_state = match latest_approve_state(&app.pool, &channel).await? {
-        Some(approve_state) => approve_state,
-        None => return Err(ResponseError::NotFound),
-    };
+    let approve_state = latest_approve_state(&app.pool, &channel)
+        .await?
+        .ok_or(ResponseError::NotFound)?;
 
     let state_root = approve_state.msg.state_root.clone();
 
@@ -566,9 +566,9 @@ pub async fn get_leaf<C: Locked + 'static>(
 
     let signable_state_root = get_signable_state_root(channel.id().as_bytes(), &merkle_tree.root());
 
-    let res = hex::encode(signable_state_root);
+    let merkle_proof = hex::encode(signable_state_root);
 
-    Ok(Json(GetLeafResponse { merkle_proof: res }))
+    Ok(Json(GetLeafResponse { merkle_proof }))
 }
 
 /// POST `/v5/channel/dummy-deposit` request
