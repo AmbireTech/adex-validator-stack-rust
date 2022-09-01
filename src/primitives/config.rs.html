@@ -322,6 +322,24 @@
 <span id="322">322</span>
 <span id="323">323</span>
 <span id="324">324</span>
+<span id="325">325</span>
+<span id="326">326</span>
+<span id="327">327</span>
+<span id="328">328</span>
+<span id="329">329</span>
+<span id="330">330</span>
+<span id="331">331</span>
+<span id="332">332</span>
+<span id="333">333</span>
+<span id="334">334</span>
+<span id="335">335</span>
+<span id="336">336</span>
+<span id="337">337</span>
+<span id="338">338</span>
+<span id="339">339</span>
+<span id="340">340</span>
+<span id="341">341</span>
+<span id="342">342</span>
 </pre><pre class="rust"><code><span class="kw">use crate</span>::{
     chain::{Chain, ChainId},
     event_submission::RateLimit,
@@ -329,7 +347,7 @@
     Address, BigNum, ChainOf, ValidatorId,
 };
 <span class="kw">use </span>once_cell::sync::Lazy;
-<span class="kw">use </span>serde::{Deserialize, Deserializer, Serialize};
+<span class="kw">use </span>serde::{Deserialize, Serialize};
 <span class="kw">use </span>std::{collections::HashMap, num::NonZeroU8, time::Duration};
 <span class="kw">use </span>thiserror::Error;
 
@@ -371,7 +389,11 @@
     }
 }
 
-<span class="attribute">#[derive(Serialize, Deserialize, Debug, Clone)]
+<span class="doccomment">/// Examples:
+/// ```
+</span><span class="attribute">#[doc = <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/get_cfg_response.rs&quot;</span>)]
+</span><span class="doccomment">/// ```
+</span><span class="attribute">#[derive(Serialize, Deserialize, Debug, Clone)]
 </span><span class="kw">pub struct </span>Config {
     <span class="doccomment">/// The maximum number of [`Channel`](crate::Channel)s that the worker
     /// can process for one tick.
@@ -397,7 +419,7 @@
     /// finish before running a new tick in the Validator Worker.
     ///
     /// In milliseconds
-    </span><span class="attribute">#[serde(deserialize_with = <span class="string">&quot;milliseconds_to_std_duration&quot;</span>)]
+    </span><span class="attribute">#[serde(with = <span class="string">&quot;std_duration_millis&quot;</span>)]
     </span><span class="kw">pub </span>wait_time: Duration,
     <span class="doccomment">/// The maximum allowed limit of [`ValidatorMessage`](crate::sentry::ValidatorMessage)s per page
     /// returned by Sentry&#39;s GET `/v5/channel/0xXXX.../validator-messages` route.
@@ -428,12 +450,12 @@
     /// - GET `/v5/analytics/for-admin`
     ///
     /// In milliseconds
-    </span><span class="attribute">#[serde(deserialize_with = <span class="string">&quot;milliseconds_to_std_duration&quot;</span>)]
+    </span><span class="attribute">#[serde(with = <span class="string">&quot;std_duration_millis&quot;</span>)]
     </span><span class="kw">pub </span>analytics_maxtime: Duration,
     <span class="doccomment">/// The amount of time that should have passed before sending a new heartbeat.
     ///
     /// In milliseconds
-    </span><span class="attribute">#[serde(deserialize_with = <span class="string">&quot;milliseconds_to_std_duration&quot;</span>)]
+    </span><span class="attribute">#[serde(with = <span class="string">&quot;std_duration_millis&quot;</span>)]
     </span><span class="kw">pub </span>heartbeat_time: Duration,
     <span class="doccomment">/// The pro miles below which the [`ApproveState`](crate::validator::ApproveState)
     /// becomes **unhealthy** in the [`Channel`](crate::Channel)&#39;s Follower.
@@ -452,7 +474,7 @@
     /// to a validator.
     ///
     /// In milliseconds
-    </span><span class="attribute">#[serde(deserialize_with = <span class="string">&quot;milliseconds_to_std_duration&quot;</span>)]
+    </span><span class="attribute">#[serde(with = <span class="string">&quot;std_duration_millis&quot;</span>)]
     </span><span class="kw">pub </span>propagation_timeout: Duration,
     <span class="doccomment">/// The Client timeout for `SentryApi`.
     ///
@@ -462,20 +484,20 @@
     /// [`Config.propagation_timeout`](Config::propagation_timeout).
     ///
     /// In milliseconds
-    </span><span class="attribute">#[serde(deserialize_with = <span class="string">&quot;milliseconds_to_std_duration&quot;</span>)]
+    </span><span class="attribute">#[serde(with = <span class="string">&quot;std_duration_millis&quot;</span>)]
     </span><span class="kw">pub </span>fetch_timeout: Duration,
     <span class="doccomment">/// The Client timeout for `SentryApi` when collecting all channels
     /// and Validators using the `/campaign/list` route.
     ///
     /// In milliseconds
-    </span><span class="attribute">#[serde(deserialize_with = <span class="string">&quot;milliseconds_to_std_duration&quot;</span>)]
+    </span><span class="attribute">#[serde(with = <span class="string">&quot;std_duration_millis&quot;</span>)]
     </span><span class="kw">pub </span>all_campaigns_timeout: Duration,
     <span class="doccomment">/// The timeout for a single tick of a [`Channel`](crate::Channel) in
     /// the Validator Worker.
     /// This timeout is applied to both the leader and follower ticks.
     ///
     /// In milliseconds
-    </span><span class="attribute">#[serde(deserialize_with = <span class="string">&quot;milliseconds_to_std_duration&quot;</span>)]
+    </span><span class="attribute">#[serde(with = <span class="string">&quot;std_duration_millis&quot;</span>)]
     </span><span class="kw">pub </span>channel_tick_timeout: Duration,
     <span class="doccomment">/// The default IP rate limit that will be imposed if
     /// [`Campaign.event_submission`](crate::Campaign::event_submission) is [`None`].
@@ -534,7 +556,7 @@
 <span class="attribute">#[derive(Serialize, Deserialize, Debug, Clone)]
 </span><span class="kw">pub struct </span>PlatformConfig {
     <span class="kw">pub </span>url: ApiUrl,
-    <span class="attribute">#[serde(deserialize_with = <span class="string">&quot;milliseconds_to_std_duration&quot;</span>)]
+    <span class="attribute">#[serde(with = <span class="string">&quot;std_duration_millis&quot;</span>)]
     </span><span class="kw">pub </span>keep_alive_interval: Duration,
 }
 
@@ -572,21 +594,35 @@
     <span class="kw">pub </span>units_for_slot: limits::UnitsForSlot,
 }
 
-<span class="kw">fn </span>milliseconds_to_std_duration&lt;<span class="lifetime">&#39;de</span>, D&gt;(deserializer: D) -&gt; <span class="prelude-ty">Result</span>&lt;Duration, D::Error&gt;
-<span class="kw">where
-    </span>D: Deserializer&lt;<span class="lifetime">&#39;de</span>&gt;,
-{
-    <span class="kw">use </span>serde::de::Error;
-    <span class="kw">use </span>toml::Value;
+<span class="doccomment">/// Module for [`Config`] (de)serialization of [`std::time::Duration`] from
+/// and to milliseconds.
+</span><span class="kw">pub mod </span>std_duration_millis {
+    <span class="kw">use </span>serde::{Deserialize, Deserializer, Serializer};
+    <span class="kw">use </span>std::time::Duration;
 
-    <span class="kw">let </span>toml_value: Value = Value::deserialize(deserializer)<span class="question-mark">?</span>;
+    <span class="kw">pub fn </span>deserialize&lt;<span class="lifetime">&#39;de</span>, D&gt;(deserializer: D) -&gt; <span class="prelude-ty">Result</span>&lt;Duration, D::Error&gt;
+    <span class="kw">where
+        </span>D: Deserializer&lt;<span class="lifetime">&#39;de</span>&gt;,
+    {
+        <span class="kw">use </span>serde::de::Error;
+        <span class="kw">use </span>toml::Value;
 
-    <span class="kw">let </span>milliseconds = <span class="kw">match </span>toml_value {
-        Value::Integer(mills) =&gt; u64::try_from(mills).map_err(Error::custom),
-        <span class="kw">_ </span>=&gt; <span class="prelude-val">Err</span>(Error::custom(<span class="string">&quot;Only integers allowed for this value&quot;</span>)),
-    }<span class="question-mark">?</span>;
+        <span class="kw">let </span>toml_value: Value = Value::deserialize(deserializer)<span class="question-mark">?</span>;
 
-    <span class="prelude-val">Ok</span>(Duration::from_millis(milliseconds))
+        <span class="kw">let </span>milliseconds = <span class="kw">match </span>toml_value {
+            Value::Integer(mills) =&gt; u64::try_from(mills).map_err(Error::custom),
+            <span class="kw">_ </span>=&gt; <span class="prelude-val">Err</span>(Error::custom(<span class="string">&quot;Only integers allowed for this value&quot;</span>)),
+        }<span class="question-mark">?</span>;
+
+        <span class="prelude-val">Ok</span>(Duration::from_millis(milliseconds))
+    }
+
+    <span class="kw">pub fn </span>serialize&lt;S&gt;(duration: <span class="kw-2">&amp;</span>Duration, serializer: S) -&gt; <span class="prelude-ty">Result</span>&lt;S::Ok, S::Error&gt;
+    <span class="kw">where
+        </span>S: Serializer,
+    {
+        serializer.serialize_str(<span class="kw-2">&amp;</span>duration.as_millis().to_string())
+    }
 }
 
 <span class="kw">pub mod </span>limits {
@@ -647,4 +683,4 @@
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="primitives" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (02654a084 2022-08-30)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="primitives" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9243168fa 2022-08-31)" ></div></body></html>

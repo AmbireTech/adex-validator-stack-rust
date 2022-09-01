@@ -519,6 +519,26 @@
 <span id="519">519</span>
 <span id="520">520</span>
 <span id="521">521</span>
+<span id="522">522</span>
+<span id="523">523</span>
+<span id="524">524</span>
+<span id="525">525</span>
+<span id="526">526</span>
+<span id="527">527</span>
+<span id="528">528</span>
+<span id="529">529</span>
+<span id="530">530</span>
+<span id="531">531</span>
+<span id="532">532</span>
+<span id="533">533</span>
+<span id="534">534</span>
+<span id="535">535</span>
+<span id="536">536</span>
+<span id="537">537</span>
+<span id="538">538</span>
+<span id="539">539</span>
+<span id="540">540</span>
+<span id="541">541</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Sentry REST API documentation
 //!
 //! This module includes the documentation for all routes of the `Sentry`
@@ -550,6 +570,8 @@
 //!   - [GET `/v5/analytics/for-publisher`](#get-v5analyticsfor-publisher-auth-required) (auth required)
 //!   - [GET `/v5/analytics/for-advertiser`](#get-v5analyticsfor-advertiser-auth-required) (auth required)
 //!   - [GET `/v5/analytics/for-admin`](#get-v5analyticsfor-admin-auth-required) (auth required)
+//! - [Config](#config) route
+//!   - [GET `/cfg`](#get-cfg)
 //!
 //! ## Channel
 //!
@@ -996,6 +1018,24 @@
 //!
 //! See [GET `/v5/analytics`](#get-v5analytics)
 //!
+//! ## Config
+//!
+//! #### GET `/cfg`
+//!
+//! Gets the config that the validator is running on.
+//!
+//! The route is handled by [`get_cfg()`](crate::routes::get_cfg())
+//!
+//! Response: [`Config`](primitives::Config)
+//!
+//! ##### Examples
+//!
+//! Response:
+//!
+//! ```
+</span><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/get_cfg_response.rs&quot;</span>)]
+</span><span class="doccomment">//! ```
+//!
 //! [`Adapter`]: adapter::Adapter
 //! [`Address`]: primitives::Address
 //! [`AllowedKey`]: primitives::analytics::query::AllowedKey
@@ -1026,9 +1066,9 @@
 //! [`SuccessResponse`]: primitives::sentry::SuccessResponse
 //! [`ValidatorId`]: primitives::ValidatorId
 
-</span><span class="kw">pub use </span>analytics::analytics <span class="kw">as </span>get_analytics;
+</span><span class="kw">pub use </span>analytics::get_analytics;
 
-<span class="kw">pub use </span>cfg::config <span class="kw">as </span>get_cfg;
+<span class="kw">pub use </span>cfg::get_cfg;
 
 <span class="comment">// `analytics` module has single request, so we only export this request
 </span><span class="kw">mod </span>analytics;
@@ -1041,4 +1081,4 @@
 
 <span class="kw">mod </span>units_for_slot;
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (02654a084 2022-08-30)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9243168fa 2022-08-31)" ></div></body></html>

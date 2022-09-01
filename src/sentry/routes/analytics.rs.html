@@ -1301,7 +1301,7 @@
 };
 
 <span class="kw">use crate</span>::{
-    application::Qs, db::analytics::get_analytics, response::ResponseError, Application, Auth,
+    application::Qs, db::analytics::fetch_analytics, response::ResponseError, Application, Auth,
 };
 
 <span class="doccomment">/// The GET `/v5/analytics` allowed keys that are applied to the route.
@@ -1321,7 +1321,7 @@
 /// - GET `/v5/analytics/for-publisher`
 /// - GET `/v5/analytics/for-advertiser`
 /// - GET `/v5/analytics/for-admin`
-</span><span class="kw">pub async fn </span>analytics&lt;C: Locked + <span class="lifetime">&#39;static</span>&gt;(
+</span><span class="kw">pub async fn </span>get_analytics&lt;C: Locked + <span class="lifetime">&#39;static</span>&gt;(
     Extension(app): Extension&lt;Arc&lt;Application&lt;C&gt;&gt;&gt;,
     auth: <span class="prelude-ty">Option</span>&lt;Extension&lt;Auth&gt;&gt;,
     Extension(route_allowed_keys): Extension&lt;HashSet&lt;AllowedKey&gt;&gt;,
@@ -1367,7 +1367,7 @@
 
     <span class="kw">let </span>analytics = <span class="kw">match </span>tokio::time::timeout(
         app.config.analytics_maxtime,
-        get_analytics(
+        fetch_analytics(
             <span class="kw-2">&amp;</span>app.pool,
             query.clone(),
             route_allowed_keys,
@@ -1686,7 +1686,7 @@
                 .<span class="kw">await
                 </span>.expect(<span class="string">&quot;Should update analytics&quot;</span>);
 
-            <span class="kw">let </span>analytics_response = analytics(
+            <span class="kw">let </span>analytics_response = get_analytics(
                 app.clone(),
                 <span class="prelude-val">None</span>,
                 Extension(GET_ANALYTICS_ALLOWED_KEYS.clone()),
@@ -1733,7 +1733,7 @@
                 ..Default::default()
             };
 
-            <span class="kw">let </span>analytics_response = analytics(
+            <span class="kw">let </span>analytics_response = get_analytics(
                 app.clone(),
                 <span class="prelude-val">None</span>,
                 Extension(GET_ANALYTICS_ALLOWED_KEYS.clone()),
@@ -1770,7 +1770,7 @@
                 ..Default::default()
             };
 
-            <span class="kw">let </span>analytics_response = analytics(
+            <span class="kw">let </span>analytics_response = get_analytics(
                 app.clone(),
                 <span class="prelude-val">None</span>,
                 Extension(GET_ANALYTICS_ALLOWED_KEYS.clone()),
@@ -1810,7 +1810,7 @@
                 ..Default::default()
             };
 
-            <span class="kw">let </span>analytics_response = analytics(
+            <span class="kw">let </span>analytics_response = get_analytics(
                 app.clone(),
                 <span class="prelude-val">None</span>,
                 Extension(GET_ANALYTICS_ALLOWED_KEYS.clone()),
@@ -1853,7 +1853,7 @@
                 ..Default::default()
             };
 
-            <span class="kw">let </span>analytics_response = analytics(
+            <span class="kw">let </span>analytics_response = get_analytics(
                 app.clone(),
                 <span class="prelude-val">None</span>,
                 Extension(GET_ANALYTICS_ALLOWED_KEYS.clone()),
@@ -1895,7 +1895,7 @@
                 ..Default::default()
             };
 
-            <span class="kw">let </span>analytics_response = analytics(
+            <span class="kw">let </span>analytics_response = get_analytics(
                 app.clone(),
                 <span class="prelude-val">None</span>,
                 Extension(GET_ANALYTICS_ALLOWED_KEYS.clone()),
@@ -1921,7 +1921,7 @@
                 ..Default::default()
             };
 
-            <span class="kw">let </span>analytics_response = analytics(
+            <span class="kw">let </span>analytics_response = get_analytics(
                 app.clone(),
                 <span class="prelude-val">None</span>,
                 Extension(GET_ANALYTICS_ALLOWED_KEYS.clone()),
@@ -1946,7 +1946,7 @@
                 ..Default::default()
             };
 
-            <span class="kw">let </span>analytics_response = analytics(
+            <span class="kw">let </span>analytics_response = get_analytics(
                 app.clone(),
                 <span class="prelude-val">None</span>,
                 Extension(GET_ANALYTICS_ALLOWED_KEYS.clone()),
@@ -1986,7 +1986,7 @@
                 ..Default::default()
             };
 
-            <span class="kw">let </span>analytics_response = analytics(
+            <span class="kw">let </span>analytics_response = get_analytics(
                 app.clone(),
                 <span class="prelude-val">None</span>,
                 Extension(GET_ANALYTICS_ALLOWED_KEYS.clone()),
@@ -2023,7 +2023,7 @@
                 ..Default::default()
             };
 
-            <span class="kw">let </span>analytics_response = analytics(
+            <span class="kw">let </span>analytics_response = get_analytics(
                 app.clone(),
                 <span class="prelude-val">None</span>,
                 Extension(GET_ANALYTICS_ALLOWED_KEYS.clone()),
@@ -2062,7 +2062,7 @@
                 ..Default::default()
             };
 
-            <span class="kw">let </span>analytics_response = analytics(
+            <span class="kw">let </span>analytics_response = get_analytics(
                 app.clone(),
                 <span class="prelude-val">None</span>,
                 Extension(GET_ANALYTICS_ALLOWED_KEYS.clone()),
@@ -2100,7 +2100,7 @@
                 ..Default::default()
             };
 
-            <span class="kw">let </span>analytics_response = analytics(
+            <span class="kw">let </span>analytics_response = get_analytics(
                 app.clone(),
                 <span class="prelude-val">None</span>,
                 Extension(GET_ANALYTICS_ALLOWED_KEYS.clone()),
@@ -2138,7 +2138,7 @@
                 ..Default::default()
             };
 
-            <span class="kw">let </span>analytics_response = analytics(
+            <span class="kw">let </span>analytics_response = get_analytics(
                 app.clone(),
                 <span class="prelude-val">None</span>,
                 Extension(GET_ANALYTICS_ALLOWED_KEYS.clone()),
@@ -2178,7 +2178,7 @@
                 ..Default::default()
             };
 
-            <span class="kw">let </span>analytics_response = analytics(
+            <span class="kw">let </span>analytics_response = get_analytics(
                 app.clone(),
                 <span class="prelude-val">None</span>,
                 Extension(GET_ANALYTICS_ALLOWED_KEYS.clone()),
@@ -2420,7 +2420,7 @@
 
         <span class="comment">// test for publisher
         </span>{
-            <span class="kw">let </span>analytics_response = analytics(
+            <span class="kw">let </span>analytics_response = get_analytics(
                 app.clone(),
                 <span class="prelude-val">Some</span>(publisher_auth.clone()),
                 Extension(ALLOWED_KEYS.clone()),
@@ -2443,7 +2443,7 @@
 
         <span class="comment">// test for advertiser
         </span>{
-            <span class="kw">let </span>analytics_response = analytics(
+            <span class="kw">let </span>analytics_response = get_analytics(
                 app.clone(),
                 <span class="prelude-val">Some</span>(advertiser_auth.clone()),
                 Extension(ALLOWED_KEYS.clone()),
@@ -2465,7 +2465,7 @@
         }
         <span class="comment">// test for admin
         </span>{
-            <span class="kw">let </span>analytics_response = analytics(
+            <span class="kw">let </span>analytics_response = get_analytics(
                 app.clone(),
                 <span class="prelude-val">Some</span>(admin_auth.clone()),
                 Extension(ALLOWED_KEYS.clone()),
@@ -2512,7 +2512,7 @@
                 chains: <span class="macro">vec!</span>[GANACHE_1337.chain_id],
             };
 
-            <span class="kw">let </span>analytics_response = analytics(
+            <span class="kw">let </span>analytics_response = get_analytics(
                 app.clone(),
                 <span class="prelude-val">Some</span>(admin_auth.clone()),
                 Extension(ALLOWED_KEYS.clone()),
@@ -2533,7 +2533,7 @@
 
         <span class="comment">// test for admin with a different chain
         </span>{
-            <span class="kw">let </span>analytics_response = analytics(
+            <span class="kw">let </span>analytics_response = get_analytics(
                 app.clone(),
                 <span class="prelude-val">Some</span>(admin_auth_other_chain.clone()),
                 Extension(ALLOWED_KEYS.clone()),
@@ -2569,4 +2569,4 @@
     </span>}
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (02654a084 2022-08-30)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9243168fa 2022-08-31)" ></div></body></html>

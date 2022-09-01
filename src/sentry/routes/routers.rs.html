@@ -254,7 +254,7 @@
         channel::channel_load,
     },
     routes::{
-        analytics::{analytics, GET_ANALYTICS_ALLOWED_KEYS},
+        analytics::{get_analytics, GET_ANALYTICS_ALLOWED_KEYS},
         campaign,
         channel::{
             add_spender_leaf, channel_dummy_deposit, channel_list, channel_payout,
@@ -399,7 +399,7 @@
     <span class="kw">let </span>authenticated_analytics = Router::new()
         .route(
             <span class="string">&quot;/for-advertiser&quot;</span>,
-            get(analytics::&lt;C&gt;).route_layer(
+            get(get_analytics::&lt;C&gt;).route_layer(
                 ServiceBuilder::new()
                     .layer(middleware::from_fn(authenticate_as_advertiser))
                     .layer(Extension(ALLOWED_KEYS.clone())),
@@ -407,7 +407,7 @@
         )
         .route(
             <span class="string">&quot;/for-publisher&quot;</span>,
-            get(analytics::&lt;C&gt;).route_layer(
+            get(get_analytics::&lt;C&gt;).route_layer(
                 ServiceBuilder::new()
                     .layer(middleware::from_fn(authenticate_as_publisher))
                     .layer(Extension(ALLOWED_KEYS.clone())),
@@ -415,7 +415,7 @@
         )
         .route(
             <span class="string">&quot;/for-admin&quot;</span>,
-            get(analytics::&lt;C&gt;).route_layer(
+            get(get_analytics::&lt;C&gt;).route_layer(
                 ServiceBuilder::new()
                     .layer(middleware::from_fn(is_admin::&lt;C, <span class="kw">_</span>&gt;))
                     .layer(Extension(ALLOWED_KEYS.clone())),
@@ -432,9 +432,9 @@
         .route(
             <span class="string">&quot;/&quot;</span>,
             <span class="comment">// only some keys are allowed for the default analytics route
-            </span>get(analytics::&lt;C&gt;).route_layer(Extension(GET_ANALYTICS_ALLOWED_KEYS.clone())),
+            </span>get(get_analytics::&lt;C&gt;).route_layer(Extension(GET_ANALYTICS_ALLOWED_KEYS.clone())),
         )
         .merge(authenticated_analytics)
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (02654a084 2022-08-30)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9243168fa 2022-08-31)" ></div></body></html>

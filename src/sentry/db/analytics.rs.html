@@ -933,7 +933,7 @@
 
 <span class="kw">use super</span>::{DbPool, PoolError};
 
-<span class="kw">pub async fn </span>get_analytics(
+<span class="kw">pub async fn </span>fetch_analytics(
     pool: <span class="kw-2">&amp;</span>DbPool,
     query: AnalyticsQuery,
     allowed_keys: HashSet&lt;AllowedKey&gt;,
@@ -1104,7 +1104,7 @@
     <span class="kw">use </span><span class="kw">crate</span>::db::tests_postgres::{setup_test_migrations, DATABASE_POOL};
 
     <span class="attribute">#[tokio::test]
-    </span><span class="kw">async fn </span>insert_update_and_get_analytics() {
+    </span><span class="kw">async fn </span>insert_update_and_fetch_analytics() {
         <span class="kw">let </span>database = DATABASE_POOL.get().<span class="kw">await</span>.expect(<span class="string">&quot;Should get a DB pool&quot;</span>);
 
         <span class="kw">let </span>ad_unit = DUMMY_AD_UNITS[<span class="number">0</span>].clone();
@@ -1317,7 +1317,7 @@
 
         <span class="comment">// Impression query - should count all inserted Analytics
         </span>{
-            <span class="kw">let </span>count_impressions = get_analytics(
+            <span class="kw">let </span>count_impressions = fetch_analytics(
                 <span class="kw-2">&amp;</span>database.pool,
                 impression_query.clone(),
                 ALLOWED_KEYS.clone(),
@@ -1360,7 +1360,7 @@
             <span class="kw">let </span><span class="kw-2">mut </span>paid_impressions_query = impression_query.clone();
             paid_impressions_query.metric = Metric::Paid;
 
-            <span class="kw">let </span>paid_impressions = get_analytics(
+            <span class="kw">let </span>paid_impressions = fetch_analytics(
                 <span class="kw-2">&amp;</span>database.pool,
                 paid_impressions_query,
                 ALLOWED_KEYS.clone(),
@@ -1422,7 +1422,7 @@
 
         <span class="comment">// Click query - should count all inserted Analytics
         </span>{
-            <span class="kw">let </span>count_clicks = get_analytics(
+            <span class="kw">let </span>count_clicks = fetch_analytics(
                 <span class="kw-2">&amp;</span>database.pool,
                 click_query.clone(),
                 ALLOWED_KEYS.clone(),
@@ -1465,7 +1465,7 @@
             <span class="kw">let </span><span class="kw-2">mut </span>paid_clicks_query = impression_query.clone();
             paid_clicks_query.metric = Metric::Paid;
 
-            <span class="kw">let </span>paid_impressions = get_analytics(
+            <span class="kw">let </span>paid_impressions = fetch_analytics(
                 <span class="kw-2">&amp;</span>database.pool,
                 paid_clicks_query,
                 ALLOWED_KEYS.clone(),
@@ -1519,7 +1519,7 @@
             };
             click_germany_query.country = <span class="prelude-val">Some</span>(<span class="string">&quot;Germany&quot;</span>.into());
 
-            <span class="kw">let </span>count_clicks = get_analytics(
+            <span class="kw">let </span>count_clicks = fetch_analytics(
                 <span class="kw-2">&amp;</span>database.pool,
                 click_germany_query.clone(),
                 ALLOWED_KEYS.clone(),
@@ -1570,7 +1570,7 @@
                 chains: <span class="macro">vec!</span>[],
             };
 
-            <span class="kw">let </span>count_impressions = get_analytics(
+            <span class="kw">let </span>count_impressions = fetch_analytics(
                 <span class="kw-2">&amp;</span>database.pool,
                 ad_unit_2_query.clone(),
                 ALLOWED_KEYS.clone(),
@@ -1626,7 +1626,7 @@
                 chains: <span class="macro">vec!</span>[],
             };
 
-            <span class="kw">let </span>count_impressions = get_analytics(
+            <span class="kw">let </span>count_impressions = fetch_analytics(
                 <span class="kw-2">&amp;</span>database.pool,
                 filter_by_publisher_2_query.clone(),
                 ALLOWED_KEYS.clone(),
@@ -1682,7 +1682,7 @@
                 chains: <span class="macro">vec!</span>[],
             };
 
-            <span class="kw">let </span>count_impressions = get_analytics(
+            <span class="kw">let </span>count_impressions = fetch_analytics(
                 <span class="kw-2">&amp;</span>database.pool,
                 authenticate_as_publisher_2_query.clone(),
                 ALLOWED_KEYS.clone(),
@@ -1738,7 +1738,7 @@
                 chains: <span class="macro">vec!</span>[],
             };
 
-            <span class="kw">let </span>count_impressions = get_analytics(
+            <span class="kw">let </span>count_impressions = fetch_analytics(
                 <span class="kw-2">&amp;</span>database.pool,
                 segment_ad_units_query.clone(),
                 ALLOWED_KEYS.clone(),
@@ -1847,4 +1847,4 @@
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (02654a084 2022-08-30)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9243168fa 2022-08-31)" ></div></body></html>
