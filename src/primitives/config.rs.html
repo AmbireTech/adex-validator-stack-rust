@@ -393,7 +393,7 @@
 /// ```
 </span><span class="attribute">#[doc = <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/get_cfg_response.rs&quot;</span>)]
 </span><span class="doccomment">/// ```
-</span><span class="attribute">#[derive(Serialize, Deserialize, Debug, Clone)]
+</span><span class="attribute">#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 </span><span class="kw">pub struct </span>Config {
     <span class="doccomment">/// The maximum number of [`Channel`](crate::Channel)s that the worker
     /// can process for one tick.
@@ -553,7 +553,7 @@
     }
 }
 
-<span class="attribute">#[derive(Serialize, Deserialize, Debug, Clone)]
+<span class="attribute">#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 </span><span class="kw">pub struct </span>PlatformConfig {
     <span class="kw">pub </span>url: ApiUrl,
     <span class="attribute">#[serde(with = <span class="string">&quot;std_duration_millis&quot;</span>)]
@@ -589,7 +589,7 @@
     <span class="kw">pub </span>address: Address,
 }
 
-<span class="attribute">#[derive(Serialize, Deserialize, Debug, Clone)]
+<span class="attribute">#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 </span><span class="kw">pub struct </span>Limits {
     <span class="kw">pub </span>units_for_slot: limits::UnitsForSlot,
 }
@@ -631,7 +631,7 @@
     <span class="kw">use </span><span class="kw">crate</span>::UnifiedNum;
 
     <span class="doccomment">/// Limits applied to the `POST /units-for-slot` route
-    </span><span class="attribute">#[derive(Serialize, Deserialize, Debug, Clone)]
+    </span><span class="attribute">#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
     </span><span class="kw">pub struct </span>UnitsForSlot {
         <span class="doccomment">/// The maximum number of campaigns a publisher can earn from.
         /// This will limit the returned Campaigns to the set number.

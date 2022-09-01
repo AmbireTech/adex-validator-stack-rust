@@ -1346,7 +1346,7 @@ Applies <a href="../../primitives/campaign/struct.Campaign.html#structfield.even
 <h6 id="examples-17"><a href="#examples-17">Examples</a></h6>
 <p>Response:</p>
 
-<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>primitives::Config;
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>primitives::{config::GANACHE_CONFIG, Config};
 <span class="kw">use </span>serde_json::{from_value, json};
 
 <span class="kw">fn </span>main() {
@@ -1370,8 +1370,16 @@ Applies <a href="../../primitives/campaign/struct.Campaign.html#structfield.even
         <span class="string">&quot;type&quot;</span>: <span class="string">&quot;ip&quot;</span>,
         <span class="string">&quot;timeframe&quot;</span>: <span class="number">1200000
       </span>},
-      <span class="string">&quot;creators_whitelist&quot;</span>: [],
-      <span class="string">&quot;validators_whitelist&quot;</span>: [],
+      <span class="string">&quot;creators_whitelist&quot;</span>: [
+        <span class="string">&quot;0xaCBaDA2d5830d1875ae3D2de207A1363B316Df2F&quot;</span>,
+        <span class="string">&quot;0xDd589B43793934EF6Ad266067A0d1D4896b0dff0&quot;</span>,
+        <span class="string">&quot;0x541b401362Ea1D489D322579552B099e801F3632&quot;
+      </span>],
+      <span class="string">&quot;validators_whitelist&quot;</span>: [
+        <span class="string">&quot;0x80690751969B234697e9059e04ed72195c3507fa&quot;</span>,
+        <span class="string">&quot;0xf3f583AEC5f7C030722Fe992A5688557e1B86ef7&quot;</span>,
+        <span class="string">&quot;0x6B83e7D6B72c098d48968441e0d05658dc17Adb9&quot;
+      </span>],
       <span class="string">&quot;admins&quot;</span>: [
         <span class="string">&quot;0x80690751969B234697e9059e04ed72195c3507fa&quot;
       </span>],
@@ -1414,7 +1422,10 @@ Applies <a href="../../primitives/campaign/struct.Campaign.html#structfield.even
         </span>}
       }
     });
-    <span class="macro">assert!</span>(from_value::&lt;Config&gt;(json).is_ok());
+    <span class="macro">assert_eq!</span>(
+        from_value::&lt;Config&gt;(json).expect(<span class="string">&quot;Should deserialize&quot;</span>),
+        GANACHE_CONFIG.clone()
+    );
 }</code></pre></div>
 </div></details><h2 id="modules" class="small-section-header"><a href="#modules">Modules</a></h2><div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="mod" href="campaign/index.html" title="sentry::routes::campaign mod">campaign</a></div><div class="item-right docblock-short"><p><code>/v5/campaign</code> routes</p>
 </div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="channel/index.html" title="sentry::routes::channel mod">channel</a></div><div class="item-right docblock-short"><p><code>/v5/channel</code> routes</p>
