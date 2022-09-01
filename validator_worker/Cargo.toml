@@ -16,7 +16,7 @@ path = "src/lib.rs"
 
 [dependencies]
 # Primitve
-primitives = { path = "../primitives", features = ["test-util"] }
+primitives = { version = "0.2", path = "../primitives", features = ["test-util"] }
 adapter = { version = "0.2", path = "../adapter", features = ["test-util"] }
 chrono = { version = "0.4", features = ["serde"] }
 num = "0.4"

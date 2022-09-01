@@ -11,7 +11,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
 # Domain
-adex_primitives = { version = "0.2.0", path = "../primitives", package = "primitives" }
+adex_primitives = { version = "0.2", path = "../primitives", package = "primitives" }
 chrono = "0.4"
 num-integer = "0.1"
 # (De)Serialization & Http requests
@@ -30,4 +30,4 @@ rand = "0.8"
 
 [dev-dependencies]
 # enable the `test-util` only in dev
-adex_primitives = { version = "0.2.0", path = "../primitives", package = "primitives", features = ["test-util"] }
+adex_primitives = { version = "0.2", path = "../primitives", package = "primitives", features = ["test-util"] }
