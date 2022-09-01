@@ -118,7 +118,7 @@ mod test {
 
     use super::*;
     use adapter::ethereum::test_util::{GANACHE_1, GANACHE_1337};
-    use chrono::Utc;
+    use chrono::{Datelike, Utc};
     use primitives::{
         analytics::{
             query::{AllowedKey, Time},
@@ -827,8 +827,16 @@ mod test {
 
             let fetched_analytics = analytics_response.0.analytics;
 
+            // because data is grouped by month, when it's the 1st day of the month
+            // and the CI runs, this causes a failing test.
+            let expected = if Utc::today().day() == 1 {
+                vec![FetchedMetric::Count(58), FetchedMetric::Count(42)]
+            } else {
+                vec![FetchedMetric::Count(100)]
+            };
+
             assert_eq!(
-                vec![FetchedMetric::Count(100)],
+                expected,
                 fetched_analytics
                     .iter()
                     .map(|fetched| fetched.value)
