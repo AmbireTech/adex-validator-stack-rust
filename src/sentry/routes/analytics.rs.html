@@ -1283,6 +1283,14 @@
 <span id="1283">1283</span>
 <span id="1284">1284</span>
 <span id="1285">1285</span>
+<span id="1286">1286</span>
+<span id="1287">1287</span>
+<span id="1288">1288</span>
+<span id="1289">1289</span>
+<span id="1290">1290</span>
+<span id="1291">1291</span>
+<span id="1292">1292</span>
+<span id="1293">1293</span>
 </pre><pre class="rust"><code><span class="doccomment">//! `/v5/analytics` routes
 //!
 
@@ -1403,7 +1411,7 @@
 
     <span class="kw">use super</span>::<span class="kw-2">*</span>;
     <span class="kw">use </span>adapter::ethereum::test_util::{GANACHE_1, GANACHE_1337};
-    <span class="kw">use </span>chrono::Utc;
+    <span class="kw">use </span>chrono::{Datelike, Utc};
     <span class="kw">use </span>primitives::{
         analytics::{
             query::{AllowedKey, Time},
@@ -2112,8 +2120,16 @@
 
             <span class="kw">let </span>fetched_analytics = analytics_response.<span class="number">0</span>.analytics;
 
+            <span class="comment">// because data is grouped by month, when it&#39;s the 1st day of the month
+            // and the CI runs, this causes a failing test.
+            </span><span class="kw">let </span>expected = <span class="kw">if </span>Utc::today().day() == <span class="number">1 </span>{
+                <span class="macro">vec!</span>[FetchedMetric::Count(<span class="number">58</span>), FetchedMetric::Count(<span class="number">42</span>)]
+            } <span class="kw">else </span>{
+                <span class="macro">vec!</span>[FetchedMetric::Count(<span class="number">100</span>)]
+            };
+
             <span class="macro">assert_eq!</span>(
-                <span class="macro">vec!</span>[FetchedMetric::Count(<span class="number">100</span>)],
+                expected,
                 fetched_analytics
                     .iter()
                     .map(|fetched| fetched.value)
