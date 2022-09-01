@@ -77,6 +77,7 @@ name = "validator_messages_list_response"
 
 [[example]]
 name = "get_cfg_response"
+required-features = ["test-util"]
 
 [dependencies]
 # (De)Serialization

@@ -1,4 +1,4 @@
-use primitives::Config;
+use primitives::{config::GANACHE_CONFIG, Config};
 use serde_json::{from_value, json};
 
 fn main() {
@@ -22,8 +22,16 @@ fn main() {
         "type": "ip",
         "timeframe": 1200000
       },
-      "creators_whitelist": [],
-      "validators_whitelist": [],
+      "creators_whitelist": [
+        "0xaCBaDA2d5830d1875ae3D2de207A1363B316Df2F",
+        "0xDd589B43793934EF6Ad266067A0d1D4896b0dff0",
+        "0x541b401362Ea1D489D322579552B099e801F3632"
+      ],
+      "validators_whitelist": [
+        "0x80690751969B234697e9059e04ed72195c3507fa",
+        "0xf3f583AEC5f7C030722Fe992A5688557e1B86ef7",
+        "0x6B83e7D6B72c098d48968441e0d05658dc17Adb9"
+      ],
       "admins": [
         "0x80690751969B234697e9059e04ed72195c3507fa"
       ],
@@ -66,5 +74,8 @@ fn main() {
         }
       }
     });
-    assert!(from_value::<Config>(json).is_ok());
+    assert_eq!(
+        from_value::<Config>(json).expect("Should deserialize"),
+        GANACHE_CONFIG.clone()
+    );
 }

@@ -51,7 +51,7 @@ impl Default for Environment {
 /// ```
 #[doc = include_str!("../../primitives/examples/get_cfg_response.rs")]
 /// ```
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct Config {
     /// The maximum number of [`Channel`](crate::Channel)s that the worker
     /// can process for one tick.
@@ -211,7 +211,7 @@ impl Config {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct PlatformConfig {
     pub url: ApiUrl,
     #[serde(with = "std_duration_millis")]
@@ -247,7 +247,7 @@ pub struct TokenInfo {
     pub address: Address,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct Limits {
     pub units_for_slot: limits::UnitsForSlot,
 }
@@ -289,7 +289,7 @@ pub mod limits {
     use crate::UnifiedNum;
 
     /// Limits applied to the `POST /units-for-slot` route
-    #[derive(Serialize, Deserialize, Debug, Clone)]
+    #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
     pub struct UnitsForSlot {
         /// The maximum number of campaigns a publisher can earn from.
         /// This will limit the returned Campaigns to the set number.
