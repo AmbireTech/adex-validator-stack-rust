@@ -3,8 +3,8 @@ use tokio_postgres::types::ToSql;
 
 use primitives::{
     balances::UncheckedState,
-    sentry::{MessageResponse, ValidatorMessage},
-    validator::{ApproveState, Heartbeat, MessageTypes, NewState},
+    sentry::{message::MessageResponse, validator_messages::ValidatorMessage},
+    validator::{ApproveState, Heartbeat, MessageType, MessageTypes, NewState},
     Channel, ChannelId, ValidatorId,
 };
 
@@ -39,7 +39,7 @@ pub async fn get_validator_messages(
     pool: &DbPool,
     channel_id: &ChannelId,
     validator_id: &Option<ValidatorId>,
-    message_types: &[String],
+    message_types: &[MessageType],
     limit: u64,
 ) -> Result<Vec<ValidatorMessage>, PoolError> {
     let client = pool.get().await?;
@@ -69,7 +69,7 @@ pub async fn get_validator_messages(
 fn add_message_types_params<'a>(
     where_clauses: &mut Vec<String>,
     params: &mut Vec<&'a (dyn ToSql + Sync)>,
-    message_types: &'a [String],
+    message_types: &'a [MessageType],
 ) {
     let mut msg_prep = vec![];
     for message_type in message_types.iter() {

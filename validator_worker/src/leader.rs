@@ -3,7 +3,7 @@ use thiserror::Error;
 use adapter::{prelude::*, Error as AdapterError};
 use primitives::{
     balances::CheckedState,
-    validator::{MessageError, MessageTypes, NewState},
+    validator::{MessageError, MessageType, MessageTypes, NewState},
     Balances, ChainOf, Channel,
 };
 
@@ -51,7 +51,7 @@ pub async fn tick<C: Unlocked + 'static>(
                 false
             } else {
                 let latest_new_state = sentry
-                    .get_our_latest_msg(channel.id(), &["NewState"])
+                    .get_our_latest_msg(channel.id(), &[MessageType::NewState])
                     .await?
                     .map(NewState::<CheckedState>::try_from)
                     .transpose()?;
@@ -138,7 +138,10 @@ mod test {
         balances::UncheckedState,
         campaign::Validators,
         config::GANACHE_CONFIG,
-        sentry::{SuccessResponse, ValidatorMessage, ValidatorMessagesListResponse},
+        sentry::{
+            validator_messages::{ValidatorMessage, ValidatorMessagesListResponse},
+            SuccessResponse,
+        },
         test_util::{
             discard_logger, ADVERTISER, CREATOR, DUMMY_AUTH, DUMMY_CAMPAIGN,
             DUMMY_VALIDATOR_FOLLOWER, DUMMY_VALIDATOR_LEADER, FOLLOWER, IDS, LEADER, PUBLISHER,

@@ -1,4 +1,4 @@
-use primitives::sentry::ValidatorMessagesListQuery;
+use primitives::sentry::validator_messages::ValidatorMessagesListQuery;
 
 fn main() {
     // Empty query - default values only
