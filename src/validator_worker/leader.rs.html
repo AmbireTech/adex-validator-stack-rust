@@ -423,12 +423,15 @@
 <span id="423">423</span>
 <span id="424">424</span>
 <span id="425">425</span>
+<span id="426">426</span>
+<span id="427">427</span>
+<span id="428">428</span>
 </pre><pre class="rust"><code><span class="kw">use </span>thiserror::Error;
 
 <span class="kw">use </span>adapter::{prelude::<span class="kw-2">*</span>, Error <span class="kw">as </span>AdapterError};
 <span class="kw">use </span>primitives::{
     balances::CheckedState,
-    validator::{MessageError, MessageTypes, NewState},
+    validator::{MessageError, MessageType, MessageTypes, NewState},
     Balances, ChainOf, Channel,
 };
 
@@ -476,7 +479,7 @@
                 <span class="bool-val">false
             </span>} <span class="kw">else </span>{
                 <span class="kw">let </span>latest_new_state = sentry
-                    .get_our_latest_msg(channel.id(), <span class="kw-2">&amp;</span>[<span class="string">&quot;NewState&quot;</span>])
+                    .get_our_latest_msg(channel.id(), <span class="kw-2">&amp;</span>[MessageType::NewState])
                     .<span class="kw">await</span><span class="question-mark">?
                     </span>.map(NewState::&lt;CheckedState&gt;::try_from)
                     .transpose()<span class="question-mark">?</span>;
@@ -563,7 +566,10 @@
         balances::UncheckedState,
         campaign::Validators,
         config::GANACHE_CONFIG,
-        sentry::{SuccessResponse, ValidatorMessage, ValidatorMessagesListResponse},
+        sentry::{
+            validator_messages::{ValidatorMessage, ValidatorMessagesListResponse},
+            SuccessResponse,
+        },
         test_util::{
             discard_logger, ADVERTISER, CREATOR, DUMMY_AUTH, DUMMY_CAMPAIGN,
             DUMMY_VALIDATOR_FOLLOWER, DUMMY_VALIDATOR_LEADER, FOLLOWER, IDS, LEADER, PUBLISHER,

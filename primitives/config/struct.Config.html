@@ -119,12 +119,12 @@ returned by Sentry’s GET <code>/v5/channel/0xXXX.../spender/all</code> route.<
 <p>The <a href="../struct.Channel.html"><code>Channel</code></a>s’ tick and the wait time should both
 finish before running a new tick in the Validator Worker.</p>
 <p>In milliseconds</p>
-</div><span id="structfield.msgs_find_limit" class="structfield small-section-header"><a href="#structfield.msgs_find_limit" class="anchor field"></a><code>msgs_find_limit: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.u32.html">u32</a></code></span><div class="docblock"><p>The maximum allowed limit of <a href="../sentry/struct.ValidatorMessage.html"><code>ValidatorMessage</code></a>s per page
+</div><span id="structfield.msgs_find_limit" class="structfield small-section-header"><a href="#structfield.msgs_find_limit" class="anchor field"></a><code>msgs_find_limit: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.u32.html">u32</a></code></span><div class="docblock"><p>The maximum allowed limit of <a href="../sentry/validator_messages/struct.ValidatorMessage.html"><code>ValidatorMessage</code></a>s per page
 returned by Sentry’s GET <code>/v5/channel/0xXXX.../validator-messages</code> route.</p>
 <p>Request query also has a <code>limit</code> parameter, which can be used to return
 &lt;= <code>msgs_find_limit</code> messages in the request.</p>
-<p>Also see: <a href="../sentry/struct.ValidatorMessagesListResponse.html"><code>ValidatorMessagesListResponse</code></a>,
-<a href="../sentry/struct.ValidatorMessagesListQuery.html"><code>ValidatorMessagesListQuery</code></a></p>
+<p>Also see: <a href="../sentry/validator_messages/struct.ValidatorMessagesListResponse.html"><code>ValidatorMessagesListResponse</code></a>,
+<a href="../sentry/validator_messages/struct.ValidatorMessagesListQuery.html"><code>ValidatorMessagesListQuery</code></a></p>
 </div><span id="structfield.analytics_find_limit" class="structfield small-section-header"><a href="#structfield.analytics_find_limit" class="anchor field"></a><code>analytics_find_limit: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.u32.html">u32</a></code></span><div class="docblock"><p>The maximum allowed limit of <a href="../sentry/struct.FetchedAnalytics.html"><code>FetchedAnalytics</code></a>s per page
 returned by Sentry’s GET <code>/v5/analytics</code> routes:</p>
 <ul>

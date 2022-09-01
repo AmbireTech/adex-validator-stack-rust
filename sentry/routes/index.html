@@ -238,12 +238,12 @@ validator <a href="../../primitives/validator/messages/enum.MessageTypes.html"><
 </li>
 </ul>
 <p>The route is handled by <a href="channel/validator_message/fn.list_validator_messages.html" title="channel::validator_message::list_validator_messages()"><code>channel::validator_message::list_validator_messages()</code></a>.</p>
-<p>Request query parameters: <a href="../../primitives/sentry/struct.ValidatorMessagesListQuery.html"><code>ValidatorMessagesListQuery</code></a></p>
-<p>Response: <a href="../../primitives/sentry/struct.ValidatorMessagesListResponse.html"><code>ValidatorMessagesListResponse</code></a></p>
+<p>Request query parameters: <a href="../../primitives/sentry/validator_messages/struct.ValidatorMessagesListQuery.html"><code>ValidatorMessagesListQuery</code></a></p>
+<p>Response: <a href="../../primitives/sentry/validator_messages/struct.ValidatorMessagesListResponse.html"><code>ValidatorMessagesListResponse</code></a></p>
 <h6 id="examples-4"><a href="#examples-4">Examples</a></h6>
 <p>Query:</p>
 
-<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>primitives::sentry::ValidatorMessagesListQuery;
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>primitives::sentry::validator_messages::ValidatorMessagesListQuery;
 
 <span class="kw">fn </span>main() {
     <span class="comment">// Empty query - default values only
@@ -263,7 +263,7 @@ validator <a href="../../primitives/validator/messages/enum.MessageTypes.html"><
 }</code></pre></div>
 <p>Response:</p>
 
-<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>primitives::sentry::ValidatorMessagesListResponse;
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>primitives::sentry::validator_messages::ValidatorMessagesListResponse;
 <span class="kw">use </span>serde_json::{from_value, json};
 
 <span class="kw">fn </span>main() {
@@ -321,12 +321,12 @@ used when propagating messages from the validator worker.</p>
 <p><strong>Authentication is required</strong> to validate that the <a href="../struct.Auth.html#structfield.uid"><code>Auth.uid</code></a> is either
 the <a href="../../primitives/channel/struct.Channel.html#structfield.leader"><code>Channel.leader</code></a> or <a href="../../primitives/channel/struct.Channel.html#structfield.follower"><code>Channel.follower</code></a>.</p>
 <p>The route is handled by <a href="channel/validator_message/fn.create_validator_messages.html" title="channel::validator_message::create_validator_messages()"><code>channel::validator_message::create_validator_messages()</code></a>.</p>
-<p>Request body (json): <a href="../../primitives/sentry/struct.ValidatorMessagesCreateRequest.html"><code>ValidatorMessagesCreateRequest</code></a></p>
+<p>Request body (json): <a href="../../primitives/sentry/validator_messages/struct.ValidatorMessagesCreateRequest.html"><code>ValidatorMessagesCreateRequest</code></a></p>
 <p>Response: <a href="../../primitives/sentry/struct.SuccessResponse.html"><code>SuccessResponse</code></a></p>
 <h6 id="examples-5"><a href="#examples-5">Examples</a></h6>
 <p>Request:</p>
 
-<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>primitives::sentry::ValidatorMessagesCreateRequest;
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>primitives::sentry::validator_messages::ValidatorMessagesCreateRequest;
 <span class="kw">use </span>serde_json::{from_value, json};
 
 <span class="kw">fn </span>main() {

@@ -421,14 +421,14 @@
     /// In milliseconds
     </span><span class="attribute">#[serde(with = <span class="string">&quot;std_duration_millis&quot;</span>)]
     </span><span class="kw">pub </span>wait_time: Duration,
-    <span class="doccomment">/// The maximum allowed limit of [`ValidatorMessage`](crate::sentry::ValidatorMessage)s per page
+    <span class="doccomment">/// The maximum allowed limit of [`ValidatorMessage`](crate::sentry::validator_messages::ValidatorMessage)s per page
     /// returned by Sentry&#39;s GET `/v5/channel/0xXXX.../validator-messages` route.
     ///
     /// Request query also has a `limit` parameter, which can be used to return
     /// &lt;= `msgs_find_limit` messages in the request.
     ///
-    /// Also see: [`ValidatorMessagesListResponse`](crate::sentry::ValidatorMessagesListResponse),
-    /// [`ValidatorMessagesListQuery`](crate::sentry::ValidatorMessagesListQuery)
+    /// Also see: [`ValidatorMessagesListResponse`](crate::sentry::validator_messages::ValidatorMessagesListResponse),
+    /// [`ValidatorMessagesListQuery`](crate::sentry::validator_messages::ValidatorMessagesListQuery)
     </span><span class="kw">pub </span>msgs_find_limit: u32,
     <span class="doccomment">/// The maximum allowed limit of [`FetchedAnalytics`](crate::sentry::FetchedAnalytics)s per page
     /// returned by Sentry&#39;s GET `/v5/analytics` routes:

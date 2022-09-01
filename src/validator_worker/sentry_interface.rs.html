@@ -1045,6 +1045,36 @@
 <span id="1045">1045</span>
 <span id="1046">1046</span>
 <span id="1047">1047</span>
+<span id="1048">1048</span>
+<span id="1049">1049</span>
+<span id="1050">1050</span>
+<span id="1051">1051</span>
+<span id="1052">1052</span>
+<span id="1053">1053</span>
+<span id="1054">1054</span>
+<span id="1055">1055</span>
+<span id="1056">1056</span>
+<span id="1057">1057</span>
+<span id="1058">1058</span>
+<span id="1059">1059</span>
+<span id="1060">1060</span>
+<span id="1061">1061</span>
+<span id="1062">1062</span>
+<span id="1063">1063</span>
+<span id="1064">1064</span>
+<span id="1065">1065</span>
+<span id="1066">1066</span>
+<span id="1067">1067</span>
+<span id="1068">1068</span>
+<span id="1069">1069</span>
+<span id="1070">1070</span>
+<span id="1071">1071</span>
+<span id="1072">1072</span>
+<span id="1073">1073</span>
+<span id="1074">1074</span>
+<span id="1075">1075</span>
+<span id="1076">1076</span>
+<span id="1077">1077</span>
 </pre><pre class="rust"><code><span class="kw">use </span>std::{
     collections::{hash_map::Entry, HashMap, HashSet},
     time::Duration,
@@ -1058,12 +1088,14 @@
 <span class="kw">use </span>primitives::{
     balances::{CheckedState, UncheckedState},
     sentry::{
+        validator_messages::{
+            MessageTypesFilter, ValidatorMessagesCreateRequest, ValidatorMessagesListResponse,
+        },
         AccountingResponse, AllSpendersResponse, LastApprovedResponse, SuccessResponse,
-        ValidatorMessagesCreateRequest, ValidatorMessagesListResponse,
     },
     spender::Spender,
     util::ApiUrl,
-    validator::MessageTypes,
+    validator::{MessageType, MessageTypes},
     Address, ChainId, ChainOf, Channel, ChannelId, Config, ValidatorId,
 };
 <span class="kw">use </span>thiserror::Error;
@@ -1243,15 +1275,16 @@
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         channel: ChannelId,
         from: ValidatorId,
-        message_types: <span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span>str],
+        message_types: <span class="kw-2">&amp;</span>[MessageType],
     ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;MessageTypes&gt;, Error&gt; {
-        <span class="kw">let </span>message_type = message_types.join(<span class="string">&quot;+&quot;</span>);
+        <span class="kw">let </span>messages_filter = MessageTypesFilter(message_types.to_vec());
+        <span class="kw">let </span>messages_encoded = urlencoding::Encoded(messages_filter.to_string());
 
         <span class="kw">let </span>endpoint = <span class="self">self
             </span>.sentry_url
             .join(<span class="kw-2">&amp;</span><span class="macro">format!</span>(
                 <span class="string">&quot;v5/channel/{}/validator-messages/{}/{}?limit=1&quot;</span>,
-                channel, from, message_type
+                channel, from, messages_encoded
             ))
             .expect(<span class="string">&quot;Should not error when creating endpoint url&quot;</span>);
 
@@ -1269,7 +1302,7 @@
     <span class="kw">pub async fn </span>get_our_latest_msg(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         channel: ChannelId,
-        message_types: <span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span>str],
+        message_types: <span class="kw-2">&amp;</span>[MessageType],
     ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;MessageTypes&gt;, Error&gt; {
         <span class="self">self</span>.get_latest_msg(channel, <span class="self">self</span>.adapter.whoami(), message_types)
             .<span class="kw">await
@@ -1688,6 +1721,33 @@
         matchers::{method, path, query_param},
         Mock, MockServer, ResponseTemplate,
     };
+
+    <span class="attribute">#[test]
+    </span><span class="kw">fn </span>test_message_types_filter_encoding() {
+        <span class="kw">let </span>cases = [
+            (<span class="string">&quot;&quot;</span>, <span class="macro">vec!</span>[]),
+            (
+                <span class="string">&quot;NewState%2BApproveState&quot;</span>,
+                <span class="macro">vec!</span>[MessageType::NewState, MessageType::ApproveState],
+            ),
+            (
+                <span class="string">&quot;NewState%2BApproveState%2BRejectState&quot;</span>,
+                <span class="macro">vec!</span>[
+                    MessageType::NewState,
+                    MessageType::ApproveState,
+                    MessageType::RejectState,
+                ],
+            ),
+        ];
+
+        <span class="kw">for </span>(expected_urlencoded, message_types) <span class="kw">in </span>cases {
+            <span class="kw">let </span>filter = MessageTypesFilter(message_types);
+            <span class="kw">let </span>message_types_filter = urlencoding::Encoded(filter.to_string());
+
+            <span class="macro">assert_eq!</span>(expected_urlencoded, message_types_filter.to_str());
+            <span class="macro">assert_eq!</span>(expected_urlencoded, <span class="macro">format!</span>(<span class="string">&quot;{message_types_filter}&quot;</span>));
+        }
+    }
 
     <span class="doccomment">/// Uses the [`Dummy`] adapter with [`DUMMY_AUTH`] as the authentication tokens.
     /// Sentry url can be provided, for `wiremock` to be able to mock the calls in [`SentryApi`].

@@ -143,8 +143,8 @@
 
 <span class="kw">use </span>primitives::{
     balances::UncheckedState,
-    sentry::{MessageResponse, ValidatorMessage},
-    validator::{ApproveState, Heartbeat, MessageTypes, NewState},
+    sentry::{message::MessageResponse, validator_messages::ValidatorMessage},
+    validator::{ApproveState, Heartbeat, MessageType, MessageTypes, NewState},
     Channel, ChannelId, ValidatorId,
 };
 
@@ -179,7 +179,7 @@
     pool: <span class="kw-2">&amp;</span>DbPool,
     channel_id: <span class="kw-2">&amp;</span>ChannelId,
     validator_id: <span class="kw-2">&amp;</span><span class="prelude-ty">Option</span>&lt;ValidatorId&gt;,
-    message_types: <span class="kw-2">&amp;</span>[String],
+    message_types: <span class="kw-2">&amp;</span>[MessageType],
     limit: u64,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;ValidatorMessage&gt;, PoolError&gt; {
     <span class="kw">let </span>client = pool.get().<span class="kw">await</span><span class="question-mark">?</span>;
@@ -209,7 +209,7 @@
 <span class="kw">fn </span>add_message_types_params&lt;<span class="lifetime">&#39;a</span>&gt;(
     where_clauses: <span class="kw-2">&amp;mut </span>Vec&lt;String&gt;,
     params: <span class="kw-2">&amp;mut </span>Vec&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>(<span class="kw">dyn </span>ToSql + Sync)&gt;,
-    message_types: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>[String],
+    message_types: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>[MessageType],
 ) {
     <span class="kw">let </span><span class="kw-2">mut </span>msg_prep = <span class="macro">vec!</span>[];
     <span class="kw">for </span>message_type <span class="kw">in </span>message_types.iter() {

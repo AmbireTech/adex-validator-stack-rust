@@ -1057,6 +1057,10 @@
 <span id="1057">1057</span>
 <span id="1058">1058</span>
 <span id="1059">1059</span>
+<span id="1060">1060</span>
+<span id="1061">1061</span>
+<span id="1062">1062</span>
+<span id="1063">1063</span>
 </pre><pre class="rust"><code><span class="kw">use </span>std::{collections::HashMap, fmt};
 
 <span class="kw">use </span>adapter::{prelude::<span class="kw-2">*</span>, Error <span class="kw">as </span>AdapterError};
@@ -1064,7 +1068,7 @@
     balances,
     balances::{Balances, CheckedState, UncheckedState},
     spender::Spender,
-    validator::{ApproveState, MessageTypes, NewState, RejectState},
+    validator::{ApproveState, MessageType, MessageTypes, NewState, RejectState},
     Address, ChainOf, Channel, UnifiedNum,
 };
 
@@ -1159,14 +1163,17 @@
 
     <span class="comment">// if we don&#39;t have a `NewState` return `None`
     </span><span class="kw">let </span>new_msg = sentry
-        .get_latest_msg(channel_id, from, <span class="kw-2">&amp;</span>[<span class="string">&quot;NewState&quot;</span>])
+        .get_latest_msg(channel_id, from, <span class="kw-2">&amp;</span>[MessageType::NewState])
         .<span class="kw">await</span><span class="question-mark">?
         </span>.map(NewState::try_from)
         .transpose()
         .expect(<span class="string">&quot;Should always return a NewState message&quot;</span>);
 
     <span class="kw">let </span>our_latest_msg_response = sentry
-        .get_our_latest_msg(channel_id, <span class="kw-2">&amp;</span>[<span class="string">&quot;ApproveState&quot;</span>, <span class="string">&quot;RejectState&quot;</span>])
+        .get_our_latest_msg(
+            channel_id,
+            <span class="kw-2">&amp;</span>[MessageType::ApproveState, MessageType::RejectState],
+        )
         .<span class="kw">await</span><span class="question-mark">?</span>;
 
     <span class="kw">let </span>our_latest_msg_state_root = <span class="kw">match </span>our_latest_msg_response {
@@ -1404,8 +1411,9 @@
         campaign::Validators,
         config::GANACHE_CONFIG,
         sentry::{
-            message::Message, LastApproved, LastApprovedResponse, MessageResponse, SuccessResponse,
-            ValidatorMessage, ValidatorMessagesListResponse,
+            message::{Message, MessageResponse},
+            validator_messages::{ValidatorMessage, ValidatorMessagesListResponse},
+            LastApproved, LastApprovedResponse, SuccessResponse,
         },
         test_util::{
             discard_logger, ADVERTISER, CREATOR, DUMMY_AUTH, DUMMY_CAMPAIGN,
@@ -1547,7 +1555,7 @@
                 <span class="string">&quot;/follower/v5/channel/{}/validator-messages/{}/{}&quot;</span>,
                 DUMMY_CAMPAIGN.channel.id(),
                 DUMMY_CAMPAIGN.channel.leader,
-                <span class="string">&quot;ApproveState+RejectState&quot;</span>,
+                <span class="string">&quot;ApproveState%2BRejectState&quot;</span>,
             )))
             .and(query_param(<span class="string">&quot;limit&quot;</span>, <span class="string">&quot;1&quot;</span>))
             .respond_with(ResponseTemplate::new(<span class="number">200</span>).set_body_json(<span class="kw-2">&amp;</span>approve_state_res))
@@ -1578,7 +1586,7 @@
                 <span class="string">&quot;/follower/v5/channel/{}/validator-messages/{}/{}&quot;</span>,
                 DUMMY_CAMPAIGN.channel.id(),
                 DUMMY_CAMPAIGN.channel.leader,
-                <span class="string">&quot;ApproveState+RejectState&quot;</span>,
+                <span class="string">&quot;ApproveState%2BRejectState&quot;</span>,
             )))
             .and(query_param(<span class="string">&quot;limit&quot;</span>, <span class="string">&quot;1&quot;</span>))
             .respond_with(ResponseTemplate::new(<span class="number">200</span>).set_body_json(<span class="kw-2">&amp;</span>reject_state_res))

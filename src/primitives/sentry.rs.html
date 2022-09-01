@@ -1398,14 +1398,95 @@
 <span id="1398">1398</span>
 <span id="1399">1399</span>
 <span id="1400">1400</span>
-</pre><pre class="rust"><code><span class="kw">use crate</span>::{
-    analytics::{OperatingSystem, Timeframe},
-    balances::BalancesState,
-    spender::Spender,
-    validator::{ApproveState, Heartbeat, MessageTypes, NewState, Type <span class="kw">as </span>MessageType},
-    Address, Balances, CampaignId, ChainId, UnifiedMap, UnifiedNum, ValidatorId, IPFS,
-};
-<span class="kw">use </span>chrono::{
+<span id="1401">1401</span>
+<span id="1402">1402</span>
+<span id="1403">1403</span>
+<span id="1404">1404</span>
+<span id="1405">1405</span>
+<span id="1406">1406</span>
+<span id="1407">1407</span>
+<span id="1408">1408</span>
+<span id="1409">1409</span>
+<span id="1410">1410</span>
+<span id="1411">1411</span>
+<span id="1412">1412</span>
+<span id="1413">1413</span>
+<span id="1414">1414</span>
+<span id="1415">1415</span>
+<span id="1416">1416</span>
+<span id="1417">1417</span>
+<span id="1418">1418</span>
+<span id="1419">1419</span>
+<span id="1420">1420</span>
+<span id="1421">1421</span>
+<span id="1422">1422</span>
+<span id="1423">1423</span>
+<span id="1424">1424</span>
+<span id="1425">1425</span>
+<span id="1426">1426</span>
+<span id="1427">1427</span>
+<span id="1428">1428</span>
+<span id="1429">1429</span>
+<span id="1430">1430</span>
+<span id="1431">1431</span>
+<span id="1432">1432</span>
+<span id="1433">1433</span>
+<span id="1434">1434</span>
+<span id="1435">1435</span>
+<span id="1436">1436</span>
+<span id="1437">1437</span>
+<span id="1438">1438</span>
+<span id="1439">1439</span>
+<span id="1440">1440</span>
+<span id="1441">1441</span>
+<span id="1442">1442</span>
+<span id="1443">1443</span>
+<span id="1444">1444</span>
+<span id="1445">1445</span>
+<span id="1446">1446</span>
+<span id="1447">1447</span>
+<span id="1448">1448</span>
+<span id="1449">1449</span>
+<span id="1450">1450</span>
+<span id="1451">1451</span>
+<span id="1452">1452</span>
+<span id="1453">1453</span>
+<span id="1454">1454</span>
+<span id="1455">1455</span>
+<span id="1456">1456</span>
+<span id="1457">1457</span>
+<span id="1458">1458</span>
+<span id="1459">1459</span>
+<span id="1460">1460</span>
+<span id="1461">1461</span>
+<span id="1462">1462</span>
+<span id="1463">1463</span>
+<span id="1464">1464</span>
+<span id="1465">1465</span>
+<span id="1466">1466</span>
+<span id="1467">1467</span>
+<span id="1468">1468</span>
+<span id="1469">1469</span>
+<span id="1470">1470</span>
+<span id="1471">1471</span>
+<span id="1472">1472</span>
+<span id="1473">1473</span>
+<span id="1474">1474</span>
+<span id="1475">1475</span>
+<span id="1476">1476</span>
+<span id="1477">1477</span>
+<span id="1478">1478</span>
+<span id="1479">1479</span>
+<span id="1480">1480</span>
+<span id="1481">1481</span>
+<span id="1482">1482</span>
+<span id="1483">1483</span>
+<span id="1484">1484</span>
+<span id="1485">1485</span>
+<span id="1486">1486</span>
+<span id="1487">1487</span>
+<span id="1488">1488</span>
+</pre><pre class="rust"><code><span class="kw">use </span>chrono::{
     serde::ts_milliseconds, Date, DateTime, Datelike, Duration, NaiveDate, TimeZone, Timelike, Utc,
 };
 <span class="kw">use </span>serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -1419,6 +1500,15 @@
 <span class="kw">use </span>thiserror::Error;
 
 <span class="kw">pub use </span>event::{Event, EventType, CLICK, IMPRESSION};
+
+<span class="kw">use </span><span class="self">self</span>::message::MessageResponse;
+<span class="kw">use crate</span>::{
+    analytics::{OperatingSystem, Timeframe},
+    balances::BalancesState,
+    spender::Spender,
+    validator::{ApproveState, Heartbeat, NewState},
+    Address, Balances, CampaignId, ChainId, UnifiedMap, UnifiedNum, IPFS,
+};
 
 <span class="attribute">#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]
@@ -1447,18 +1537,19 @@
     </span><span class="kw">pub </span>approve_state: <span class="prelude-ty">Option</span>&lt;MessageResponse&lt;ApproveState&gt;&gt;,
 }
 
-<span class="attribute">#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-</span><span class="kw">pub struct </span>MessageResponse&lt;T: MessageType&gt; {
-    <span class="kw">pub </span>from: ValidatorId,
-    <span class="kw">pub </span>received: DateTime&lt;Utc&gt;,
-    <span class="kw">pub </span>msg: message::Message&lt;T&gt;,
-}
-
 <span class="kw">pub mod </span>message {
     <span class="kw">use </span>std::ops::Deref;
 
-    <span class="kw">use </span><span class="kw">crate</span>::validator::messages::<span class="kw-2">*</span>;
+    <span class="kw">use crate</span>::{validator::messages::<span class="kw-2">*</span>, ValidatorId};
+    <span class="kw">use </span>chrono::{DateTime, Utc};
     <span class="kw">use </span>serde::{Deserialize, Serialize};
+
+    <span class="attribute">#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+    </span><span class="kw">pub struct </span>MessageResponse&lt;T: Type&gt; {
+        <span class="kw">pub </span>from: ValidatorId,
+        <span class="kw">pub </span>received: DateTime&lt;Utc&gt;,
+        <span class="kw">pub </span>msg: Message&lt;T&gt;,
+    }
 
     <span class="attribute">#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
     #[serde(try_from = <span class="string">&quot;MessageTypes&quot;</span>, into = <span class="string">&quot;MessageTypes&quot;</span>)]
@@ -2082,39 +2173,6 @@
 }
 
 <span class="attribute">#[derive(Serialize, Deserialize, Debug)]
-</span><span class="kw">pub struct </span>ValidatorMessage {
-    <span class="kw">pub </span>from: ValidatorId,
-    <span class="kw">pub </span>received: DateTime&lt;Utc&gt;,
-    <span class="kw">pub </span>msg: MessageTypes,
-}
-
-<span class="attribute">#[derive(Serialize, Deserialize, Debug)]
-#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]
-</span><span class="kw">pub struct </span>ValidatorMessagesListResponse {
-    <span class="kw">pub </span>messages: Vec&lt;ValidatorMessage&gt;,
-}
-
-<span class="doccomment">/// Contains all the different validator messages to be created.
-///
-/// # Examples
-///
-/// ```
-</span><span class="attribute">#[doc = <span class="macro">include_str!</span>(<span class="string">&quot;../examples/validator_messages_create_request.rs&quot;</span>)]
-</span><span class="doccomment">/// ```
-</span><span class="attribute">#[derive(Serialize, Deserialize, Debug)]
-#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]
-</span><span class="kw">pub struct </span>ValidatorMessagesCreateRequest {
-    <span class="kw">pub </span>messages: Vec&lt;MessageTypes&gt;,
-}
-
-<span class="attribute">#[derive(Deserialize, Debug)]
-#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]
-</span><span class="kw">pub struct </span>ValidatorMessagesListQuery {
-    <span class="doccomment">/// Will apply the lower limit of: `query.limit` and `Config::msgs_find_limit`
-    </span><span class="kw">pub </span>limit: <span class="prelude-ty">Option</span>&lt;u64&gt;,
-}
-
-<span class="attribute">#[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]
 </span><span class="kw">pub struct </span>ValidationErrorResponse {
     <span class="kw">pub </span>status_code: u64,
@@ -2173,6 +2231,123 @@
         <span class="doccomment">/// Returns only the Channels from the specified [`ChainId`]s.
         </span><span class="attribute">#[serde(default)]
         </span><span class="kw">pub </span>chains: Vec&lt;ChainId&gt;,
+    }
+}
+
+<span class="kw">pub mod </span>validator_messages {
+    <span class="kw">use </span>std::{fmt, str::FromStr};
+
+    <span class="kw">use </span>chrono::{DateTime, Utc};
+    <span class="kw">use </span>parse_display::ParseError;
+    <span class="kw">use </span>serde::{Deserialize, Serialize};
+
+    <span class="kw">use crate</span>::{
+        validator::{MessageType, MessageTypes},
+        ValidatorId,
+    };
+
+    <span class="attribute">#[derive(Serialize, Deserialize, Debug)]
+    </span><span class="kw">pub struct </span>ValidatorMessage {
+        <span class="kw">pub </span>from: ValidatorId,
+        <span class="kw">pub </span>received: DateTime&lt;Utc&gt;,
+        <span class="kw">pub </span>msg: MessageTypes,
+    }
+
+    <span class="attribute">#[derive(Serialize, Deserialize, Debug)]
+    #[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]
+    </span><span class="kw">pub struct </span>ValidatorMessagesListResponse {
+        <span class="kw">pub </span>messages: Vec&lt;ValidatorMessage&gt;,
+    }
+
+    <span class="attribute">#[derive(Deserialize, Debug)]
+    #[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]
+    </span><span class="kw">pub struct </span>ValidatorMessagesListQuery {
+        <span class="doccomment">/// Will apply the lower limit of: `query.limit` and `Config::msgs_find_limit`
+        </span><span class="kw">pub </span>limit: <span class="prelude-ty">Option</span>&lt;u64&gt;,
+    }
+
+    <span class="doccomment">/// Message type filter (used in path)
+    ///
+    /// Expects url decoded string with [`MessageType`]s separated by `+`.
+    ///
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use primitives::{validator::MessageType, sentry::validator_messages::MessageTypesFilter};
+    ///
+    /// let path_filter = &quot;NewState+ApproveState+Heartbeat&quot;;
+    ///
+    /// let expected = MessageTypesFilter(vec![MessageType::NewState, MessageType::ApproveState, MessageType::Heartbeat]);
+    ///
+    /// assert_eq!(path_filter.parse::&lt;MessageTypesFilter&gt;().expect(&quot;Should deserialize&quot;), expected);
+    /// assert_eq!(path_filter, String::from(expected));
+    /// ```
+    </span><span class="attribute">#[derive(Serialize, Deserialize, Debug, Default, PartialEq, Eq, Clone)]
+    #[serde(try_from = <span class="string">&quot;String&quot;</span>, into = <span class="string">&quot;String&quot;</span>)]
+    </span><span class="kw">pub struct </span>MessageTypesFilter(<span class="kw">pub </span>Vec&lt;MessageType&gt;);
+
+    <span class="kw">impl </span>fmt::Display <span class="kw">for </span>MessageTypesFilter {
+        <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; fmt::Result {
+            f.write_str(
+                <span class="kw-2">&amp;</span><span class="self">self
+                    </span>.<span class="number">0
+                    </span>.iter()
+                    .map(|message_type| message_type.to_string())
+                    .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;()
+                    .join(<span class="string">&quot;+&quot;</span>),
+            )
+        }
+    }
+
+    <span class="kw">impl </span>FromStr <span class="kw">for </span>MessageTypesFilter {
+        <span class="kw">type </span><span class="prelude-val">Err </span>= ParseError;
+
+        <span class="kw">fn </span>from_str(filter: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, <span class="self">Self</span>::Err&gt; {
+            <span class="kw">let </span>message_types = <span class="kw">if </span>!filter.is_empty() {
+                filter
+                    .split(<span class="string">&#39;+&#39;</span>)
+                    .map(|s| s.parse())
+                    .collect::&lt;<span class="prelude-ty">Result</span>&lt;<span class="kw">_</span>, <span class="kw">_</span>&gt;&gt;()<span class="question-mark">?
+            </span>} <span class="kw">else </span>{
+                <span class="macro">vec!</span>[]
+            };
+
+            <span class="prelude-val">Ok</span>(MessageTypesFilter(message_types))
+        }
+    }
+
+    <span class="kw">impl </span>TryFrom&lt;String&gt; <span class="kw">for </span>MessageTypesFilter {
+        <span class="kw">type </span>Error = ParseError;
+
+        <span class="kw">fn </span>try_from(url_decoded_string: String) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, <span class="self">Self</span>::Error&gt; {
+            url_decoded_string.parse()
+        }
+    }
+
+    <span class="kw">impl </span>From&lt;MessageTypesFilter&gt; <span class="kw">for </span>String {
+        <span class="kw">fn </span>from(message_types: MessageTypesFilter) -&gt; <span class="self">Self </span>{
+            message_types.to_string()
+        }
+    }
+
+    <span class="kw">impl </span>AsRef&lt;[MessageType]&gt; <span class="kw">for </span>MessageTypesFilter {
+        <span class="kw">fn </span>as_ref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>[MessageType] {
+            <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0
+        </span>}
+    }
+
+    <span class="doccomment">/// Contains all the different validator messages to be created.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    </span><span class="attribute">#[doc = <span class="macro">include_str!</span>(<span class="string">&quot;../examples/validator_messages_create_request.rs&quot;</span>)]
+    </span><span class="doccomment">/// ```
+    </span><span class="attribute">#[derive(Serialize, Deserialize, Debug)]
+    #[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]
+    </span><span class="kw">pub struct </span>ValidatorMessagesCreateRequest {
+        <span class="kw">pub </span>messages: Vec&lt;MessageTypes&gt;,
     }
 }
 
@@ -2465,21 +2640,22 @@
 
 <span class="attribute">#[cfg(feature = <span class="string">&quot;postgres&quot;</span>)]
 </span><span class="kw">mod </span>postgres {
-    <span class="kw">use super</span>::{
-        Analytics, DateHour, EventType, FetchedAnalytics, FetchedMetric, MessageResponse,
-        ValidatorMessage,
-    };
-    <span class="kw">use crate</span>::{
-        analytics::{AnalyticsQuery, Metric},
-        validator::{messages::Type <span class="kw">as </span>MessageType, MessageTypes},
-        IPFS,
-    };
     <span class="kw">use </span>bytes::BytesMut;
     <span class="kw">use </span>chrono::{DateTime, Timelike, Utc};
     <span class="kw">use </span>serde::Deserialize;
     <span class="kw">use </span>tokio_postgres::{
-        types::{accepts, to_sql_checked, FromSql, IsNull, Json, ToSql, Type},
+        types::{accepts, to_sql_checked, FromSql, IsNull, Json, ToSql, Type <span class="kw">as </span>PgType},
         Error, Row,
+    };
+
+    <span class="kw">use super</span>::{
+        message::MessageResponse, validator_messages::ValidatorMessage, Analytics, DateHour,
+        EventType, FetchedAnalytics, FetchedMetric,
+    };
+    <span class="kw">use crate</span>::{
+        analytics::{AnalyticsQuery, Metric},
+        validator::{MessageTypes, Type},
+        IPFS,
     };
 
     <span class="kw">impl </span>From&lt;<span class="kw-2">&amp;</span>Row&gt; <span class="kw">for </span>ValidatorMessage {
@@ -2494,7 +2670,7 @@
 
     <span class="kw">impl</span>&lt;T&gt; TryFrom&lt;<span class="kw-2">&amp;</span>Row&gt; <span class="kw">for </span>MessageResponse&lt;T&gt;
     <span class="kw">where
-        </span>T: MessageType,
+        </span>T: Type,
         <span class="kw">for</span>&lt;<span class="lifetime">&#39;de</span>&gt; T: Deserialize&lt;<span class="lifetime">&#39;de</span>&gt;,
     {
         <span class="kw">type </span>Error = Error;
@@ -2512,7 +2688,7 @@
     <span class="kw">impl </span>ToSql <span class="kw">for </span>MessageTypes {
         <span class="kw">fn </span>to_sql(
             <span class="kw-2">&amp;</span><span class="self">self</span>,
-            ty: <span class="kw-2">&amp;</span>Type,
+            ty: <span class="kw-2">&amp;</span>PgType,
             w: <span class="kw-2">&amp;mut </span>BytesMut,
         ) -&gt; <span class="prelude-ty">Result</span>&lt;IsNull, Box&lt;<span class="kw">dyn </span>std::error::Error + Sync + Send&gt;&gt; {
             Json(<span class="self">self</span>).to_sql(ty, w)
@@ -2560,7 +2736,7 @@
 
     <span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; FromSql&lt;<span class="lifetime">&#39;a</span>&gt; <span class="kw">for </span>DateHour&lt;Utc&gt; {
         <span class="kw">fn </span>from_sql(
-            ty: <span class="kw-2">&amp;</span>Type,
+            ty: <span class="kw-2">&amp;</span>PgType,
             raw: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>[u8],
         ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, Box&lt;<span class="kw">dyn </span>std::error::Error + Sync + Send&gt;&gt; {
             <span class="kw">let </span>datetime = &lt;DateTime&lt;Utc&gt; <span class="kw">as </span>FromSql&gt;::from_sql(ty, raw)<span class="question-mark">?</span>;
@@ -2579,7 +2755,7 @@
     <span class="kw">impl </span>ToSql <span class="kw">for </span>DateHour&lt;Utc&gt; {
         <span class="kw">fn </span>to_sql(
             <span class="kw-2">&amp;</span><span class="self">self</span>,
-            ty: <span class="kw-2">&amp;</span>Type,
+            ty: <span class="kw-2">&amp;</span>PgType,
             w: <span class="kw-2">&amp;mut </span>BytesMut,
         ) -&gt; <span class="prelude-ty">Result</span>&lt;IsNull, Box&lt;<span class="kw">dyn </span>std::error::Error + Sync + Send&gt;&gt; {
             <span class="self">self</span>.date.and_hms(<span class="self">self</span>.hour, <span class="number">0</span>, <span class="number">0</span>).to_sql(ty, w)
@@ -2591,7 +2767,7 @@
 
     <span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; FromSql&lt;<span class="lifetime">&#39;a</span>&gt; <span class="kw">for </span>EventType {
         <span class="kw">fn </span>from_sql(
-            ty: <span class="kw-2">&amp;</span>Type,
+            ty: <span class="kw-2">&amp;</span>PgType,
             raw: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>[u8],
         ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, Box&lt;<span class="kw">dyn </span>std::error::Error + Sync + Send&gt;&gt; {
             <span class="kw">let </span>event_string = &lt;<span class="kw-2">&amp;</span>str <span class="kw">as </span>FromSql&gt;::from_sql(ty, raw)<span class="question-mark">?</span>;
@@ -2604,7 +2780,7 @@
     <span class="kw">impl </span>ToSql <span class="kw">for </span>EventType {
         <span class="kw">fn </span>to_sql(
             <span class="kw-2">&amp;</span><span class="self">self</span>,
-            ty: <span class="kw-2">&amp;</span>Type,
+            ty: <span class="kw-2">&amp;</span>PgType,
             w: <span class="kw-2">&amp;mut </span>BytesMut,
         ) -&gt; <span class="prelude-ty">Result</span>&lt;IsNull, Box&lt;<span class="kw">dyn </span>std::error::Error + Sync + Send&gt;&gt; {
             <span class="self">self</span>.as_str().to_sql(ty, w)

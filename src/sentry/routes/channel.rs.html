@@ -1571,18 +1571,6 @@
 <span id="1571">1571</span>
 <span id="1572">1572</span>
 <span id="1573">1573</span>
-<span id="1574">1574</span>
-<span id="1575">1575</span>
-<span id="1576">1576</span>
-<span id="1577">1577</span>
-<span id="1578">1578</span>
-<span id="1579">1579</span>
-<span id="1580">1580</span>
-<span id="1581">1581</span>
-<span id="1582">1582</span>
-<span id="1583">1583</span>
-<span id="1584">1584</span>
-<span id="1585">1585</span>
 </pre><pre class="rust"><code><span class="doccomment">//! `/v5/channel` routes
 //!
 
@@ -2209,8 +2197,11 @@
     <span class="kw">use </span>adapter::client::Locked;
     <span class="kw">use </span>primitives::{
         sentry::{
-            SuccessResponse, ValidatorMessagesCreateRequest, ValidatorMessagesListQuery,
-            ValidatorMessagesListResponse,
+            validator_messages::{
+                MessageTypesFilter, ValidatorMessagesCreateRequest, ValidatorMessagesListQuery,
+                ValidatorMessagesListResponse,
+            },
+            SuccessResponse,
         },
         ChainOf, Channel, ChannelId, ValidatorId,
     };
@@ -2225,13 +2216,15 @@
     <span class="attribute">#[derive(Debug, Deserialize)]
     </span><span class="kw">pub struct </span>MessagesListParams {
         <span class="kw">pub </span>id: ChannelId,
-        <span class="comment">// Optional filtering by ValidatorId
+        <span class="comment">// Optional filtering by [`ValidatorId`].
         </span><span class="attribute">#[serde(default)]
         </span><span class="kw">pub </span>address: <span class="prelude-ty">Option</span>&lt;ValidatorId&gt;,
-        <span class="doccomment">/// List of validator message types separated by `+` (urlencoded):
-        /// e.g. `ApproveState+NewState`
+        <span class="doccomment">/// Optional filtering by a list of [`MessageType`](primitives::validator::messages::MessageType)s
+        /// separated by `+` (url encoded).
+        ///
+        /// See [`MessageTypesFilter`] for more details.
         </span><span class="attribute">#[serde(default)]
-        </span><span class="kw">pub </span>message_types: String,
+        </span><span class="kw">pub </span>message_types: MessageTypesFilter,
     }
 
     <span class="doccomment">/// GET `/v5/channel/0xXXX.../validator-messages`
@@ -2248,23 +2241,6 @@
         Path(params): Path&lt;MessagesListParams&gt;,
         Qs(query): Qs&lt;ValidatorMessagesListQuery&gt;,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;Json&lt;ValidatorMessagesListResponse&gt;, ResponseError&gt; {
-        <span class="kw">let </span>message_types = {
-            <span class="comment">// We need to strip the `/` prefix from axum
-            </span><span class="kw">let </span>stripped = params
-                .message_types
-                .strip_prefix(<span class="string">&#39;/&#39;</span>)
-                .unwrap_or(<span class="kw-2">&amp;</span>params.message_types);
-
-            <span class="kw">if </span>!stripped.is_empty() {
-                stripped
-                    .split(<span class="string">&#39;+&#39;</span>)
-                    .map(|s| s.to_string())
-                    .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;()
-            } <span class="kw">else </span>{
-                <span class="macro">vec!</span>[]
-            }
-        };
-
         <span class="kw">let </span>channel = channel_context.context;
 
         <span class="kw">let </span>config_limit = app.config.msgs_find_limit <span class="kw">as </span>u64;
@@ -2278,7 +2254,7 @@
             <span class="kw-2">&amp;</span>app.pool,
             <span class="kw-2">&amp;</span>channel.id(),
             <span class="kw-2">&amp;</span>params.address,
-            <span class="kw-2">&amp;</span>message_types,
+            params.message_types.as_ref(),
             limit,
         )
         .<span class="kw">await</span><span class="question-mark">?</span>;

@@ -461,6 +461,95 @@
 <span id="461">461</span>
 <span id="462">462</span>
 <span id="463">463</span>
+<span id="464">464</span>
+<span id="465">465</span>
+<span id="466">466</span>
+<span id="467">467</span>
+<span id="468">468</span>
+<span id="469">469</span>
+<span id="470">470</span>
+<span id="471">471</span>
+<span id="472">472</span>
+<span id="473">473</span>
+<span id="474">474</span>
+<span id="475">475</span>
+<span id="476">476</span>
+<span id="477">477</span>
+<span id="478">478</span>
+<span id="479">479</span>
+<span id="480">480</span>
+<span id="481">481</span>
+<span id="482">482</span>
+<span id="483">483</span>
+<span id="484">484</span>
+<span id="485">485</span>
+<span id="486">486</span>
+<span id="487">487</span>
+<span id="488">488</span>
+<span id="489">489</span>
+<span id="490">490</span>
+<span id="491">491</span>
+<span id="492">492</span>
+<span id="493">493</span>
+<span id="494">494</span>
+<span id="495">495</span>
+<span id="496">496</span>
+<span id="497">497</span>
+<span id="498">498</span>
+<span id="499">499</span>
+<span id="500">500</span>
+<span id="501">501</span>
+<span id="502">502</span>
+<span id="503">503</span>
+<span id="504">504</span>
+<span id="505">505</span>
+<span id="506">506</span>
+<span id="507">507</span>
+<span id="508">508</span>
+<span id="509">509</span>
+<span id="510">510</span>
+<span id="511">511</span>
+<span id="512">512</span>
+<span id="513">513</span>
+<span id="514">514</span>
+<span id="515">515</span>
+<span id="516">516</span>
+<span id="517">517</span>
+<span id="518">518</span>
+<span id="519">519</span>
+<span id="520">520</span>
+<span id="521">521</span>
+<span id="522">522</span>
+<span id="523">523</span>
+<span id="524">524</span>
+<span id="525">525</span>
+<span id="526">526</span>
+<span id="527">527</span>
+<span id="528">528</span>
+<span id="529">529</span>
+<span id="530">530</span>
+<span id="531">531</span>
+<span id="532">532</span>
+<span id="533">533</span>
+<span id="534">534</span>
+<span id="535">535</span>
+<span id="536">536</span>
+<span id="537">537</span>
+<span id="538">538</span>
+<span id="539">539</span>
+<span id="540">540</span>
+<span id="541">541</span>
+<span id="542">542</span>
+<span id="543">543</span>
+<span id="544">544</span>
+<span id="545">545</span>
+<span id="546">546</span>
+<span id="547">547</span>
+<span id="548">548</span>
+<span id="549">549</span>
+<span id="550">550</span>
+<span id="551">551</span>
+<span id="552">552</span>
 </pre><pre class="rust"><code><span class="kw">use </span>once_cell::sync::Lazy;
 <span class="kw">use </span>serde::{Deserialize, Serialize};
 <span class="kw">use </span>std::{borrow::Borrow, fmt, str::FromStr};
@@ -626,6 +715,8 @@
 <span class="doccomment">/// Validator Message Types
 </span><span class="kw">pub mod </span>messages {
     <span class="kw">use </span>std::{any::type_name, fmt, marker::PhantomData};
+
+    <span class="kw">use </span>parse_display::{Display, FromStr};
     <span class="kw">use </span>thiserror::Error;
 
     <span class="kw">use </span><span class="kw">crate</span>::balances::{Balances, BalancesState, CheckedState, UncheckedState};
@@ -860,10 +951,63 @@
         RejectState(RejectState&lt;UncheckedState&gt;),
         Heartbeat(Heartbeat),
     }
+
+    <span class="doccomment">/// All available message type names.
+    </span><span class="attribute">#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, FromStr, Display)]
+    #[display(style = <span class="string">&quot;CamelCase&quot;</span>)]
+    </span><span class="kw">pub enum </span>MessageType {
+        ApproveState,
+        NewState,
+        RejectState,
+        Heartbeat,
+    }
+
+    <span class="doccomment">/// This ensures that all [`MessageTypes`] are also listed in the enum [`MessageType`]!
+    </span><span class="kw">impl </span>From&lt;<span class="kw-2">&amp;</span>MessageTypes&gt; <span class="kw">for </span>MessageType {
+        <span class="kw">fn </span>from(message_types: <span class="kw-2">&amp;</span>MessageTypes) -&gt; <span class="self">Self </span>{
+            <span class="kw">match </span>message_types {
+                MessageTypes::ApproveState(<span class="kw">_</span>) =&gt; <span class="self">Self</span>::ApproveState,
+                MessageTypes::NewState(<span class="kw">_</span>) =&gt; <span class="self">Self</span>::NewState,
+                MessageTypes::RejectState(<span class="kw">_</span>) =&gt; <span class="self">Self</span>::RejectState,
+                MessageTypes::Heartbeat(<span class="kw">_</span>) =&gt; <span class="self">Self</span>::Heartbeat,
+            }
+        }
+    }
+
+    <span class="kw">impl </span>From&lt;MessageTypes&gt; <span class="kw">for </span>MessageType {
+        <span class="kw">fn </span>from(message_types: MessageTypes) -&gt; <span class="self">Self </span>{
+            <span class="self">Self</span>::from(<span class="kw-2">&amp;</span>message_types)
+        }
+    }
+
+    <span class="attribute">#[cfg(test)]
+    </span><span class="kw">mod </span>test {
+        <span class="kw">use </span><span class="kw">super</span>::MessageType;
+
+        <span class="attribute">#[test]
+        </span><span class="kw">fn </span>test_message_type_from_and_to_string() {
+            <span class="kw">let </span>cases = [
+                (<span class="string">&quot;ApproveState&quot;</span>, MessageType::ApproveState),
+                (<span class="string">&quot;NewState&quot;</span>, MessageType::NewState),
+                (<span class="string">&quot;RejectState&quot;</span>, MessageType::RejectState),
+                (<span class="string">&quot;Heartbeat&quot;</span>, MessageType::Heartbeat),
+            ];
+
+            <span class="kw">for </span>(expected, value) <span class="kw">in </span>cases {
+                <span class="macro">assert_eq!</span>(expected, value.to_string());
+                <span class="macro">assert_eq!</span>(
+                    expected
+                        .parse::&lt;MessageType&gt;()
+                        .expect(<span class="string">&quot;Should parse string&quot;</span>),
+                    value
+                );
+            }
+        }
+    }
 }
 <span class="attribute">#[cfg(feature = <span class="string">&quot;postgres&quot;</span>)]
 </span><span class="kw">mod </span>postgres {
-    <span class="kw">use </span><span class="kw">super</span>::ValidatorId;
+    <span class="kw">use super</span>::{MessageType, ValidatorId};
     <span class="kw">use </span><span class="kw">crate</span>::ToETHChecksum;
     <span class="kw">use </span>bytes::BytesMut;
     <span class="kw">use </span>std::error::Error;
@@ -905,6 +1049,40 @@
             <span class="kw">let </span>string = <span class="self">self</span>.to_checksum();
 
             &lt;String <span class="kw">as </span>ToSql&gt;::to_sql_checked(<span class="kw-2">&amp;</span>string, ty, out)
+        }
+    }
+
+    <span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; FromSql&lt;<span class="lifetime">&#39;a</span>&gt; <span class="kw">for </span>MessageType {
+        <span class="kw">fn </span>from_sql(ty: <span class="kw-2">&amp;</span>Type, raw: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>[u8]) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, Box&lt;<span class="kw">dyn </span>Error + Sync + Send&gt;&gt; {
+            <span class="kw">let </span>str_slice = &lt;<span class="kw-2">&amp;</span>str <span class="kw">as </span>FromSql&gt;::from_sql(ty, raw)<span class="question-mark">?</span>;
+
+            <span class="prelude-val">Ok</span>(str_slice.parse()<span class="question-mark">?</span>)
+        }
+
+        <span class="kw">fn </span>accepts(ty: <span class="kw-2">&amp;</span>Type) -&gt; bool {
+            <span class="macro">matches!</span>(<span class="kw-2">*</span>ty, Type::TEXT | Type::VARCHAR)
+        }
+    }
+
+    <span class="kw">impl </span>ToSql <span class="kw">for </span>MessageType {
+        <span class="kw">fn </span>to_sql(
+            <span class="kw-2">&amp;</span><span class="self">self</span>,
+            ty: <span class="kw-2">&amp;</span>Type,
+            w: <span class="kw-2">&amp;mut </span>BytesMut,
+        ) -&gt; <span class="prelude-ty">Result</span>&lt;IsNull, Box&lt;<span class="kw">dyn </span>Error + Sync + Send&gt;&gt; {
+            &lt;String <span class="kw">as </span>ToSql&gt;::to_sql(<span class="kw-2">&amp;</span><span class="self">self</span>.to_string(), ty, w)
+        }
+
+        <span class="kw">fn </span>accepts(ty: <span class="kw-2">&amp;</span>Type) -&gt; bool {
+            &lt;String <span class="kw">as </span>ToSql&gt;::accepts(ty)
+        }
+
+        <span class="kw">fn </span>to_sql_checked(
+            <span class="kw-2">&amp;</span><span class="self">self</span>,
+            ty: <span class="kw-2">&amp;</span>Type,
+            out: <span class="kw-2">&amp;mut </span>BytesMut,
+        ) -&gt; <span class="prelude-ty">Result</span>&lt;IsNull, Box&lt;<span class="kw">dyn </span>Error + Sync + Send&gt;&gt; {
+            &lt;String <span class="kw">as </span>ToSql&gt;::to_sql_checked(<span class="kw-2">&amp;</span><span class="self">self</span>.to_string(), ty, out)
         }
     }
 }

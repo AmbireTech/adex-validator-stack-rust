@@ -217,6 +217,10 @@
 <span id="217">217</span>
 <span id="218">218</span>
 <span id="219">219</span>
+<span id="220">220</span>
+<span id="221">221</span>
+<span id="222">222</span>
+<span id="223">223</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This module contains all the Sentry REST API routers.
 //!
 //! Ideally these routers will be replaced with proper routing,
@@ -327,9 +331,13 @@
                 .route_layer(middleware::from_fn(authentication_required::&lt;C, <span class="kw">_</span>&gt;)),
         )
         .route(<span class="string">&quot;/validator-messages&quot;</span>, get(list_validator_messages::&lt;C&gt;))
+        .route(
+            <span class="string">&quot;/validator-messages/:address&quot;</span>,
+            get(list_validator_messages::&lt;C&gt;),
+        )
         <span class="comment">// We allow Message Type filtering only when filtering by a ValidatorId
         </span>.route(
-            <span class="string">&quot;/validator-messages/:address/*message_types&quot;</span>,
+            <span class="string">&quot;/validator-messages/:address/:message_types&quot;</span>,
             get(list_validator_messages::&lt;C&gt;),
         )
         .layer(

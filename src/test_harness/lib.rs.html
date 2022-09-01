@@ -3146,7 +3146,7 @@
         },
         unified_num::FromWhole,
         util::{logging::new_logger, ApiUrl},
-        validator::{ApproveState, Heartbeat, NewState, RejectState},
+        validator::{ApproveState, Heartbeat, MessageType, NewState, RejectState},
         Balances, BigNum, Campaign, CampaignId, ChainId, Channel, ChannelId, UnifiedNum,
     };
     <span class="kw">use </span>reqwest::{Client, StatusCode};
@@ -4155,7 +4155,7 @@
         // Total: 5.00075 TOKENs
         </span>{
             <span class="kw">let </span>latest_new_state_leader = follower_sentry
-                .get_our_latest_msg(CAMPAIGN_2.channel.id(), <span class="kw-2">&amp;</span>[<span class="string">&quot;NewState&quot;</span>])
+                .get_our_latest_msg(CAMPAIGN_2.channel.id(), <span class="kw-2">&amp;</span>[MessageType::NewState])
                 .<span class="kw">await
                 </span>.expect(<span class="string">&quot;Should fetch NewState from Channel&#39;s Leader (Who am I) in FOLLOWER sentry&quot;</span>)
                 .map(|message| {
@@ -4165,7 +4165,7 @@
                 .expect(<span class="string">&quot;Should have a NewState in Channel&#39;s Leader for the Campaign 2 channel&quot;</span>);
 
             <span class="kw">let </span>latest_reject_state_follower = leader_sentry
-                .get_our_latest_msg(CAMPAIGN_2.channel.id(), <span class="kw-2">&amp;</span>[<span class="string">&quot;RejectState&quot;</span>])
+                .get_our_latest_msg(CAMPAIGN_2.channel.id(), <span class="kw-2">&amp;</span>[MessageType::RejectState])
                 .<span class="kw">await
                 </span>.expect(
                     <span class="string">&quot;Should successfully try to fetch a RejectState from Channel&#39;s Follower (Who am I) in LEADER sentry&quot;</span>,
@@ -4209,7 +4209,7 @@
         </span>{
             <span class="comment">// Channel 1
             </span><span class="kw">let </span>_channel_1_heartbeat = leader_sentry
-                .get_our_latest_msg(CAMPAIGN_1.channel.id(), <span class="kw-2">&amp;</span>[<span class="string">&quot;Heartbeat&quot;</span>])
+                .get_our_latest_msg(CAMPAIGN_1.channel.id(), <span class="kw-2">&amp;</span>[MessageType::Heartbeat])
                 .<span class="kw">await
                 </span>.expect(<span class="string">&quot;Should fetch Heartbeat from Leader&quot;</span>)
                 .map(|message| Heartbeat::try_from(message).expect(<span class="string">&quot;Should be Heartbeat&quot;</span>))
@@ -4217,7 +4217,7 @@
 
             <span class="comment">// Channel 2
             </span><span class="kw">let </span>_channel_2_heartbeat = leader_sentry
-                .get_our_latest_msg(CAMPAIGN_2.channel.id(), <span class="kw-2">&amp;</span>[<span class="string">&quot;Heartbeat&quot;</span>])
+                .get_our_latest_msg(CAMPAIGN_2.channel.id(), <span class="kw-2">&amp;</span>[MessageType::Heartbeat])
                 .<span class="kw">await
                 </span>.expect(<span class="string">&quot;Should fetch Heartbeat from Leader&quot;</span>)
                 .map(|message| Heartbeat::try_from(message).expect(<span class="string">&quot;Should be Heartbeat&quot;</span>))
@@ -4225,7 +4225,7 @@
 
             <span class="comment">// Channel 3
             </span><span class="kw">let </span>_channel_3_heartbeat = leader_sentry
-                .get_our_latest_msg(CAMPAIGN_3.channel.id(), <span class="kw-2">&amp;</span>[<span class="string">&quot;Heartbeat&quot;</span>])
+                .get_our_latest_msg(CAMPAIGN_3.channel.id(), <span class="kw-2">&amp;</span>[MessageType::Heartbeat])
                 .<span class="kw">await
                 </span>.expect(<span class="string">&quot;Should fetch Heartbeat from Leader&quot;</span>)
                 .map(|message| Heartbeat::try_from(message).expect(<span class="string">&quot;Should be Heartbeat&quot;</span>))
@@ -4500,7 +4500,7 @@
         // Assert that it exists in both validators
         </span>{
             <span class="kw">let </span>latest_new_state_leader = leader_sentry
-                .get_our_latest_msg(CAMPAIGN_1.channel.id(), <span class="kw-2">&amp;</span>[<span class="string">&quot;NewState&quot;</span>])
+                .get_our_latest_msg(CAMPAIGN_1.channel.id(), <span class="kw-2">&amp;</span>[MessageType::NewState])
                 .<span class="kw">await
                 </span>.expect(<span class="string">&quot;Should fetch NewState from Leader (Who am I) in Leader sentry&quot;</span>)
                 .map(|message| {
@@ -4670,7 +4670,7 @@
         // Ganache health_unsignable_promilles = 750
         </span>{
             <span class="kw">let </span>latest_reject_state_follower = leader_sentry
-                .get_our_latest_msg(CAMPAIGN_2.channel.id(), <span class="kw-2">&amp;</span>[<span class="string">&quot;RejectState&quot;</span>])
+                .get_our_latest_msg(CAMPAIGN_2.channel.id(), <span class="kw-2">&amp;</span>[MessageType::RejectState])
                 .<span class="kw">await
                 </span>.expect(
                     <span class="string">&quot;Should fetch RejectState from Channel&#39;s Follower (Who am I) in Leader sentry&quot;</span>,
@@ -4707,7 +4707,7 @@
         // Assert that it exists in both validators
         </span>{
             <span class="kw">let </span>latest_new_state_leader = leader_sentry
-                .get_our_latest_msg(CAMPAIGN_3.channel.id(), <span class="kw-2">&amp;</span>[<span class="string">&quot;NewState&quot;</span>])
+                .get_our_latest_msg(CAMPAIGN_3.channel.id(), <span class="kw-2">&amp;</span>[MessageType::NewState])
                 .<span class="kw">await
                 </span>.expect(<span class="string">&quot;Should fetch NewState from Leader (Who am I) in Leader sentry&quot;</span>)
                 .map(|message| {
@@ -4937,7 +4937,7 @@
 
         {
             <span class="kw">let </span>latest_approve_state_follower = leader_sentry
-                .get_our_latest_msg(CAMPAIGN_2.channel.id(), <span class="kw-2">&amp;</span>[<span class="string">&quot;ApproveState&quot;</span>])
+                .get_our_latest_msg(CAMPAIGN_2.channel.id(), <span class="kw-2">&amp;</span>[MessageType::ApproveState])
                 .<span class="kw">await
                 </span>.expect(
                     <span class="string">&quot;Should fetch ApproveState from Channel&#39;s Follower (Who am I) from LEADER sentry&quot;</span>,
@@ -4949,7 +4949,7 @@
                 .expect(<span class="string">&quot;Should have a ApproveState in Channel&#39;s Follower for the Campaign 2 channel&quot;</span>);
 
             <span class="kw">let </span>latest_new_state_leader = follower_sentry
-                .get_our_latest_msg(CAMPAIGN_2.channel.id(), <span class="kw-2">&amp;</span>[<span class="string">&quot;NewState&quot;</span>])
+                .get_our_latest_msg(CAMPAIGN_2.channel.id(), <span class="kw-2">&amp;</span>[MessageType::NewState])
                 .<span class="kw">await
                 </span>.expect(
                     <span class="string">&quot;Should fetch NewState from Channel&#39;s Leader (Who am I) from FOLLOWER sentry&quot;</span>,
@@ -5029,7 +5029,7 @@
         //
         </span>{
             <span class="kw">let </span>latest_approve_state_follower = leader_sentry
-                .get_our_latest_msg(CAMPAIGN_2.channel.id(), <span class="kw-2">&amp;</span>[<span class="string">&quot;ApproveState&quot;</span>])
+                .get_our_latest_msg(CAMPAIGN_2.channel.id(), <span class="kw-2">&amp;</span>[MessageType::ApproveState])
                 .<span class="kw">await
                 </span>.expect(
                     <span class="string">&quot;Should fetch ApproveState from Channel&#39;s Follower (Who am I) from LEADER sentry&quot;</span>,
@@ -5046,7 +5046,7 @@
             </span>);
 
             <span class="kw">let </span>latest_new_state_leader = follower_sentry
-                .get_our_latest_msg(CAMPAIGN_2.channel.id(), <span class="kw-2">&amp;</span>[<span class="string">&quot;NewState&quot;</span>])
+                .get_our_latest_msg(CAMPAIGN_2.channel.id(), <span class="kw-2">&amp;</span>[MessageType::NewState])
                 .<span class="kw">await
                 </span>.expect(
                     <span class="string">&quot;Should fetch NewState from Channel&#39;s Leader (Who am I) from FOLLOWER sentry&quot;</span>,

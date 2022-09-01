@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["MessageTypesFilter","Message type filter (used in path)"],["ValidatorMessage",""],["ValidatorMessagesCreateRequest","Contains all the different validator messages to be created."],["ValidatorMessagesListQuery",""],["ValidatorMessagesListResponse",""]]};
