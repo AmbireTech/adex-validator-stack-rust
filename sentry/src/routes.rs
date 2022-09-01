@@ -29,6 +29,8 @@
 //!   - [GET `/v5/analytics/for-publisher`](#get-v5analyticsfor-publisher-auth-required) (auth required)
 //!   - [GET `/v5/analytics/for-advertiser`](#get-v5analyticsfor-advertiser-auth-required) (auth required)
 //!   - [GET `/v5/analytics/for-admin`](#get-v5analyticsfor-admin-auth-required) (auth required)
+//! - [Config](#config) route
+//!   - [GET `/cfg`](#get-cfg)
 //!
 //! ## Channel
 //!
@@ -475,6 +477,24 @@
 //!
 //! See [GET `/v5/analytics`](#get-v5analytics)
 //!
+//! ## Config
+//!
+//! #### GET `/cfg`
+//!
+//! Gets the config that the validator is running on.
+//!
+//! The route is handled by [`get_cfg()`](crate::routes::get_cfg())
+//!
+//! Response: [`Config`](primitives::Config)
+//!
+//! ##### Examples
+//!
+//! Response:
+//!
+//! ```
+#![doc = include_str!("../../primitives/examples/get_cfg_response.rs")]
+//! ```
+//!
 //! [`Adapter`]: adapter::Adapter
 //! [`Address`]: primitives::Address
 //! [`AllowedKey`]: primitives::analytics::query::AllowedKey
@@ -505,9 +525,9 @@
 //! [`SuccessResponse`]: primitives::sentry::SuccessResponse
 //! [`ValidatorId`]: primitives::ValidatorId
 
-pub use analytics::analytics as get_analytics;
+pub use analytics::get_analytics;
 
-pub use cfg::config as get_cfg;
+pub use cfg::get_cfg;
 
 // `analytics` module has single request, so we only export this request
 mod analytics;

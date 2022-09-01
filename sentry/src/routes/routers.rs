@@ -35,7 +35,7 @@ use crate::{
         channel::channel_load,
     },
     routes::{
-        analytics::{analytics, GET_ANALYTICS_ALLOWED_KEYS},
+        analytics::{get_analytics, GET_ANALYTICS_ALLOWED_KEYS},
         campaign,
         channel::{
             add_spender_leaf, channel_dummy_deposit, channel_list, channel_payout,
@@ -180,7 +180,7 @@ pub fn analytics_router<C: Locked + 'static>() -> Router {
     let authenticated_analytics = Router::new()
         .route(
             "/for-advertiser",
-            get(analytics::<C>).route_layer(
+            get(get_analytics::<C>).route_layer(
                 ServiceBuilder::new()
                     .layer(middleware::from_fn(authenticate_as_advertiser))
                     .layer(Extension(ALLOWED_KEYS.clone())),
@@ -188,7 +188,7 @@ pub fn analytics_router<C: Locked + 'static>() -> Router {
         )
         .route(
             "/for-publisher",
-            get(analytics::<C>).route_layer(
+            get(get_analytics::<C>).route_layer(
                 ServiceBuilder::new()
                     .layer(middleware::from_fn(authenticate_as_publisher))
                     .layer(Extension(ALLOWED_KEYS.clone())),
@@ -196,7 +196,7 @@ pub fn analytics_router<C: Locked + 'static>() -> Router {
         )
         .route(
             "/for-admin",
-            get(analytics::<C>).route_layer(
+            get(get_analytics::<C>).route_layer(
                 ServiceBuilder::new()
                     .layer(middleware::from_fn(is_admin::<C, _>))
                     .layer(Extension(ALLOWED_KEYS.clone())),
@@ -213,7 +213,7 @@ pub fn analytics_router<C: Locked + 'static>() -> Router {
         .route(
             "/",
             // only some keys are allowed for the default analytics route
-            get(analytics::<C>).route_layer(Extension(GET_ANALYTICS_ALLOWED_KEYS.clone())),
+            get(get_analytics::<C>).route_layer(Extension(GET_ANALYTICS_ALLOWED_KEYS.clone())),
         )
         .merge(authenticated_analytics)
 }

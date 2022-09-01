@@ -75,6 +75,9 @@ name = "validator_messages_list_query"
 [[example]]
 name = "validator_messages_list_response"
 
+[[example]]
+name = "get_cfg_response"
+
 [dependencies]
 # (De)Serialization
 serde = { version = "1.0", features = ["derive"] }
