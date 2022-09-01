@@ -221,11 +221,14 @@ pub fn analytics_router<C: Locked + 'static>() -> Router {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{test_util::{setup_dummy_app}, Auth};
-    use axum::{body::Body, http::{Request, StatusCode}};
-    use primitives::test_util::{PUBLISHER, ADVERTISER, IDS, LEADER, FOLLOWER};
+    use crate::{test_util::setup_dummy_app, Auth};
     use adapter::ethereum::test_util::GANACHE_1;
-    use tower::{Service};
+    use axum::{
+        body::Body,
+        http::{Request, StatusCode},
+    };
+    use primitives::test_util::{ADVERTISER, FOLLOWER, IDS, LEADER, PUBLISHER};
+    use tower::Service;
 
     #[tokio::test]
     async fn analytics_router_tests() {
