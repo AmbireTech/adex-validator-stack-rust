@@ -29,8 +29,7 @@
 //!   - [GET `/v5/analytics/for-publisher`](#get-v5analyticsfor-publisher-auth-required) (auth required)
 //!   - [GET `/v5/analytics/for-advertiser`](#get-v5analyticsfor-advertiser-auth-required) (auth required)
 //!   - [GET `/v5/analytics/for-admin`](#get-v5analyticsfor-admin-auth-required) (auth required)
-//! - [Config](#config) route
-//!   - [GET `/cfg`](#get-cfg)
+//! - [GET `/cfg`](#get-cfg)
 //!
 //! ## Channel
 //!
@@ -477,13 +476,11 @@
 //!
 //! See [GET `/v5/analytics`](#get-v5analytics)
 //!
-//! ## Config
-//!
-//! #### GET `/cfg`
+//! ## GET `/cfg`
 //!
 //! Gets the config that the validator is running on.
 //!
-//! The route is handled by [`get_cfg()`](crate::routes::get_cfg())
+//! The route is handled by [`get_cfg()`]
 //!
 //! Response: [`Config`](primitives::Config)
 //!
