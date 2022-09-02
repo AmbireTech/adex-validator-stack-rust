@@ -1,4 +1,4 @@
-use primitives::sentry::ValidatorMessagesCreateRequest;
+use primitives::sentry::validator_messages::ValidatorMessagesCreateRequest;
 use serde_json::{from_value, json};
 
 fn main() {

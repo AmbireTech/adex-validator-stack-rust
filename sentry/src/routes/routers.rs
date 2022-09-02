@@ -108,9 +108,13 @@ pub fn channels_router<C: Locked + 'static>() -> Router {
                 .route_layer(middleware::from_fn(authentication_required::<C, _>)),
         )
         .route("/validator-messages", get(list_validator_messages::<C>))
+        .route(
+            "/validator-messages/:address",
+            get(list_validator_messages::<C>),
+        )
         // We allow Message Type filtering only when filtering by a ValidatorId
         .route(
-            "/validator-messages/:address/*message_types",
+            "/validator-messages/:address/:message_types",
             get(list_validator_messages::<C>),
         )
         .layer(

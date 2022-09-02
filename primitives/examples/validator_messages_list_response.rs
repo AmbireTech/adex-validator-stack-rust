@@ -1,4 +1,4 @@
-use primitives::sentry::ValidatorMessagesListResponse;
+use primitives::sentry::validator_messages::ValidatorMessagesListResponse;
 use serde_json::{from_value, json};
 
 fn main() {

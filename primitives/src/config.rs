@@ -79,14 +79,14 @@ pub struct Config {
     /// In milliseconds
     #[serde(with = "std_duration_millis")]
     pub wait_time: Duration,
-    /// The maximum allowed limit of [`ValidatorMessage`](crate::sentry::ValidatorMessage)s per page
+    /// The maximum allowed limit of [`ValidatorMessage`](crate::sentry::validator_messages::ValidatorMessage)s per page
     /// returned by Sentry's GET `/v5/channel/0xXXX.../validator-messages` route.
     ///
     /// Request query also has a `limit` parameter, which can be used to return
     /// <= `msgs_find_limit` messages in the request.
     ///
-    /// Also see: [`ValidatorMessagesListResponse`](crate::sentry::ValidatorMessagesListResponse),
-    /// [`ValidatorMessagesListQuery`](crate::sentry::ValidatorMessagesListQuery)
+    /// Also see: [`ValidatorMessagesListResponse`](crate::sentry::validator_messages::ValidatorMessagesListResponse),
+    /// [`ValidatorMessagesListQuery`](crate::sentry::validator_messages::ValidatorMessagesListQuery)
     pub msgs_find_limit: u32,
     /// The maximum allowed limit of [`FetchedAnalytics`](crate::sentry::FetchedAnalytics)s per page
     /// returned by Sentry's GET `/v5/analytics` routes:

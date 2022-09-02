@@ -624,8 +624,11 @@ pub mod validator_message {
     use adapter::client::Locked;
     use primitives::{
         sentry::{
-            SuccessResponse, ValidatorMessagesCreateRequest, ValidatorMessagesListQuery,
-            ValidatorMessagesListResponse,
+            validator_messages::{
+                MessageTypesFilter, ValidatorMessagesCreateRequest, ValidatorMessagesListQuery,
+                ValidatorMessagesListResponse,
+            },
+            SuccessResponse,
         },
         ChainOf, Channel, ChannelId, ValidatorId,
     };
@@ -640,13 +643,15 @@ pub mod validator_message {
     #[derive(Debug, Deserialize)]
     pub struct MessagesListParams {
         pub id: ChannelId,
-        // Optional filtering by ValidatorId
+        // Optional filtering by [`ValidatorId`].
         #[serde(default)]
         pub address: Option<ValidatorId>,
-        /// List of validator message types separated by `+` (urlencoded):
-        /// e.g. `ApproveState+NewState`
+        /// Optional filtering by a list of [`MessageType`](primitives::validator::messages::MessageType)s
+        /// separated by `+` (url encoded).
+        ///
+        /// See [`MessageTypesFilter`] for more details.
         #[serde(default)]
-        pub message_types: String,
+        pub message_types: MessageTypesFilter,
     }
 
     /// GET `/v5/channel/0xXXX.../validator-messages`
@@ -663,23 +668,6 @@ pub mod validator_message {
         Path(params): Path<MessagesListParams>,
         Qs(query): Qs<ValidatorMessagesListQuery>,
     ) -> Result<Json<ValidatorMessagesListResponse>, ResponseError> {
-        let message_types = {
-            // We need to strip the `/` prefix from axum
-            let stripped = params
-                .message_types
-                .strip_prefix('/')
-                .unwrap_or(&params.message_types);
-
-            if !stripped.is_empty() {
-                stripped
-                    .split('+')
-                    .map(|s| s.to_string())
-                    .collect::<Vec<_>>()
-            } else {
-                vec![]
-            }
-        };
-
         let channel = channel_context.context;
 
         let config_limit = app.config.msgs_find_limit as u64;
@@ -693,7 +681,7 @@ pub mod validator_message {
             &app.pool,
             &channel.id(),
             &params.address,
-            &message_types,
+            params.message_types.as_ref(),
             limit,
         )
         .await?;
