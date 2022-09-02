@@ -227,7 +227,7 @@ mod test {
         body::Body,
         http::{Request, StatusCode},
     };
-    use primitives::test_util::{ADVERTISER, FOLLOWER, IDS, LEADER, PUBLISHER};
+    use primitives::{test_util::{ADVERTISER, FOLLOWER, IDS, LEADER, PUBLISHER}};
     use tower::Service;
 
     #[tokio::test]
@@ -376,11 +376,5 @@ mod test {
 
             assert_eq!(StatusCode::OK, response.status());
         }
-    }
-
-    #[tokio::test]
-    async fn guest_route_allowed_key_tests() {
-        // TODO: Test each allowed key
-        // TODO: Test each not allowed key
     }
 }
