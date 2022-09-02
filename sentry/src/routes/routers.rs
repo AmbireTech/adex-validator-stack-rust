@@ -227,7 +227,7 @@ mod test {
         body::Body,
         http::{Request, StatusCode},
     };
-    use primitives::{test_util::{ADVERTISER, FOLLOWER, IDS, LEADER, PUBLISHER}};
+    use primitives::test_util::{ADVERTISER, FOLLOWER, IDS, LEADER, PUBLISHER};
     use tower::Service;
 
     #[tokio::test]

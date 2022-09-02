@@ -1283,7 +1283,6 @@ mod test {
         // ));
     }
 
-
     #[tokio::test]
     async fn test_allowed_keys_for_guest() {
         let app_guard = setup_dummy_app().await;
@@ -1291,7 +1290,6 @@ mod test {
 
         let allowed_keys = GET_ANALYTICS_ALLOWED_KEYS.clone();
         let base_datehour = DateHour::from_ymdh(2022, 1, 17, 14);
-
 
         // Test for each allowed key
         // Country
@@ -1310,7 +1308,14 @@ mod test {
                 country: Some("Bulgaria".to_string()),
                 ..Default::default()
             };
-            let res = get_analytics(Extension(app.clone()), None, Extension(allowed_keys.clone()), None, Qs(query)).await;
+            let res = get_analytics(
+                Extension(app.clone()),
+                None,
+                Extension(allowed_keys.clone()),
+                None,
+                Qs(query),
+            )
+            .await;
             assert!(res.is_ok());
         }
         // Ad Slot Type
@@ -1329,7 +1334,14 @@ mod test {
                 ad_slot_type: Some("legacy_300x100".to_string()),
                 ..Default::default()
             };
-            let res = get_analytics(Extension(app.clone()), None, Extension(allowed_keys.clone()), None, Qs(query)).await;
+            let res = get_analytics(
+                Extension(app.clone()),
+                None,
+                Extension(allowed_keys.clone()),
+                None,
+                Qs(query),
+            )
+            .await;
             assert!(res.is_ok());
         }
         // Test each not allowed key
@@ -1349,7 +1361,15 @@ mod test {
                 campaign_id: Some(DUMMY_CAMPAIGN.id),
                 ..Default::default()
             };
-            let res = get_analytics(Extension(app.clone()), None, Extension(allowed_keys.clone()), None, Qs(query)).await.expect_err("should be an error");
+            let res = get_analytics(
+                Extension(app.clone()),
+                None,
+                Extension(allowed_keys.clone()),
+                None,
+                Qs(query),
+            )
+            .await
+            .expect_err("should be an error");
             assert_eq!(
                 ResponseError::Forbidden("Disallowed query key `campaignId`".into()),
                 res,
@@ -1371,7 +1391,15 @@ mod test {
                 ad_unit: Some(DUMMY_IPFS[0]),
                 ..Default::default()
             };
-            let res = get_analytics(Extension(app.clone()), None, Extension(allowed_keys.clone()), None, Qs(query)).await.expect_err("should be an error");
+            let res = get_analytics(
+                Extension(app.clone()),
+                None,
+                Extension(allowed_keys.clone()),
+                None,
+                Qs(query),
+            )
+            .await
+            .expect_err("should be an error");
             assert_eq!(
                 ResponseError::Forbidden("Disallowed query key `adUnit`".into()),
                 res,
@@ -1393,7 +1421,15 @@ mod test {
                 ad_slot: Some(DUMMY_IPFS[1]),
                 ..Default::default()
             };
-            let res = get_analytics(Extension(app.clone()), None, Extension(allowed_keys.clone()), None, Qs(query)).await.expect_err("should be an error");
+            let res = get_analytics(
+                Extension(app.clone()),
+                None,
+                Extension(allowed_keys.clone()),
+                None,
+                Qs(query),
+            )
+            .await
+            .expect_err("should be an error");
             assert_eq!(
                 ResponseError::Forbidden("Disallowed query key `adSlot`".into()),
                 res,
@@ -1415,7 +1451,15 @@ mod test {
                 advertiser: Some(*ADVERTISER),
                 ..Default::default()
             };
-            let res = get_analytics(Extension(app.clone()), None, Extension(allowed_keys.clone()), None, Qs(query)).await.expect_err("should throw an error");
+            let res = get_analytics(
+                Extension(app.clone()),
+                None,
+                Extension(allowed_keys.clone()),
+                None,
+                Qs(query),
+            )
+            .await
+            .expect_err("should throw an error");
             assert_eq!(
                 ResponseError::Forbidden("Disallowed query key `advertiser`".into()),
                 res,
@@ -1437,7 +1481,15 @@ mod test {
                 publisher: Some(*PUBLISHER),
                 ..Default::default()
             };
-            let res = get_analytics(Extension(app.clone()), None, Extension(allowed_keys.clone()), None, Qs(query)).await.expect_err("should throw an error");
+            let res = get_analytics(
+                Extension(app.clone()),
+                None,
+                Extension(allowed_keys.clone()),
+                None,
+                Qs(query),
+            )
+            .await
+            .expect_err("should throw an error");
             assert_eq!(
                 ResponseError::Forbidden("Disallowed query key `publisher`".into()),
                 res,
@@ -1459,7 +1511,15 @@ mod test {
                 hostname: Some("localhost".to_string()),
                 ..Default::default()
             };
-            let res = get_analytics(Extension(app.clone()), None, Extension(allowed_keys.clone()), None, Qs(query)).await.expect_err("should throw an error");
+            let res = get_analytics(
+                Extension(app.clone()),
+                None,
+                Extension(allowed_keys.clone()),
+                None,
+                Qs(query),
+            )
+            .await
+            .expect_err("should throw an error");
             assert_eq!(
                 ResponseError::Forbidden("Disallowed query key `hostname`".into()),
                 res,
@@ -1481,7 +1541,15 @@ mod test {
                 os_name: Some(OperatingSystem::map_os("Windows")),
                 ..Default::default()
             };
-            let res = get_analytics(Extension(app.clone()), None, Extension(allowed_keys.clone()), None, Qs(query)).await.expect_err("should throw an error");
+            let res = get_analytics(
+                Extension(app.clone()),
+                None,
+                Extension(allowed_keys.clone()),
+                None,
+                Qs(query),
+            )
+            .await
+            .expect_err("should throw an error");
             assert_eq!(
                 ResponseError::Forbidden("Disallowed query key `osName`".into()),
                 res,
