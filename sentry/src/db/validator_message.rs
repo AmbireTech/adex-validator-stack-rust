@@ -2,7 +2,7 @@ use chrono::Utc;
 use tokio_postgres::types::ToSql;
 
 use primitives::{
-    balances::UncheckedState,
+    balances::BalancesState,
     sentry::{message::MessageResponse, validator_messages::ValidatorMessage},
     validator::{ApproveState, Heartbeat, MessageType, MessageTypes, NewState},
     Channel, ChannelId, ValidatorId,
@@ -102,11 +102,11 @@ pub async fn latest_approve_state(
 /// Returns the latest [`NewState`] message for this [`Channel`] and the provided `state_root`.
 ///
 /// Ordered by: `received DESC`
-pub async fn latest_new_state(
+pub async fn latest_new_state<S: BalancesState>(
     pool: &DbPool,
     channel: &Channel,
     state_root: &str,
-) -> Result<Option<MessageResponse<NewState<UncheckedState>>>, PoolError> {
+) -> Result<Option<MessageResponse<NewState<S>>>, PoolError> {
     let client = pool.get().await?;
 
     let select = client.prepare("SELECT \"from\", msg, received FROM validator_messages WHERE channel_id = $1 AND \"from\" = $2 AND msg ->> 'type' = 'NewState' AND msg->> 'stateRoot' = $3 ORDER BY received DESC LIMIT 1").await?;
@@ -115,7 +115,7 @@ pub async fn latest_new_state(
         .await?;
 
     rows.get(0)
-        .map(MessageResponse::<NewState<UncheckedState>>::try_from)
+        .map(MessageResponse::<NewState<S>>::try_from)
         .transpose()
         .map_err(PoolError::Backend)
 }

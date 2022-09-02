@@ -13,16 +13,17 @@ use adapter::{
     Adapter, Dummy,
 };
 use primitives::{
-    balances::{Balances, CheckedState, UncheckedState},
+    balances::{Balances, BalancesState, CheckedState, UncheckedState},
     merkle_tree::MerkleTree,
     sentry::{
         channel_list::{ChannelListQuery, ChannelListResponse},
+        message::MessageResponse,
         AccountingResponse, AllSpendersQuery, AllSpendersResponse, ChannelPayRequest,
         GetLeafResponse, LastApproved, LastApprovedQuery, LastApprovedResponse, SpenderResponse,
         SuccessResponse,
     },
     spender::{Spendable, Spender},
-    validator::NewState,
+    validator::{ApproveState, NewState},
     Address, ChainOf, Channel, ChannelId, Deposit, UnifiedNum,
 };
 
@@ -97,17 +98,11 @@ pub async fn last_approved<C: Locked + 'static>(
         heartbeats: None,
     });
 
-    let approve_state = match latest_approve_state(&app.pool, &channel).await? {
-        Some(approve_state) => approve_state,
-        None => return Ok(default_response),
-    };
-
-    let state_root = approve_state.msg.state_root.clone();
-
-    let new_state = latest_new_state(&app.pool, &channel, &state_root).await?;
-    if new_state.is_none() {
-        return Ok(default_response);
-    }
+    let (approve_state, new_state) =
+        match get_corresponding_states::<UncheckedState>(&app.pool, &app.logger, &channel).await? {
+            Some(states) => states,
+            None => return Ok(default_response),
+        };
 
     let validators = vec![channel.leader, channel.follower];
     let channel_id = channel.id();
@@ -126,7 +121,7 @@ pub async fn last_approved<C: Locked + 'static>(
 
     Ok(Json(LastApprovedResponse {
         last_approved: Some(LastApproved {
-            new_state,
+            new_state: Some(new_state),
             approve_state: Some(approve_state),
         }),
         heartbeats,
@@ -193,19 +188,21 @@ pub async fn get_spender_limits<C: Locked + 'static>(
         }
     };
 
-    let new_state = match get_corresponding_new_state(&app.pool, &app.logger, channel).await? {
-        Some(new_state) => new_state,
-        None => {
-            return Ok(Json(SpenderResponse {
-                spender: Spender {
-                    total_deposited: latest_spendable.deposit.total,
-                    total_spent: None,
-                },
-            }))
-        }
-    };
+    let (_, new_state) =
+        match get_corresponding_states::<CheckedState>(&app.pool, &app.logger, channel).await? {
+            Some(new_state) => new_state,
+            None => {
+                return Ok(Json(SpenderResponse {
+                    spender: Spender {
+                        total_deposited: latest_spendable.deposit.total,
+                        total_spent: None,
+                    },
+                }))
+            }
+        };
 
     let total_spent = new_state
+        .msg
         .balances
         .spenders
         .get(&spender)
@@ -235,7 +232,8 @@ pub async fn get_all_spender_limits<C: Locked + 'static>(
         .checked_mul(limit.into())
         .ok_or_else(|| ResponseError::FailedValidation("Page and/or limit is too large".into()))?;
 
-    let new_state = get_corresponding_new_state(&app.pool, &app.logger, &channel).await?;
+    let corresponding_states =
+        get_corresponding_states::<CheckedState>(&app.pool, &app.logger, &channel).await?;
 
     let mut all_spender_limits: HashMap<Address, Spender> = HashMap::new();
 
@@ -245,16 +243,20 @@ pub async fn get_all_spender_limits<C: Locked + 'static>(
     // Using for loop to avoid async closures
     for spendable in all_spendables {
         let spender = spendable.spender;
-        let total_spent = match new_state {
-            Some(ref new_state) => new_state.balances.spenders.get(&spender).map(|balance| {
-                spendable
-                    .deposit
-                    .total
-                    .checked_sub(balance)
-                    .unwrap_or_default()
-            }),
-            None => None,
-        };
+        let total_spent = corresponding_states.as_ref().and_then(|(_, new_state)| {
+            new_state
+                .msg
+                .balances
+                .spenders
+                .get(&spender)
+                .map(|balance| {
+                    spendable
+                        .deposit
+                        .total
+                        .checked_sub(balance)
+                        .unwrap_or_default()
+                })
+        });
 
         let spender_info = Spender {
             total_deposited: spendable.deposit.total,
@@ -300,8 +302,10 @@ pub async fn add_spender_leaf<C: Locked + 'static>(
         }
     };
 
-    let new_state =
-        match get_corresponding_new_state(&app.pool, &app.logger, &channel.context).await? {
+    let (_, new_state) =
+        match get_corresponding_states::<CheckedState>(&app.pool, &app.logger, &channel.context)
+            .await?
+        {
             Some(new_state) => new_state,
             None => {
                 return Ok(Json(SpenderResponse {
@@ -313,11 +317,7 @@ pub async fn add_spender_leaf<C: Locked + 'static>(
             }
         };
 
-    let total_spent = new_state
-        .balances
-        .spenders
-        .get(&spender)
-        .map(|spent| spent.to_owned());
+    let total_spent = new_state.msg.balances.spenders.get(&spender).copied();
 
     Ok(Json(SpenderResponse {
         spender: Spender {
@@ -327,11 +327,26 @@ pub async fn add_spender_leaf<C: Locked + 'static>(
     }))
 }
 
-async fn get_corresponding_new_state(
+/// Retrieves the [`Channel`]'s latest [`ApproveState`] and the corresponding
+/// approved [`NewState`].
+///
+/// # Errors
+///
+/// - Returns [`ResponseError::NotFound`] if there is no [`ApproveState`]
+/// generated for the [`Channel`], i.e. the [`Channel`] is new.
+///
+/// - Returns [`ResponseError::BadRequest`] if the [`ApproveState`]'s
+/// corresponding approve [`NewState`] is not found.
+///
+/// - Returns [`ResponseError::BadRequest`] if the [`NewState`]'s
+/// [`Balances`] don't align, i.e. `sum(earner) != sum(spenders)`
+///
+/// [`ApproveState`]: primitives::validator::ApproveState
+async fn get_corresponding_states<S: BalancesState>(
     pool: &DbPool,
     logger: &Logger,
     channel: &Channel,
-) -> Result<Option<NewState<CheckedState>>, ResponseError> {
+) -> Result<Option<(MessageResponse<ApproveState>, MessageResponse<NewState<S>>)>, ResponseError> {
     let approve_state = match latest_approve_state(pool, channel).await? {
         Some(approve_state) => approve_state,
         None => return Ok(None),
@@ -339,16 +354,11 @@ async fn get_corresponding_new_state(
 
     let state_root = approve_state.msg.state_root.clone();
 
-    match latest_new_state(pool, channel, &state_root).await? {
-        Some(new_state) => {
-            let new_state = new_state.msg.into_inner().try_checked().map_err(|err| {
-                error!(&logger, "Balances are not aligned in an approved NewState: {}", &err; "module" => "get_spender_limits");
-                ResponseError::BadRequest("Balances are not aligned in an approved NewState".to_string())
-            })?;
-            Ok(Some(new_state))
-        }
+    match latest_new_state::<S>(pool, channel, &state_root).await? {
+        Some(new_state) => Ok(Some((approve_state, new_state))),
         None => {
-            error!(&logger, "{}", "Fatal error! The NewState for the last ApproveState was not found"; "module" => "get_spender_limits");
+            error!(&logger, "{}", "Fatal error! The NewState for the last ApproveState was not found"; "module" => "routes::channel");
+
             Err(ResponseError::BadRequest(
                 "Fatal error! The NewState for the last ApproveState was not found".to_string(),
             ))
@@ -520,15 +530,9 @@ pub async fn get_leaf<C: Locked + 'static>(
 ) -> Result<Json<GetLeafResponse>, ResponseError> {
     let channel = channel_context.context;
 
-    let approve_state = latest_approve_state(&app.pool, &channel)
+    let (_, new_state) = get_corresponding_states::<CheckedState>(&app.pool, &app.logger, &channel)
         .await?
         .ok_or(ResponseError::NotFound)?;
-
-    let state_root = approve_state.msg.state_root.clone();
-
-    let new_state = latest_new_state(&app.pool, &channel, &state_root)
-        .await?
-        .ok_or_else(|| ResponseError::BadRequest("No NewState message for spender".to_string()))?;
 
     let addr = params.1;
 
