@@ -733,7 +733,8 @@ mod test {
     use super::*;
     use crate::{
         db::{
-            insert_campaign, insert_channel, validator_message::{insert_validator_message, get_validator_messages},
+            insert_campaign, insert_channel,
+            validator_message::{get_validator_messages, insert_validator_message},
             CampaignRemaining,
         },
         routes::channel::validator_message::create_validator_messages,
@@ -744,20 +745,20 @@ mod test {
         prelude::Unlocked,
         primitives::Deposit as AdapterDeposit,
     };
+    use chrono::Utc;
     use primitives::{
         balances::UncheckedState,
         channel::Nonce,
         config::GANACHE_CONFIG,
+        sentry::validator_messages::ValidatorMessagesCreateRequest,
         test_util::{
             ADVERTISER, CREATOR, DUMMY_CAMPAIGN, FOLLOWER, GUARDIAN, IDS, LEADER, LEADER_2,
-            PUBLISHER, PUBLISHER_2
+            PUBLISHER, PUBLISHER_2,
         },
-        sentry::validator_messages::ValidatorMessagesCreateRequest,
-        validator::{ApproveState, MessageTypes, NewState, MessageType, Heartbeat, RejectState},
+        validator::{ApproveState, Heartbeat, MessageType, MessageTypes, NewState, RejectState},
         BigNum, ChainId, Deposit, UnifiedMap, ValidatorId,
     };
     use std::str::FromStr;
-    use chrono::Utc;
 
     #[tokio::test]
     async fn create_and_fetch_spendable() {
@@ -1580,7 +1581,12 @@ mod test {
         let app_guard = setup_dummy_app().await;
         let app = Extension(Arc::new(app_guard.app.clone()));
         let config = GANACHE_CONFIG.clone();
-        let all_message_types: [MessageType; 4] = [MessageType::NewState, MessageType::ApproveState, MessageType::RejectState, MessageType::Heartbeat];
+        let all_message_types: [MessageType; 4] = [
+            MessageType::NewState,
+            MessageType::ApproveState,
+            MessageType::RejectState,
+            MessageType::Heartbeat,
+        ];
 
         let channel_context = Extension(
             app.config
@@ -1604,11 +1610,15 @@ mod test {
                 chain: chain_context.chain.clone(),
             };
 
-            let req = ValidatorMessagesCreateRequest {
-                messages: vec![],
-            };
+            let req = ValidatorMessagesCreateRequest { messages: vec![] };
 
-            let res = create_validator_messages(app.clone(), Extension(auth), channel_context.clone(), Json(req)).await;
+            let res = create_validator_messages(
+                app.clone(),
+                Extension(auth),
+                channel_context.clone(),
+                Json(req),
+            )
+            .await;
 
             assert!(matches!(res, Err(ResponseError::Unauthorized)));
         }
@@ -1621,13 +1631,26 @@ mod test {
                 chain: chain_context.chain.clone(),
             };
 
-            let req = ValidatorMessagesCreateRequest {
-                messages: vec![],
-            };
+            let req = ValidatorMessagesCreateRequest { messages: vec![] };
 
-            create_validator_messages(app.clone(), Extension(auth), channel_context.clone(), Json(req)).await.expect("should work");
+            create_validator_messages(
+                app.clone(),
+                Extension(auth),
+                channel_context.clone(),
+                Json(req),
+            )
+            .await
+            .expect("should work");
 
-            let messages = get_validator_messages(&app.pool, &channel_context.context.id(), &Some(IDS[&LEADER]), &all_message_types, 100).await.expect("should get messages");
+            let messages = get_validator_messages(
+                &app.pool,
+                &channel_context.context.id(),
+                &Some(IDS[&LEADER]),
+                &all_message_types,
+                100,
+            )
+            .await
+            .expect("should get messages");
 
             assert_eq!(messages.len(), 0);
         }
@@ -1649,10 +1672,26 @@ mod test {
                 messages: vec![MessageTypes::Heartbeat(message.clone())],
             };
 
-            create_validator_messages(app.clone(), Extension(auth), channel_context.clone(), Json(req)).await.expect("Should create messages");
+            create_validator_messages(
+                app.clone(),
+                Extension(auth),
+                channel_context.clone(),
+                Json(req),
+            )
+            .await
+            .expect("Should create messages");
 
-            let messages = get_validator_messages(&app.pool, &channel_context.context.id(), &Some(IDS[&LEADER]), &all_message_types, 100).await.expect("should get messages");
-            let inner_messages: Vec<MessageTypes> = messages.into_iter().map(|m| m.msg.clone()).collect();
+            let messages = get_validator_messages(
+                &app.pool,
+                &channel_context.context.id(),
+                &Some(IDS[&LEADER]),
+                &all_message_types,
+                100,
+            )
+            .await
+            .expect("should get messages");
+            let inner_messages: Vec<MessageTypes> =
+                messages.into_iter().map(|m| m.msg.clone()).collect();
             assert_eq!(inner_messages, vec![MessageTypes::Heartbeat(message)]);
         }
         // Case with 4 messages (one of each type, heartbeat is already inserted)
@@ -1693,12 +1732,31 @@ mod test {
             };
 
             let req = ValidatorMessagesCreateRequest {
-                messages: vec![MessageTypes::NewState(new_state.clone()), MessageTypes::ApproveState(approve_state.clone()), MessageTypes::RejectState(reject_state.clone())],
+                messages: vec![
+                    MessageTypes::NewState(new_state.clone()),
+                    MessageTypes::ApproveState(approve_state.clone()),
+                    MessageTypes::RejectState(reject_state.clone()),
+                ],
             };
 
-            create_validator_messages(app.clone(), Extension(auth), channel_context.clone(), Json(req)).await.expect("Should create messages");
+            create_validator_messages(
+                app.clone(),
+                Extension(auth),
+                channel_context.clone(),
+                Json(req),
+            )
+            .await
+            .expect("Should create messages");
 
-            let messages = get_validator_messages(&app.pool, &channel_context.context.id(), &Some(IDS[&LEADER]), &all_message_types, 100).await.expect("should get messages");
+            let messages = get_validator_messages(
+                &app.pool,
+                &channel_context.context.id(),
+                &Some(IDS[&LEADER]),
+                &all_message_types,
+                100,
+            )
+            .await
+            .expect("should get messages");
             assert_eq!(messages.len(), 4);
         }
     }
