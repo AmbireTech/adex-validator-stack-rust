@@ -21,9 +21,9 @@ args = ["test", "--all-features"]
 [tasks.ganache-up]
 # `--renew-anon-volumes` is required to make sure that the snapshot used for the `ganache` instances is reloaded.
 script = '''
-docker-compose -f ../docker-compose.harness.yml up --renew-anon-volumes -d ganache-1 ganache-1337 \
+docker-compose -f ../docker-compose.yml up --renew-anon-volumes -d ganache-1 ganache-1337 \
 && sleep 6
 '''
 
 [tasks.ganache-down]
-script = "docker-compose -f ../docker-compose.harness.yml down"
+script = "docker-compose -f ../docker-compose.yml down"

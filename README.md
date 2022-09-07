@@ -30,7 +30,7 @@ Two services are needed to run `Sentry`: `Postgres` and `Redis`.
 
 The easiest way to run these services locally is by using the provided `docker-compose` file:
 
-`docker-compose -f docker-compose.harness.yml up -d adex-redis adex-postgres`
+`docker-compose -f docker-compose.yml up -d adex-redis adex-postgres`
 
 If you want to run them manually without `docker-compose`:
 
@@ -245,7 +245,7 @@ cargo make
 It will format your code using `rustfmt` and will perform `clippy` checks (it will fail on warnings).
 Thanks to `cargo` it will run all the tests (doc tests, unit tests, integration tests, etc.).
 
-Using the provided `docker-compose.harness.yml` setup [`cargo-make`][cargo-make overview] will run
+Using the provided `docker-compose.yml` setup [`cargo-make`][cargo-make overview] will run
 all the required services for the specific crate/application before executing the tests.
 
 [cargo-make overview]: https://github.com/sagiegurari/cargo-make#overview

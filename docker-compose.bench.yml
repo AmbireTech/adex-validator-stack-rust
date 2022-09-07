@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  # Service used to bechmark the sentry application in release mode
+  # It uses the dummy adapter and the Leader
+  sentry-dummy-leader-release:
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: Dockerfile-sentry
+    container_name: adex-sentry-dummy-leader-release
+    ports:
+      - "8005:8005"
+    environment:
+      ENV: development
+      IP_ADDR: 0.0.0.0
+      PORT: 8005
+      POSTGRES_DB: sentry_leader
+      POSTGRES_HOST: adex-postgres
+      REDIS_HOST: adex-redis
+      ADAPTER: dummy
+      DUMMY_IDENTITY: '0x80690751969B234697e9059e04ed72195c3507fa'
+      REDIS_URL: redis://adex-redis:6379/0
+    networks:
+      - adex-external
