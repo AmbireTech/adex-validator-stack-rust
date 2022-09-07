@@ -19,10 +19,10 @@ dependencies = [
 env = { "POSTGRES_DB" = "sentry_leader" }
 
 [tasks.services-up]
-script = "docker-compose -f ../docker-compose.harness.yml up -d adex-redis adex-postgres && sleep 3"
+script = "docker-compose -f ../docker-compose.yml up -d adex-redis adex-postgres && sleep 3"
 
 [tasks.services-down]
-script = "docker-compose -f ../docker-compose.harness.yml down"
+script = "docker-compose -f ../docker-compose.yml down"
 
 [tasks.run-benchmark]
 category = "Development"
@@ -59,7 +59,8 @@ args = [
 
 [tasks.benchmark-services-up]
 # `--renew-anon-volumes` is required to make sure that the Databases are dumpped.
-script = "docker-compose -f ../docker-compose.harness.yml up --renew-anon-volumes -d adex-redis adex-postgres sentry-dummy-leader-release && sleep 3"
+# also run with `--build` to build the latest release of sentry!
+script = "docker-compose -f ../docker-compose.yml -f ../docker-compose.bench.yml up --build --renew-anon-volumes -d adex-redis adex-postgres sentry-dummy-leader-release && sleep 3"
 
 [tasks.benchmark-services-down]
-script = "docker-compose -f ../docker-compose.harness.yml down"
+script = "docker-compose -f ../docker-compose.yml -f ../docker-compose.bench.yml down"
