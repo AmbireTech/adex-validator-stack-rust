@@ -9,8 +9,9 @@ use crate::{
     config::GANACHE_CONFIG,
     sentry::{CLICK, IMPRESSION},
     targeting::Rules,
-    AdUnit, Address, Campaign, Channel, EventSubmission, UnifiedNum, ValidatorDesc, ValidatorId,
-    IPFS,
+    unified_num::FromWhole,
+    AdUnit, Address, Campaign, ChainOf, Channel, EventSubmission, UnifiedNum, ValidatorDesc,
+    ValidatorId, IPFS,
 };
 
 pub use logger::discard_logger;
@@ -128,6 +129,9 @@ pub static DUMMY_AUTH: Lazy<HashMap<Address, String>> = Lazy::new(|| {
     auth.insert(*ADVERTISER, "AUTH_awesomeAdvertiser".into());
     auth.insert(*PUBLISHER, "AUTH_awesomePublisher".into());
     auth.insert(*GUARDIAN_2, "AUTH_awesomeGuardian2".into());
+    auth.insert(*PUBLISHER_2, "AUTH_awesomePublisher2".into());
+    auth.insert(*ADVERTISER_2, "AUTH_awesomeAdvertiser2".into());
+    auth.insert(*LEADER_2, "AUTH_awesomeLeader2".into());
 
     auth
 });
@@ -145,14 +149,14 @@ mod logger {
 pub static DUMMY_VALIDATOR_LEADER: Lazy<ValidatorDesc> = Lazy::new(|| ValidatorDesc {
     id: IDS[&LEADER],
     url: "http://localhost:8005".to_string(),
-    fee: 100.into(),
+    fee: UnifiedNum::from_whole(0.03),
     fee_addr: None,
 });
 
 pub static DUMMY_VALIDATOR_FOLLOWER: Lazy<ValidatorDesc> = Lazy::new(|| ValidatorDesc {
     id: IDS[&FOLLOWER],
     url: "http://localhost:8006".to_string(),
-    fee: 100.into(),
+    fee: UnifiedNum::from_whole(0.02),
     fee_addr: None,
 });
 
@@ -163,7 +167,7 @@ pub static DUMMY_CAMPAIGN: Lazy<Campaign> = Lazy::new(|| {
         .get("Ganache #1337")
         .unwrap()
         .tokens
-        .get("Mocked TOKEN")
+        .get("Mocked TOKEN 1337")
         .unwrap();
 
     Campaign {
@@ -179,7 +183,7 @@ pub static DUMMY_CAMPAIGN: Lazy<Campaign> = Lazy::new(|| {
         },
         creator: *CREATOR,
         // 1000.00000000
-        budget: UnifiedNum::from(100_000_000_000),
+        budget: UnifiedNum::from_whole(1_000),
         validators: Validators::new((
             DUMMY_VALIDATOR_LEADER.clone(),
             DUMMY_VALIDATOR_FOLLOWER.clone(),
@@ -230,7 +234,7 @@ pub static DUMMY_AD_UNITS: Lazy<[AdUnit; 4]> = Lazy::new(|| {
             min_targeting_score: None,
             modified: None,
             owner: IDS[&PUBLISHER],
-            title: Some("Dummy AdUnit 3".to_string()),
+            title: Some("Dummy AdUnit 1".to_string()),
         },
         AdUnit {
             ipfs: IPFS::try_from("QmVhRDGXoM3Fg3HZD5xwMuxtb9ZErwC8wHt8CjsfxaiUbZ")
@@ -296,12 +300,203 @@ pub static DUMMY_IPFS: Lazy<[IPFS; 5]> = Lazy::new(|| {
     ]
 });
 
-#[cfg(test)]
-mod test {
-    use super::*;
+/// List of test campaigns with keys `Campaign {Chain id} #{Number campaign}`
+pub static CAMPAIGNS: Lazy<[ChainOf<Campaign>; 3]> = Lazy::new(|| {
+    let campaign_1337_1 = {
+        let ganache_chain_info = GANACHE_CONFIG.chains["Ganache #1337"].clone();
+        let token_info = ganache_chain_info.tokens["Mocked TOKEN 1337"].clone();
 
-    #[test]
-    fn test_ids() {
-        println!("{:?}", IDS[&LEADER]);
-    }
-}
+        let channel = Channel {
+            leader: IDS[&LEADER],
+            follower: IDS[&FOLLOWER],
+            guardian: *GUARDIAN,
+            token: token_info.address,
+            nonce: 0_u64.into(),
+        };
+
+        let leader_desc = ValidatorDesc {
+            fee: UnifiedNum::from_whole(0.5),
+            ..DUMMY_VALIDATOR_LEADER.clone()
+        };
+
+        let follower_desc = ValidatorDesc {
+            fee: UnifiedNum::from_whole(0.4),
+            ..DUMMY_VALIDATOR_FOLLOWER.clone()
+        };
+
+        let validators = Validators::new((leader_desc, follower_desc));
+
+        ChainOf::new(ganache_chain_info.chain, token_info).with_campaign(Campaign {
+            id: "0x936da01f9abd4d9d80c702af85c822a8"
+                .parse()
+                .expect("Should parse"),
+            channel,
+            creator: *ADVERTISER,
+            // 100 000
+            budget: UnifiedNum::from_whole(100_000),
+            validators,
+            title: Some("Dummy Campaign".to_string()),
+            pricing_bounds: vec![
+                (
+                    IMPRESSION,
+                    Pricing {
+                        min: UnifiedNum::from_whole(0.0004),
+                        max: UnifiedNum::from_whole(0.0005),
+                    },
+                ),
+                (
+                    CLICK,
+                    Pricing {
+                        min: UnifiedNum::from_whole(0.0006),
+                        max: UnifiedNum::from_whole(0.001),
+                    },
+                ),
+            ]
+            .into_iter()
+            .collect(),
+            event_submission: Some(EventSubmission { allow: vec![] }),
+            ad_units: vec![DUMMY_AD_UNITS[0].clone(), DUMMY_AD_UNITS[1].clone()],
+            targeting_rules: Rules::new(),
+            created: Utc.ymd(2021, 2, 1).and_hms(7, 0, 0),
+            active: Active {
+                from: Some(Utc.ymd(2022, 6, 27).and_hms(0, 0, 0)),
+                to: Utc.ymd(2099, 1, 30).and_hms(0, 0, 0),
+            },
+        })
+    };
+
+    let campaign_1337_2 = {
+        let ganache_chain_info = GANACHE_CONFIG.chains["Ganache #1337"].clone();
+        let token_info = ganache_chain_info.tokens["Mocked TOKEN 1337"].clone();
+
+        let channel = Channel {
+            leader: IDS[&FOLLOWER],
+            follower: IDS[&LEADER],
+            guardian: *GUARDIAN_2,
+            token: token_info.address,
+            nonce: 0_u64.into(),
+        };
+
+        let leader_desc = ValidatorDesc {
+            fee: UnifiedNum::from_whole(0.1),
+            ..DUMMY_VALIDATOR_FOLLOWER.clone()
+        };
+
+        let follower_desc = ValidatorDesc {
+            fee: UnifiedNum::from_whole(0.05),
+            ..DUMMY_VALIDATOR_LEADER.clone()
+        };
+        let validators = Validators::new((leader_desc, follower_desc));
+
+        ChainOf::new(ganache_chain_info.chain, token_info).with_campaign(Campaign {
+            id: "0x127b98248f4e4b73af409d10f62daeaa"
+                .parse()
+                .expect("Should parse"),
+            channel,
+            creator: *ADVERTISER,
+            // 200 000
+            budget: UnifiedNum::from_whole(200_000.0),
+            validators,
+            title: Some("Dummy Campaign 2 in Chain #1337".to_string()),
+            pricing_bounds: vec![
+                (
+                    IMPRESSION,
+                    Pricing {
+                        min: UnifiedNum::from_whole(0.0004),
+                        max: UnifiedNum::from_whole(0.0005),
+                    },
+                ),
+                (
+                    CLICK,
+                    Pricing {
+                        min: UnifiedNum::from_whole(0.0006),
+                        max: UnifiedNum::from_whole(0.001),
+                    },
+                ),
+            ]
+            .into_iter()
+            .collect(),
+            event_submission: Some(EventSubmission { allow: vec![] }),
+            ad_units: vec![DUMMY_AD_UNITS[0].clone(), DUMMY_AD_UNITS[1].clone()],
+            targeting_rules: Rules::new(),
+            created: Utc.ymd(2021, 2, 1).and_hms(7, 0, 0),
+            active: Active {
+                from: None,
+                to: Utc.ymd(2099, 1, 30).and_hms(0, 0, 0),
+            },
+        })
+    };
+
+    let campaign_1_1 = {
+        let ganache_chain_info = GANACHE_CONFIG.chains["Ganache #1"].clone();
+        let token_info = ganache_chain_info.tokens["Mocked TOKEN 1"].clone();
+
+        let channel = Channel {
+            leader: IDS[&LEADER],
+            follower: IDS[&FOLLOWER],
+            guardian: *GUARDIAN_2,
+            token: token_info.address,
+            nonce: 1_u64.into(),
+        };
+
+        let leader_desc = ValidatorDesc {
+            fee: UnifiedNum::from_whole(0.02),
+            ..DUMMY_VALIDATOR_LEADER.clone()
+        };
+
+        let follower_desc = ValidatorDesc {
+            fee: UnifiedNum::from_whole(0.0175),
+            ..DUMMY_VALIDATOR_FOLLOWER.clone()
+        };
+
+        let validators = Validators::new((leader_desc, follower_desc));
+
+        ChainOf::new(ganache_chain_info.chain, token_info).with_campaign(Campaign {
+            id: "0xa78f3492481b41a688488a7aa1ff17df"
+                .parse()
+                .expect("Should parse"),
+            channel,
+            creator: *ADVERTISER_2,
+            // 20 000
+            budget: UnifiedNum::from_whole(20_000),
+            validators,
+            title: Some("Dummy Campaign 3 in Chain #1".to_string()),
+            pricing_bounds: vec![
+                (
+                    IMPRESSION,
+                    Pricing {
+                        // 0.01500000
+                        // Per 1000 = 15.00000000
+                        min: UnifiedNum::from_whole(0.015),
+                        // 0.0250000
+                        // Per 1000 = 25.00000000
+                        max: UnifiedNum::from_whole(0.025),
+                    },
+                ),
+                (
+                    CLICK,
+                    Pricing {
+                        // 0.03500000
+                        // Per 1000 = 35.00000000
+                        min: UnifiedNum::from_whole(0.035),
+                        // 0.06500000
+                        // Per 1000 = 65.00000000
+                        max: UnifiedNum::from_whole(0.065),
+                    },
+                ),
+            ]
+            .into_iter()
+            .collect(),
+            event_submission: Some(EventSubmission { allow: vec![] }),
+            ad_units: vec![DUMMY_AD_UNITS[2].clone(), DUMMY_AD_UNITS[3].clone()],
+            targeting_rules: Rules::new(),
+            created: Utc.ymd(2021, 2, 1).and_hms(7, 0, 0),
+            active: Active {
+                from: None,
+                to: Utc.ymd(2099, 1, 30).and_hms(0, 0, 0),
+            },
+        })
+    };
+
+    [campaign_1337_1, campaign_1337_2, campaign_1_1]
+});

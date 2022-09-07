@@ -31,6 +31,20 @@ impl Address {
     pub fn from_bytes(bytes: &[u8; 20]) -> Self {
         Self(*bytes)
     }
+
+    /// Creates an address from a bytes slice.
+    ///
+    /// Returns `None` if bytes length != 20
+    pub fn from_slice(slice: &[u8]) -> Option<Self> {
+        if slice.len() != 20 {
+            None
+        } else {
+            let mut address = [0u8; 20];
+            address.copy_from_slice(slice);
+
+            Some(Self(address))
+        }
+    }
 }
 
 impl Serialize for Address {
@@ -97,12 +111,13 @@ impl TryFrom<&str> for Address {
     }
 }
 
-/// When we have a string literal (&str) representation of the Address in the form of bytes.
+/// When we have a string literal (`&str`) representation of the `Address` in the form of bytes.
 /// Useful for creating static values from strings for testing, configuration, etc.
 ///
-/// You can find a test setup example in the [`crate::test_util`] module.
+/// You can find a test setup example in the `crate::test_util` module (requires `test-util` feature).
 ///
 /// # Example
+///
 /// ```
 /// use once_cell::sync::Lazy;
 /// use primitives::Address;
@@ -189,7 +204,7 @@ pub fn parse_bytes<T: AsRef<[u8]>>(from: T, prefix: Prefix) -> Result<[u8; 20], 
 }
 
 #[cfg(feature = "postgres")]
-pub mod postgres {
+mod postgres {
     use super::Address;
     use crate::ToETHChecksum;
     use bytes::BytesMut;

@@ -4,7 +4,7 @@ database_type = "postgres"
 # Required database info
 database_name = "sentry_leader"
 database_user = "postgres"
-database_password = "docker"
+database_password = "postgres"
 
 # Configurable database info
 # default "localhost"

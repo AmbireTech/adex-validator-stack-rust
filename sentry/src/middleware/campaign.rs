@@ -1,47 +1,60 @@
-use crate::{db::fetch_campaign, middleware::Middleware};
-use crate::{Application, Auth, ResponseError, RouteParams};
+use std::sync::Arc;
+
+use axum::{
+    extract::{Path, RequestParts},
+    middleware::Next,
+};
+use serde::Deserialize;
+
 use adapter::client::Locked;
-use async_trait::async_trait;
-use hyper::{Body, Request};
-use primitives::campaign::Campaign;
+use primitives::{campaign::Campaign, CampaignId, ChainOf};
 
-#[derive(Debug)]
-pub struct CampaignLoad;
-#[derive(Debug)]
-pub struct CalledByCreator;
+use crate::{db::fetch_campaign, response::ResponseError, Application, Auth};
 
-#[async_trait]
-impl<C: Locked + 'static> Middleware<C> for CampaignLoad {
-    async fn call<'a>(
-        &self,
-        mut request: Request<Body>,
-        application: &'a Application<C>,
-    ) -> Result<Request<Body>, ResponseError> {
-        let id = request
+/// This struct is required because of routes that have more parameters
+/// apart from the `CampaignId`
+#[derive(Debug, Deserialize)]
+struct CampaignParam {
+    pub id: CampaignId,
+}
+
+pub async fn campaign_load<C: Locked + 'static, B>(
+    request: axum::http::Request<B>,
+    next: Next<B>,
+) -> Result<axum::response::Response, ResponseError>
+where
+    B: Send,
+{
+    let (config, pool) = {
+        let app = request
             .extensions()
-            .get::<RouteParams>()
-            .ok_or_else(|| ResponseError::BadRequest("Route params not found".to_string()))?
-            .get(0)
-            .ok_or_else(|| ResponseError::BadRequest("No id".to_string()))?;
+            .get::<Arc<Application<C>>>()
+            .expect("Application should always be present");
 
-        let campaign_id = id
-            .parse()
-            .map_err(|_| ResponseError::BadRequest("Wrong Campaign Id".to_string()))?;
-        let campaign = fetch_campaign(application.pool.clone(), &campaign_id)
-            .await?
-            .ok_or(ResponseError::NotFound)?;
+        (app.config.clone(), app.pool.clone())
+    };
 
-        let campaign_context = application
-            .config
-            .find_chain_of(campaign.channel.token)
-            .ok_or(ResponseError::BadRequest(
-                "Channel token not whitelisted".to_string(),
-            ))?
-            .with_campaign(campaign);
+    // running extractors requires a `RequestParts`
+    let mut request_parts = RequestParts::new(request);
 
-        // If this is an authenticated call
-        // Check if the Campaign's Channel context (Chain Id) aligns with the Authentication token Chain id
-        match request.extensions().get::<Auth>() {
+    let campaign_id = request_parts
+        .extract::<Path<CampaignParam>>()
+        .await
+        .map_err(|_| ResponseError::BadRequest("Bad Campaign Id".to_string()))?
+        .id;
+
+    let campaign = fetch_campaign(pool.clone(), &campaign_id)
+        .await?
+        .ok_or(ResponseError::NotFound)?;
+
+    let campaign_context = config
+        .find_chain_of(campaign.channel.token)
+        .ok_or_else(|| ResponseError::BadRequest("Channel token not whitelisted".to_string()))?
+        .with_campaign(campaign);
+
+    // If this is an authenticated call
+    // Check if the Campaign's Channel context (Chain Id) aligns with the Authentication token Chain id
+    match request_parts.extensions().get::<Auth>() {
             // If Chain Ids differ, the requester hasn't generated Auth token
             // to access the Channel in it's Chain Id.
             Some(auth) if auth.chain.chain_id != campaign_context.chain.chain_id => {
@@ -50,44 +63,55 @@ impl<C: Locked + 'static> Middleware<C> for CampaignLoad {
             _ => {},
         }
 
-        request.extensions_mut().insert(campaign_context);
+    request_parts.extensions_mut().insert(campaign_context);
 
-        Ok(request)
-    }
+    let request = request_parts.try_into_request().expect("Body extracted");
+
+    Ok(next.run(request).await)
 }
 
-#[async_trait]
-impl<C: Locked + 'static> Middleware<C> for CalledByCreator {
-    async fn call<'a>(
-        &self,
-        request: Request<Body>,
-        _application: &'a Application<C>,
-    ) -> Result<Request<Body>, ResponseError> {
-        let campaign = request
-            .extensions()
-            .get::<Campaign>()
-            .expect("We must have a campaign in extensions")
-            .to_owned();
+pub async fn called_by_creator<C: Locked + 'static, B>(
+    request: axum::http::Request<B>,
+    next: Next<B>,
+) -> Result<axum::response::Response, ResponseError>
+where
+    B: Send,
+{
+    let campaign_context = request
+        .extensions()
+        .get::<ChainOf<Campaign>>()
+        .expect("We must have a Campaign in extensions");
 
-        let auth = request
-            .extensions()
-            .get::<Auth>()
-            .expect("request should have session")
-            .to_owned();
+    let auth = request
+        .extensions()
+        .get::<Auth>()
+        .expect("request should have an Authentication");
 
-        if auth.uid.to_address() != campaign.creator {
-            return Err(ResponseError::Forbidden(
-                "Request not sent by campaign creator".to_string(),
-            ));
-        }
-
-        Ok(request)
+    if auth.uid.to_address() != campaign_context.context.creator {
+        return Err(ResponseError::Forbidden(
+            "Request not sent by Campaign's creator".to_string(),
+        ));
     }
+
+    Ok(next.run(request).await)
 }
 
 #[cfg(test)]
 mod test {
-    use primitives::{test_util::DUMMY_CAMPAIGN, Campaign, ChainOf};
+    use axum::{
+        body::Body,
+        http::{Request, StatusCode},
+        middleware::from_fn,
+        routing::get,
+        Extension, Router,
+    };
+    use tower::Service;
+
+    use adapter::{ethereum::test_util::GANACHE_1, Dummy};
+    use primitives::{
+        test_util::{CAMPAIGNS, CREATOR, IDS, PUBLISHER},
+        Campaign, ChainOf,
+    };
 
     use crate::{
         db::{insert_campaign, insert_channel},
@@ -97,70 +121,223 @@ mod test {
     use super::*;
 
     #[tokio::test]
-    async fn campaign_loading() {
-        let app = setup_dummy_app().await;
+    async fn test_campaign_loading() {
+        let app_guard = setup_dummy_app().await;
+        let app = Arc::new(app_guard.app);
 
-        let build_request = |params: RouteParams| {
+        let campaign_context = CAMPAIGNS[0].clone();
+
+        let build_request = || {
             Request::builder()
-                .extension(params)
+                .uri(format!("/{id}/test", id = campaign_context.context.id))
+                .extension(app.clone())
                 .body(Body::empty())
                 .expect("Should build Request")
         };
 
-        let campaign = DUMMY_CAMPAIGN.clone();
+        async fn handle(
+            Extension(campaign_context): Extension<ChainOf<Campaign>>,
+            Path((id, another)): Path<(CampaignId, String)>,
+        ) -> String {
+            assert_eq!(id, campaign_context.context.id);
+            assert_eq!(another, "test");
+            "Ok".into()
+        }
 
-        let campaign_load = CampaignLoad;
+        let mut router = Router::new()
+            .route("/:id/:another", get(handle))
+            .layer(from_fn(campaign_load::<Dummy, _>));
 
         // bad CampaignId
         {
-            let route_params = RouteParams(vec!["Bad campaign Id".to_string()]);
+            let mut request = build_request();
+            *request.uri_mut() = "/WrongCampaignId".parse().unwrap();
 
-            let res = campaign_load
-                .call(build_request(route_params), &app)
+            let response = router
+                .call(request)
                 .await
-                .expect_err("Should return error for Bad Campaign");
+                .expect("Should make request to Router");
 
             assert_eq!(
-                ResponseError::BadRequest("Wrong Campaign Id".to_string()),
-                res
+                StatusCode::BAD_REQUEST,
+                // ResponseError::BadRequest("Wrong Campaign Id".to_string()),
+                response.status()
             );
         }
 
-        let route_params = RouteParams(vec![campaign.id.to_string()]);
-        // non-existent campaign
+        // non-existent Campaign
         {
-            let res = campaign_load
-                .call(build_request(route_params.clone()), &app)
-                .await
-                .expect_err("Should return error for Not Found");
+            let request = build_request();
 
-            assert!(matches!(res, ResponseError::NotFound));
+            let response = router
+                .call(request)
+                .await
+                .expect("Should make request to Router");
+
+            assert_eq!(response.status(), StatusCode::NOT_FOUND);
         }
 
         // existing Campaign
         {
+            let channel_context = campaign_context.of_channel();
+
             // insert Channel
-            insert_channel(&app.pool, campaign.channel)
+            insert_channel(&app.pool, &channel_context)
                 .await
                 .expect("Should insert Channel");
             // insert Campaign
-            assert!(insert_campaign(&app.pool, &campaign)
+            assert!(insert_campaign(&app.pool, &campaign_context.context)
                 .await
                 .expect("Should insert Campaign"));
 
-            let request = campaign_load
-                .call(build_request(route_params), &app)
+            let request = build_request();
+
+            let response = router
+                .call(request)
                 .await
-                .expect("Should load campaign");
+                .expect("Should make request to Router");
+
+            assert_eq!(response.status(), StatusCode::OK);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_called_by_creator() {
+        let app_guard = setup_dummy_app().await;
+        let app = Arc::new(app_guard.app);
+
+        let campaign_context = CAMPAIGNS[0].clone();
+
+        // insert Channel
+        insert_channel(&app.pool, &campaign_context.of_channel())
+            .await
+            .expect("Should insert Channel");
+        // insert Campaign
+        assert!(insert_campaign(&app.pool, &campaign_context.context)
+            .await
+            .expect("Should insert Campaign"));
+
+        let build_request = |auth: Auth| {
+            Request::builder()
+                .extension(app.clone())
+                .extension(campaign_context.clone())
+                .extension(auth)
+                .body(Body::empty())
+                .expect("Should build Request")
+        };
+
+        async fn handle(Extension(_campaign_context): Extension<ChainOf<Campaign>>) -> String {
+            "Ok".into()
+        }
+
+        let mut router = Router::new()
+            .route("/", get(handle))
+            .layer(from_fn(called_by_creator::<Dummy, _>));
+
+        // Not the Creator - Forbidden
+        {
+            let not_creator = Auth {
+                era: 1,
+                uid: IDS[&PUBLISHER],
+                chain: campaign_context.chain.clone(),
+            };
+            assert_ne!(
+                not_creator.uid.to_address(),
+                campaign_context.context.creator,
+                "The Auth address should not be the Campaign creator for this test!"
+            );
+            let request = build_request(not_creator);
+
+            let response = router
+                .call(request)
+                .await
+                .expect("Should make request to Router");
+
+            assert_eq!(response.status(), StatusCode::FORBIDDEN);
+        }
+
+        // The Campaign Creator - Ok
+        {
+            let the_creator = Auth {
+                era: 1,
+                uid: IDS[&campaign_context.context.creator],
+                chain: campaign_context.chain.clone(),
+            };
 
             assert_eq!(
-                campaign,
-                request
-                    .extensions()
-                    .get::<ChainOf<Campaign>>()
-                    .expect("Should get Campaign with Chain context")
-                    .context
+                the_creator.uid.to_address(),
+                campaign_context.context.creator,
+                "The Auth address should be the Campaign creator for this test!"
             );
+            let request = build_request(the_creator);
+
+            let response = router
+                .call(request)
+                .await
+                .expect("Should make request to Router");
+
+            assert_eq!(response.status(), StatusCode::OK);
         }
+    }
+
+    #[tokio::test]
+    #[should_panic]
+    async fn test_called_by_creator_no_auth() {
+        let app_guard = setup_dummy_app().await;
+        let app = Arc::new(app_guard.app);
+
+        let campaign_context = CAMPAIGNS[0].clone();
+
+        async fn handle(Extension(_campaign_context): Extension<ChainOf<Campaign>>) -> String {
+            "Ok".into()
+        }
+
+        let mut router = Router::new()
+            .route("/", get(handle))
+            .layer(from_fn(called_by_creator::<Dummy, _>));
+
+        // No Auth - Unauthorized
+        let request = Request::builder()
+            .extension(app.clone())
+            .extension(campaign_context.clone())
+            .body(Body::empty())
+            .expect("Should build Request");
+
+        let _response = router
+            .call(request)
+            .await
+            .expect("Should make request to Router");
+    }
+
+    #[tokio::test]
+    #[should_panic]
+    async fn test_called_by_creator_no_campaign() {
+        let app_guard = setup_dummy_app().await;
+        let app = Arc::new(app_guard.app);
+
+        let auth = Auth {
+            era: 1,
+            uid: IDS[&CREATOR],
+            chain: GANACHE_1.clone(),
+        };
+
+        let request = Request::builder()
+            .extension(app.clone())
+            .extension(auth)
+            .body(Body::empty())
+            .expect("Should build Request");
+
+        async fn handle(Extension(_campaign_context): Extension<ChainOf<Campaign>>) -> String {
+            "Ok".into()
+        }
+
+        let mut router = Router::new()
+            .route("/", get(handle))
+            .layer(from_fn(called_by_creator::<Dummy, _>));
+
+        let _response = router
+            .call(request)
+            .await
+            .expect("Should make request to Router");
     }
 }

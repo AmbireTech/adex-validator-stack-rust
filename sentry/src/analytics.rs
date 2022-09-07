@@ -2,19 +2,20 @@ use crate::{
     db::{analytics::update_analytics, DbPool, PoolError},
     Session,
 };
+use futures::future::join_all;
 use primitives::{
     analytics::OperatingSystem,
     sentry::{DateHour, Event, UpdateAnalytics},
-    Address, Campaign, UnifiedNum,
+    Address, Campaign, ChainOf, UnifiedNum,
 };
 use std::collections::HashMap;
 
 /// Validator fees will not be included in analytics
 pub async fn record(
     pool: &DbPool,
-    campaign: &Campaign,
+    campaign_context: &ChainOf<Campaign>,
     session: &Session,
-    events_with_payouts: Vec<(Event, Address, UnifiedNum)>,
+    events_with_payouts: &[(Event, Address, UnifiedNum)],
 ) -> Result<(), PoolError> {
     let os_name = session
         .os
@@ -43,7 +44,8 @@ pub async fn record(
                     ad_slot,
                 } => (*publisher, *ad_unit, referrer.clone(), *ad_slot),
             };
-            let ad_unit = campaign
+            let ad_unit = campaign_context
+                .context
                 .ad_units
                 .iter()
                 .find(|ad_unit| ad_unit.ipfs == event_ad_unit);
@@ -64,44 +66,54 @@ pub async fn record(
         };
 
         batch_update
-            .entry(event)
+            .entry(event.clone())
             .and_modify(|analytics| {
-                analytics.amount_to_add += &payout_amount;
+                analytics.amount_to_add += payout_amount;
                 analytics.count_to_add += 1;
             })
             .or_insert_with(|| UpdateAnalytics {
-                campaign_id: campaign.id,
+                campaign_id: campaign_context.context.id,
                 time: datehour,
                 ad_unit,
                 ad_slot,
                 ad_slot_type,
-                advertiser: campaign.creator,
+                advertiser: campaign_context.context.creator,
                 publisher,
                 hostname,
                 country: session.country.to_owned(),
                 os_name: os_name.clone(),
+                chain_id: campaign_context.chain.chain_id,
                 event_type,
-                amount_to_add: payout_amount,
+                amount_to_add: *payout_amount,
                 count_to_add: 1,
             });
     }
 
-    for (_event, update) in batch_update.into_iter() {
-        update_analytics(pool, update).await?;
-    }
+    let batch_futures = join_all(
+        batch_update
+            .into_iter()
+            .map(|(_event, update)| update_analytics(pool, update)),
+    );
+
+    // execute the batched futures, collect the result afterwards,
+    // in order execute all futures first and then return an error if occurred
+    batch_futures
+        .await
+        .into_iter()
+        .collect::<Result<Vec<_>, _>>()?;
+
     Ok(())
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::test_util::setup_dummy_app;
     use primitives::{
         sentry::{Analytics, CLICK, IMPRESSION},
         test_util::{DUMMY_CAMPAIGN, DUMMY_IPFS, PUBLISHER},
         UnifiedNum,
     };
-
-    use crate::db::tests_postgres::{setup_test_migrations, DATABASE_POOL};
 
     // Currently used for testing
     async fn get_all_analytics(pool: &DbPool) -> Result<Vec<Analytics>, PoolError> {
@@ -164,12 +176,9 @@ mod test {
 
     #[tokio::test]
     async fn test_analytics_recording_with_empty_events() {
-        let test_events = get_test_events();
-        let database = DATABASE_POOL.get().await.expect("Should get a DB pool");
+        let app = setup_dummy_app().await;
 
-        setup_test_migrations(database.pool.clone())
-            .await
-            .expect("Migrations should succeed");
+        let test_events = get_test_events();
 
         let campaign = DUMMY_CAMPAIGN.clone();
 
@@ -186,11 +195,19 @@ mod test {
             test_events["impression"].clone(),
         ];
 
-        record(&database.clone(), &campaign, &session, input_events.clone())
+        let dummy_channel = DUMMY_CAMPAIGN.channel;
+        let channel_chain = app
+            .config
+            .find_chain_of(dummy_channel.token)
+            .expect("Channel token should be whitelisted in config!");
+        let channel_context = channel_chain.with_channel(dummy_channel);
+        let campaign_context = channel_context.clone().with(campaign);
+
+        record(&app.pool, &campaign_context, &session, &input_events)
             .await
             .expect("should record");
 
-        let analytics = get_all_analytics(&database.pool)
+        let analytics = get_all_analytics(&app.pool)
             .await
             .expect("should get all analytics");
         assert_eq!(analytics.len(), 2);
@@ -218,11 +235,7 @@ mod test {
 
     #[tokio::test]
     async fn test_recording_with_session() {
-        let database = DATABASE_POOL.get().await.expect("Should get a DB pool");
-
-        setup_test_migrations(database.pool.clone())
-            .await
-            .expect("Migrations should succeed");
+        let app = setup_dummy_app().await;
 
         let test_events = get_test_events();
 
@@ -247,11 +260,18 @@ mod test {
             test_events["impression"].clone(),
         ];
 
-        record(&database.clone(), &campaign, &session, input_events.clone())
+        let dummy_channel = DUMMY_CAMPAIGN.channel;
+        let channel_chain = app
+            .config
+            .find_chain_of(dummy_channel.token)
+            .expect("Channel token should be whitelisted in config!");
+        let channel_context = channel_chain.with_channel(dummy_channel);
+        let campaign_context = channel_context.clone().with(campaign);
+        record(&app.pool, &campaign_context, &session, &input_events)
             .await
             .expect("should record");
 
-        let analytics = get_all_analytics(&database.pool)
+        let analytics = get_all_analytics(&app.pool)
             .await
             .expect("should find analytics");
 

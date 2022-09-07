@@ -1,6 +1,6 @@
 use crate::{
     sentry::{EventType, IMPRESSION},
-    Address, CampaignId, ValidatorId, IPFS,
+    Address, CampaignId, ChainId, ValidatorId, IPFS,
 };
 use parse_display::Display;
 use serde::{Deserialize, Serialize};
@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use self::query::{AllowedKey, Time};
 
 #[cfg(feature = "postgres")]
-pub mod postgres {
+mod postgres {
     use super::{query::AllowedKey, AnalyticsQuery, OperatingSystem};
     use bytes::BytesMut;
     use std::error::Error;
@@ -94,13 +94,22 @@ pub mod postgres {
 
 pub mod query;
 
+// Query used for filtering analytics
+//
+/// # Examples:
+/// ```
+#[doc = include_str!("../examples/analytics_query.rs")]
+/// ```
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct AnalyticsQuery {
+    /// Default: `100`
     #[serde(default = "default_limit")]
     pub limit: u32,
+    /// Default: [`EventType::Impression`]
     #[serde(default = "default_event_type")]
     pub event_type: EventType,
+    // Default: [`Metric::Count`]
     #[serde(default = "default_metric")]
     pub metric: Metric,
     pub segment_by: Option<AllowedKey>,
@@ -115,6 +124,30 @@ pub struct AnalyticsQuery {
     pub hostname: Option<String>,
     pub country: Option<String>,
     pub os_name: Option<OperatingSystem>,
+    #[serde(default)]
+    pub chains: Vec<ChainId>,
+}
+
+impl Default for AnalyticsQuery {
+    fn default() -> Self {
+        Self {
+            limit: default_limit(),
+            event_type: default_event_type(),
+            metric: default_metric(),
+            segment_by: None,
+            time: Time::default(),
+            campaign_id: None,
+            ad_unit: None,
+            ad_slot: None,
+            ad_slot_type: None,
+            advertiser: None,
+            publisher: None,
+            hostname: None,
+            country: None,
+            os_name: None,
+            chains: Vec::new(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Display, Hash, Eq)]
@@ -158,6 +191,7 @@ pub enum AuthenticateAs {
 
 impl Metric {
     #[cfg(feature = "postgres")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "postgres")))]
     /// Returns the query column name of the [`Metric`].
     ///
     /// Available only when the `postgres` feature is enabled.

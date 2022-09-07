@@ -1,10 +1,3 @@
-use crate::{
-    analytics::{OperatingSystem, Timeframe},
-    balances::BalancesState,
-    spender::Spender,
-    validator::{ApproveState, Heartbeat, MessageTypes, NewState, Type as MessageType},
-    Address, Balances, CampaignId, UnifiedMap, UnifiedNum, ValidatorId, IPFS,
-};
 use chrono::{
     serde::ts_milliseconds, Date, DateTime, Datelike, Duration, NaiveDate, TimeZone, Timelike, Utc,
 };
@@ -20,37 +13,55 @@ use thiserror::Error;
 
 pub use event::{Event, EventType, CLICK, IMPRESSION};
 
+use self::message::MessageResponse;
+use crate::{
+    analytics::{OperatingSystem, Timeframe},
+    balances::BalancesState,
+    spender::Spender,
+    validator::{ApproveState, Heartbeat, NewState},
+    Address, Balances, CampaignId, ChainId, UnifiedMap, UnifiedNum, IPFS,
+};
+
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 /// Channel Accounting response
-/// A collection of all `Accounting`s for a specific `Channel`
+///
+/// A collection of all `Accounting`s for a specific [`Channel`](crate::Channel)
+///
+/// # Examples
+///
+/// ```
+#[doc = include_str!("../examples/accounting_response.rs")]
+/// ```
 pub struct AccountingResponse<S: BalancesState> {
     #[serde(flatten, bound = "S: BalancesState")]
     pub balances: Balances<S>,
 }
 
+/// The last approved [`NewState`] and [`ApproveState`] accordingly to the validator.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct LastApproved<S: BalancesState> {
-    /// NewState can be None if the channel is brand new
+    /// [`NewState`] can be `None` if the [`Channel`](crate::Channel) is brand new.
     #[serde(bound = "S: BalancesState")]
     pub new_state: Option<MessageResponse<NewState<S>>>,
-    /// ApproveState can be None if the channel is brand new
+    /// [`ApproveState`] can be `None` if the [`Channel`](crate::Channel) is brand new.
     pub approve_state: Option<MessageResponse<ApproveState>>,
-}
-
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
-pub struct MessageResponse<T: MessageType> {
-    pub from: ValidatorId,
-    pub received: DateTime<Utc>,
-    pub msg: message::Message<T>,
 }
 
 pub mod message {
     use std::ops::Deref;
 
-    use crate::validator::messages::*;
+    use crate::{validator::messages::*, ValidatorId};
+    use chrono::{DateTime, Utc};
     use serde::{Deserialize, Serialize};
+
+    #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+    pub struct MessageResponse<T: Type> {
+        pub from: ValidatorId,
+        pub received: DateTime<Utc>,
+        pub msg: Message<T>,
+    }
 
     #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
     #[serde(try_from = "MessageTypes", into = "MessageTypes")]
@@ -133,7 +144,10 @@ mod event {
     use once_cell::sync::Lazy;
     use parse_display::{Display, FromStr};
     use serde::{Deserialize, Serialize};
-    use std::fmt;
+    use std::{
+        fmt,
+        hash::{Hash, Hasher},
+    };
 
     use crate::{Address, IPFS};
 
@@ -145,20 +159,7 @@ mod event {
     static IMPRESSION_STRING: Lazy<String> = Lazy::new(|| EventType::Impression.to_string());
     static CLICK_STRING: Lazy<String> = Lazy::new(|| EventType::Click.to_string());
 
-    #[derive(
-        Debug,
-        Display,
-        FromStr,
-        Serialize,
-        Deserialize,
-        Hash,
-        Ord,
-        Eq,
-        PartialEq,
-        PartialOrd,
-        Clone,
-        Copy,
-    )]
+    #[derive(Debug, Display, FromStr, Serialize, Deserialize, Ord, Eq, PartialOrd, Clone, Copy)]
     #[display(style = "SNAKE_CASE")]
     #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
     pub enum EventType {
@@ -175,12 +176,34 @@ mod event {
         }
     }
 
+    /// Due to the fact that we want to impl `Borrow<str>`
+    /// we must provide custom hash impl using the capitalized
+    /// version of the [`EventType`] as a string.
+    impl Hash for EventType {
+        fn hash<H: Hasher>(&self, state: &mut H) {
+            self.as_str().hash(state);
+        }
+    }
+
+    impl PartialEq for EventType {
+        fn eq(&self, other: &Self) -> bool {
+            self.as_str() == other.as_str()
+        }
+    }
+
+    impl std::borrow::Borrow<str> for EventType {
+        fn borrow(&self) -> &str {
+            self.as_str()
+        }
+    }
+
     impl From<EventType> for String {
         fn from(event_type: EventType) -> Self {
             event_type.to_string()
         }
     }
 
+    /// All the [`Event`]s available in the validator stack.
     #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
     #[serde(tag = "type", rename_all = "SCREAMING_SNAKE_CASE")]
     pub enum Event {
@@ -244,12 +267,14 @@ mod event {
 
     #[cfg(test)]
     mod test {
+        use std::borrow::Borrow;
+
         use crate::sentry::event::{CLICK_STRING, IMPRESSION_STRING};
 
         use super::EventType;
 
         #[test]
-        fn event_type_parsing_and_de_serialization() {
+        fn test_event_type_parsing_and_de_serialization() {
             let impression_parse = "IMPRESSION"
                 .parse::<EventType>()
                 .expect("Should parse IMPRESSION");
@@ -267,6 +292,8 @@ mod event {
             assert_eq!(EventType::Impression, impression_json);
             assert_eq!(EventType::Click, click_parse);
             assert_eq!(EventType::Click, click_json);
+
+            assert_eq!(Borrow::<str>::borrow(&EventType::Impression), "IMPRESSION");
         }
     }
 }
@@ -284,12 +311,13 @@ pub struct UpdateAnalytics {
     pub hostname: Option<String>,
     pub country: Option<String>,
     pub os_name: OperatingSystem,
+    pub chain_id: ChainId,
     pub event_type: EventType,
     pub amount_to_add: UnifiedNum,
     pub count_to_add: i32,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct Analytics {
     pub time: DateHour<Utc>,
@@ -307,7 +335,7 @@ pub struct Analytics {
     pub payout_count: u32,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct FetchedAnalytics {
     // time is represented as a timestamp
@@ -316,6 +344,19 @@ pub struct FetchedAnalytics {
     pub value: FetchedMetric,
     // We can't know the exact segment type but it can always be represented as a string
     pub segment: Option<String>,
+}
+
+/// Response returned when getting Analytics which returns the [`FetchedAnalytics`].
+///
+/// # Examples
+///
+/// ```
+#[doc = include_str!("../examples/analytics_response.rs")]
+/// ```
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct AnalyticsResponse {
+    pub analytics: Vec<FetchedAnalytics>,
 }
 
 /// The value of the requested analytics [`crate::analytics::Metric`].
@@ -546,28 +587,49 @@ impl<'de> Deserialize<'de> for DateHour<Utc> {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct Pagination {
+    /// The total amount of pages available for this request
     pub total_pages: u64,
+    /// The current page number returned from this request
+    /// First page starts from `0`
     pub page: u64,
 }
 
+/// GET `/v5/channel/0xXXX.../last-approved` response
+///
+/// # Examples
+///
+/// ```
+#[doc = include_str!("../../primitives/examples/channel_last_approved_response.rs")]
+/// ```
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct LastApprovedResponse<S: BalancesState> {
+    /// The last approved [`NewState`] and [`ApproveState`] accordingly to the validator.
     #[serde(bound = "S: BalancesState")]
     pub last_approved: Option<LastApproved<S>>,
-    /// None -> withHeartbeat=true wasn't passed
-    /// Some(vec![]) (empty vec) or Some(heartbeats) - withHeartbeat=true was passed
+    /// - None -> `withHeartbeat=true` wasn't passed
+    /// - `Some(vec![])` (empty vec) or `Some(heartbeats)` - `withHeartbeat=true` was passed
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub heartbeats: Option<Vec<MessageResponse<Heartbeat>>>,
 }
 
-#[derive(Debug, Deserialize)]
+/// GET `/v5/channel/0xXXX.../last-approved` query parameters
+///
+/// # Examples
+///
+/// ```
+#[doc = include_str!("../../primitives/examples/channel_last_approved_query.rs")]
+/// ```
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct LastApprovedQuery {
-    pub with_heartbeat: Option<String>,
+    /// Whether or not to return the latest 2 [`Heartbeat`] validator messages
+    /// from each of the [`Channel`](crate::Channel) validators.
+    #[serde(default)]
+    pub with_heartbeat: Option<bool>,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
@@ -575,12 +637,26 @@ pub struct SuccessResponse {
     pub success: bool,
 }
 
+/// Spender limits for a spender on a `Channel`.
+///
+/// # Examples
+///
+/// ```
+#[doc = include_str!("../examples/spender_response.rs")]
+/// ```
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct SpenderResponse {
     pub spender: Spender,
 }
 
+/// Spender limits for all spenders on a `Channel`.
+///
+/// # Examples
+///
+/// ```
+#[doc = include_str!("../examples/all_spenders_response.rs")]
+/// ```
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct AllSpendersResponse {
@@ -596,35 +672,16 @@ pub struct AllSpendersQuery {
     pub page: u64,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+/// Payouts to be performed for the given [`Channel`](crate::Channel).
+///
+/// # Examples
+///
+/// ```
+#[doc = include_str!("../examples/channel_pay_request.rs")]
+/// ```
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct ChannelPayRequest {
     pub payouts: UnifiedMap,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct ValidatorMessage {
-    pub from: ValidatorId,
-    pub received: DateTime<Utc>,
-    pub msg: MessageTypes,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct ValidatorMessagesListResponse {
-    pub messages: Vec<ValidatorMessage>,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct ValidatorMessagesCreateRequest {
-    pub messages: Vec<MessageTypes>,
-}
-
-#[derive(Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct ValidatorMessagesListQuery {
-    /// Will apply the lower limit of: `query.limit` and `Config::msgs_find_limit`
-    pub limit: Option<u64>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -635,8 +692,28 @@ pub struct ValidationErrorResponse {
     pub validation: Vec<String>,
 }
 
+/// Get leaf response with the Merkle proof for the requested spender/earner.
+///
+/// # Examples
+///
+/// ```
+#[doc = include_str!("../examples/get_leaf_response.rs")]
+/// ```
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct GetLeafResponse {
+    pub merkle_proof: String,
+}
+
+/// Request body for posting new [`Event`]s to a [`Campaign`](crate::Campaign).
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct InsertEventsRequest {
+    pub events: Vec<Event>,
+}
+
 pub mod channel_list {
-    use crate::{Channel, ValidatorId};
+    use crate::{ChainId, Channel, ValidatorId};
     use serde::{Deserialize, Serialize};
 
     use super::Pagination;
@@ -649,13 +726,140 @@ pub mod channel_list {
         pub pagination: Pagination,
     }
 
-    #[derive(Debug, Serialize, Deserialize)]
+    /// `GET /v5/channel/list` query
+    ///
+    /// # Examples
+    ///
+    /// ```
+    #[doc = include_str!("../examples/channel_list_query.rs")]
+    /// ```
+    #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
     pub struct ChannelListQuery {
+        /// default is `u64::default()` = `0`
         #[serde(default)]
-        // default is `u64::default()` = `0`
         pub page: u64,
-        /// filters the channels containing a specific validator if provided
+        /// Returns only the [`Channel`]s containing a specified validator if provided.
         pub validator: Option<ValidatorId>,
+        /// Returns only the Channels from the specified [`ChainId`]s.
+        #[serde(default)]
+        pub chains: Vec<ChainId>,
+    }
+}
+
+pub mod validator_messages {
+    use std::{fmt, str::FromStr};
+
+    use chrono::{DateTime, Utc};
+    use parse_display::ParseError;
+    use serde::{Deserialize, Serialize};
+
+    use crate::{
+        validator::{MessageType, MessageTypes},
+        ValidatorId,
+    };
+
+    #[derive(Serialize, Deserialize, Debug)]
+    pub struct ValidatorMessage {
+        pub from: ValidatorId,
+        pub received: DateTime<Utc>,
+        pub msg: MessageTypes,
+    }
+
+    #[derive(Serialize, Deserialize, Debug)]
+    #[serde(rename_all = "camelCase")]
+    pub struct ValidatorMessagesListResponse {
+        pub messages: Vec<ValidatorMessage>,
+    }
+
+    #[derive(Deserialize, Debug)]
+    #[serde(rename_all = "camelCase")]
+    pub struct ValidatorMessagesListQuery {
+        /// Will apply the lower limit of: `query.limit` and `Config::msgs_find_limit`
+        pub limit: Option<u64>,
+    }
+
+    /// Message type filter (used in path)
+    ///
+    /// Expects url decoded string with [`MessageType`]s separated by `+`.
+    ///
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use primitives::{validator::MessageType, sentry::validator_messages::MessageTypesFilter};
+    ///
+    /// let path_filter = "NewState+ApproveState+Heartbeat";
+    ///
+    /// let expected = MessageTypesFilter(vec![MessageType::NewState, MessageType::ApproveState, MessageType::Heartbeat]);
+    ///
+    /// assert_eq!(path_filter.parse::<MessageTypesFilter>().expect("Should deserialize"), expected);
+    /// assert_eq!(path_filter, String::from(expected));
+    /// ```
+    #[derive(Serialize, Deserialize, Debug, Default, PartialEq, Eq, Clone)]
+    #[serde(try_from = "String", into = "String")]
+    pub struct MessageTypesFilter(pub Vec<MessageType>);
+
+    impl fmt::Display for MessageTypesFilter {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.write_str(
+                &self
+                    .0
+                    .iter()
+                    .map(|message_type| message_type.to_string())
+                    .collect::<Vec<_>>()
+                    .join("+"),
+            )
+        }
+    }
+
+    impl FromStr for MessageTypesFilter {
+        type Err = ParseError;
+
+        fn from_str(filter: &str) -> Result<Self, Self::Err> {
+            let message_types = if !filter.is_empty() {
+                filter
+                    .split('+')
+                    .map(|s| s.parse())
+                    .collect::<Result<_, _>>()?
+            } else {
+                vec![]
+            };
+
+            Ok(MessageTypesFilter(message_types))
+        }
+    }
+
+    impl TryFrom<String> for MessageTypesFilter {
+        type Error = ParseError;
+
+        fn try_from(url_decoded_string: String) -> Result<Self, Self::Error> {
+            url_decoded_string.parse()
+        }
+    }
+
+    impl From<MessageTypesFilter> for String {
+        fn from(message_types: MessageTypesFilter) -> Self {
+            message_types.to_string()
+        }
+    }
+
+    impl AsRef<[MessageType]> for MessageTypesFilter {
+        fn as_ref(&self) -> &[MessageType] {
+            &self.0
+        }
+    }
+
+    /// Contains all the different validator messages to be created.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    #[doc = include_str!("../examples/validator_messages_create_request.rs")]
+    /// ```
+    #[derive(Serialize, Deserialize, Debug)]
+    #[serde(rename_all = "camelCase")]
+    pub struct ValidatorMessagesCreateRequest {
+        pub messages: Vec<MessageTypes>,
     }
 }
 
@@ -666,6 +870,13 @@ pub mod campaign_list {
 
     use super::Pagination;
 
+    /// `GET /v5/campaign/list` response
+    ///
+    /// # Examples
+    ///
+    /// ```
+    #[doc = include_str!("../examples/campaign_list_response.rs")]
+    /// ```
     #[derive(Debug, Serialize, Deserialize)]
     #[serde(rename_all = "camelCase")]
     pub struct CampaignListResponse {
@@ -674,22 +885,34 @@ pub mod campaign_list {
         pub pagination: Pagination,
     }
 
-    #[derive(Debug, Serialize, Deserialize, PartialEq)]
+    /// `GET /v5/campaign/list` query
+    ///
+    /// # Examples
+    ///
+    /// ```
+    #[doc = include_str!("../examples/campaign_list_query.rs")]
+    /// ```
+    #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
     pub struct CampaignListQuery {
+        /// Default is `u64::default()` = `0`.
         #[serde(default)]
-        // default is `u64::default()` = `0`
         pub page: u64,
-        /// filters the list on `active.to >= active_to_ge`
+        /// Filters the list on `Campaign.active.to >= active_to_ge`.
+        ///
         /// It should be the same timestamp format as the `Campaign.active.to`: **seconds**
+        ///
+        /// **Note:** This field is deserialized from `activeTo`.
         #[serde(with = "ts_seconds", default = "Utc::now", rename = "activeTo")]
         pub active_to_ge: DateTime<Utc>,
+        /// Returns only the [`Campaign`]s containing a specified creator if provided.
         pub creator: Option<Address>,
-        /// filters the campaigns containing a specific validator if provided
+        /// Returns only the [`Campaign`]s containing a specified validator if provided.
         #[serde(flatten)]
         pub validator: Option<ValidatorParam>,
     }
 
-    #[derive(Serialize, Deserialize, Debug, PartialEq)]
+    /// The `validator` query parameter for [`CampaignListQuery`].
+    #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
     #[serde(rename_all = "camelCase")]
     pub enum ValidatorParam {
         /// Results will include all campaigns that have the provided address as a leader
@@ -718,7 +941,7 @@ pub mod campaign_list {
                 *CREATOR, *LEADER
             );
             let query_leader_encoded =
-                serde_urlencoded::from_str::<CampaignListQuery>(&query_leader_string)
+                serde_qs::from_str::<CampaignListQuery>(&query_leader_string)
                     .expect("should encode");
 
             pretty_assertions::assert_eq!(query_leader_encoded, query_leader);
@@ -734,7 +957,7 @@ pub mod campaign_list {
                 *CREATOR, *FOLLOWER
             );
             let query_validator_encoded =
-                serde_urlencoded::from_str::<CampaignListQuery>(&query_validator_string)
+                serde_qs::from_str::<CampaignListQuery>(&query_validator_string)
                     .expect("should encode");
 
             pretty_assertions::assert_eq!(query_validator_encoded, query_validator,);
@@ -749,7 +972,7 @@ pub mod campaign_list {
             let query_no_validator_string =
                 format!("page=0&activeTo=1612162800&creator={}", *CREATOR);
             let query_no_validator_encoded =
-                serde_urlencoded::from_str::<CampaignListQuery>(&query_no_validator_string)
+                serde_qs::from_str::<CampaignListQuery>(&query_no_validator_string)
                     .expect("should encode");
 
             pretty_assertions::assert_eq!(query_no_validator_encoded, query_no_validator,);
@@ -762,15 +985,21 @@ pub mod campaign_create {
     use serde::{Deserialize, Serialize};
 
     use crate::{
-        campaign::{prefix_active, Active, PricingBounds, Validators},
+        campaign::{Active, PricingBounds, Validators},
         targeting::Rules,
         AdUnit, Address, Campaign, CampaignId, Channel, EventSubmission, UnifiedNum,
     };
 
-    #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-    #[serde(rename_all = "camelCase")]
     /// All fields are present except the `CampaignId` which is randomly created
     /// This struct defines the Body of the request (in JSON)
+    ///
+    /// # Examples
+    ///
+    /// ```
+    #[doc = include_str!("../examples/create_campaign_request.rs")]
+    /// ```
+    #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+    #[serde(rename_all = "camelCase")]
     pub struct CreateCampaign {
         pub id: Option<CampaignId>,
         pub channel: Channel,
@@ -795,7 +1024,7 @@ pub mod campaign_create {
         pub created: DateTime<Utc>,
         /// A millisecond timestamp representing the time you want this campaign to become active (optional)
         /// Used by the AdViewManager & Targeting AIP#31
-        #[serde(flatten, with = "prefix_active")]
+        #[serde(flatten)]
         pub active: Active,
     }
 
@@ -856,7 +1085,12 @@ pub mod campaign_modify {
         AdUnit, Campaign, EventSubmission, UnifiedNum,
     };
 
-    // All editable fields stored in one place, used for checking when a budget is changed
+    /// All editable fields stored in one place, used for checking when a budget is changed
+    ///
+    /// # Examples:
+    /// ```
+    #[doc = include_str!("../examples/modify_campaign_request.rs")]
+    /// ```
     #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
     pub struct ModifyCampaign {
         pub budget: Option<UnifiedNum>,
@@ -918,21 +1152,22 @@ pub mod campaign_modify {
 
 #[cfg(feature = "postgres")]
 mod postgres {
-    use super::{
-        Analytics, DateHour, EventType, FetchedAnalytics, FetchedMetric, MessageResponse,
-        ValidatorMessage,
-    };
-    use crate::{
-        analytics::{AnalyticsQuery, Metric},
-        validator::{messages::Type as MessageType, MessageTypes},
-        IPFS,
-    };
     use bytes::BytesMut;
     use chrono::{DateTime, Timelike, Utc};
     use serde::Deserialize;
     use tokio_postgres::{
-        types::{accepts, to_sql_checked, FromSql, IsNull, Json, ToSql, Type},
+        types::{accepts, to_sql_checked, FromSql, IsNull, Json, ToSql, Type as PgType},
         Error, Row,
+    };
+
+    use super::{
+        message::MessageResponse, validator_messages::ValidatorMessage, Analytics, DateHour,
+        EventType, FetchedAnalytics, FetchedMetric,
+    };
+    use crate::{
+        analytics::{AnalyticsQuery, Metric},
+        validator::{MessageTypes, Type},
+        IPFS,
     };
 
     impl From<&Row> for ValidatorMessage {
@@ -947,7 +1182,7 @@ mod postgres {
 
     impl<T> TryFrom<&Row> for MessageResponse<T>
     where
-        T: MessageType,
+        T: Type,
         for<'de> T: Deserialize<'de>,
     {
         type Error = Error;
@@ -965,7 +1200,7 @@ mod postgres {
     impl ToSql for MessageTypes {
         fn to_sql(
             &self,
-            ty: &Type,
+            ty: &PgType,
             w: &mut BytesMut,
         ) -> Result<IsNull, Box<dyn std::error::Error + Sync + Send>> {
             Json(self).to_sql(ty, w)
@@ -1013,7 +1248,7 @@ mod postgres {
 
     impl<'a> FromSql<'a> for DateHour<Utc> {
         fn from_sql(
-            ty: &Type,
+            ty: &PgType,
             raw: &'a [u8],
         ) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {
             let datetime = <DateTime<Utc> as FromSql>::from_sql(ty, raw)?;
@@ -1032,7 +1267,7 @@ mod postgres {
     impl ToSql for DateHour<Utc> {
         fn to_sql(
             &self,
-            ty: &Type,
+            ty: &PgType,
             w: &mut BytesMut,
         ) -> Result<IsNull, Box<dyn std::error::Error + Sync + Send>> {
             self.date.and_hms(self.hour, 0, 0).to_sql(ty, w)
@@ -1044,7 +1279,7 @@ mod postgres {
 
     impl<'a> FromSql<'a> for EventType {
         fn from_sql(
-            ty: &Type,
+            ty: &PgType,
             raw: &'a [u8],
         ) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {
             let event_string = <&str as FromSql>::from_sql(ty, raw)?;
@@ -1057,7 +1292,7 @@ mod postgres {
     impl ToSql for EventType {
         fn to_sql(
             &self,
-            ty: &Type,
+            ty: &PgType,
             w: &mut BytesMut,
         ) -> Result<IsNull, Box<dyn std::error::Error + Sync + Send>> {
             self.as_str().to_sql(ty, w)
@@ -1096,15 +1331,55 @@ mod postgres {
             }
         }
     }
+
+    #[cfg(test)]
+    mod test {
+        use chrono::{TimeZone, Utc};
+
+        use crate::{postgres::POSTGRES_POOL, sentry::DateHour};
+
+        #[tokio::test]
+        pub async fn datehour_from_to_sql() {
+            let client = POSTGRES_POOL.get().await.unwrap();
+            let sql_type = "TIMESTAMPTZ";
+
+            let example_datehour = DateHour::<Utc>::from_ymdh(2021, 1, 1, 1);
+            let expected_datehour = DateHour::try_from(Utc.ymd(2021, 1, 1).and_hms(1, 0, 0))
+                .expect("Should get DateHour");
+            assert_eq!(
+                example_datehour, expected_datehour,
+                "Example and expected datehour must be the same"
+            );
+
+            // from SQL
+            let actual_datehour: DateHour<Utc> = client
+                .query_one(
+                    &*format!("SELECT '{}'::{}", example_datehour.to_datetime(), sql_type),
+                    &[],
+                )
+                .await
+                .unwrap()
+                .get(0);
+
+            assert_eq!(&expected_datehour, &actual_datehour);
+
+            // to SQL
+            let actual_datehour: DateHour<Utc> = client
+                .query_one(&*format!("SELECT $1::{}", sql_type), &[&example_datehour])
+                .await
+                .unwrap()
+                .get(0);
+
+            assert_eq!(&expected_datehour, &actual_datehour);
+        }
+    }
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{
-        postgres::POSTGRES_POOL,
-        test_util::{DUMMY_IPFS, PUBLISHER},
-    };
+    use crate::test_util::{DUMMY_IPFS, PUBLISHER};
+
     use serde_json::{json, Value};
 
     #[test]
@@ -1170,7 +1445,7 @@ mod test {
         // Serialize & deserialize
         let json_datetime = Value::String("2021-12-01T16:00:00+02:00".into());
         let datehour: DateHour<Utc> =
-            serde_json::from_value(json_datetime.clone()).expect("Should deserialize");
+            serde_json::from_value(json_datetime).expect("Should deserialize");
         assert_eq!(
             DateHour::from_ymdh(2021, 12, 1, 14),
             datehour,
@@ -1209,40 +1484,5 @@ mod test {
             map["UTC+0"] >= map["UTC+2"],
             "UTC+0 value should be equal to UTC+2"
         );
-    }
-
-    #[tokio::test]
-    pub async fn datehour_from_to_sql() {
-        let client = POSTGRES_POOL.get().await.unwrap();
-        let sql_type = "TIMESTAMPTZ";
-
-        let example_datehour = DateHour::<Utc>::from_ymdh(2021, 1, 1, 1);
-        let expected_datehour =
-            DateHour::try_from(Utc.ymd(2021, 1, 1).and_hms(1, 0, 0)).expect("Should get DateHour");
-        assert_eq!(
-            example_datehour, expected_datehour,
-            "Example and expected datehour must be the same"
-        );
-
-        // from SQL
-        let actual_datehour: DateHour<Utc> = client
-            .query_one(
-                &*format!("SELECT '{}'::{}", example_datehour.to_datetime(), sql_type),
-                &[],
-            )
-            .await
-            .unwrap()
-            .get(0);
-
-        assert_eq!(&expected_datehour, &actual_datehour);
-
-        // to SQL
-        let actual_datehour: DateHour<Utc> = client
-            .query_one(&*format!("SELECT $1::{}", sql_type), &[&example_datehour])
-            .await
-            .unwrap()
-            .get(0);
-
-        assert_eq!(&expected_datehour, &actual_datehour);
     }
 }

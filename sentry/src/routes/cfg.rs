@@ -1,20 +1,19 @@
 //! `GET /cfg` request
 
-use crate::Application;
-use crate::ResponseError;
+use std::sync::Arc;
+
+use axum::{Extension, Json};
+
 use adapter::client::Locked;
-use hyper::header::CONTENT_TYPE;
-use hyper::{Body, Request, Response};
+use primitives::Config;
 
-/// `GET /cfg` request
-pub async fn config<C: Locked + 'static>(
-    _: Request<Body>,
-    app: &Application<C>,
-) -> Result<Response<Body>, ResponseError> {
-    let config_str = serde_json::to_string(&app.config)?;
+use crate::Application;
 
-    Ok(Response::builder()
-        .header(CONTENT_TYPE, "application/json")
-        .body(Body::from(config_str))
-        .expect("Creating a response should never fail"))
+/// GET `/cfg` request
+///
+/// Response: [`Config`]
+pub async fn get_cfg<C: Locked + 'static>(
+    Extension(app): Extension<Arc<Application<C>>>,
+) -> Json<Config> {
+    Json(app.config.clone())
 }

@@ -9,6 +9,7 @@ use thiserror::Error;
 pub struct Balances<S: BalancesState = CheckedState> {
     pub earners: UnifiedMap,
     pub spenders: UnifiedMap,
+    #[serde(skip)]
     state: PhantomData<S>,
 }
 
@@ -73,12 +74,11 @@ impl<S: BalancesState> Balances<S> {
         self.spenders
             .values()
             .sum::<Option<UnifiedNum>>()
-            .map(|spenders| {
+            .and_then(|spenders| {
                 let earners = self.earners.values().sum::<Option<UnifiedNum>>()?;
 
                 Some((earners, spenders))
             })
-            .flatten()
     }
 }
 

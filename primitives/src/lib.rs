@@ -1,10 +1,12 @@
 #![deny(rust_2018_idioms)]
 #![deny(clippy::all)]
+#![deny(rustdoc::broken_intra_doc_links)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 // TODO: Remove once stabled and upstream num::Integer::div_floor(...) is fixed
 #![allow(unstable_name_collisions)]
 use std::{error, fmt};
 
+#[doc(inline)]
 pub use self::{
     ad_slot::AdSlot,
     ad_unit::AdUnit,
@@ -44,10 +46,15 @@ pub mod sentry;
 pub mod spender;
 pub mod supermarket;
 pub mod targeting;
-#[cfg(feature = "test-util")]
+// It's not possible to enable this feature for doctest,
+// so we always must pass `--feature=test-util` or `--all-features` when running doctests:
+// `cargo test --doc --all-features`
+//
+// See issue: <https://github.com/rust-lang/rust/issues/67295>
+#[cfg(any(test, feature = "test-util"))]
 #[cfg_attr(docsrs, doc(cfg(feature = "test-util")))]
 pub mod test_util;
-mod unified_num;
+pub mod unified_num;
 pub mod validator;
 
 /// This module is available with the `postgres` feature.
@@ -138,14 +145,12 @@ mod deposit {
     #[serde(rename_all = "camelCase")]
     pub struct Deposit<N> {
         pub total: N,
-        pub still_on_create2: N,
     }
 
     impl Deposit<UnifiedNum> {
         pub fn to_precision(&self, precision: u8) -> Deposit<BigNum> {
             Deposit {
                 total: self.total.to_precision(precision),
-                still_on_create2: self.total.to_precision(precision),
             }
         }
 
@@ -154,20 +159,22 @@ mod deposit {
             precision: u8,
         ) -> Option<Deposit<UnifiedNum>> {
             let total = UnifiedNum::from_precision(deposit.total, precision);
-            let still_on_create2 = UnifiedNum::from_precision(deposit.still_on_create2, precision);
 
-            match (total, still_on_create2) {
-                (Some(total), Some(still_on_create2)) => Some(Deposit {
-                    total,
-                    still_on_create2,
-                }),
-                _ => None,
+            total.map(|total| Deposit { total })
+        }
+    }
+
+    impl<N: Default> Default for Deposit<N> {
+        fn default() -> Self {
+            Self {
+                total: Default::default(),
             }
         }
     }
 }
 
 pub mod util {
+    #[doc(inline)]
     pub use api::ApiUrl;
 
     pub mod api;

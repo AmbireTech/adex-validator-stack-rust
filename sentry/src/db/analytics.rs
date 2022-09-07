@@ -9,7 +9,7 @@ use tokio_postgres::{types::ToSql, Row};
 
 use super::{DbPool, PoolError};
 
-pub async fn get_analytics(
+pub async fn fetch_analytics(
     pool: &DbPool,
     query: AnalyticsQuery,
     allowed_keys: HashSet<AllowedKey>,
@@ -18,7 +18,20 @@ pub async fn get_analytics(
 ) -> Result<Vec<FetchedAnalytics>, PoolError> {
     let client = pool.get().await?;
 
-    let (where_clauses, params) = analytics_query_params(&query, auth_as.as_ref(), &allowed_keys);
+    let (mut where_clauses, params) =
+        analytics_query_params(&query, auth_as.as_ref(), &allowed_keys);
+
+    if !query.chains.is_empty() {
+        where_clauses.push(format!(
+            "chain_id IN ({})",
+            query
+                .chains
+                .iter()
+                .map(|id| id.to_u32().to_string())
+                .collect::<Vec<String>>()
+                .join(",")
+        ));
+    }
 
     let time_group = match &query.time.timeframe {
         Timeframe::Year => "date_trunc('month', analytics.time) as timeframe_time",
@@ -110,13 +123,13 @@ pub async fn update_analytics(
 ) -> Result<Analytics, PoolError> {
     let client = pool.get().await?;
 
-    let query = "INSERT INTO analytics(campaign_id, time, ad_unit, ad_slot, ad_slot_type, advertiser, publisher, hostname, country, os_name, event_type, payout_amount, payout_count)
-    VALUES ($1, date_trunc('hour', cast($2 as timestamp with time zone)), $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+    let query = "INSERT INTO analytics(campaign_id, time, ad_unit, ad_slot, ad_slot_type, advertiser, publisher, hostname, country, os_name, chain_id, event_type, payout_amount, payout_count)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
     ON CONFLICT ON CONSTRAINT analytics_pkey DO UPDATE
-    SET payout_amount = analytics.payout_amount + $12, payout_count = analytics.payout_count + 1
+    SET payout_amount = analytics.payout_amount + EXCLUDED.payout_amount, payout_count = analytics.payout_count + EXCLUDED.payout_count
     RETURNING campaign_id, time, ad_unit, ad_slot, ad_slot_type, advertiser, publisher, hostname, country, os_name, event_type, payout_amount, payout_count";
 
-    let stmt = client.prepare(query).await?;
+    let stmt = client.prepare_cached(query).await?;
 
     let row = client
         .query_one(
@@ -135,6 +148,7 @@ pub async fn update_analytics(
                     .unwrap_or(&"".to_string()),
                 &update_analytics.country.as_ref().unwrap_or(&"".to_string()),
                 &update_analytics.os_name.to_string(),
+                &update_analytics.chain_id,
                 &update_analytics.event_type,
                 &update_analytics.amount_to_add,
                 &update_analytics.count_to_add,
@@ -159,13 +173,14 @@ mod test {
         },
         sentry::{DateHour, CLICK, IMPRESSION},
         test_util::{CREATOR, DUMMY_AD_UNITS, DUMMY_CAMPAIGN, DUMMY_IPFS, PUBLISHER, PUBLISHER_2},
-        AdUnit, UnifiedNum, ValidatorId, IPFS,
+        unified_num::FromWhole,
+        AdUnit, ChainId, UnifiedNum, ValidatorId, IPFS,
     };
 
     use crate::db::tests_postgres::{setup_test_migrations, DATABASE_POOL};
 
     #[tokio::test]
-    async fn insert_update_and_get_analytics() {
+    async fn insert_update_and_fetch_analytics() {
         let database = DATABASE_POOL.get().await.expect("Should get a DB pool");
 
         let ad_unit = DUMMY_AD_UNITS[0].clone();
@@ -188,6 +203,7 @@ mod test {
                 hostname: Some("localhost".to_string()),
                 country: Some("Bulgaria".to_string()),
                 os_name: OperatingSystem::Linux,
+                chain_id: ChainId::new(1),
                 event_type: IMPRESSION,
                 amount_to_add: UnifiedNum::from_u64(1_000_000),
                 count_to_add: 1,
@@ -213,14 +229,32 @@ mod test {
             assert_eq!(UnifiedNum::from_u64(1_000_000), analytics.payout_amount);
             assert_eq!(1, analytics.payout_count);
 
-            let analytics_updated = update_analytics(&database.clone(), update.clone())
+            let new_update = UpdateAnalytics {
+                time: DateHour::from_ymdh(2021, 2, 1, 1),
+                campaign_id: DUMMY_CAMPAIGN.id,
+                ad_unit: ad_unit.ipfs,
+                ad_slot: ad_slot_ipfs,
+                ad_slot_type: Some(ad_unit.ad_type.clone()),
+                advertiser: *CREATOR,
+                publisher: *PUBLISHER,
+                hostname: Some("localhost".to_string()),
+                country: Some("Bulgaria".to_string()),
+                os_name: OperatingSystem::Linux,
+                chain_id: ChainId::new(1),
+                event_type: IMPRESSION,
+                amount_to_add: UnifiedNum::from_u64(1_000_000),
+                count_to_add: 69,
+            };
+
+            let analytics_updated = update_analytics(&database.clone(), new_update.clone())
                 .await
                 .expect("Should update");
+
             assert_eq!(
                 analytics_updated.payout_amount,
                 UnifiedNum::from_u64(2_000_000)
             );
-            assert_eq!(analytics_updated.payout_count, 2);
+            assert_eq!(analytics_updated.payout_count, 70);
         }
 
         // On empty fields marked as `NOT NULL` it should successfully insert a new analytics
@@ -236,6 +270,7 @@ mod test {
                 hostname: None,
                 country: None,
                 os_name: OperatingSystem::Linux,
+                chain_id: ChainId::new(1),
                 event_type: IMPRESSION,
                 amount_to_add: UnifiedNum::from_u64(1_000_000),
                 count_to_add: 1,
@@ -314,12 +349,12 @@ mod test {
 
         let amount_per_day: UnifiedNum = hours
             .clone()
-            .map(|hour| UnifiedNum::from(hour as u64 * 100_000_000))
+            .map(|hour| UnifiedNum::from_whole(hour as u64))
             .sum::<Option<_>>()
             .expect("Should not overflow");
         let amount_for_month: UnifiedNum = december_days
             .clone()
-            .map(|day_n| UnifiedNum::from(amount_per_day * day_n as u64))
+            .map(|day_n| amount_per_day * UnifiedNum::from_whole(day_n as u64))
             .sum::<Option<UnifiedNum>>()
             .expect("Should not overflow");
 
@@ -353,11 +388,12 @@ mod test {
             hostname: Some("localhost".into()),
             country: Some("Bulgaria".into()),
             os_name: Some(OperatingSystem::Linux),
+            chains: vec![],
         };
 
         // Impression query - should count all inserted Analytics
         {
-            let count_impressions = get_analytics(
+            let count_impressions = fetch_analytics(
                 &database.pool,
                 impression_query.clone(),
                 ALLOWED_KEYS.clone(),
@@ -400,7 +436,7 @@ mod test {
             let mut paid_impressions_query = impression_query.clone();
             paid_impressions_query.metric = Metric::Paid;
 
-            let paid_impressions = get_analytics(
+            let paid_impressions = fetch_analytics(
                 &database.pool,
                 paid_impressions_query,
                 ALLOWED_KEYS.clone(),
@@ -431,7 +467,9 @@ mod test {
                 .expect("Should not overflow");
 
             assert_eq!(
-                14 * amount_per_day + 15 * amount_per_day + 16 * amount_per_day,
+                UnifiedNum::from_whole(14) * amount_per_day
+                    + UnifiedNum::from_whole(15) * amount_per_day
+                    + UnifiedNum::from_whole(16) * amount_per_day,
                 three_days_fetched_paid
             );
         }
@@ -455,11 +493,12 @@ mod test {
             hostname: Some("localhost".into()),
             country: Some("Estonia".into()),
             os_name: Some(OperatingSystem::Linux),
+            chains: vec![],
         };
 
         // Click query - should count all inserted Analytics
         {
-            let count_clicks = get_analytics(
+            let count_clicks = fetch_analytics(
                 &database.pool,
                 click_query.clone(),
                 ALLOWED_KEYS.clone(),
@@ -502,7 +541,7 @@ mod test {
             let mut paid_clicks_query = impression_query.clone();
             paid_clicks_query.metric = Metric::Paid;
 
-            let paid_impressions = get_analytics(
+            let paid_impressions = fetch_analytics(
                 &database.pool,
                 paid_clicks_query,
                 ALLOWED_KEYS.clone(),
@@ -533,12 +572,12 @@ mod test {
                 .expect("Should not overflow");
 
             assert_eq!(
-                10 * amount_per_day
-                    + 11 * amount_per_day
-                    + 12 * amount_per_day
-                    + 13 * amount_per_day
-                    + 14 * amount_per_day
-                    + 15 * amount_per_day,
+                UnifiedNum::from_whole(10) * amount_per_day
+                    + UnifiedNum::from_whole(11) * amount_per_day
+                    + UnifiedNum::from_whole(12) * amount_per_day
+                    + UnifiedNum::from_whole(13) * amount_per_day
+                    + UnifiedNum::from_whole(14) * amount_per_day
+                    + UnifiedNum::from_whole(15) * amount_per_day,
                 six_days_fetched_paid
             );
         }
@@ -556,7 +595,7 @@ mod test {
             };
             click_germany_query.country = Some("Germany".into());
 
-            let count_clicks = get_analytics(
+            let count_clicks = fetch_analytics(
                 &database.pool,
                 click_germany_query.clone(),
                 ALLOWED_KEYS.clone(),
@@ -604,9 +643,10 @@ mod test {
                 hostname: None,
                 country: None,
                 os_name: None,
+                chains: vec![],
             };
 
-            let count_impressions = get_analytics(
+            let count_impressions = fetch_analytics(
                 &database.pool,
                 ad_unit_2_query.clone(),
                 ALLOWED_KEYS.clone(),
@@ -659,9 +699,10 @@ mod test {
                 hostname: None,
                 country: None,
                 os_name: None,
+                chains: vec![],
             };
 
-            let count_impressions = get_analytics(
+            let count_impressions = fetch_analytics(
                 &database.pool,
                 filter_by_publisher_2_query.clone(),
                 ALLOWED_KEYS.clone(),
@@ -714,9 +755,10 @@ mod test {
                 hostname: None,
                 country: None,
                 os_name: None,
+                chains: vec![],
             };
 
-            let count_impressions = get_analytics(
+            let count_impressions = fetch_analytics(
                 &database.pool,
                 authenticate_as_publisher_2_query.clone(),
                 ALLOWED_KEYS.clone(),
@@ -769,9 +811,10 @@ mod test {
                 hostname: None,
                 country: None,
                 os_name: None,
+                chains: vec![],
             };
 
-            let count_impressions = get_analytics(
+            let count_impressions = fetch_analytics(
                 &database.pool,
                 segment_ad_units_query.clone(),
                 ALLOWED_KEYS.clone(),
@@ -815,13 +858,14 @@ mod test {
             time: DateHour::from_ymdh(2021, 12, day, hour),
             campaign_id: DUMMY_CAMPAIGN.id,
             ad_unit: ad_unit.ipfs,
-            ad_slot: ad_slot,
+            ad_slot,
             ad_slot_type: Some(ad_unit.ad_type.clone()),
             advertiser: *CREATOR,
             publisher: *PUBLISHER,
             hostname: Some("localhost".to_string()),
             country: Some("Bulgaria".to_string()),
             os_name: OperatingSystem::Linux,
+            chain_id: ChainId::new(1),
             event_type: IMPRESSION,
             amount_to_add: UnifiedNum::from_u64(day as u64 * hour as u64 * 100_000_000),
             count_to_add: hour as i32,
@@ -841,13 +885,14 @@ mod test {
             time: DateHour::from_ymdh(2021, 12, day, hour),
             campaign_id: DUMMY_CAMPAIGN.id,
             ad_unit: ad_unit.ipfs,
-            ad_slot: ad_slot,
+            ad_slot,
             ad_slot_type: Some(ad_unit.ad_type.clone()),
             advertiser: *CREATOR,
             publisher: *PUBLISHER,
             hostname: Some("localhost".to_string()),
             country: Some("Estonia".to_string()),
             os_name: OperatingSystem::Linux,
+            chain_id: ChainId::new(1),
             event_type: CLICK,
             amount_to_add: UnifiedNum::from_u64(day as u64 * hour as u64 * 100_000_000),
             count_to_add: hour as i32,

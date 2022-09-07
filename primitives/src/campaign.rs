@@ -8,15 +8,13 @@ use chrono::{
     DateTime, Utc,
 };
 use serde::{Deserialize, Serialize};
-use serde_with::with_prefix;
 
+#[doc(inline)]
 pub use {
     campaign_id::CampaignId,
     pricing::{Pricing, PricingBounds},
     validators::Validators,
 };
-
-with_prefix!(pub prefix_active "active_");
 
 mod campaign_id {
     use crate::ToHex;
@@ -29,11 +27,17 @@ mod campaign_id {
     use thiserror::Error;
     use uuid::Uuid;
 
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    #[derive(Clone, Copy, PartialEq, Eq, Hash)]
     /// an Id of 16 bytes, (de)serialized as a `0x` prefixed hex
     ///
     /// In this implementation of the `CampaignId` the value is generated from a `Uuid::new_v4().to_simple()`
     pub struct CampaignId([u8; 16]);
+
+    impl fmt::Debug for CampaignId {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(f, "CampaignId({})", self)
+        }
+    }
 
     impl CampaignId {
         /// Generates randomly a `CampaignId` using `Uuid::new_v4().to_simple()`
@@ -190,7 +194,7 @@ pub struct Campaign {
     #[serde(with = "ts_milliseconds")]
     pub created: DateTime<Utc>,
     /// Used by the AdViewManager & Targeting AIP#31
-    #[serde(flatten, with = "prefix_active")]
+    #[serde(flatten)]
     pub active: Active,
 }
 
@@ -229,13 +233,14 @@ pub struct Active {
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        with = "ts_milliseconds_option"
+        with = "ts_milliseconds_option",
+        rename = "activeFrom"
     )]
     pub from: Option<DateTime<Utc>>,
     /// Campaign active to in a milliseconds timestamp
     ///
     /// The time at which you want this campaign to become inactive (mandatory)
-    #[serde(with = "ts_milliseconds")]
+    #[serde(with = "ts_milliseconds", rename = "activeTo")]
     pub to: DateTime<Utc>,
 }
 
@@ -284,6 +289,7 @@ mod pricing {
         }
     }
 }
+
 /// Campaign Validators
 pub mod validators {
     use std::ops::Index;
@@ -291,8 +297,8 @@ pub mod validators {
     use crate::{ValidatorDesc, ValidatorId};
     use serde::{Deserialize, Serialize};
 
-    #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
     /// Unordered list of the validators representing the leader & follower
+    #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
     pub struct Validators(ValidatorDesc, ValidatorDesc);
 
     impl Validators {

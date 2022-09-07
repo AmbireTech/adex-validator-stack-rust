@@ -6,49 +6,22 @@ use crate::{
 };
 use async_trait::async_trait;
 use chrono::Utc;
-use create2::calc_addr;
-use ethstore::{
-    ethkey::{verify_address, Message, Signature},
-    SafeAccount,
-};
+use ethsign::{KeyFile, Signature};
 use primitives::{Address, BigNum, Chain, ChainId, ChainOf, Channel, Config, ValidatorId};
 
 use super::{
-    channel::EthereumChannel,
     error::{Error, EwtSigningError, KeystoreError, VerifyError},
     ewt::{self, Payload},
-    to_ethereum_signed, LockedWallet, UnlockedWallet, WalletState, DEPOSITOR_BYTECODE_DECODED,
-    ERC20_ABI, IDENTITY_ABI, OUTPACE_ABI, SWEEPER_ABI,
+    to_ethereum_signed, Electrum, LockedWallet, UnlockedWallet, WalletState, IDENTITY_ABI,
+    OUTPACE_ABI,
 };
-use serde_json::Value;
 use web3::{
     contract::{Contract, Options as ContractOptions},
-    ethabi::{encode, Token},
+    ethabi::Token,
     transports::Http,
     types::{H160, U256},
     Web3,
 };
-
-pub fn get_counterfactual_address(
-    sweeper: Address,
-    channel: &Channel,
-    outpace: Address,
-    depositor: Address,
-) -> Address {
-    let salt: [u8; 32] = [0; 32];
-    let encoded_params = encode(&[
-        Token::Address(outpace.as_bytes().into()),
-        channel.tokenize(),
-        Token::Address(depositor.as_bytes().into()),
-    ]);
-
-    let mut init_code = DEPOSITOR_BYTECODE_DECODED.clone();
-    init_code.extend(&encoded_params);
-
-    let address_bytes = calc_addr(sweeper.as_bytes(), &salt, &init_code);
-
-    Address::from(address_bytes)
-}
 
 #[derive(Debug, Clone)]
 pub struct Options {
@@ -80,22 +53,18 @@ impl Ethereum<LockedWallet> {
     pub fn init(opts: Options, config: &Config) -> Result<Self, Error> {
         let keystore_contents =
             fs::read_to_string(&opts.keystore_file).map_err(KeystoreError::ReadingFile)?;
-        let keystore_json: Value =
+        let keystore_json: KeyFile =
             serde_json::from_str(&keystore_contents).map_err(KeystoreError::Deserialization)?;
 
-        let address = {
-            let keystore_address = keystore_json
-                .get("address")
-                .and_then(|value| value.as_str())
-                .ok_or(KeystoreError::AddressMissing)?;
+        let address_bytes = keystore_json
+            .address
+            .clone()
+            .ok_or(KeystoreError::AddressMissing)?;
 
-            keystore_address
-                .parse()
-                .map_err(KeystoreError::AddressInvalid)
-        }?;
+        let address = Address::from_slice(&address_bytes.0).ok_or(KeystoreError::AddressLength)?;
 
         Ok(Self {
-            address,
+            address: ValidatorId::from(address),
             config: config.to_owned(),
             state: LockedWallet::KeyStore {
                 keystore: keystore_json,
@@ -160,16 +129,9 @@ impl Unlockable for Ethereum<LockedWallet> {
     fn unlock(&self) -> Result<Ethereum<UnlockedWallet>, <Self::Unlocked as Locked>::Error> {
         let unlocked_wallet = match &self.state {
             LockedWallet::KeyStore { keystore, password } => {
-                let json = serde_json::from_value(keystore.clone())
-                    .map_err(KeystoreError::Deserialization)?;
+                let wallet = keystore.to_secret_key(password)?;
 
-                let wallet = SafeAccount::from_file(json, None, &Some(password.clone()))
-                    .map_err(|err| Error::WalletUnlock(err.to_string()))?;
-
-                UnlockedWallet {
-                    wallet,
-                    password: password.clone(),
-                }
+                UnlockedWallet { wallet }
             }
             LockedWallet::PrivateKey(_priv_key) => todo!(),
         };
@@ -201,15 +163,19 @@ impl<S: WalletState> Locked for Ethereum<S> {
         }
         let decoded_signature =
             hex::decode(&signature[2..]).map_err(VerifyError::SignatureDecoding)?;
-        let address = ethstore::ethkey::Address::from(*signer.as_bytes());
-        let signature = Signature::from_electrum(&decoded_signature);
+
+        let signature =
+            Signature::from_electrum(&decoded_signature).ok_or(VerifyError::SignatureInvalid)?;
         let state_root = hex::decode(state_root).map_err(VerifyError::StateRootDecoding)?;
-        let message = Message::from(to_ethereum_signed(&state_root));
 
-        let verify_address = verify_address(&address, &signature, &message)
-            .map_err(VerifyError::PublicKeyRecovery)?;
+        let message = to_ethereum_signed(&state_root);
 
-        Ok(verify_address)
+        // recover the public key using the signature and the eth sign message
+        let public_key = signature
+            .recover(&message)
+            .map_err(|ec_err| VerifyError::PublicKeyRecovery(ec_err.to_string()))?;
+
+        Ok(public_key.address() == signer.as_bytes())
     }
 
     /// Creates a `Session` from a provided Token by calling the Contract.
@@ -273,31 +239,16 @@ impl<S: WalletState> Locked for Ethereum<S> {
         depositor_address: Address,
     ) -> Result<Deposit, Self::Error> {
         let channel = channel_context.context;
-        let token = &channel_context.token;
         let chain = &channel_context.chain;
 
         let web3 = chain.init_web3()?;
 
         let outpace_contract = Contract::from_json(
             web3.eth(),
-            channel_context.chain.outpace.as_bytes().into(),
+            H160(channel_context.chain.outpace.to_bytes()),
             &OUTPACE_ABI,
         )
         .map_err(Error::ContractInitialization)?;
-
-        let erc20_contract =
-            Contract::from_json(web3.eth(), channel.token.as_bytes().into(), &ERC20_ABI)
-                .map_err(Error::ContractInitialization)?;
-
-        let sweeper_contract = Contract::from_json(
-            web3.eth(),
-            channel_context.chain.sweeper.as_bytes().into(),
-            &SWEEPER_ABI,
-        )
-        .map_err(Error::ContractInitialization)?;
-
-        let sweeper_address = Address::from(sweeper_contract.address().to_fixed_bytes());
-        let outpace_address = Address::from(outpace_contract.address().to_fixed_bytes());
 
         let on_outpace: U256 = outpace_contract
             .query(
@@ -315,40 +266,7 @@ impl<S: WalletState> Locked for Ethereum<S> {
 
         let on_outpace = BigNum::from_str(&on_outpace.to_string()).map_err(Error::BigNumParsing)?;
 
-        let counterfactual_address = get_counterfactual_address(
-            sweeper_address,
-            &channel,
-            outpace_address,
-            depositor_address,
-        );
-        let still_on_create2: U256 = erc20_contract
-            .query(
-                "balanceOf",
-                H160(counterfactual_address.to_bytes()),
-                None,
-                ContractOptions::default(),
-                None,
-            )
-            .await
-            .map_err(Error::ContractQuerying)?;
-
-        let still_on_create2: BigNum = still_on_create2
-            .to_string()
-            .parse()
-            .map_err(Error::BigNumParsing)?;
-
-        // Count the create2 deposit only if it's > minimum token units configured
-        let deposit = if still_on_create2 > token.min_token_units_for_deposit {
-            Deposit {
-                total: &still_on_create2 + &on_outpace,
-                still_on_create2,
-            }
-        } else {
-            Deposit {
-                total: on_outpace,
-                still_on_create2: BigNum::from(0),
-            }
-        };
+        let deposit = Deposit { total: on_outpace };
 
         Ok(deposit)
     }
@@ -358,16 +276,16 @@ impl<S: WalletState> Locked for Ethereum<S> {
 impl Unlocked for Ethereum<UnlockedWallet> {
     fn sign(&self, state_root: &str) -> Result<String, Error> {
         let state_root = hex::decode(state_root).map_err(VerifyError::StateRootDecoding)?;
-        let message = Message::from(to_ethereum_signed(&state_root));
+        let message = to_ethereum_signed(&state_root);
+
         let wallet_sign = self
             .state
             .wallet
-            .sign(&self.state.password, &message)
+            .sign(&message)
             // TODO: This is not entirely true, we do not sign an Ethereum Web Token but Outpace state_root
             .map_err(|err| EwtSigningError::SigningMessage(err.to_string()))?;
-        let signature: Signature = wallet_sign.into_electrum().into();
 
-        Ok(format!("0x{}", signature))
+        Ok(format!("0x{}", hex::encode(wallet_sign.to_electrum())))
     }
 
     fn get_auth(&self, for_chain: ChainId, intended_for: ValidatorId) -> Result<String, Error> {
@@ -380,8 +298,7 @@ impl Unlocked for Ethereum<UnlockedWallet> {
             chain_id: for_chain,
         };
 
-        let token = ewt::Token::sign(&self.state.wallet, &self.state.password, payload)
-            .map_err(Error::SignMessage)?;
+        let token = ewt::Token::sign(&self.state.wallet, payload).map_err(Error::SignMessage)?;
 
         Ok(token.to_string())
     }
@@ -393,9 +310,8 @@ mod test {
     use crate::ethereum::{
         client::ChainTransport,
         ewt::{self, Payload},
-        get_counterfactual_address,
         test_util::*,
-        to_ethereum_signed,
+        to_ethereum_signed, Electrum,
     };
 
     use crate::{
@@ -403,12 +319,15 @@ mod test {
         primitives::{Deposit, Session},
     };
     use chrono::Utc;
-    use ethstore::ethkey::Message;
 
     use primitives::{
+        channel::Nonce,
         config::GANACHE_CONFIG,
-        test_util::{ADDRESS_3, ADDRESS_4, ADDRESS_5, ADVERTISER, CREATOR, LEADER},
-        BigNum, ChainOf, ToHex, ValidatorId,
+        test_util::{
+            ADDRESS_3, ADDRESS_4, ADDRESS_5, ADVERTISER, CREATOR, DUMMY_CAMPAIGN, FOLLOWER,
+            GUARDIAN, GUARDIAN_2, IDS, LEADER, LEADER_2,
+        },
+        BigNum, ChainOf, Channel, ToHex, ValidatorId,
     };
     use web3::{
         contract::Options as ContractOptions, ethabi::Token, signing::keccak256, types::H160,
@@ -505,14 +424,13 @@ mod test {
 
             let signature_actual = {
                 let ethers_sign_message = to_ethereum_signed(&msg_hash_actual);
-                let message = Message::from(ethers_sign_message);
 
                 let mut signature = user_adapter
                     .state
                     .wallet
-                    .sign(&user_adapter.state.password, &message)
+                    .sign(&ethers_sign_message)
                     .expect("Should sign message")
-                    .into_electrum()
+                    .to_electrum()
                     .to_vec();
 
                 signature.extend(ETH_SIGN_SUFFIX.as_slice());
@@ -545,14 +463,13 @@ mod test {
 
             let signature_actual = {
                 let ethers_sign_message = to_ethereum_signed(&msg_hash_actual);
-                let message = Message::from(ethers_sign_message);
 
                 let mut signature = evil_adapter
                     .state
                     .wallet
-                    .sign(&evil_adapter.state.password, &message)
+                    .sign(&ethers_sign_message)
                     .expect("Should sign message")
-                    .into_electrum()
+                    .to_electrum()
                     .to_vec();
 
                 signature.extend(ETH_SIGN_SUFFIX.as_slice());
@@ -627,7 +544,7 @@ mod test {
             chain_id: ganache_chain.chain_id,
         };
 
-        let auth_token = ewt::Token::sign(&adapter.state.wallet, &adapter.state.password, payload)
+        let auth_token = ewt::Token::sign(&adapter.state.wallet, payload)
             .expect("Should sign successfully the Payload");
 
         let has_privileges = adapter
@@ -680,12 +597,8 @@ mod test {
             chain_id: ganache_chain.chain_id,
         };
 
-        let token = ewt::Token::sign(
-            &signer_adapter.state.wallet,
-            &signer_adapter.state.password,
-            payload,
-        )
-        .expect("Should sign successfully the Payload");
+        let token = ewt::Token::sign(&signer_adapter.state.wallet, payload)
+            .expect("Should sign successfully the Payload");
 
         // double check that we have privileges for _Who Am I_
         assert!(adapter
@@ -703,218 +616,189 @@ mod test {
     }
 
     #[tokio::test]
-    async fn get_deposit_and_count_create2_when_min_tokens_received() {
-        let web3 = GANACHE_1337_WEB3.clone();
+    async fn multi_chain_deposit_from_config() -> Result<(), Box<dyn std::error::Error>> {
+        let config = GANACHE_CONFIG.clone();
 
-        let leader_account = *LEADER;
+        let mut channel_1 = DUMMY_CAMPAIGN.channel;
+        let channel_1_token = GANACHE_INFO_1.tokens["Mocked TOKEN 1"].clone();
+        channel_1.token = channel_1_token.address;
 
-        // deploy contracts
-        let token = deploy_token_contract(&web3, 1_000)
-            .await
-            .expect("Correct parameters are passed to the Token constructor.");
-        let token_address = token.1;
+        let chain_of = ChainOf::new(GANACHE_1.clone(), channel_1_token);
 
-        let sweeper = deploy_sweeper_contract(&web3)
-            .await
-            .expect("Correct parameters are passed to the Sweeper constructor.");
+        let web3_1 = chain_of
+            .chain
+            .init_web3()
+            .expect("Should init web3 for Chain #1");
 
-        let outpace = deploy_outpace_contract(&web3)
-            .await
-            .expect("Correct parameters are passed to the OUTPACE constructor.");
-
-        let spender = *CREATOR;
-
-        let (config, chain_context) = {
-            let mut init_chain = GANACHE_1337.clone();
-            init_chain.outpace = outpace.0;
-            init_chain.sweeper = sweeper.0;
-
-            let mut config = GANACHE_CONFIG.clone();
-
-            // Assert that the Ganache chain exist in the configuration
-            let mut config_chain = config
-                .chains
-                .values_mut()
-                .find(|chain_info| chain_info.chain.chain_id == init_chain.chain_id)
-                .expect("Should find Ganache chain in the configuration");
-
-            // override the chain to use the outpace & sweeper addresses that were just deployed
-            config_chain.chain = init_chain.clone();
-
-            // Assert that the token that was just deploy does not exist in the Config
-            assert!(
-                config_chain
-                    .tokens
-                    .values()
-                    .find(|config_token_info| config_token_info.address == token.1)
-                    .is_none(),
-                "Config should not have this token address, we've just deployed the contract."
-            );
-
-            let token_exists = config_chain.tokens.insert("TOKEN".into(), token.0.clone());
-
-            // Assert that the token name that was just deploy does not exist in the Config
-            assert!(
-                token_exists.is_none(),
-                "This token name should not pre-exist in Ganache config"
-            );
-
-            let chain_context = ChainOf::new(init_chain, token.0.clone());
-
-            (config, chain_context)
-        };
-
-        let channel = get_test_channel(token_address);
-        let channel_context = chain_context.with(channel);
-
-        // since we deploy a new contract, it's should be different from all the ones found in config.
-        let eth_adapter = Ethereum::init(KEYSTORES[&LEADER].clone(), &config)
+        let leader_adapter = Ethereum::init(KEYSTORES[&LEADER].clone(), &config)
             .expect("should init ethereum adapter")
             .unlock()
             .expect("should unlock eth adapter");
 
-        let counterfactual_address =
-            get_counterfactual_address(sweeper.0, &channel, outpace.0, spender);
+        let advertiser = *ADVERTISER;
 
-        // No Regular nor Create2 deposits
+        let _actual_deposit = leader_adapter
+            .get_deposit(&chain_of.clone().with(channel_1), advertiser)
+            .await
+            .expect("Should get deposit for Channel in Chain 1");
+
+        let token = Erc20Token::new(&web3_1, chain_of.token.clone());
+        let outpace = Outpace::new(&web3_1, chain_of.chain.outpace);
+
+        // OUTPACE deposit Chain #1
+        // 10 tokens
+        {
+            let ten = BigNum::with_precision(10, chain_of.token.precision.into());
+            token
+                .set_balance(LEADER.to_bytes(), advertiser.to_bytes(), &ten)
+                .await
+                .expect("Failed to set balance");
+
+            outpace
+                .deposit(&channel_1, advertiser.to_bytes(), &ten)
+                .await
+                .expect("Should deposit funds");
+
+            let regular_deposit = leader_adapter
+                .get_deposit(&chain_of.clone().with(channel_1), advertiser)
+                .await
+                .expect("should get deposit");
+
+            assert_eq!(Deposit { total: ten.clone() }, regular_deposit);
+        }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn multi_chain_deposit_from_deployed_contracts() -> Result<(), Box<dyn std::error::Error>>
+    {
+        let chain_of_1337 = ChainOf::new(
+            GANACHE_1337.clone(),
+            GANACHE_INFO_1337.tokens["Mocked TOKEN 1337"].clone(),
+        );
+
+        let mut config = GANACHE_CONFIG.clone();
+
+        let channel_chain_1 = {
+            let web3 = GANACHE_1.init_web3().expect("Init web3");
+
+            // deploy contracts
+            let token = Erc20Token::deploy(&web3, 1_000)
+                .await
+                .expect("Correct parameters are passed to the Token constructor.");
+
+            let outpace = Outpace::deploy(&web3)
+                .await
+                .expect("Correct parameters are passed to the OUTPACE constructor.");
+
+            // Add new "Deployed TOKEN"
+            let mut ganache_1 = config
+                .chains
+                .get_mut("Ganache #1")
+                .expect("Should have Ganache #1 already in config");
+
+            assert!(
+                !ganache_1
+                    .tokens
+                    .values()
+                    .any(|existing_token| { existing_token.address == token.info.address }),
+                "The deployed token address should not have existed previously in the config!"
+            );
+
+            // Insert the new token in the config
+            assert!(
+                ganache_1
+                    .tokens
+                    .insert("Deployed TOKEN".into(), token.info.clone())
+                    .is_none(),
+                "Should not have previous value for the Deployed TOKEN"
+            );
+
+            // Replace Outpace & Sweeper addresses with the ones just deployed.
+            ganache_1.chain.outpace = outpace.address;
+
+            let chain_of_1 = ChainOf::new(ganache_1.chain.clone(), token.info.clone());
+
+            chain_of_1.clone().with(Channel {
+                leader: IDS[&LEADER],
+                follower: IDS[&FOLLOWER],
+                guardian: *GUARDIAN,
+                token: chain_of_1.token.address,
+                nonce: Nonce::from(1_u32),
+            })
+        };
+
+        let channel_chain_1337 = chain_of_1337.clone().with(Channel {
+            leader: IDS[&LEADER_2],
+            follower: IDS[&FOLLOWER],
+            guardian: *GUARDIAN_2,
+            token: chain_of_1337.token.address,
+            nonce: Nonce::from(1337_u32),
+        });
+
+        let eth_adapter = Ethereum::init(KEYSTORES[&FOLLOWER].clone(), &config)
+            .expect("should init ethereum adapter")
+            .unlock()
+            .expect("should unlock eth adapter");
+
+        let spender = *ADVERTISER;
+
+        // No Regular deposits
+        // Chain #1
         {
             let no_deposits = eth_adapter
-                .get_deposit(&channel_context, spender)
+                .get_deposit(&channel_chain_1, spender)
                 .await
                 .expect("should get deposit");
 
             assert_eq!(
                 Deposit {
                     total: BigNum::from(0),
-                    still_on_create2: BigNum::from(0),
                 },
                 no_deposits
             );
         }
 
-        // 10^18 = 1 TOKEN
-        let one_token = {
-            let deposit = "1000000000000000000".parse::<BigNum>().unwrap();
-            // make sure 1 TOKEN is the minimum set in Config
-            let config_token = eth_adapter
-                .config
-                .find_chain_of(channel.token)
-                .expect("Channel token should be present in Config")
-                .token;
-
-            assert!(
-                deposit >= config_token.min_token_units_for_deposit,
-                "The minimum deposit should be >= the configured token minimum token units"
-            );
-
-            deposit
-        };
-
-        // Regular deposit in Outpace without Create2
+        // No Regular deposits
+        // Chain #1337
         {
-            assert!(token.1 == channel.token);
-            mock_set_balance(&token.2, LEADER.to_bytes(), spender.to_bytes(), &one_token)
-                .await
-                .expect("Failed to set balance");
-
-            outpace_deposit(&outpace.1, &channel, spender.to_bytes(), &one_token)
-                .await
-                .expect("Should deposit funds");
-
-            let regular_deposit = eth_adapter
-                .get_deposit(&channel_context, spender)
+            let no_deposits = eth_adapter
+                .get_deposit(&channel_chain_1337, spender)
                 .await
                 .expect("should get deposit");
 
             assert_eq!(
                 Deposit {
-                    total: one_token.clone(),
-                    still_on_create2: BigNum::from(0),
+                    total: BigNum::from(0),
                 },
-                regular_deposit
+                no_deposits
             );
         }
 
-        // Create2 deposit with less than minimum token units
-        // 1 TOKEN = 1 * 10^18
-        // 999 * 10^18 < 1 TOKEN
-        {
-            // Set balance < minimal token units, i.e. 1 TOKEN
-            mock_set_balance(
-                &token.2,
-                leader_account.to_bytes(),
-                counterfactual_address.to_bytes(),
-                &BigNum::from(999),
-            )
-            .await
-            .expect("Failed to set balance");
+        // OUTPACE deposit
+        // {
+        //     mock_set_balance(&token.2, LEADER.to_bytes(), spender.to_bytes(), &one_token)
+        //         .await
+        //         .expect("Failed to set balance");
 
-            let deposit_with_create2 = eth_adapter
-                .get_deposit(&channel_context, spender)
-                .await
-                .expect("should get deposit");
+        //     outpace_deposit(&outpace.1, &channel, spender.to_bytes(), &one_token)
+        //         .await
+        //         .expect("Should deposit funds");
 
-            assert_eq!(
-                Deposit {
-                    total: one_token.clone(),
-                    // tokens are **less** than the minimum tokens required for deposits to count
-                    still_on_create2: BigNum::from(0),
-                },
-                deposit_with_create2
-            );
-        }
+        //     let regular_deposit = eth_adapter
+        //         .get_deposit(&channel_context, spender)
+        //         .await
+        //         .expect("should get deposit");
 
-        // Deposit with more than minimum token units
-        {
-            // Set balance > minimal token units
-            mock_set_balance(
-                &token.2,
-                leader_account.to_bytes(),
-                counterfactual_address.to_bytes(),
-                &BigNum::from(1_999),
-            )
-            .await
-            .expect("Failed to set balance");
+        //     assert_eq!(
+        //         Deposit {
+        //             total: one_token.clone(),
+        //         },
+        //         regular_deposit
+        //     );
+        // }
 
-            let deposit_with_create2 = eth_adapter
-                .get_deposit(&channel_context, spender)
-                .await
-                .expect("should get deposit");
-
-            assert_eq!(
-                Deposit {
-                    total: &one_token + BigNum::from(1_999),
-                    // tokens are more than the minimum tokens required for deposits to count
-                    still_on_create2: BigNum::from(1_999),
-                },
-                deposit_with_create2
-            );
-        }
-
-        // Run sweeper, it should clear the previously set create2 deposit and leave the total
-        {
-            sweeper_sweep(
-                &sweeper.1,
-                outpace.0.to_bytes(),
-                &channel,
-                spender.to_bytes(),
-            )
-            .await
-            .expect("Should sweep the Spender account");
-
-            let swept_deposit = eth_adapter
-                .get_deposit(&channel_context, spender)
-                .await
-                .expect("should get deposit");
-
-            assert_eq!(
-                Deposit {
-                    total: &one_token + BigNum::from(1_999),
-                    // we've just swept the account, so create2 should be empty
-                    still_on_create2: BigNum::from(0),
-                },
-                swept_deposit
-            );
-        }
+        Ok(())
     }
 }

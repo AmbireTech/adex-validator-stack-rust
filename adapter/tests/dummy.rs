@@ -49,7 +49,6 @@ impl Locked for Dummy {
     ) -> Result<Deposit, crate::Error> {
         Ok(Deposit {
             total: BigNum::from(42_u64),
-            still_on_create2: BigNum::from(12_u64),
         })
     }
 }
@@ -83,7 +82,7 @@ async fn main() {
     let channel_context = ChainOf {
         context: DUMMY_CAMPAIGN.channel,
         token: TokenInfo {
-            min_token_units_for_deposit: 1_u64.into(),
+            min_campaign_budget: 1_u64.into(),
             min_validator_fee: 1_u64.into(),
             precision: NonZeroU8::new(18).unwrap(),
             address: "0x6B83e7D6B72c098d48968441e0d05658dc17Adb9"
@@ -94,9 +93,6 @@ async fn main() {
             chain_id: ChainId::new(1),
             rpc: "http://dummy.com".parse().unwrap(),
             outpace: "0x0000000000000000000000000000000000000000"
-                .parse()
-                .unwrap(),
-            sweeper: "0x0000000000000000000000000000000000000000"
                 .parse()
                 .unwrap(),
         },

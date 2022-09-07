@@ -1,13 +1,66 @@
 on: [push, pull_request]
 
+# Stops the running workflow of previous pushes
+concurrency:
+  group: ${{ github.ref }}
+  cancel-in-progress: true
+
 name: Continuous Integration
 
 jobs:
-  ci-flow:
-    name: cargo make ci-flow - Tests, clippy & rustfmt
+  lint-rustfmt:
+    name: Running lint - rustfmt
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
+        with:
+          submodules: true
+      - uses: actions-rs/toolchain@v1
+        with:
+          # No need to add `toolchain`, it will use `rust-toolchain` file instead
+          profile: minimal
+          components: rustfmt
+      - uses: davidB/rust-cargo-make@v1
+      - name: Rustfmt
+        # we don't use the check-format-ci-flow because it requires nightly (cargo-make)
+        run: cargo make check-format-flow
+  lint-clippy:
+    name: Running lint - clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: true
+      - uses: actions-rs/toolchain@v1
+        with:
+          # No need to add `toolchain`, it will use `rust-toolchain` file instead
+          profile: minimal
+          components: clippy
+      - uses: davidB/rust-cargo-make@v1
+      - name: Run Clippy
+        # we don't use the clippy-ci-flow because it requires nightly (cargo-make)
+        run: cargo make clippy-flow
+  check-docs:
+    name: Rustdoc build check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: true
+      - uses: actions-rs/toolchain@v1
+        with:
+          # No need to add `toolchain`, it will use `rust-toolchain` file instead
+          profile: minimal
+          components: rust-docs
+      - name: Build docs with no features
+        run: RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --no-default-features
+      - name: Build docs with --all-features
+        run: RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --all-features
+  test-flow:
+    name: cargo make ci-flow - Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
         with:
           submodules: true
       # Runs all services needed for testing
@@ -15,13 +68,11 @@ jobs:
         uses: sudo-bot/action-docker-compose@latest
         with:
           # https://docs.docker.com/compose/reference/overview/
-          cli-args: "-f docker-compose.harness.yml up -d --build"
+          cli-args: "-f docker-compose.harness.yml up -d --build adex-postgres adex-redis ganache-1 ganache-1337"
       - uses: actions-rs/toolchain@v1
         with:
           # No need to add `toolchain`, it will use `rust-toolchain` file instead
-          profile: default
-          override: true
-          components: clippy, rustfmt
+          profile: minimal
       - uses: davidB/rust-cargo-make@v1
       - name: Run `cargo make ci-flow`
         # Running cargo make doesn't successfully start `ganache`

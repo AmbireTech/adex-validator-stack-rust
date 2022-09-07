@@ -5,12 +5,16 @@ use primitives::{sentry::Pagination, spender::Spendable, Address, ChannelId};
 use super::{DbPool, PoolError};
 
 /// ```text
-/// INSERT INTO spendable (spender, channel_id, total, still_on_create2, created)
-/// values ('0xce07CbB7e054514D590a0262C93070D838bFBA2e', '0x061d5e2a67d0a9a10f1c732bca12a676d83f79663a396f7d87b3e30b9b411088', 10.00000000, 2.00000000, NOW());
+/// INSERT INTO spendable (spender, channel_id, total, created)
+/// values ('0xce07CbB7e054514D590a0262C93070D838bFBA2e', '0x061d5e2a67d0a9a10f1c732bca12a676d83f79663a396f7d87b3e30b9b411088', 10.00000000, NOW());
 /// ```
 pub async fn insert_spendable(pool: DbPool, spendable: &Spendable) -> Result<bool, PoolError> {
     let client = pool.get().await?;
-    let stmt = client.prepare("INSERT INTO spendable (spender, channel_id, total, still_on_create2, created) values ($1, $2, $3, $4, $5)").await?;
+    let stmt = client
+        .prepare(
+            "INSERT INTO spendable (spender, channel_id, total, created) values ($1, $2, $3, $4)",
+        )
+        .await?;
 
     let row = client
         .execute(
@@ -19,7 +23,6 @@ pub async fn insert_spendable(pool: DbPool, spendable: &Spendable) -> Result<boo
                 &spendable.spender,
                 &spendable.channel.id(),
                 &spendable.deposit.total,
-                &spendable.deposit.still_on_create2,
                 &Utc::now(),
             ],
         )
@@ -30,7 +33,7 @@ pub async fn insert_spendable(pool: DbPool, spendable: &Spendable) -> Result<boo
 }
 
 /// ```text
-/// SELECT spender, total, still_on_create2, channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce FROM spendable INNER JOIN channels ON channels.id = spendable.channel_id WHERE spender = $1 AND channel_id = $2
+/// SELECT spender, total, channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce FROM spendable INNER JOIN channels ON channels.id = spendable.channel_id WHERE spender = $1 AND channel_id = $2
 /// ```
 pub async fn fetch_spendable(
     pool: DbPool,
@@ -38,7 +41,7 @@ pub async fn fetch_spendable(
     channel_id: &ChannelId,
 ) -> Result<Option<Spendable>, PoolError> {
     let client = pool.get().await?;
-    let statement = client.prepare("SELECT spender, total, still_on_create2, spendable.created, channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce FROM spendable INNER JOIN channels ON channels.id = spendable.channel_id WHERE spender = $1 AND channel_id = $2").await?;
+    let statement = client.prepare("SELECT spender, total, spendable.created, channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce FROM spendable INNER JOIN channels ON channels.id = spendable.channel_id WHERE spender = $1 AND channel_id = $2").await?;
 
     let row = client.query_opt(&statement, &[spender, channel_id]).await?;
 
@@ -52,7 +55,7 @@ pub async fn get_all_spendables_for_channel(
     limit: u64,
 ) -> Result<(Vec<Spendable>, Pagination), PoolError> {
     let client = pool.get().await?;
-    let query = format!("SELECT spender, total, still_on_create2, spendable.created, channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce FROM spendable INNER JOIN channels ON channels.id = spendable.channel_id WHERE channel_id = $1 ORDER BY spendable.created ASC LIMIT {} OFFSET {}", limit, skip);
+    let query = format!("SELECT spender, total, spendable.created, channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce FROM spendable INNER JOIN channels ON channels.id = spendable.channel_id WHERE channel_id = $1 ORDER BY spendable.created ASC LIMIT {} OFFSET {}", limit, skip);
 
     let statement = client.prepare(&query).await?;
 
@@ -76,7 +79,7 @@ pub async fn get_all_spendables_for_channel(
     Ok((spendables, pagination))
 }
 
-static UPDATE_SPENDABLE_STATEMENT: &str = "WITH inserted_spendable AS (INSERT INTO spendable(spender, channel_id, total, still_on_create2, created) VALUES($1, $2, $3, $4, $5) ON CONFLICT ON CONSTRAINT spendable_pkey DO UPDATE SET total = $3, still_on_create2 = $4 WHERE spendable.spender = $1 AND spendable.channel_id = $2 RETURNING *) SELECT inserted_spendable.*, channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce FROM inserted_spendable INNER JOIN channels ON inserted_spendable.channel_id = channels.id";
+static UPDATE_SPENDABLE_STATEMENT: &str = "WITH inserted_spendable AS (INSERT INTO spendable(spender, channel_id, total, created) VALUES($1, $2, $3, $4) ON CONFLICT ON CONSTRAINT spendable_pkey DO UPDATE SET total = $3 WHERE spendable.spender = $1 AND spendable.channel_id = $2 RETURNING *) SELECT inserted_spendable.*, channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce FROM inserted_spendable INNER JOIN channels ON inserted_spendable.channel_id = channels.id";
 
 // Updates spendable entry deposit or inserts a new spendable entry if it doesn't exist
 pub async fn update_spendable(pool: DbPool, spendable: &Spendable) -> Result<Spendable, PoolError> {
@@ -90,7 +93,6 @@ pub async fn update_spendable(pool: DbPool, spendable: &Spendable) -> Result<Spe
                 &spendable.spender,
                 &spendable.channel.id(),
                 &spendable.deposit.total,
-                &spendable.deposit.still_on_create2,
                 &Utc::now(),
             ],
         )
@@ -117,6 +119,7 @@ mod test {
     use std::collections::HashMap;
 
     use primitives::{
+        config::GANACHE_CONFIG,
         spender::Spendable,
         test_util::DUMMY_CAMPAIGN,
         test_util::{ADVERTISER, CREATOR, FOLLOWER, GUARDIAN, GUARDIAN_2, PUBLISHER},
@@ -144,11 +147,14 @@ mod test {
             channel: DUMMY_CAMPAIGN.channel,
             deposit: Deposit {
                 total: UnifiedNum::from(100_000_000),
-                still_on_create2: UnifiedNum::from(500_000),
             },
         };
 
-        insert_channel(&database.pool, spendable.channel)
+        let channel_chain = GANACHE_CONFIG
+            .find_chain_of(DUMMY_CAMPAIGN.channel.token)
+            .expect("Channel token should be whitelisted in config!");
+        let channel_context = channel_chain.with_channel(spendable.channel);
+        insert_channel(&database.pool, &channel_context)
             .await
             .expect("Should insert Channel before creating spendable");
 
@@ -176,7 +182,6 @@ mod test {
             channel: DUMMY_CAMPAIGN.channel,
             deposit: Deposit {
                 total: UnifiedNum::from(100_000_000),
-                still_on_create2: UnifiedNum::from(500_000),
             },
         }
     }
@@ -190,8 +195,12 @@ mod test {
             .expect("Migrations should succeed");
 
         let channel = DUMMY_CAMPAIGN.channel;
+        let channel_chain = GANACHE_CONFIG
+            .find_chain_of(DUMMY_CAMPAIGN.channel.token)
+            .expect("Channel token should be whitelisted in config!");
+        let channel_context = channel_chain.with_channel(channel);
 
-        insert_channel(&database, channel)
+        insert_channel(&database, &channel_context)
             .await
             .expect("Should insert");
 
@@ -233,8 +242,12 @@ mod test {
             .expect("Migrations should succeed");
 
         let channel = DUMMY_CAMPAIGN.channel;
+        let channel_chain = GANACHE_CONFIG
+            .find_chain_of(DUMMY_CAMPAIGN.channel.token)
+            .expect("Channel token should be whitelisted in config!");
+        let channel_context = channel_chain.with_channel(channel);
 
-        insert_channel(&database, channel)
+        insert_channel(&database, &channel_context)
             .await
             .expect("Should insert");
 
@@ -250,10 +263,12 @@ mod test {
         for (address, spendable) in create_spendables.iter() {
             insert_spendable(database.pool.clone(), spendable)
                 .await
-                .expect(&format!(
-                    "Failed to insert spendable for {:?} with Spendable: {:?}",
-                    address, spendable
-                ));
+                .unwrap_or_else(|_| {
+                    panic!(
+                        "Failed to insert spendable for {:?} with Spendable: {:?}",
+                        address, spendable
+                    )
+                });
             // use sleep to make all spendables with different time
             // they will follow the order in which they were defined in the variable
             sleep(Duration::from_millis(100)).await;
@@ -303,7 +318,7 @@ mod test {
             let (spendables, pagination) =
                 get_all_spendables_for_channel(database.clone(), &channel.id(), skip, limit)
                     .await
-                    .expect(&format!("could not fetch spendables {}", debug_msg));
+                    .unwrap_or_else(|_| panic!("could not fetch spendables {}", debug_msg));
 
             pretty_assertions::assert_eq!(
                 &pagination,

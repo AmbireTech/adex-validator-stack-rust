@@ -14,19 +14,38 @@ analytics_maxtime = 20000
 heartbeat_time = 30000
 health_threshold_promilles = 950
 health_unsignable_promilles = 750
-propagation_timeout = 1000
+# 2 seconds
+# TODO: Check the POST /validator-message route performance, more than 1 second for timeout is a lot!
+propagation_timeout = 2000
 
 fetch_timeout = 5000
 all_campaigns_timeout = 5000
-channel_tick_timeout = 5000
+# for test_harness make it larger
+# Default: 5000
+channel_tick_timeout = 8000
 
 ip_rate_limit = { type = 'ip', timeframe = 1200000 }
-sid_rate_limit = { type = 'sid', timeframe = 0 }
 
-creators_whitelist = []
-validators_whitelist = []
-# Leader - 0x80690751969B234697e9059e04ed72195c3507fa
-admins = ['0x80690751969B234697e9059e04ed72195c3507fa']
+creators_whitelist = [
+    # CREATOR
+    '0xaCBaDA2d5830d1875ae3D2de207A1363B316Df2F',
+    # ADVERTISER
+    '0xDd589B43793934EF6Ad266067A0d1D4896b0dff0',
+    # ADVERTISER_2
+    '0x541b401362Ea1D489D322579552B099e801F3632',
+]
+validators_whitelist = [
+    # LEADER
+    '0x80690751969B234697e9059e04ed72195c3507fa',
+    # FOLLOWER
+    '0xf3f583AEC5f7C030722Fe992A5688557e1B86ef7',
+    # LEADER_2
+    '0x6B83e7D6B72c098d48968441e0d05658dc17Adb9'
+]
+admins = [
+    # LEADER
+    '0x80690751969B234697e9059e04ed72195c3507fa'
+]
 
 [platform]
 # This should be changed for tests and use the wiremock url
@@ -47,16 +66,13 @@ global_min_impression_price = '1000000'
 chain_id = 1
 rpc = 'http://localhost:8545'
 # Ganache Snapshot address
-outpace = '0x671b54359be2fa82aB05A5336EB8134F782B88Cd'
-# Ganache Snapshot address
-sweeper = '0xE37BA12D23e755138f7Ea8391551B773Cb2D8F5F'
+outpace = '0x26CBc2eAAe377f6Ac4b73a982CD1125eF4CEC96f'
 
-    [chain."Ganache #1".token."Mocked TOKEN 2"]
-    address = '0x704D76a8c31FbAafE2B7895b13A763c7487FC0D8' # checked
+    [chain."Ganache #1".token."Mocked TOKEN 1"]
+    address = '0x12a28f2bfBFfDf5842657235cC058242f40fDEa6' # checked
     precision = 18
-    # Minimum token units for the Create2 deposits to count
     # 1 * 10^18 = 1.0000 TOKEN
-    min_token_units_for_deposit = '1000000000000000000'
+    min_campaign_budget = '1000000000000000000'
     # multiplier = 10^12 - 10^18 (token precision) = 10^-6
     # min_validator_fee = 1 * 10^-6 = 0.000_001
     min_validator_fee = '1000000000000'
@@ -67,15 +83,12 @@ chain_id = 1337
 rpc = 'http://localhost:1337'
 # Ganache Snapshot address
 outpace = '0xAbc27d46a458E2e49DaBfEf45ca74dEDBAc3DD06'
-# Ganache Snapshot address
-sweeper = '0x7dD57C0324284102A757153E18F2Cb1ACdB7d2bD'
 
-    [chain."Ganache #1337".token."Mocked TOKEN"]
+    [chain."Ganache #1337".token."Mocked TOKEN 1337"]
     address = '0x2bcaf6968aec8a3b5126fbfab5fd419da6e8ad8e' # checked
     precision = 18
-    # Minimum token units for the Create2 deposits to count
     # 1 * 10^18 = 1.0000 TOKEN
-    min_token_units_for_deposit = '1000000000000000000'
+    min_campaign_budget = '1000000000000000000'
     # multiplier = 10^12 - 10^18 (token precision) = 10^-6
     # min_validator_fee = 1 * 10^-6 = 0.000_001
     min_validator_fee = '1000000000000'

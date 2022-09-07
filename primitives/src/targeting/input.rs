@@ -14,7 +14,7 @@ pub type Map = serde_json::Map<String, serde_json::Value>;
 
 pub mod field;
 
-#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 #[serde(untagged)]
 pub enum Get<G, V> {
     #[serde(skip_deserializing)]
@@ -113,7 +113,7 @@ impl GetField for Input {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct AdView {
     pub seconds_since_campaign_impression: u64,
@@ -136,7 +136,7 @@ impl GetField for AdView {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 /// Global scope, accessible everywhere
 pub struct Global {
@@ -216,7 +216,7 @@ pub mod campaign {
 
     pub type GetCampaign = Get<FullCampaign, Values>;
 
-    #[derive(Debug, Clone, Deserialize, PartialEq)]
+    #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
     #[serde(rename_all = "camelCase")]
     pub struct Values {
         pub advertiser_id: Address,
@@ -322,14 +322,14 @@ pub mod balances {
 
     pub type GetBalances = Get<Getter, Values>;
 
-    #[derive(Debug, Clone, Deserialize, PartialEq)]
+    #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
     #[serde(rename_all = "camelCase")]
     pub struct Values {
         pub campaign_total_spent: UnifiedNum,
         pub publisher_earned_from_campaign: UnifiedNum,
     }
 
-    #[derive(Debug, Clone, PartialEq)]
+    #[derive(Debug, Clone, PartialEq, Eq)]
     pub struct Getter {
         pub balances: UnifiedMap,
         pub(super) publisher_id: Address,

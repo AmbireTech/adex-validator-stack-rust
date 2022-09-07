@@ -2,16 +2,16 @@ use chrono::Utc;
 use tokio_postgres::types::ToSql;
 
 use primitives::{
-    balances::UncheckedState,
-    sentry::{MessageResponse, ValidatorMessage},
-    validator::{ApproveState, Heartbeat, MessageTypes, NewState},
+    balances::BalancesState,
+    sentry::{message::MessageResponse, validator_messages::ValidatorMessage},
+    validator::{ApproveState, Heartbeat, MessageType, MessageTypes, NewState},
     Channel, ChannelId, ValidatorId,
 };
 
 use super::{DbPool, PoolError};
 
 /// Inserts a new validator [`MessageTypes`] using the `from` [`ValidatorId`] and `received` at: [`Utc::now()`][Utc]
-pub async fn insert_validator_messages(
+pub async fn insert_validator_message(
     pool: &DbPool,
     channel: &Channel,
     from: &ValidatorId,
@@ -39,7 +39,7 @@ pub async fn get_validator_messages(
     pool: &DbPool,
     channel_id: &ChannelId,
     validator_id: &Option<ValidatorId>,
-    message_types: &[String],
+    message_types: &[MessageType],
     limit: u64,
 ) -> Result<Vec<ValidatorMessage>, PoolError> {
     let client = pool.get().await?;
@@ -69,7 +69,7 @@ pub async fn get_validator_messages(
 fn add_message_types_params<'a>(
     where_clauses: &mut Vec<String>,
     params: &mut Vec<&'a (dyn ToSql + Sync)>,
-    message_types: &'a [String],
+    message_types: &'a [MessageType],
 ) {
     let mut msg_prep = vec![];
     for message_type in message_types.iter() {
@@ -102,11 +102,11 @@ pub async fn latest_approve_state(
 /// Returns the latest [`NewState`] message for this [`Channel`] and the provided `state_root`.
 ///
 /// Ordered by: `received DESC`
-pub async fn latest_new_state(
+pub async fn latest_new_state<S: BalancesState>(
     pool: &DbPool,
     channel: &Channel,
     state_root: &str,
-) -> Result<Option<MessageResponse<NewState<UncheckedState>>>, PoolError> {
+) -> Result<Option<MessageResponse<NewState<S>>>, PoolError> {
     let client = pool.get().await?;
 
     let select = client.prepare("SELECT \"from\", msg, received FROM validator_messages WHERE channel_id = $1 AND \"from\" = $2 AND msg ->> 'type' = 'NewState' AND msg->> 'stateRoot' = $3 ORDER BY received DESC LIMIT 1").await?;
@@ -115,7 +115,7 @@ pub async fn latest_new_state(
         .await?;
 
     rows.get(0)
-        .map(MessageResponse::<NewState<UncheckedState>>::try_from)
+        .map(MessageResponse::<NewState<S>>::try_from)
         .transpose()
         .map_err(PoolError::Backend)
 }

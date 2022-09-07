@@ -11,7 +11,7 @@ use std::cmp::{max, min};
 
 pub type Result = std::result::Result<Option<(Address, UnifiedNum)>, Error>;
 
-/// If None is returned this means that the targeting rules evaluation has set `show = false`
+/// If `None` is returned this means that the targeting rules evaluation has set `show = false`
 pub fn get_payout(
     logger: &Logger,
     campaign: &Campaign,
@@ -50,7 +50,7 @@ pub fn get_payout(
                         ad_slot_type: ad_unit.map(|u| u.ad_type.clone()).unwrap_or_default(),
                         publisher_id: *publisher,
                         country: session.country.clone(),
-                        event_type: event_type,
+                        event_type,
                         seconds_since_epoch: Utc::now(),
                         user_agent_os: session.os.clone(),
                         user_agent_browser_family: None,
@@ -65,9 +65,7 @@ pub fn get_payout(
                 let mut output = Output {
                     show: true,
                     boost: 1.0,
-                    price: vec![(event_type.to_string(), pricing.min)]
-                        .into_iter()
-                        .collect(),
+                    price: [(event_type, pricing.min)].into_iter().collect(),
                 };
 
                 let on_type_error = |error, rule| error!(logger, "Rule evaluation error for {:?}", campaign.id; "error" => ?error, "rule" => ?rule);
@@ -75,7 +73,7 @@ pub fn get_payout(
                 eval_with_callback(&targeting_rules, &input, &mut output, Some(on_type_error));
 
                 if output.show {
-                    let price = match output.price.get(event_type.as_str()) {
+                    let price = match output.price.get(&event_type) {
                         Some(output_price) => max(pricing.min, min(pricing.max, *output_price)),
                         None => max(pricing.min, pricing.max),
                     };

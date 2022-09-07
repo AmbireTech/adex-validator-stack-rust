@@ -1,27 +1,20 @@
-# AdEx Validator Stack in Rust [![CI](https://github.com/AdExNetwork/adex-validator-stack-rust/workflows/Continuous%20Integration/badge.svg)](https://github.com/AdExNetwork/adex-validator-stack-rust/actions)
-
-The Rust implementation of the Validator Stack
-
-Reference implementation of the [AdEx validator stack](https://github.com/adexnetwork/adex-protocol#validator-stack-platform).
+# Ambire AdEx Validator Stack [![CI](https://github.com/AdExNetwork/adex-validator-stack-rust/workflows/Continuous%20Integration/badge.svg)](https://github.com/AdExNetwork/adex-validator-stack-rust/actions)
 
 Components:
 
 * [Sentry](#sentry)
 * [Validator worker](#validator-worker)
-* Adapter - Ethereum & Dummy (for testing) Adapters
-* AdView manager
+* [Adapter](./adapter/README.md) - Ethereum & Dummy (for testing) Adapters
+* [AdView manager](./adview-manager/README.md)
 
 ## Local & Testing setup
 
 Requirements:
 
 - Rust
-
-  Check the [`rust-toolchain`](./rust-toolchain) file for specific version of rust.
+  - We target the `stable` version of the Rust compiler.
   - [`cargo-make`](https://github.com/sagiegurari/cargo-make)
-- Docker
-- Node 14 (LTS) & npm
-    Used for running a local Ethereum node with `ganache-cli` for automated tests in the `Ethereum Adapter` ([adapter/src/ethereum.rs](./adapter/src/ethereum.rs), also check [scripts/ethereum.sh](./scripts/ethereum.sh))
+- Docker & Docker-compose
 
 #### Linux
 
@@ -30,17 +23,25 @@ Requirements:
 
 ## Sentry
 
-`Sentry` is the REST API that the [`Validator worker`](#validator-worker) uses for storing and retrieving information.
-We need two services to be able to run `Sentry`: `Postgres` and `Redis`.
+`Sentry` is the REST API that the [`Validator worker`](#validator-worker)
+uses for storing and retrieving information.
 
-### Running Postgres
+Two services are needed to run `Sentry`: `Postgres` and `Redis`.
+
+The easiest way to run these services locally is by using the provided `docker-compose` file:
+
+`docker-compose -f docker-compose.harness.yml up -d adex-redis adex-postgres`
+
+If you want to run them manually without `docker-compose`:
+
+#### Running Postgres
 
 `docker run --rm --name adex-validator-postgres -e POSTGRES_PASSWORD=postgres -d -p 5432:5432 -v $HOME/docker/volumes/postgres:/var/lib/postgresql/data postgres`
 
 - `$HOME/docker/volumes/postgres` - your local storage for postgres (persist the data when we remove the container)
-- `POSTGRES_PASSWORD=postgres` - the password of `postgres` user
+- `POSTGRES_PASSWORD=postgres` - the password of the default `postgres` user
 
-**NOTE:** Additionally you must setup 2 databases - `sentry_leader` & `sentry_follower` in order for the provided examples bellow to work.
+**NOTE:** Additionally you must setup 2 databases - `sentry_leader` & `sentry_follower` in order for the provided examples below to work. Postgres comes with an environment variable `POSTGRES_DB` that you can use to change the default `postgres` database, but there is currently no way to create multiple using the official `postgres` image.
 
 ### Running Redis
 
@@ -56,73 +57,107 @@ cargo run -p sentry -- --help
 
 Starting the Sentry API in will always run migrations, this will make sure the database is always up to date with the latest migrations, before starting and exposing the web server.
 
-In `development` ( [`ENV` environment variable](#environment-variables) ) it will seed the database as well.
+By default, we use the `development` environment ( [`ENV` environment variable](#environment-variables) ) ~~as it will also seed the database~~ (seeding is disabled, see #514).
 
-#### Using the `Ethereum Adapter`
+To enable TLS for the sentry server you need to pass both `--privateKeys` and
+`--certificates` cli options (paths to `.pem` files) otherwise the cli will
+exit with an error.
 
-The password for the Keystore file can be set using the [environment variable `KEYSTORE_PWD`](#adapter).
+For full list of available addresses see [primitives/src/test_util.rs#L39-L118](./primitives/src/test_util.rs#L39-L118)
 
-- Leader
-    ```bash
-    POSTGRES_DB="sentry_leader" PORT=8005 KEYSTORE_PWD=adexvalidator cargo run -p sentry -- \
-        --adapter ethereum \
-        --keystoreFile ./adapter/resources/keystore.json \
-        ./docs/config/dev.toml
-    ```
+#### Using the `Ethereum` adapter
 
-- Follower
-    ```bash
-    POSTGRES_DB="sentry_follower" PORT=8006 KEYSTORE_PWD=adexvalidator cargo run -p sentry -- \
-        --adapter ethereum \
-        --keystoreFile ./adapter/resources/keystore.json
-        ./docs/config/dev.toml
-    ```
+The password for the keystore file can be set using the [`KEYSTORE_PWD` environment variable](#adapter).
+These examples use the Leader and Follower addresses for testing locally with
+`ganache` and the production configuration of the validator.
 
-#### Using the `Dummy Adapter`
+##### Leader (`0x80690751969B234697e9059e04ed72195c3507fa`)
+
+Sentry API will be accessible at `localhost:8005`
+
+```bash
+IP_ADDR=127.0.0.1 REDIS_URL="redis://127.0.0.1:6379/1" \
+POSTGRES_DB="sentry_leader" PORT=8005 KEYSTORE_PWD=ganache0 \
+cargo run -p sentry -- \
+    --adapter ethereum \
+    --keystoreFile ./adapter/tests/resources/0x80690751969B234697e9059e04ed72195c3507fa_keystore.json \
+    ./docs/config/ganache.toml
+```
+
+##### Follower (`0xf3f583AEC5f7C030722Fe992A5688557e1B86ef7`)
+
+Sentry API will be accessible at `localhost:8006`
+
+```bash
+IP_ADDR=127.0.0.1 REDIS_URL="redis://127.0.0.1:6379/2" \
+POSTGRES_DB="sentry_follower" PORT=8006 KEYSTORE_PWD=ganache1 cargo run -p sentry -- \
+    --adapter ethereum \
+    --keystoreFile ./adapter/tests/resources/0xf3f583AEC5f7C030722Fe992A5688557e1B86ef7_keystore.json \
+    ./docs/config/ganache.toml
+```
+
+#### Using the `Dummy` adapter
+
+Using the dummy adapter you get access to additional route
+for adding deposits to the dummy adapter. The authenticated address
+is used to set the deposit in the adapter for the given Chain id.
+
+##### `POST /v5/channel/dummy-deposit` (auth required)
+
+Request body (`JSON`):
+
+```json
+{
+    "channel": { "leader": "0x000..", ...},
+    "deposit": { "total": "10000000" }
+}
+```
 
 **Dummy** identities:
 
-- Leader: `ce07CbB7e054514D590a0262C93070D838bFBA2e`
+##### Leader (`0x80690751969B234697e9059e04ed72195c3507fa`)
 
 ```bash
-    POSTGRES_DB="sentry_leader" PORT=8005 cargo run -p sentry -- \
-        --adapter dummy \
-        --dummyIdentity ce07CbB7e054514D590a0262C93070D838bFBA2e \
-        ./docs/config/dev.toml
+IP_ADDR=127.0.0.1 REDIS_URL="redis://127.0.0.1:6379/1" \
+POSTGRES_DB="sentry_leader" PORT=8005 cargo run -p sentry -- \
+    --adapter dummy \
+    --dummyIdentity 0x80690751969B234697e9059e04ed72195c3507fa \
+    ./docs/config/ganache.toml
 ```
-- Follower: `c91763d7f14ac5c5ddfbcd012e0d2a61ab9bded3`
+##### Follower (`0xf3f583AEC5f7C030722Fe992A5688557e1B86ef7`)
 
 ```bash
-    POSTGRES_DB="sentry_follower" PORT=8006 cargo run -p sentry -- \
-        --adapter dummy \
-        --dummyIdentity c91763d7f14ac5c5ddfbcd012e0d2a61ab9bded3 \
-        ./docs/config/dev.toml
+IP_ADDR=127.0.0.1 REDIS_URL="redis://127.0.0.1:6379/2" \
+POSTGRES_DB="sentry_follower" PORT=8006 cargo run -p sentry -- \
+    --adapter dummy \
+    --dummyIdentity 0xf3f583AEC5f7C030722Fe992A5688557e1B86ef7 \
+    ./docs/config/ganache.toml
 ```
-
-For full list, check out [primitives/src/util/tests/prep_db.rs#L29-L43](./primitives/src/util/tests/prep_db.rs#L29-L43)
 
 #### Environment variables
 
-- `ENV` - `production` or `development`; *default*: `development` - passing this env. variable will use the default configuration paths - [`docs/config/dev.toml`](./docs/config/dev.toml) (for `development`) or [`docs/config/prod.toml`](./docs/config/prod.toml) (for `production`). Otherwise you can pass your own configuration file path to the binary (check `cargo run -p sentry --help` for more information). In `development` it will make sure Sentry to seed the database.
+- `ENV` - `production` or `development`; *default*: `development` - passing this env. variable will use the default configuration paths - [`docs/config/ganache.toml`](./docs/config/ganache.toml) (for `development`) or [`docs/config/prod.toml`](./docs/config/prod.toml) (for `production`). Otherwise you can pass your own configuration file path to the binary (check `cargo run -p sentry --help` for more information). ~~In `development` it will make sure Sentry to seed the database~~ (seeding is disabled, see #514).
 - `PORT` - *default*: `8005` - The local port that Sentry API will be accessible at
 - `IP_ADDR` - *default*: `0.0.0.0` - the IP address that the API should be listening to
-- `ANALYTICS_RECORDER` - accepts any non-zero value - whether or not to start the `Analytics recorder` that will track analytics stats for payout events (`IMPRESSION` & `CLICK`)
+
 ##### Adapter
-- `KEYSTORE_PWD` - Password for the `Keystore file`, only available when using `Ethereum Adapter` (`--adapter ethereum`)
+
+- `KEYSTORE_PWD` - Password for the `Keystore file`, only available when using `Ethereum` adapter (`--adapter ethereum`)
 
 ##### Redis
+
 - `REDIS_URL` - *default*: `redis://127.0.0.1:6379`
 
 ##### Postgres
+
 - `POSTGRES_HOST` - *default*: `localhost`
 - `POSTGRES_USER` - *default*: `postgres`
 - `POSTGRES_PASSWORD` - *default*: `postgres`
 - `POSTGRES_DB` - *default*: `user` name - Database name in Postgres to be used for this instance
 - `POSTGRES_PORT` - *default*: `5432`
 
-#####
 
-### Running the Validator Worker
+### Validator worker
 
 For a full list of all available CLI options on the Validator worker run `--help`:
 
@@ -130,90 +165,100 @@ For a full list of all available CLI options on the Validator worker run `--help
 cargo run -p validator_worker -- --help
 ```
 
-#### Using the `Ethereum Adapter`
-TODO: Update Keystore file and Keystore password for Leader/Follower as they are using the same at the moment.
-
+#### Using the `Ethereum` adapter
 The password for the Keystore file can be set using the environment variable `KEYSTORE_PWD`.
 
-- Leader
-    Assuming you have [Sentry API running](#running-sentry-rest-api) for the **Leader** on port `8005`:
+##### Validator Leader (`0x80690751969B234697e9059e04ed72195c3507fa`)
+Assuming you have [Sentry API running](#running-sentry-rest-api) for the **Leader** on port `8005`:
 
-    ```bash
-    KEYSTORE_PWD=adexvalidator cargo run -p validator_worker -- \
-        --adapter ethereum \
-        --keystoreFile ./adapter/resources/keystore.json \
-        --sentryUrl http://127.0.0.1:8005 \
-        ./docs/config/dev.toml
-    ```
+```bash
+KEYSTORE_PWD=ganache0 cargo run -p validator_worker -- \
+    --adapter ethereum \
+    --keystoreFile ./adapter/tests/resources/0x80690751969B234697e9059e04ed72195c3507fa_keystore.json \
+    --sentryUrl http://127.0.0.1:8005 \
+    ./docs/config/ganache.toml
+```
 
-- Follower
+##### Validator Follower
 
-    Assuming you have [Sentry API running](#running-sentry-rest-api) for the **Follower** on port `8006`:
+Assuming you have [Sentry API running](#running-sentry-rest-api) for the **Follower** on port `8006`:
 
-    ```bash
-    KEYSTORE_PWD=adexvalidator cargo run -p validator_worker -- \
-        --adapter ethereum \
-        --keystoreFile ./adapter/resources/keystore.json \
-        --sentryUrl http://127.0.0.1:8006 \
-        ./docs/config/dev.toml
-    ```
+```bash
+KEYSTORE_PWD=ganache1 cargo run -p validator_worker -- \
+    --adapter ethereum \
+    --keystoreFile ./adapter/tests/resources/0xf3f583AEC5f7C030722Fe992A5688557e1B86ef7_keystore.json \
+    --sentryUrl http://127.0.0.1:8006 \
+    ./docs/config/ganache.toml
+```
 
-#### Using the `Dummy Adapter`
-- Leader: `ce07CbB7e054514D590a0262C93070D838bFBA2e`
+#### Using the `Dummy` adapter
 
-    Assuming you have [Sentry API running](#running-sentry-rest-api) for the **Leader** on port `8005`:
+##### Validator Leader (`0x80690751969B234697e9059e04ed72195c3507fa`)
 
-    ```bash
-    cargo run -p validator_worker -- \
-        --adapter dummy \
-        --dummyIdentity ce07CbB7e054514D590a0262C93070D838bFBA2e \
-        --sentryUrl http://127.0.0.1:8005 \
-        ./docs/config/dev.toml
-    ```
+Assuming you have [Sentry API running](#running-sentry-rest-api) for the **Leader** on port `8005`:
 
-- Follower: `c91763d7f14ac5c5ddfbcd012e0d2a61ab9bded3`
+```bash
+cargo run -p validator_worker -- \
+    --adapter dummy \
+    --dummyIdentity 0x80690751969B234697e9059e04ed72195c3507fa \
+    --sentryUrl http://127.0.0.1:8005 \
+    ./docs/config/ganache.toml
+```
 
-    Assuming you have [Sentry API running](#running-sentry-rest-api) for the **Follower** on port `8006`:
+##### Follower: `0xf3f583AEC5f7C030722Fe992A5688557e1B86ef7`
 
-    ```bash
-    cargo run -p validator_worker -- \
-        --adapter dummy \
-        --dummyIdentity c91763d7f14ac5c5ddfbcd012e0d2a61ab9bded3 \
-        --sentryUrl http://127.0.0.1:8006 \
-        ./docs/config/dev.toml
-    ```
+Assuming you have [Sentry API running](#running-sentry-rest-api) for the **Follower** on port `8006`:
+
+```bash
+cargo run -p validator_worker -- \
+    --adapter dummy \
+    --dummyIdentity 0xf3f583AEC5f7C030722Fe992A5688557e1B86ef7 \
+    --sentryUrl http://127.0.0.1:8006 \
+    ./docs/config/ganache.toml
+```
 
 #### Environment variables
 
-- `ENV`: `production` or `development` ( *default* ) - passing this env. variable will use the default configuration paths - [`docs/config/dev.toml`](./docs/config/dev.toml) (for `development`) or [`docs/config/prod.toml`](./docs/config/prod.toml) (for `production`). Otherwise you can pass your own configuration file path to the binary (check `cargo run -p sentry --help` for more information). In `development` it will make sure Sentry to seed the database.
-- `PORT` - The local port that Sentry API will accessible at
+- `ENV` - `production` or `development`; *default*: `development` - passing this env. variable will use the default configuration paths - [`docs/config/ganache.toml`](./docs/config/ganache.toml) (for `development`) or [`docs/config/prod.toml`](./docs/config/prod.toml) (for `production`). Otherwise you can pass your own configuration file path to the binary (check `cargo run -p sentry --help` for more information).
 
 ##### Adapter
+
 - `KEYSTORE_PWD` - Password for the `Keystore file`, only available when using `Ethereum Adapter` (`--adapter ethereum`)
 
 ## Development environment
 
-We use [`cargo-make`](https://github.com/sagiegurari/cargo-make#overview) for running automated checks (tests, builds, formatting, code linting, etc.) and building the project locally
-as well as on our Continuous Integration (CI). For a complete list of out-of-the-box commands you can check
-[Makefile.stable.toml](https://github.com/sagiegurari/cargo-make/blob/master/src/lib/Makefile.stable.toml).
+We use [`cargo-make`][cargo-make overview] for running automated checks
+(tests, builds, formatting, code linting, etc.) and building the project locally
+as well as on our Continuous Integration (CI).
+
+For a complete list of out-of-the-box commands you can check out the [`Predefined Makefiles`](https://github.com/sagiegurari/cargo-make#usage-predefined-makefiles)
+while locally defined commands can be found in the `Makefiles.toml` in each crate directory.
 
 ### Local development
 
-Locally it's enough to ensure that the default development command is executing successfully:
+It's enough to ensure that the default development command is executing successfully:
 
 ```bash
 cargo make
 ```
 
-It will run `rustfmt` for you as well as `clippy` (it will fail on warnings) and it will run all the tests thanks to `cargo` (doc tests, unit tests, integration tests, etc.).
+It will format your code using `rustfmt` and will perform `clippy` checks (it will fail on warnings).
+Thanks to `cargo` it will run all the tests (doc tests, unit tests, integration tests, etc.).
 
-This will also run the [Automated tests](#automated-tests), so you must have `Redis` & `Postgres` running.
+Using the provided `docker-compose.harness.yml` setup [`cargo-make`][cargo-make overview] will run
+all the required services for the specific crate/application before executing the tests.
 
-#### Automated tests
+[cargo-make overview]: https://github.com/sagiegurari/cargo-make#overview
 
-This requires [`cargo-make`](https://github.com/sagiegurari/cargo-make#overview) and since we have integration tests that require `Redis` ([see `Running Redis`](#running-redis)) & `Postgres` (see [`Running Postgres`](#running-postgres)), you need to be running those in order to run the automated tests:
 
-`cargo make test`
 
-You can relate to the [`Makefile.stable.toml`](https://github.com/sagiegurari/cargo-make/blob/master/src/lib/Makefile.stable.toml)
-for more commands and cargo-make as a whole.
+### License
+
+This project is licensed under the [AGPL-3.0 license](./LICENSE)
+
+### Contribution
+
+Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in AdEx Validator by you, shall be licensed as AGPL-3.0, without any additional terms or conditions.
+
+#### Sign the CLA
+When you contribute to a AdEx Validator open source project on GitHub with a new pull request, a bot will evaluate whether you have signed the CLA. If required, the bot will comment on the pull request, including a link to this system to accept the agreement. 

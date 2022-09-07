@@ -1,4 +1,8 @@
-use crate::UnifiedNum;
+use crate::{
+    sentry::{CLICK, IMPRESSION},
+    unified_num::FromWhole,
+    UnifiedNum,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::{value::Value as SerdeValue, Number};
 use std::{
@@ -453,7 +457,7 @@ impl Value {
     }
 }
 
-/// The UnifiedNum can be extracted from the DSL either String or UnifiedNum
+/// The UnifiedNum can be expressed in the DSL either with a String or UnifiedNum
 impl TryFrom<Value> for UnifiedNum {
     type Error = Error;
     fn try_from(value: Value) -> Result<Self, Self::Error> {
@@ -461,7 +465,19 @@ impl TryFrom<Value> for UnifiedNum {
             Value::String(string) => UnifiedNum::from_str(&string).map_err(|_| Error::TypeError),
             Value::UnifiedNum(unified) => Ok(unified),
             Value::Number(number) => {
-                UnifiedNum::from_str(&number.to_string()).map_err(|_| Error::TypeError)
+                if number.is_u64() {
+                    // a whole number
+                    let whole_number = number.as_u64().ok_or(Error::TypeError)?;
+
+                    UnifiedNum::from_whole_opt(whole_number).ok_or(Error::TypeError)
+                } else if number.is_f64() {
+                    // a floating point whole number
+                    let whole_number = number.as_f64().ok_or(Error::TypeError)?;
+
+                    UnifiedNum::from_whole_opt(whole_number).ok_or(Error::TypeError)
+                } else {
+                    Err(Error::TypeError)
+                }
             }
             _ => Err(Error::TypeError),
         }
@@ -992,7 +1008,7 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
                         .try_unified()?;
 
                     // we do not care about any other old value
-                    output.price.insert("IMPRESSION".to_string(), price);
+                    output.price.insert(IMPRESSION, price);
                 }
                 "price.CLICK" => {
                     let price = rule
@@ -1001,7 +1017,7 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
                         .try_unified()?;
 
                     // we do not care about any other old value
-                    output.price.insert("CLICK".to_string(), price);
+                    output.price.insert(CLICK, price);
                 }
                 _ => return Err(Error::UnknownVariable),
             }
@@ -1224,7 +1240,7 @@ fn math_operator(lhs: Number, rhs: Number, ops: MathOperator) -> Result<Number, 
 }
 
 #[cfg(feature = "postgres")]
-pub mod postgres {
+mod postgres {
     use super::*;
     use bytes::BytesMut;
     use std::error::Error;

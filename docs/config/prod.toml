@@ -20,46 +20,101 @@ fetch_timeout = 10000
 all_campaigns_timeout = 10000
 channel_tick_timeout = 10000
 
-ip_rate_limit = { type = 'ip', timeframe = 1200000 }
-sid_rate_limit = { type = 'sid', timeframe = 0 }
+# 2h
+ip_rate_limit = { type = 'ip', timeframe = 7200000 }
 
 creators_whitelist = []
 validators_whitelist = []
+# Galya (for analytics)
 admins = ['0x5d6A3F1AD7b124ecDFDf4841D9bB246eD5fBF04c']
 
-[[token_address_whitelist]]
-# DAI
-# Polygon: https://polygonscan.com/token/0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063
-address = '0x6b175474e89094c44da98b954eedeac495271d0f'
-# 1 * 10^-10 = 0.0_000_000_001
-min_token_units_for_deposit = '100000000'
-min_validator_fee = '100000000'
-precision = 18
+[platform]
+# This should be changed for tests and use the wiremock url
+url = "https://platform.adex.network"
+# 20 minutes in milliseconds
+keep_alive_interval = 1200000
 
-[[token_address_whitelist]]
-# SAI
-address = '0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359'
-# 1 * 10^-10 = 0.0_000_000_001
-min_token_units_for_deposit = '100000000'
-min_validator_fee = '100000000'
-precision = 18
+[limits.units_for_slot]
+# The maximum number of campaigns a publisher can earn from
+# This will limit the returned Campaigns to the set number
+max_campaigns_earning_from = 25
 
-[[token_address_whitelist]]
-# USDT
-# Polygon: https://polygonscan.com/token/0xc2132d05d31c914a87c6611c10748aeb04b58e8f
-address = '0xdac17f958d2ee523a2206206994597c13d831ec7'
-# 1.000_000
-min_token_units_for_deposit = '1000000'
-# 0.001
-min_validator_fee = '1000'
-precision = 6
+# 0.01 (UnifiedNum) per 1000 impressions
+# 1_000 * (per) 1_000 / 10^8 = 0.01
+global_min_impression_price = '1000000'
 
-[[token_address_whitelist]]
-# USDC
-# Polygon: https://polygonscan.com/token/0x2791bca1f2de4661ed88a30c99a7a9449aa84174
-address = '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48'
-# 1.000_000
-min_token_units_for_deposit = '100000000'
-# 0.001
-min_validator_fee = '1000'
-precision = 6
+[chain."Ethereum Mainnet"]
+chain_id = 1
+rpc = 'https://mainnet.infura.io/v3/' # todo
+outpace = '0x0000000000000000000000000000000000000000' # todo
+
+    [chain."Ethereum Mainnet".token."DAI"]
+    address = '0x6b175474e89094c44da98b954eedeac495271d0f' # checked
+    precision = 18
+    # 1 * 10^18 = 1.0000 TOKEN
+    min_campaign_budget = '1000000000000000000' # todo
+    # multiplier = 10^12 - 10^18 (token precision) = 10^-6
+    # 1 * 10^-6 = 0.000_001
+    min_validator_fee = '1000000000000' # todo
+
+    [chain."Ethereum Mainnet".token."SAI"]
+    address = '0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359' # checked
+    precision = 18
+    # multiplier = 10^8 - 10^18 (token precision) = 10^-10
+    # 1 * 10^-10 = 0.0_000_000_001
+    min_campaign_budget = '100000000' # todo
+    # multiplier = 10^8 - 10^18 (token precision) = 10^-10
+    # 1 * 10^-10 = 0.0_000_000_001
+    min_validator_fee = '100000000' # todo
+
+    [chain."Ethereum Mainnet".token."USDT"]
+    address = '0xdac17f958d2ee523a2206206994597c13d831ec7' # checked
+    precision = 6
+    # 1 * 10^6 = 1.0000 TOKEN
+    min_campaign_budget = '1000000' # todo
+    # 1 * 10^-6 = 0.000_001
+    min_validator_fee = '1' # todo
+
+    [chain."Ethereum Mainnet".token."USDC"]
+    # Polygon: https://polygonscan.com/token/0x2791bca1f2de4661ed88a30c99a7a9449aa84174
+    address = '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48' # checked
+    precision = 6
+    # 1 * 10^6 = 1.0000 TOKEN
+    min_campaign_budget = '1000000' # todo
+    # 1 * (10^3 - 10^6) = 0.001
+    min_validator_fee = '1000' # todo
+
+
+[chain."Polygon Mainnet"]
+chain_id = 137
+rpc = 'https://rpc-mainnet.maticvigil.com/' # todo
+outpace = '0x0000000000000000000000000000000000000000' # todo
+
+    [chain."Polygon Mainnet".token."DAI"]
+    # https://polygonscan.com/token/0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063
+    address = '0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063' # checked
+    precision = 18
+    # 1 * 10^18 = 1.0000 TOKEN
+    min_campaign_budget = '1000000000000000000' # todo
+    # multiplier = 10^12 - 10^18 (token precision) = 10^-6
+    # 1 * 10^-6 = 0.000_001
+    min_validator_fee = '1000000000000' # todo
+
+    [chain."Polygon Mainnet".token."USDT"]
+    # https://polygonscan.com/token/0xc2132d05d31c914a87c6611c10748aeb04b58e8f
+    address = '0xc2132d05d31c914a87c6611c10748aeb04b58e8f' # checked
+    precision = 6
+    # 1 * 10^6 = 1.0000 TOKEN
+    min_campaign_budget = '1000000' # todo
+    # 1 * 10^-6 = 0.000_001
+    min_validator_fee = '1' # todo
+
+    [chain."Polygon Mainnet".token."USDC"]
+    # https://polygonscan.com/token/0x2791bca1f2de4661ed88a30c99a7a9449aa84174
+    address = '0x2791bca1f2de4661ed88a30c99a7a9449aa84174' # checked
+    precision = 6
+    # 1 * 10^6 = 1.0000 TOKEN
+    min_campaign_budget = '1000000' # todo
+    # 1 * (10^3 - 10^6) = 0.001
+    min_validator_fee = '1000' # todo
+

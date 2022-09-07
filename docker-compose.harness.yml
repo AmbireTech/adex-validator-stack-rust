@@ -12,7 +12,11 @@ services:
       POSTGRES_HOST: 'localhost'
       POSTGRES_USER: 'postgres'
       POSTGRES_PASSWORD: 'postgres'
-      POSTGRES_MULTIPLE_DATABASES: harness_leader,harness_follower,sentry_leader,primitives
+      # harness_* databases are used by the `test_harness` crate for testing
+      # `sentry_leader` is the default database used by `sentry` for running tests and the leader
+      # `sentry_leader` is for running the local follower when maunally testing
+      # `primitives` is used for running tests in the `primitives` crate
+      POSTGRES_MULTIPLE_DATABASES: harness_leader,harness_follower,sentry_leader,sentry_follower,primitives
     networks:
       - adex-external
 
@@ -52,6 +56,29 @@ services:
       - "1337:8545"
     environment:
       CHAIN_ID: 1337
+    networks:
+      - adex-external
+
+  # Service used to bechmark the sentry application in release mode
+  # It uses the dummy adapter and the Leader
+  sentry-dummy-leader-release:
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: Dockerfile-sentry
+    container_name: adex-sentry-dummy-leader-release
+    ports:
+      - "8005:8005"
+    environment:
+      ENV: development
+      IP_ADDR: 0.0.0.0
+      PORT: 8005
+      POSTGRES_DB: sentry_leader
+      POSTGRES_HOST: adex-postgres
+      REDIS_HOST: adex-redis
+      ADAPTER: dummy
+      DUMMY_IDENTITY: '0x80690751969B234697e9059e04ed72195c3507fa'
+      REDIS_URL: redis://adex-redis:6379/0
     networks:
       - adex-external
 

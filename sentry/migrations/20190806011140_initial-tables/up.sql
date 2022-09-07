@@ -6,6 +6,7 @@ CREATE TABLE channels (
     token varchar(42) NOT NULL,
     -- Using varchar for U256 for simplicity
     nonce varchar(78) NOT NULL,
+    chain_id integer NOT NULL,
     -- In order to be able to order the channels for the `GET channel` request
     created timestamp(2) with time zone NOT NULL,
     -- Do not rename the Primary key constraint (`channels_pkey`)!
@@ -42,7 +43,6 @@ CREATE TABLE spendable (
     spender varchar(42) NOT NULL,
     channel_id varchar(66) NOT NULL,
     total bigint NOT NULL,
-    still_on_create2 bigint NOT NULL,
     created timestamp(2) with time zone NOT NULL,
     PRIMARY KEY (spender, channel_id),
     CONSTRAINT fk_spendable_channel_id FOREIGN KEY (channel_id) REFERENCES channels (id) ON DELETE RESTRICT ON UPDATE RESTRICT
@@ -72,7 +72,7 @@ CREATE TABLE accounting (
     side AccountingSide NOT NULL,
     "address" varchar(42) NOT NULL,
     amount bigint NOT NULL,
-    updated timestamp(2) with time zone DEFAULT NULL NULL,
+    updated timestamp(2) with time zone DEFAULT NULL,
     created timestamp(2) with time zone NOT NULL,
     -- Do not rename the Primary key constraint (`accounting_pkey`)!
     PRIMARY KEY (channel_id, side, "address"),
@@ -93,9 +93,10 @@ CREATE TABLE analytics (
     hostname varchar(255) NOT NULL,
     country varchar(255) NOT NULL,
     os_name varchar(255) NOT NULL,
+    chain_id integer NOT NULL,
     event_type varchar(255) NOT NULL,
     payout_amount bigint NOT NULL DEFAULT 0,
     payout_count integer NOT NULL DEFAULT 0,
     -- Do not rename the Primary key constraint (`analytics_pkey`)!
-    PRIMARY KEY (campaign_id, "time", ad_unit, ad_slot, ad_slot_type, advertiser, publisher, hostname, country, os_name, event_type)
+    PRIMARY KEY (campaign_id, "time", ad_unit, ad_slot, ad_slot_type, advertiser, publisher, hostname, country, os_name, chain_id, event_type)
 );
