@@ -1,14 +1,20 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, sync::Arc};
 
-use adapter::client::Locked;
+use axum::{
+    extract::TypedHeader,
+    headers::UserAgent,
+    http::header::{HeaderMap, HeaderName},
+    Extension, Json,
+};
 use chrono::Utc;
 use futures::future::try_join_all;
-use hyper::{header::USER_AGENT, Body, Request, Response};
-use hyper::{
-    header::{HeaderName, CONTENT_TYPE},
-    StatusCode,
-};
 use once_cell::sync::Lazy;
+use reqwest::Url;
+use serde::{Deserialize, Serialize};
+use slog::{debug, error, warn, Logger};
+use woothee::{parser::Parser, woothee::VALUE_UNKNOWN};
+
+use adapter::client::Locked;
 use primitives::{
     sentry::IMPRESSION,
     supermarket::units_for_slot::response,
@@ -16,17 +22,14 @@ use primitives::{
     targeting::{eval_with_callback, get_pricing_bounds, input, input::Input, Output},
     AdSlot, AdUnit, Address, Campaign, Config, UnifiedNum, ValidatorId,
 };
-use reqwest::Url;
-use serde::{Deserialize, Serialize};
-use slog::{debug, error, warn, Logger};
-use woothee::{parser::Parser, woothee::VALUE_UNKNOWN};
 
 use crate::{
     db::{
         accounting::{get_accounting, Side},
         units_for_slot_get_campaigns, CampaignRemaining, DbPool,
     },
-    Application, ResponseError,
+    response::ResponseError,
+    Application,
 };
 
 pub(crate) static CLOUDFLARE_IPCOUNTRY_HEADER: Lazy<HeaderName> =
@@ -43,36 +46,15 @@ pub struct RequestBody {
     pub deposit_assets: Option<HashSet<Address>>,
 }
 
-pub(crate) fn not_found() -> Response<Body> {
-    Response::builder()
-        .status(StatusCode::NOT_FOUND)
-        .body(Body::empty())
-        .expect("Not Found response should be valid")
-}
-
-pub(crate) fn service_unavailable() -> Response<Body> {
-    Response::builder()
-        .status(StatusCode::SERVICE_UNAVAILABLE)
-        .body(Body::empty())
-        .expect("Bad Request response should be valid")
-}
-
 pub async fn post_units_for_slot<C>(
-    req: Request<Body>,
-    app: &Application<C>,
-) -> Result<Response<Body>, ResponseError>
+    Extension(app): Extension<Arc<Application<C>>>,
+    Json(request_body): Json<RequestBody>,
+    user_agent: Option<TypedHeader<UserAgent>>,
+    headers: HeaderMap,
+) -> Result<Json<UnitsForSlotResponse>, ResponseError>
 where
     C: Locked + 'static,
 {
-    let logger = &app.logger;
-    let config = &app.config;
-
-    let (request_parts, body) = req.into_parts();
-
-    let body_bytes = hyper::body::to_bytes(body).await?;
-
-    let request_body = serde_json::from_slice::<RequestBody>(&body_bytes)?;
-
     let ad_slot = request_body.ad_slot.clone();
 
     // TODO: remove once we know how/where we will be fetching the rest of the information!
@@ -87,9 +69,11 @@ where
     {
         Ok(units) => units,
         Err(error) => {
-            error!(&logger, "Error fetching AdUnits for AdSlot"; "AdSlot" => ?ad_slot, "error" => ?error);
+            error!(&app.logger, "Error fetching AdUnits for AdSlot"; "AdSlot" => ?ad_slot, "error" => ?error);
 
-            return Ok(service_unavailable());
+            return Err(ResponseError::BadRequest(
+                "Error fetching AdUnits for AdSlot. Please try again later.".into(),
+            ));
         }
     };
 
@@ -97,22 +81,22 @@ where
         Some(unit_ipfs) => {
             let ad_unit_response = match app.platform_api.fetch_unit(*unit_ipfs).await {
                 Ok(Some(response)) => {
-                    debug!(&logger, "Fetched AdUnit {:?}", unit_ipfs; "AdUnit" => ?unit_ipfs);
+                    debug!(&app.logger, "Fetched AdUnit {:?}", unit_ipfs; "AdUnit" => ?unit_ipfs);
                     response
                 }
                 Ok(None) => {
                     warn!(
-                        &logger,
+                        &app.logger,
                         "AdSlot fallback AdUnit {} not found in Platform",
                         unit_ipfs;
                         "AdUnit" => ?unit_ipfs,
                         "AdSlot" => ?ad_slot,
                     );
 
-                    return Ok(not_found());
+                    return Err(ResponseError::NotFound);
                 }
                 Err(error) => {
-                    error!(&logger,
+                    error!(&app.logger,
                         "Error when fetching AdSlot fallback AdUnit ({}) from Platform",
                         unit_ipfs;
                         "AdSlot" => ?ad_slot,
@@ -120,7 +104,10 @@ where
                         "error" => ?error
                     );
 
-                    return Ok(service_unavailable());
+                    return Err(ResponseError::BadRequest(
+                        "Error when fetching AdSlot fallback AdUnit. Please try again later."
+                            .into(),
+                    ));
                 }
             };
 
@@ -129,44 +116,35 @@ where
         None => None,
     };
 
-    debug!(&logger, "Fetched {} AdUnits for AdSlot", units.len(); "AdSlot" => ?ad_slot);
+    debug!(&app.logger, "Fetched {} AdUnits for AdSlot", units.len(); "AdSlot" => ?ad_slot);
 
     // For each adUnits apply input
     let ua_parser = Parser::new();
-    let user_agent = request_parts
-        .headers
-        .get(USER_AGENT)
-        .and_then(|h| h.to_str().map(ToString::to_string).ok())
+    let user_agent = user_agent
+        .map(|h| h.as_str().to_string())
         .unwrap_or_default();
     let parsed = ua_parser.parse(&user_agent);
     // WARNING! This will return only the OS type, e.g. `Linux` and not the actual distribution name e.g. `Ubuntu`
     // By contrast `ua-parser-js` will return `Ubuntu` (distribution) and not the OS type `Linux`.
     // `UAParser(...).os.name` (`ua-parser-js: 0.7.22`)
-    let user_agent_os = parsed
-        .as_ref()
-        .map(|p| {
-            if p.os != VALUE_UNKNOWN {
-                Some(p.os.to_string())
-            } else {
-                None
-            }
-        })
-        .flatten();
+    let user_agent_os = parsed.as_ref().and_then(|p| {
+        if p.os != VALUE_UNKNOWN {
+            Some(p.os.to_string())
+        } else {
+            None
+        }
+    });
 
     // Corresponds to `UAParser(...).browser.name` (`ua-parser-js: 0.7.22`)
-    let user_agent_browser_family = parsed
-        .as_ref()
-        .map(|p| {
-            if p.name != VALUE_UNKNOWN {
-                Some(p.name.to_string())
-            } else {
-                None
-            }
-        })
-        .flatten();
+    let user_agent_browser_family = parsed.as_ref().and_then(|p| {
+        if p.name != VALUE_UNKNOWN {
+            Some(p.name.to_string())
+        } else {
+            None
+        }
+    });
 
-    let country = request_parts
-        .headers
+    let country = headers
         .get(CLOUDFLARE_IPCOUNTRY_HEADER.clone())
         .and_then(|h| h.to_str().map(ToString::to_string).ok());
 
@@ -180,7 +158,7 @@ where
     let campaigns_limited_by_earner = get_campaigns(
         app.pool.clone(),
         app.campaign_remaining.clone(),
-        config,
+        &app.config,
         &request_body.deposit_assets,
         publisher_id,
     )
@@ -188,7 +166,7 @@ where
     // TODO: Fix mapping this error and Log the error!
     .map_err(|err| ResponseError::BadRequest(err.to_string()))?;
 
-    debug!(&logger, "Fetched Cache campaigns limited by earner (publisher)"; "campaigns" => campaigns_limited_by_earner.len(), "publisher_id" => %publisher_id);
+    debug!(&app.logger, "Fetched Cache campaigns limited by earner (publisher)"; "campaigns" => campaigns_limited_by_earner.len(), "publisher_id" => %publisher_id);
 
     // We return those in the result (which means AdView would have those) but we don't actually use them
     // we do that in order to have the same variables as the validator, so that the `price` is the same
@@ -205,7 +183,7 @@ where
             ad_slot_type: ad_slot.ad_type.clone(),
             publisher_id: publisher_id.to_address(),
             country,
-            event_type: IMPRESSION.into(),
+            event_type: IMPRESSION,
             seconds_since_epoch: Utc::now(),
             user_agent_os,
             user_agent_browser_family: user_agent_browser_family.clone(),
@@ -217,8 +195,8 @@ where
     };
 
     let campaigns = apply_targeting(
-        config,
-        logger,
+        &app.config,
+        &app.logger,
         campaigns_limited_by_earner,
         targeting_input_base.clone(),
         ad_slot,
@@ -234,11 +212,7 @@ where
         fallback_unit: fallback_unit.map(|ad_unit| response::AdUnit::from(&ad_unit)),
     };
 
-    Ok(Response::builder()
-        .status(StatusCode::OK)
-        .header(CONTENT_TYPE, "application/json")
-        .body(Body::from(serde_json::to_string(&response)?))
-        .expect("Should create response"))
+    Ok(Json(response))
 }
 
 // TODO: Use error instead of std::error::Error
@@ -267,7 +241,7 @@ async fn get_campaigns(
 
     // 2. Check those Campaigns if `Campaign remaining > 0` (in redis)
     let campaigns_remaining = campaign_remaining
-        .get_multiple_with_ids(&active_campaign_ids)
+        .get_multiple_with_ids(active_campaign_ids)
         .await?;
 
     let campaigns_with_remaining = campaigns_remaining
@@ -301,7 +275,7 @@ async fn get_campaigns(
     }))
     .await?
     .into_iter()
-    .filter_map(|accounting| accounting)
+    .flatten()
     .collect::<Vec<_>>();
 
     // 3. Filter `Campaign`s, that include the `publisher_id` in the Channel balances.
@@ -309,8 +283,7 @@ async fn get_campaigns(
         campaigns_with_remaining.into_iter().partition(|campaign| {
             publisher_accountings
                 .iter()
-                .find(|accounting| accounting.channel_id == campaign.channel.id())
-                .is_some()
+                .any(|accounting| accounting.channel_id == campaign.channel.id())
         });
 
     let campaigns = if campaigns_by_earner.len()
@@ -363,7 +336,7 @@ async fn apply_targeting(
                                 show: true,
                                 boost: 1.0,
                                 // only "IMPRESSION" event can be used for this `Output`
-                                price: vec![(IMPRESSION.into(), pricing_bounds.min)]
+                                price: [(IMPRESSION, pricing_bounds.min)]
                                     .into_iter()
                                     .collect(),
                             };

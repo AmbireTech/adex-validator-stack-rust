@@ -1,11 +1,13 @@
+use std::{sync::Arc, time::Duration};
+
+use reqwest::{Client, Error, StatusCode};
+
 // previously fetched from the market (in the supermarket) it should now be fetched from the Platform!
 use primitives::{
     platform::{AdUnitResponse, AdUnitsResponse},
     util::ApiUrl,
     AdUnit, IPFS,
 };
-use reqwest::{Client, Error, StatusCode};
-use std::{sync::Arc, time::Duration};
 
 pub type Result<T> = std::result::Result<T, Error>;
 
