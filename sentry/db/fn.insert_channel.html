@@ -4,4 +4,4 @@ This call should never trigger a <code>SqlState::UNIQUE_VIOLATION</code></p>
 <div class="example-wrap"><pre class="language-sql"><code>INSERT INTO channels (id, leader, follower, guardian, token, nonce, chain_id, created)
 VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
 ON CONFLICT ON CONSTRAINT channels_pkey DO UPDATE SET created=EXCLUDED.created
-RETURNING leader, follower, guardian, token, nonce</code></pre></div></div></details></section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9243168fa 2022-08-31)" ></div></body></html>
+RETURNING leader, follower, guardian, token, nonce</code></pre></div></div></details></section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (78a891d36 2022-09-06)" ></div></body></html>

@@ -142,7 +142,7 @@
 <span class="kw">use </span>tokio_postgres::types::ToSql;
 
 <span class="kw">use </span>primitives::{
-    balances::UncheckedState,
+    balances::BalancesState,
     sentry::{message::MessageResponse, validator_messages::ValidatorMessage},
     validator::{ApproveState, Heartbeat, MessageType, MessageTypes, NewState},
     Channel, ChannelId, ValidatorId,
@@ -242,11 +242,11 @@
 <span class="doccomment">/// Returns the latest [`NewState`] message for this [`Channel`] and the provided `state_root`.
 ///
 /// Ordered by: `received DESC`
-</span><span class="kw">pub async fn </span>latest_new_state(
+</span><span class="kw">pub async fn </span>latest_new_state&lt;S: BalancesState&gt;(
     pool: <span class="kw-2">&amp;</span>DbPool,
     channel: <span class="kw-2">&amp;</span>Channel,
     state_root: <span class="kw-2">&amp;</span>str,
-) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;MessageResponse&lt;NewState&lt;UncheckedState&gt;&gt;&gt;, PoolError&gt; {
+) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;MessageResponse&lt;NewState&lt;S&gt;&gt;&gt;, PoolError&gt; {
     <span class="kw">let </span>client = pool.get().<span class="kw">await</span><span class="question-mark">?</span>;
 
     <span class="kw">let </span>select = client.prepare(<span class="string">&quot;SELECT \&quot;from\&quot;, msg, received FROM validator_messages WHERE channel_id = $1 AND \&quot;from\&quot; = $2 AND msg -&gt;&gt; &#39;type&#39; = &#39;NewState&#39; AND msg-&gt;&gt; &#39;stateRoot&#39; = $3 ORDER BY received DESC LIMIT 1&quot;</span>).<span class="kw">await</span><span class="question-mark">?</span>;
@@ -255,7 +255,7 @@
         .<span class="kw">await</span><span class="question-mark">?</span>;
 
     rows.get(<span class="number">0</span>)
-        .map(MessageResponse::&lt;NewState&lt;UncheckedState&gt;&gt;::try_from)
+        .map(MessageResponse::&lt;NewState&lt;S&gt;&gt;::try_from)
         .transpose()
         .map_err(PoolError::Backend)
 }
@@ -279,4 +279,4 @@
         .map_err(PoolError::Backend)
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9243168fa 2022-08-31)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (78a891d36 2022-09-06)" ></div></body></html>

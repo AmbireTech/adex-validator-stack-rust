@@ -1571,6 +1571,10 @@
 <span id="1571">1571</span>
 <span id="1572">1572</span>
 <span id="1573">1573</span>
+<span id="1574">1574</span>
+<span id="1575">1575</span>
+<span id="1576">1576</span>
+<span id="1577">1577</span>
 </pre><pre class="rust"><code><span class="doccomment">//! `/v5/channel` routes
 //!
 
@@ -1586,16 +1590,17 @@
     Adapter, Dummy,
 };
 <span class="kw">use </span>primitives::{
-    balances::{Balances, CheckedState, UncheckedState},
+    balances::{Balances, BalancesState, CheckedState, UncheckedState},
     merkle_tree::MerkleTree,
     sentry::{
         channel_list::{ChannelListQuery, ChannelListResponse},
+        message::MessageResponse,
         AccountingResponse, AllSpendersQuery, AllSpendersResponse, ChannelPayRequest,
         GetLeafResponse, LastApproved, LastApprovedQuery, LastApprovedResponse, SpenderResponse,
         SuccessResponse,
     },
     spender::{Spendable, Spender},
-    validator::NewState,
+    validator::{ApproveState, NewState},
     Address, ChainOf, Channel, ChannelId, Deposit, UnifiedNum,
 };
 
@@ -1670,17 +1675,11 @@
         heartbeats: <span class="prelude-val">None</span>,
     });
 
-    <span class="kw">let </span>approve_state = <span class="kw">match </span>latest_approve_state(<span class="kw-2">&amp;</span>app.pool, <span class="kw-2">&amp;</span>channel).<span class="kw">await</span><span class="question-mark">? </span>{
-        <span class="prelude-val">Some</span>(approve_state) =&gt; approve_state,
-        <span class="prelude-val">None </span>=&gt; <span class="kw">return </span><span class="prelude-val">Ok</span>(default_response),
-    };
-
-    <span class="kw">let </span>state_root = approve_state.msg.state_root.clone();
-
-    <span class="kw">let </span>new_state = latest_new_state(<span class="kw-2">&amp;</span>app.pool, <span class="kw-2">&amp;</span>channel, <span class="kw-2">&amp;</span>state_root).<span class="kw">await</span><span class="question-mark">?</span>;
-    <span class="kw">if </span>new_state.is_none() {
-        <span class="kw">return </span><span class="prelude-val">Ok</span>(default_response);
-    }
+    <span class="kw">let </span>(approve_state, new_state) =
+        <span class="kw">match </span>get_corresponding_states::&lt;UncheckedState&gt;(<span class="kw-2">&amp;</span>app.pool, <span class="kw-2">&amp;</span>app.logger, <span class="kw-2">&amp;</span>channel).<span class="kw">await</span><span class="question-mark">? </span>{
+            <span class="prelude-val">Some</span>(states) =&gt; states,
+            <span class="prelude-val">None </span>=&gt; <span class="kw">return </span><span class="prelude-val">Ok</span>(default_response),
+        };
 
     <span class="kw">let </span>validators = <span class="macro">vec!</span>[channel.leader, channel.follower];
     <span class="kw">let </span>channel_id = channel.id();
@@ -1699,7 +1698,7 @@
 
     <span class="prelude-val">Ok</span>(Json(LastApprovedResponse {
         last_approved: <span class="prelude-val">Some</span>(LastApproved {
-            new_state,
+            new_state: <span class="prelude-val">Some</span>(new_state),
             approve_state: <span class="prelude-val">Some</span>(approve_state),
         }),
         heartbeats,
@@ -1766,19 +1765,21 @@
         </span>}
     };
 
-    <span class="kw">let </span>new_state = <span class="kw">match </span>get_corresponding_new_state(<span class="kw-2">&amp;</span>app.pool, <span class="kw-2">&amp;</span>app.logger, channel).<span class="kw">await</span><span class="question-mark">? </span>{
-        <span class="prelude-val">Some</span>(new_state) =&gt; new_state,
-        <span class="prelude-val">None </span>=&gt; {
-            <span class="kw">return </span><span class="prelude-val">Ok</span>(Json(SpenderResponse {
-                spender: Spender {
-                    total_deposited: latest_spendable.deposit.total,
-                    total_spent: <span class="prelude-val">None</span>,
-                },
-            }))
-        }
-    };
+    <span class="kw">let </span>(<span class="kw">_</span>, new_state) =
+        <span class="kw">match </span>get_corresponding_states::&lt;CheckedState&gt;(<span class="kw-2">&amp;</span>app.pool, <span class="kw-2">&amp;</span>app.logger, channel).<span class="kw">await</span><span class="question-mark">? </span>{
+            <span class="prelude-val">Some</span>(new_state) =&gt; new_state,
+            <span class="prelude-val">None </span>=&gt; {
+                <span class="kw">return </span><span class="prelude-val">Ok</span>(Json(SpenderResponse {
+                    spender: Spender {
+                        total_deposited: latest_spendable.deposit.total,
+                        total_spent: <span class="prelude-val">None</span>,
+                    },
+                }))
+            }
+        };
 
     <span class="kw">let </span>total_spent = new_state
+        .msg
         .balances
         .spenders
         .get(<span class="kw-2">&amp;</span>spender)
@@ -1808,7 +1809,8 @@
         .checked_mul(limit.into())
         .ok_or_else(|| ResponseError::FailedValidation(<span class="string">&quot;Page and/or limit is too large&quot;</span>.into()))<span class="question-mark">?</span>;
 
-    <span class="kw">let </span>new_state = get_corresponding_new_state(<span class="kw-2">&amp;</span>app.pool, <span class="kw-2">&amp;</span>app.logger, <span class="kw-2">&amp;</span>channel).<span class="kw">await</span><span class="question-mark">?</span>;
+    <span class="kw">let </span>corresponding_states =
+        get_corresponding_states::&lt;CheckedState&gt;(<span class="kw-2">&amp;</span>app.pool, <span class="kw-2">&amp;</span>app.logger, <span class="kw-2">&amp;</span>channel).<span class="kw">await</span><span class="question-mark">?</span>;
 
     <span class="kw">let </span><span class="kw-2">mut </span>all_spender_limits: HashMap&lt;Address, Spender&gt; = HashMap::new();
 
@@ -1818,16 +1820,20 @@
     <span class="comment">// Using for loop to avoid async closures
     </span><span class="kw">for </span>spendable <span class="kw">in </span>all_spendables {
         <span class="kw">let </span>spender = spendable.spender;
-        <span class="kw">let </span>total_spent = <span class="kw">match </span>new_state {
-            <span class="prelude-val">Some</span>(<span class="kw-2">ref </span>new_state) =&gt; new_state.balances.spenders.get(<span class="kw-2">&amp;</span>spender).map(|balance| {
-                spendable
-                    .deposit
-                    .total
-                    .checked_sub(balance)
-                    .unwrap_or_default()
-            }),
-            <span class="prelude-val">None </span>=&gt; <span class="prelude-val">None</span>,
-        };
+        <span class="kw">let </span>total_spent = corresponding_states.as_ref().and_then(|(<span class="kw">_</span>, new_state)| {
+            new_state
+                .msg
+                .balances
+                .spenders
+                .get(<span class="kw-2">&amp;</span>spender)
+                .map(|balance| {
+                    spendable
+                        .deposit
+                        .total
+                        .checked_sub(balance)
+                        .unwrap_or_default()
+                })
+        });
 
         <span class="kw">let </span>spender_info = Spender {
             total_deposited: spendable.deposit.total,
@@ -1873,8 +1879,10 @@
         </span>}
     };
 
-    <span class="kw">let </span>new_state =
-        <span class="kw">match </span>get_corresponding_new_state(<span class="kw-2">&amp;</span>app.pool, <span class="kw-2">&amp;</span>app.logger, <span class="kw-2">&amp;</span>channel.context).<span class="kw">await</span><span class="question-mark">? </span>{
+    <span class="kw">let </span>(<span class="kw">_</span>, new_state) =
+        <span class="kw">match </span>get_corresponding_states::&lt;CheckedState&gt;(<span class="kw-2">&amp;</span>app.pool, <span class="kw-2">&amp;</span>app.logger, <span class="kw-2">&amp;</span>channel.context)
+            .<span class="kw">await</span><span class="question-mark">?
+        </span>{
             <span class="prelude-val">Some</span>(new_state) =&gt; new_state,
             <span class="prelude-val">None </span>=&gt; {
                 <span class="kw">return </span><span class="prelude-val">Ok</span>(Json(SpenderResponse {
@@ -1886,11 +1894,7 @@
             }
         };
 
-    <span class="kw">let </span>total_spent = new_state
-        .balances
-        .spenders
-        .get(<span class="kw-2">&amp;</span>spender)
-        .map(|spent| spent.to_owned());
+    <span class="kw">let </span>total_spent = new_state.msg.balances.spenders.get(<span class="kw-2">&amp;</span>spender).copied();
 
     <span class="prelude-val">Ok</span>(Json(SpenderResponse {
         spender: Spender {
@@ -1900,11 +1904,26 @@
     }))
 }
 
-<span class="kw">async fn </span>get_corresponding_new_state(
+<span class="doccomment">/// Retrieves the [`Channel`]&#39;s latest [`ApproveState`] and the corresponding
+/// approved [`NewState`].
+///
+/// # Errors
+///
+/// - Returns [`ResponseError::NotFound`] if there is no [`ApproveState`]
+/// generated for the [`Channel`], i.e. the [`Channel`] is new.
+///
+/// - Returns [`ResponseError::BadRequest`] if the [`ApproveState`]&#39;s
+/// corresponding approve [`NewState`] is not found.
+///
+/// - Returns [`ResponseError::BadRequest`] if the [`NewState`]&#39;s
+/// [`Balances`] don&#39;t align, i.e. `sum(earner) != sum(spenders)`
+///
+/// [`ApproveState`]: primitives::validator::ApproveState
+</span><span class="kw">async fn </span>get_corresponding_states&lt;S: BalancesState&gt;(
     pool: <span class="kw-2">&amp;</span>DbPool,
     logger: <span class="kw-2">&amp;</span>Logger,
     channel: <span class="kw-2">&amp;</span>Channel,
-) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;NewState&lt;CheckedState&gt;&gt;, ResponseError&gt; {
+) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;(MessageResponse&lt;ApproveState&gt;, MessageResponse&lt;NewState&lt;S&gt;&gt;)&gt;, ResponseError&gt; {
     <span class="kw">let </span>approve_state = <span class="kw">match </span>latest_approve_state(pool, channel).<span class="kw">await</span><span class="question-mark">? </span>{
         <span class="prelude-val">Some</span>(approve_state) =&gt; approve_state,
         <span class="prelude-val">None </span>=&gt; <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>),
@@ -1912,16 +1931,11 @@
 
     <span class="kw">let </span>state_root = approve_state.msg.state_root.clone();
 
-    <span class="kw">match </span>latest_new_state(pool, channel, <span class="kw-2">&amp;</span>state_root).<span class="kw">await</span><span class="question-mark">? </span>{
-        <span class="prelude-val">Some</span>(new_state) =&gt; {
-            <span class="kw">let </span>new_state = new_state.msg.into_inner().try_checked().map_err(|err| {
-                <span class="macro">error!</span>(<span class="kw-2">&amp;</span>logger, <span class="string">&quot;Balances are not aligned in an approved NewState: {}&quot;</span>, <span class="kw-2">&amp;</span>err; <span class="string">&quot;module&quot; </span>=&gt; <span class="string">&quot;get_spender_limits&quot;</span>);
-                ResponseError::BadRequest(<span class="string">&quot;Balances are not aligned in an approved NewState&quot;</span>.to_string())
-            })<span class="question-mark">?</span>;
-            <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(new_state))
-        }
+    <span class="kw">match </span>latest_new_state::&lt;S&gt;(pool, channel, <span class="kw-2">&amp;</span>state_root).<span class="kw">await</span><span class="question-mark">? </span>{
+        <span class="prelude-val">Some</span>(new_state) =&gt; <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>((approve_state, new_state))),
         <span class="prelude-val">None </span>=&gt; {
-            <span class="macro">error!</span>(<span class="kw-2">&amp;</span>logger, <span class="string">&quot;{}&quot;</span>, <span class="string">&quot;Fatal error! The NewState for the last ApproveState was not found&quot;</span>; <span class="string">&quot;module&quot; </span>=&gt; <span class="string">&quot;get_spender_limits&quot;</span>);
+            <span class="macro">error!</span>(<span class="kw-2">&amp;</span>logger, <span class="string">&quot;{}&quot;</span>, <span class="string">&quot;Fatal error! The NewState for the last ApproveState was not found&quot;</span>; <span class="string">&quot;module&quot; </span>=&gt; <span class="string">&quot;routes::channel&quot;</span>);
+
             <span class="prelude-val">Err</span>(ResponseError::BadRequest(
                 <span class="string">&quot;Fatal error! The NewState for the last ApproveState was not found&quot;</span>.to_string(),
             ))
@@ -2093,15 +2107,9 @@
 ) -&gt; <span class="prelude-ty">Result</span>&lt;Json&lt;GetLeafResponse&gt;, ResponseError&gt; {
     <span class="kw">let </span>channel = channel_context.context;
 
-    <span class="kw">let </span>approve_state = latest_approve_state(<span class="kw-2">&amp;</span>app.pool, <span class="kw-2">&amp;</span>channel)
+    <span class="kw">let </span>(<span class="kw">_</span>, new_state) = get_corresponding_states::&lt;CheckedState&gt;(<span class="kw-2">&amp;</span>app.pool, <span class="kw-2">&amp;</span>app.logger, <span class="kw-2">&amp;</span>channel)
         .<span class="kw">await</span><span class="question-mark">?
         </span>.ok_or(ResponseError::NotFound)<span class="question-mark">?</span>;
-
-    <span class="kw">let </span>state_root = approve_state.msg.state_root.clone();
-
-    <span class="kw">let </span>new_state = latest_new_state(<span class="kw-2">&amp;</span>app.pool, <span class="kw-2">&amp;</span>channel, <span class="kw-2">&amp;</span>state_root)
-        .<span class="kw">await</span><span class="question-mark">?
-        </span>.ok_or_else(|| ResponseError::BadRequest(<span class="string">&quot;No NewState message for spender&quot;</span>.to_string()))<span class="question-mark">?</span>;
 
     <span class="kw">let </span>addr = params.<span class="number">1</span>;
 
@@ -3145,4 +3153,4 @@
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (9243168fa 2022-08-31)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (78a891d36 2022-09-06)" ></div></body></html>

@@ -1,3 +1,3 @@
 (function() {var implementors = {
-"primitives":[["impl&lt;D&gt; Drain for <a class=\"struct\" href=\"primitives/util/logging/struct.PrefixedCompactFormat.html\" title=\"struct primitives::util::logging::PrefixedCompactFormat\">PrefixedCompactFormat</a>&lt;D&gt; <span class=\"where fmt-newline\">where<br>&nbsp;&nbsp;&nbsp;&nbsp;D: Decorator,&nbsp;</span>"]]
+"primitives":[["impl&lt;D&gt; Drain for <a class=\"struct\" href=\"primitives/util/logging/struct.PrefixedCompactFormat.html\" title=\"struct primitives::util::logging::PrefixedCompactFormat\">PrefixedCompactFormat</a>&lt;D&gt;<span class=\"where fmt-newline\">where<br>&nbsp;&nbsp;&nbsp;&nbsp;D: Decorator,</span>"]]
 };if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()
