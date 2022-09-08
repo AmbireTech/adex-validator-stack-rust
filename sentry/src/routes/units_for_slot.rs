@@ -80,7 +80,6 @@ where
 
     // TODO: remove once we know how/where we will be fetching the rest of the information!
     let accepted_referrers: Vec<Url> = vec!["TODO".parse().unwrap()];
-    let alexa_rank = Some(1.0_f64);
     let categories: Vec<String> = vec!["TODO".into()];
 
     let units = match app
@@ -189,7 +188,6 @@ where
     let targeting_input_ad_slot = Some(input::AdSlot {
         categories: categories.clone(),
         hostname,
-        alexa_rank,
     });
 
     let mut targeting_input_base = Input {

@@ -136,7 +136,6 @@ mod dsl_test {
         input.ad_slot = Some(input::AdSlot {
             categories: vec!["Bitcoin".to_string(), "Ethereum".to_string()],
             hostname: Default::default(),
-            alexa_rank: Some(0.0),
         });
 
         let mut output = Output {
@@ -163,7 +162,6 @@ mod dsl_test {
         input.ad_slot = Some(input::AdSlot {
             categories: vec!["Advertisement".to_string(), "Programming".to_string()],
             hostname: Default::default(),
-            alexa_rank: Some(0.0),
         });
 
         let result = rules.eval(&input, &mut output).expect("Should eval rules");
