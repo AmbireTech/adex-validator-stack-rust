@@ -20,6 +20,18 @@ services:
     networks:
       - adex-external
 
+  adex-mongodb:
+    image: mongo:latest
+    container_name: adex-mongodb
+    restart: always
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: mongodb
+      MONGO_INITDB_ROOT_PASSWORD: mongodb
+    networks:
+      - adex-external
+
   adex-redis:
     image: redis
     container_name: adex-redis

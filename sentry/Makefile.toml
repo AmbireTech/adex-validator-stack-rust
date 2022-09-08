@@ -19,7 +19,7 @@ dependencies = [
 env = { "POSTGRES_DB" = "sentry_leader" }
 
 [tasks.services-up]
-script = "docker-compose -f ../docker-compose.yml up -d adex-redis adex-postgres && sleep 3"
+script = "docker-compose -f ../docker-compose.yml up -d adex-redis adex-postgres adex-mongodb && sleep 3"
 
 [tasks.services-down]
 script = "docker-compose -f ../docker-compose.yml down"
