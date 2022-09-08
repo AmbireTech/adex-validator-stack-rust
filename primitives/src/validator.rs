@@ -400,6 +400,12 @@ pub mod messages {
         Heartbeat(Heartbeat),
     }
 
+    impl MessageTypes {
+        pub fn message_type(&self) -> MessageType {
+            self.into()
+        }
+    }
+
     /// All available message type names.
     #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, FromStr, Display)]
     #[display(style = "CamelCase")]

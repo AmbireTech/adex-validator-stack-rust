@@ -744,9 +744,8 @@ pub mod validator_message {
 
         use primitives::{
             balances::UncheckedState,
-            config::GANACHE_CONFIG,
             sentry::validator_messages::ValidatorMessagesCreateRequest,
-            test_util::{ADVERTISER, DUMMY_CAMPAIGN, IDS, LEADER},
+            test_util::{ADVERTISER, CAMPAIGNS, IDS, LEADER},
             validator::{
                 ApproveState, Heartbeat, MessageType, MessageTypes, NewState, RejectState,
             },
@@ -757,7 +756,6 @@ pub mod validator_message {
         async fn post_validator_messages() {
             let app_guard = setup_dummy_app().await;
             let app = Extension(Arc::new(app_guard.app.clone()));
-            let config = GANACHE_CONFIG.clone();
             let all_message_types: [MessageType; 4] = [
                 MessageType::NewState,
                 MessageType::ApproveState,
@@ -765,26 +763,18 @@ pub mod validator_message {
                 MessageType::Heartbeat,
             ];
 
-            let channel_context = Extension(
-                app.config
-                    .find_chain_of(DUMMY_CAMPAIGN.channel.token)
-                    .expect("Dummy channel Token should be present in config!")
-                    .with(DUMMY_CAMPAIGN.channel),
-            );
-
-            let chain_context = config
-                .find_chain_of(DUMMY_CAMPAIGN.channel.token)
-                .expect("Campaign's Channel.token should be set in config");
+            let channel_context = Extension(CAMPAIGNS[0].clone().of_channel());
 
             insert_channel(&app.pool, &channel_context)
                 .await
                 .expect("should insert channel");
+
             // Case when the request is not sent by a channel validator
             {
                 let auth = Auth {
                     era: 0,
                     uid: IDS[&ADVERTISER],
-                    chain: chain_context.chain.clone(),
+                    chain: channel_context.chain.clone(),
                 };
 
                 let req = ValidatorMessagesCreateRequest { messages: vec![] };
@@ -795,17 +785,19 @@ pub mod validator_message {
                     channel_context.clone(),
                     Json(req),
                 )
-                .await;
+                .await
+                .expect_err("We expect an error to be returned");
 
-                assert!(matches!(res, Err(ResponseError::Unauthorized)));
+                assert_eq!(res, ResponseError::Unauthorized);
             }
+
             // Cases where we insert validator messages
             // Case with 0 messages
             {
                 let auth = Auth {
                     era: 0,
                     uid: IDS[&LEADER],
-                    chain: chain_context.chain.clone(),
+                    chain: channel_context.chain.clone(),
                 };
 
                 let req = ValidatorMessagesCreateRequest { messages: vec![] };
@@ -836,17 +828,17 @@ pub mod validator_message {
                 let auth = Auth {
                     era: 0,
                     uid: IDS[&LEADER],
-                    chain: chain_context.chain.clone(),
+                    chain: channel_context.chain.clone(),
                 };
 
-                let message = Heartbeat {
+                let message = MessageTypes::Heartbeat(Heartbeat {
                     signature: String::new(),
                     state_root: String::new(),
                     timestamp: Utc::now(),
-                };
+                });
 
                 let req = ValidatorMessagesCreateRequest {
-                    messages: vec![MessageTypes::Heartbeat(message.clone())],
+                    messages: vec![message.clone()],
                 };
 
                 create_validator_messages(
@@ -869,14 +861,14 @@ pub mod validator_message {
                 .expect("should get messages");
                 let inner_messages: Vec<MessageTypes> =
                     messages.into_iter().map(|m| m.msg.clone()).collect();
-                assert_eq!(inner_messages, vec![MessageTypes::Heartbeat(message)]);
+                assert_eq!(inner_messages, vec![message]);
             }
             // Case with 4 messages (one of each type, heartbeat is already inserted)
             {
                 let auth = Auth {
                     era: 0,
                     uid: IDS[&LEADER],
-                    chain: chain_context.chain.clone(),
+                    chain: channel_context.chain.clone(),
                 };
 
                 let state_root =
@@ -888,31 +880,31 @@ pub mod validator_message {
                     .expect("should unlock")
                     .sign(&state_root.clone())
                     .expect("should sign");
-                let new_state: NewState<UncheckedState> = NewState {
+                let new_state = MessageTypes::NewState(NewState {
                     state_root: state_root.clone(),
                     signature: signature.clone(),
-                    balances: Balances::new(),
-                };
+                    balances: Balances::<UncheckedState>::new(),
+                });
 
-                let approve_state = ApproveState {
+                let approve_state = MessageTypes::ApproveState(ApproveState {
                     state_root: state_root.clone(),
                     signature: signature.clone(),
                     is_healthy: true,
-                };
+                });
 
-                let reject_state = RejectState {
+                let reject_state = MessageTypes::RejectState(RejectState {
                     state_root,
                     signature: signature.clone(),
                     timestamp: Utc::now(),
                     reason: "rejected".to_string(),
                     balances: None,
-                };
+                });
 
                 let req = ValidatorMessagesCreateRequest {
                     messages: vec![
-                        MessageTypes::NewState(new_state.clone()),
-                        MessageTypes::ApproveState(approve_state.clone()),
-                        MessageTypes::RejectState(reject_state.clone()),
+                        new_state.clone(),
+                        approve_state.clone(),
+                        reject_state.clone(),
                     ],
                 };
 
