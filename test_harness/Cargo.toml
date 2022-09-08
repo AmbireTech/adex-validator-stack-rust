@@ -5,7 +5,7 @@ version = "0.1.0"
 authors = ["Ambire <dev@ambire.com>", "Lachezar Lechev <lachezar@ambire.com>"]
 
 [dependencies]
-primitives = { path = "../primitives", features = ["postgres", "test-util"] }
+primitives = { version = "0.2", path = "../primitives", features = ["postgres", "test-util"] }
 adapter = { version = "0.2", path = "../adapter", features = ["test-util"] }
 sentry = { version = "0.1", path = "../sentry", features = ["test-util"] }
 validator_worker = { version = "0.2", path = "../validator_worker" }
