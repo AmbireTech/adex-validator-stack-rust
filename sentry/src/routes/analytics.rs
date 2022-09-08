@@ -1290,4 +1290,278 @@ mod test {
         //     Err(ResponseError::BadRequest(err_msg))
         // ));
     }
+
+    #[tokio::test]
+    async fn test_allowed_keys_for_guest() {
+        let app_guard = setup_dummy_app().await;
+        let app = Arc::new(app_guard.app);
+
+        let allowed_keys = GET_ANALYTICS_ALLOWED_KEYS.clone();
+        let base_datehour = DateHour::from_ymdh(2022, 1, 17, 14);
+
+        // Test for each allowed key
+        // Country
+        {
+            let query = AnalyticsQuery {
+                limit: 1000,
+                event_type: CLICK,
+                metric: Metric::Count,
+                segment_by: None,
+                time: Time {
+                    timeframe: Timeframe::Day,
+                    start: base_datehour - 1,
+                    end: None,
+                },
+                chains: vec![GANACHE_1337.chain_id],
+                country: Some("Bulgaria".to_string()),
+                ..Default::default()
+            };
+            let res = get_analytics(
+                Extension(app.clone()),
+                None,
+                Extension(allowed_keys.clone()),
+                None,
+                Qs(query),
+            )
+            .await;
+            assert!(res.is_ok());
+        }
+        // Ad Slot Type
+        {
+            let query = AnalyticsQuery {
+                limit: 1000,
+                event_type: CLICK,
+                metric: Metric::Count,
+                segment_by: None,
+                time: Time {
+                    timeframe: Timeframe::Day,
+                    start: base_datehour - 1,
+                    end: None,
+                },
+                chains: vec![GANACHE_1337.chain_id],
+                ad_slot_type: Some("legacy_300x100".to_string()),
+                ..Default::default()
+            };
+            let res = get_analytics(
+                Extension(app.clone()),
+                None,
+                Extension(allowed_keys.clone()),
+                None,
+                Qs(query),
+            )
+            .await;
+            assert!(res.is_ok());
+        }
+        // Test each not allowed key
+        // CampaignId
+        {
+            let query = AnalyticsQuery {
+                limit: 1000,
+                event_type: CLICK,
+                metric: Metric::Count,
+                segment_by: None,
+                time: Time {
+                    timeframe: Timeframe::Day,
+                    start: base_datehour - 1,
+                    end: None,
+                },
+                chains: vec![GANACHE_1337.chain_id],
+                campaign_id: Some(DUMMY_CAMPAIGN.id),
+                ..Default::default()
+            };
+            let res = get_analytics(
+                Extension(app.clone()),
+                None,
+                Extension(allowed_keys.clone()),
+                None,
+                Qs(query),
+            )
+            .await
+            .expect_err("should be an error");
+            assert_eq!(
+                ResponseError::Forbidden("Disallowed query key `campaignId`".into()),
+                res,
+            );
+        }
+        // AdUnit
+        {
+            let query = AnalyticsQuery {
+                limit: 1000,
+                event_type: CLICK,
+                metric: Metric::Count,
+                segment_by: None,
+                time: Time {
+                    timeframe: Timeframe::Day,
+                    start: base_datehour - 1,
+                    end: None,
+                },
+                chains: vec![GANACHE_1337.chain_id],
+                ad_unit: Some(DUMMY_IPFS[0]),
+                ..Default::default()
+            };
+            let res = get_analytics(
+                Extension(app.clone()),
+                None,
+                Extension(allowed_keys.clone()),
+                None,
+                Qs(query),
+            )
+            .await
+            .expect_err("should be an error");
+            assert_eq!(
+                ResponseError::Forbidden("Disallowed query key `adUnit`".into()),
+                res,
+            );
+        }
+        // AdSlot
+        {
+            let query = AnalyticsQuery {
+                limit: 1000,
+                event_type: CLICK,
+                metric: Metric::Count,
+                segment_by: None,
+                time: Time {
+                    timeframe: Timeframe::Day,
+                    start: base_datehour - 1,
+                    end: None,
+                },
+                chains: vec![GANACHE_1337.chain_id],
+                ad_slot: Some(DUMMY_IPFS[1]),
+                ..Default::default()
+            };
+            let res = get_analytics(
+                Extension(app.clone()),
+                None,
+                Extension(allowed_keys.clone()),
+                None,
+                Qs(query),
+            )
+            .await
+            .expect_err("should be an error");
+            assert_eq!(
+                ResponseError::Forbidden("Disallowed query key `adSlot`".into()),
+                res,
+            );
+        }
+        // Advertiser
+        {
+            let query = AnalyticsQuery {
+                limit: 1000,
+                event_type: CLICK,
+                metric: Metric::Count,
+                segment_by: None,
+                time: Time {
+                    timeframe: Timeframe::Day,
+                    start: base_datehour - 1,
+                    end: None,
+                },
+                chains: vec![GANACHE_1337.chain_id],
+                advertiser: Some(*ADVERTISER),
+                ..Default::default()
+            };
+            let res = get_analytics(
+                Extension(app.clone()),
+                None,
+                Extension(allowed_keys.clone()),
+                None,
+                Qs(query),
+            )
+            .await
+            .expect_err("should throw an error");
+            assert_eq!(
+                ResponseError::Forbidden("Disallowed query key `advertiser`".into()),
+                res,
+            );
+        }
+        // Publisher
+        {
+            let query = AnalyticsQuery {
+                limit: 1000,
+                event_type: CLICK,
+                metric: Metric::Count,
+                segment_by: None,
+                time: Time {
+                    timeframe: Timeframe::Day,
+                    start: base_datehour - 1,
+                    end: None,
+                },
+                chains: vec![GANACHE_1337.chain_id],
+                publisher: Some(*PUBLISHER),
+                ..Default::default()
+            };
+            let res = get_analytics(
+                Extension(app.clone()),
+                None,
+                Extension(allowed_keys.clone()),
+                None,
+                Qs(query),
+            )
+            .await
+            .expect_err("should throw an error");
+            assert_eq!(
+                ResponseError::Forbidden("Disallowed query key `publisher`".into()),
+                res,
+            );
+        }
+        // Hostname
+        {
+            let query = AnalyticsQuery {
+                limit: 1000,
+                event_type: CLICK,
+                metric: Metric::Count,
+                segment_by: None,
+                time: Time {
+                    timeframe: Timeframe::Day,
+                    start: base_datehour - 1,
+                    end: None,
+                },
+                chains: vec![GANACHE_1337.chain_id],
+                hostname: Some("localhost".to_string()),
+                ..Default::default()
+            };
+            let res = get_analytics(
+                Extension(app.clone()),
+                None,
+                Extension(allowed_keys.clone()),
+                None,
+                Qs(query),
+            )
+            .await
+            .expect_err("should throw an error");
+            assert_eq!(
+                ResponseError::Forbidden("Disallowed query key `hostname`".into()),
+                res,
+            );
+        }
+        // OsName
+        {
+            let query = AnalyticsQuery {
+                limit: 1000,
+                event_type: CLICK,
+                metric: Metric::Count,
+                segment_by: None,
+                time: Time {
+                    timeframe: Timeframe::Day,
+                    start: base_datehour - 1,
+                    end: None,
+                },
+                chains: vec![GANACHE_1337.chain_id],
+                os_name: Some(OperatingSystem::map_os("Windows")),
+                ..Default::default()
+            };
+            let res = get_analytics(
+                Extension(app.clone()),
+                None,
+                Extension(allowed_keys.clone()),
+                None,
+                Qs(query),
+            )
+            .await
+            .expect_err("should throw an error");
+            assert_eq!(
+                ResponseError::Forbidden("Disallowed query key `osName`".into()),
+                res,
+            );
+        }
+    }
 }

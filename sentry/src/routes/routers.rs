@@ -221,3 +221,164 @@ pub fn analytics_router<C: Locked + 'static>() -> Router {
         )
         .merge(authenticated_analytics)
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::{test_util::setup_dummy_app, Auth};
+    use adapter::ethereum::test_util::GANACHE_1;
+    use axum::{
+        body::Body,
+        http::{Request, StatusCode},
+    };
+    use primitives::test_util::{ADVERTISER, FOLLOWER, IDS, LEADER, PUBLISHER};
+    use tower::Service;
+
+    #[tokio::test]
+    async fn analytics_router_tests() {
+        let mut router = analytics_router::<Dummy>();
+        let app_guard = setup_dummy_app().await;
+        let app = Arc::new(app_guard.app);
+
+        // Test /for-publisher with no auth
+        {
+            let req = Request::builder()
+                .uri("/for-publisher")
+                .extension(app.clone())
+                .body(Body::empty())
+                .expect("Should build Request");
+
+            let response = router
+                .call(req)
+                .await
+                .expect("Should make request to Router");
+
+            assert_eq!(StatusCode::UNAUTHORIZED, response.status());
+        }
+        // Test /for-publisher with auth
+        {
+            let req = Request::builder()
+                .uri("/for-publisher")
+                .extension(app.clone())
+                .extension(Auth {
+                    era: 1,
+                    uid: IDS[&PUBLISHER],
+                    chain: GANACHE_1.clone(),
+                })
+                .body(Body::empty())
+                .expect("Should build Request");
+
+            let response = router
+                .call(req)
+                .await
+                .expect("Should make request to Router");
+
+            assert_eq!(StatusCode::OK, response.status());
+        }
+        // Test /for-advertiser with no auth
+        {
+            let req = Request::builder()
+                .uri("/for-advertiser")
+                .extension(app.clone())
+                .body(Body::empty())
+                .expect("Should build Request");
+
+            let response = router
+                .call(req)
+                .await
+                .expect("Should make request to Router");
+
+            assert_eq!(StatusCode::UNAUTHORIZED, response.status());
+        }
+        // Test /for-advertiser with auth
+        {
+            let req = Request::builder()
+                .uri("/for-advertiser")
+                .extension(app.clone())
+                .extension(Auth {
+                    era: 1,
+                    uid: IDS[&ADVERTISER],
+                    chain: GANACHE_1.clone(),
+                })
+                .body(Body::empty())
+                .expect("Should build Request");
+
+            let response = router
+                .call(req)
+                .await
+                .expect("Should make request to Router");
+
+            assert_eq!(StatusCode::OK, response.status());
+        }
+        // Test /for-admin with no auth
+        {
+            let req = Request::builder()
+                .uri("/for-admin")
+                .extension(app.clone())
+                .body(Body::empty())
+                .expect("Should build Request");
+
+            let response = router
+                .call(req)
+                .await
+                .expect("Should make request to Router");
+
+            assert_eq!(StatusCode::UNAUTHORIZED, response.status());
+        }
+        // Test /for-admin with wrong auth
+        {
+            let not_admin = {
+                assert!(
+                    !app.config.admins.contains(&FOLLOWER),
+                    "Should not contain the Follower as an Admin for this test!"
+                );
+
+                IDS[&FOLLOWER]
+            };
+            let req = Request::builder()
+                .uri("/for-admin")
+                .extension(app.clone())
+                .extension(Auth {
+                    era: 1,
+                    uid: not_admin,
+                    chain: GANACHE_1.clone(),
+                })
+                .body(Body::empty())
+                .expect("Should build Request");
+
+            let response = router
+                .call(req)
+                .await
+                .expect("Should make request to Router");
+
+            assert_eq!(StatusCode::UNAUTHORIZED, response.status());
+        }
+        // Test /for-admin with correct auth
+        {
+            let admin = {
+                assert!(
+                    app.config.admins.contains(&LEADER),
+                    "Should contain the Leader as an Admin for this test!"
+                );
+                IDS[&LEADER]
+            };
+            let req = Request::builder()
+                .uri("/for-admin")
+                .extension(app.clone())
+                .extension(Auth {
+                    era: 1,
+                    uid: admin,
+                    chain: GANACHE_1.clone(),
+                })
+                .body(Body::empty())
+                .expect("Should build Request");
+
+            let response = router
+                .call(req)
+                .await
+                .expect("Should make request to Router");
+
+            assert_eq!(StatusCode::OK, response.status());
+        }
+    }
+}
