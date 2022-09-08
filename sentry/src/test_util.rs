@@ -13,6 +13,7 @@ use primitives::{
 
 use crate::{
     db::{
+        mongodb_pool,
         redis_pool::TESTS_POOL,
         tests_postgres::{setup_test_migrations, DATABASE_POOL},
         CampaignRemaining,
@@ -30,6 +31,8 @@ pub struct ApplicationGuard {
     redis_pool: deadpool::managed::Object<crate::db::redis_pool::Manager>,
     #[allow(dead_code)]
     db_pool: deadpool::managed::Object<crate::db::tests_postgres::Manager>,
+    #[allow(dead_code)]
+    mongodb_pool: deadpool::managed::Object<crate::db::mongodb_pool::Manager>,
 }
 
 impl ops::Deref for ApplicationGuard {
@@ -60,6 +63,11 @@ pub async fn setup_dummy_app() -> ApplicationGuard {
     let redis = TESTS_POOL.get().await.expect("Should return Object");
     let database = DATABASE_POOL.get().await.expect("Should get a DB pool");
 
+    let mongodb = mongodb_pool::TESTS_POOL
+        .get()
+        .await
+        .expect("Should get a Mongodb Pool");
+
     setup_test_migrations(database.pool.clone())
         .await
         .expect("Migrations should succeed");
@@ -78,6 +86,7 @@ pub async fn setup_dummy_app() -> ApplicationGuard {
         logger,
         redis.connection.clone(),
         database.pool.clone(),
+        mongodb.database.clone(),
         campaign_remaining,
         platform_api,
     );
@@ -86,5 +95,6 @@ pub async fn setup_dummy_app() -> ApplicationGuard {
         app,
         redis_pool: redis,
         db_pool: database,
+        mongodb_pool: mongodb,
     }
 }

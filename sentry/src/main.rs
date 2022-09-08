@@ -5,16 +5,23 @@ use std::{env, net::SocketAddr, path::PathBuf};
 
 use clap::{crate_version, value_parser, Arg, Command};
 
+use mongodb::options::ClientOptions;
 use slog::info;
 
 use adapter::{primitives::AdapterTypes, Adapter};
 use primitives::{
-    config::configuration, postgres::POSTGRES_CONFIG, test_util::DUMMY_AUTH,
-    util::logging::new_logger, ValidatorId,
+    config::configuration,
+    postgres::{POSTGRES_CONFIG, POSTGRES_DB},
+    test_util::DUMMY_AUTH,
+    util::logging::new_logger,
+    ValidatorId,
 };
 use sentry::{
     application::EnableTls,
-    db::{postgres_connection, redis_connection, setup_migrations, CampaignRemaining},
+    db::{
+        mongodb_connection, postgres_connection, redis_connection, setup_migrations,
+        CampaignRemaining,
+    },
     platform::PlatformApi,
     Application,
 };
@@ -136,11 +143,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         setup_migrations(env_config.env)
     });
 
-    // use the environmental variables to setup the Postgres connection
-    let postgres = match postgres_connection(POSTGRES_CONFIG.clone()).await {
-        Ok(pool) => pool,
-        Err(build_err) => panic!("Failed to build postgres database pool: {build_err}"),
+    let mongodb_database = {
+        let mongodb_options =
+            ClientOptions::parse("mongodb://mongodb:mongodb@adex-mongodb:27017").await?;
+        let mongodb_client = mongodb_connection(mongodb_options)
+            .await
+            .expect("Failed to build Client for mongodb");
+
+        mongodb_client.database(&POSTGRES_DB)
     };
+
+    // use the environmental variables to setup the Postgres connection
+    let postgres = postgres_connection(POSTGRES_CONFIG.clone())
+        .await
+        .expect("Failed to build postgres database pool");
 
     let campaign_remaining = CampaignRemaining::new(redis.clone());
 
@@ -158,6 +174,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 logger,
                 redis,
                 postgres,
+                mongodb_database,
                 campaign_remaining,
                 platform_api,
             )
@@ -171,6 +188,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 logger,
                 redis,
                 postgres,
+                mongodb_database,
                 campaign_remaining,
                 platform_api,
             )

@@ -2769,8 +2769,8 @@ pub mod run {
     use sentry::{
         application::EnableTls,
         db::{
-            postgres_connection, redis_connection, redis_pool::Manager,
-            tests_postgres::setup_test_migrations, CampaignRemaining,
+            mongodb_connection, postgres_connection, redis_connection, redis_pool::Manager,
+            tests_postgres::setup_test_migrations, CampaignRemaining, ClientOptions,
         },
         platform::PlatformApi,
         Application,
@@ -2803,6 +2803,20 @@ pub mod run {
         };
 
         let postgres = postgres_connection(postgres_config).await?;
+        let mongodb_options = ClientOptions::parse("mongodb://mongodb:mongodb@0.0.0.0:27017")
+            .await
+            .expect("Should parse mongodb connection string");
+        let mongodb = mongodb_connection(mongodb_options)
+            .await
+            .expect("Should connect to mongodb")
+            .database(&validator.db_name);
+
+        // drop anything from previous runs
+        mongodb
+            .drop(None)
+            .await
+            .expect("Should drop the mongodb database before running the test harness");
+
         let mut redis = redis_connection(validator.sentry_config.redis_url.clone()).await?;
 
         Manager::flush_db(&mut redis)
@@ -2824,6 +2838,7 @@ pub mod run {
             logger,
             redis.clone(),
             postgres.clone(),
+            mongodb,
             campaign_remaining,
             platform_api,
         );

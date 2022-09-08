@@ -1,13 +1,16 @@
-use deadpool_postgres::{Manager, ManagerConfig, RecyclingMethod};
-use primitives::{
-    config::Environment,
-    postgres::{POSTGRES_DB, POSTGRES_HOST, POSTGRES_PASSWORD, POSTGRES_PORT, POSTGRES_USER},
-};
-use redis::{aio::MultiplexedConnection, IntoConnectionInfo};
 use std::str::FromStr;
+
+use deadpool_postgres::{Manager, ManagerConfig, RecyclingMethod};
+use mongodb::Client;
+use redis::{aio::MultiplexedConnection, IntoConnectionInfo};
 use tokio_postgres::{
     types::{accepts, FromSql, Type},
     NoTls,
+};
+
+use primitives::{
+    config::Environment,
+    postgres::{POSTGRES_DB, POSTGRES_HOST, POSTGRES_PASSWORD, POSTGRES_PORT, POSTGRES_USER},
 };
 
 pub mod accounting;
@@ -22,6 +25,9 @@ pub use self::channel::*;
 
 // Re-export the Postgres Config
 pub use tokio_postgres::Config as PostgresConfig;
+
+// Re-export the Mongodb Options
+pub use mongodb::options::ClientOptions;
 
 // Re-export the Postgres PoolError for easier usages
 pub use deadpool_postgres::PoolError;
@@ -66,6 +72,16 @@ pub async fn postgres_connection(
     // use default max_size which is set by PoolConfig::default()
     // num_cpus::get_physical() * 4
     DbPool::builder(manager).build()
+}
+
+pub async fn mongodb_connection(
+    mut options: ClientOptions,
+) -> Result<Client, mongodb::error::Error> {
+    // Manually set an option.
+    options.app_name = Some("Sentry".to_string());
+
+    // Get a handle to the deployment.
+    Client::with_options(options)
 }
 
 /// Sets the migrations using the `POSTGRES_*` environment variables
@@ -478,6 +494,194 @@ pub mod tests_postgres {
             let status = pool.status();
             assert_eq!(status.size, 3);
             assert_eq!(status.available, 3);
+        }
+    }
+}
+
+#[cfg(any(test, feature = "test-util"))]
+#[cfg_attr(docsrs, doc(cfg(feature = "test-util")))]
+pub mod mongodb_pool {
+    use dashmap::DashMap;
+    use deadpool::managed::{Manager as ManagerTrait, RecycleResult};
+    use thiserror::Error;
+
+    use crate::db::mongodb_connection;
+    use async_trait::async_trait;
+
+    use once_cell::sync::Lazy;
+
+    use mongodb::{error::Error as MongodbError, options::ClientOptions, Client};
+
+    pub type Pool = deadpool::managed::Pool<Manager>;
+
+    pub static TESTS_POOL: Lazy<Pool> = Lazy::new(|| {
+        Pool::builder(Manager::new())
+            .max_size(Manager::CONNECTIONS.into())
+            .build()
+            .expect("Should build Pools for tests")
+    });
+
+    #[derive(Clone)]
+    pub struct Database {
+        available: bool,
+        pub database: mongodb::Database,
+    }
+
+    impl std::ops::Deref for Database {
+        type Target = mongodb::Database;
+
+        fn deref(&self) -> &Self::Target {
+            &self.database
+        }
+    }
+
+    impl std::ops::DerefMut for Database {
+        fn deref_mut(&mut self) -> &mut Self::Target {
+            &mut self.database
+        }
+    }
+
+    pub struct Manager {
+        databases: DashMap<u8, Option<Database>>,
+    }
+
+    impl Default for Manager {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
+
+    impl Manager {
+        /// The maximum databases that the Mongodb Pool will have at it's disposal
+        const CONNECTIONS: u8 = u8::MAX;
+        /// The default URL for connecting to the different databases
+        const URL: &'static str = "mongodb://mongodb:mongodb@0.0.0.0:27017/";
+
+        /// Connects to the default Mongodb DB
+        pub fn new() -> Self {
+            Self {
+                databases: (0..Self::CONNECTIONS)
+                    .into_iter()
+                    .map(|database_index| (database_index, None))
+                    .collect(),
+            }
+        }
+
+        pub async fn new_client() -> Result<Client, MongodbError> {
+            let options = ClientOptions::parse(Self::URL).await?;
+
+            mongodb_connection(options).await
+        }
+    }
+
+    #[derive(Debug, Error)]
+    pub enum Error {
+        #[error("A mongodb error occurred")]
+        MongoDB(#[from] MongodbError),
+        #[error("Creation of new database connection failed")]
+        CreationFailed,
+    }
+
+    #[async_trait]
+    impl ManagerTrait for Manager {
+        type Type = Database;
+        type Error = Error;
+
+        async fn create(&self) -> Result<Self::Type, Self::Error> {
+            for mut record in self.databases.iter_mut() {
+                let database = record.value_mut().as_mut();
+
+                match database {
+                    Some(database) if database.available => {
+                        database.available = false;
+                        // drop the database before returning it
+                        database.database.drop(None).await?;
+
+                        return Ok(database.clone());
+                    }
+                    // if Some but not available, skip it
+                    Some(database) if !database.available => continue,
+                    _ => {
+                        let db_name = format!("test_{}", record.key());
+
+                        // create a new client
+                        let client = Self::new_client().await?;
+
+                        // Drop the whole database to remove old test data
+                        let mongo_database = client.database(&db_name);
+                        mongo_database.drop(None).await?;
+
+                        let database = Database {
+                            available: false,
+                            database: mongo_database,
+                        };
+
+                        *record.value_mut() = Some(database.clone());
+
+                        return Ok(database);
+                    }
+                }
+            }
+
+            Err(Error::CreationFailed)
+        }
+
+        async fn recycle(&self, database: &mut Database) -> RecycleResult<Self::Error> {
+            // Drop the whole database to remove old test data
+            let client = Self::new_client().await.map_err(Error::MongoDB)?;
+            let mongo_database = client.database(database.name());
+            // Drop the whole database to remove old test data
+            let drop_result = mongo_database.drop(None).await;
+
+            // make the database available
+            database.available = true;
+
+            drop_result.expect("Should have dropped the mongodb DB successfully");
+
+            Ok(())
+        }
+    }
+
+    #[cfg(test)]
+    mod test {
+        use futures::TryStreamExt;
+
+        use super::TESTS_POOL;
+
+        #[tokio::test]
+        async fn test_mongodb_connection() {
+            let database = TESTS_POOL.get().await.unwrap();
+
+            let list_collections = || async {
+                database
+                    .list_collections(None, None)
+                    .await
+                    .expect("Should query the list of collections")
+                    .try_collect::<Vec<_>>()
+                    .await
+                    .expect("Should fetch all collections")
+            };
+
+            assert!(database.name().starts_with("test_"));
+
+            let initial_collections = list_collections().await;
+            assert_eq!(0, initial_collections.len());
+
+            database
+                .create_collection("collection", None)
+                .await
+                .expect("should not exist from previous runs");
+
+            let collections = list_collections().await;
+
+            assert_eq!(1, collections.len());
+
+            // clean up Mongodb by dropping the database for this test
+            database
+                .database
+                .drop(None)
+                .await
+                .expect("Should drop the whole test database");
         }
     }
 }

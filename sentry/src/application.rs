@@ -12,6 +12,7 @@ use axum::{
     Extension, Router,
 };
 use axum_server::{tls_rustls::RustlsConfig, Handle};
+use mongodb::Database;
 use once_cell::sync::Lazy;
 use redis::{aio::MultiplexedConnection, ConnectionInfo};
 use serde::{Deserialize, Deserializer};
@@ -102,6 +103,7 @@ pub struct Application<C: Locked + 'static> {
     pub logger: Logger,
     pub redis: MultiplexedConnection,
     pub pool: DbPool,
+    pub mongodb: mongodb::Database,
     pub campaign_remaining: CampaignRemaining,
     pub platform_api: PlatformApi,
 }
@@ -110,12 +112,14 @@ impl<C> Application<C>
 where
     C: Locked,
 {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         adapter: Adapter<C>,
         config: primitives::Config,
         logger: Logger,
         redis: MultiplexedConnection,
         pool: DbPool,
+        mongodb: Database,
         campaign_remaining: CampaignRemaining,
         platform_api: PlatformApi,
     ) -> Self {
@@ -125,6 +129,7 @@ where
             logger,
             redis,
             pool,
+            mongodb,
             campaign_remaining,
             platform_api,
         }
@@ -221,6 +226,7 @@ impl<C: Locked> Clone for Application<C> {
             logger: self.logger.clone(),
             redis: self.redis.clone(),
             pool: self.pool.clone(),
+            mongodb: self.mongodb.clone(),
             campaign_remaining: self.campaign_remaining.clone(),
             platform_api: self.platform_api.clone(),
         }
