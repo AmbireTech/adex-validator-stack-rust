@@ -182,7 +182,6 @@ impl GetField for Global {
 pub struct AdSlot {
     pub categories: Vec<String>,
     pub hostname: String,
-    pub alexa_rank: Option<f64>,
 }
 
 impl GetField for AdSlot {
@@ -198,10 +197,6 @@ impl GetField for AdSlot {
                     .collect(),
             )),
             field::AdSlot::Hostname => Some(Value::String(self.hostname.clone())),
-            field::AdSlot::AlexaRank => self
-                .alexa_rank
-                .and_then(serde_json::Number::from_f64)
-                .map(Value::Number),
         }
     }
 }
@@ -413,7 +408,6 @@ mod test {
             // adSlot scope, accessible on Supermarket and AdView
             "adSlot.categories": ["IAB3", "IAB13-7", "IAB5"],
             "adSlot.hostname": "adex.network",
-            "adSlot.alexaRank": 2.0,
         });
 
         let actual_date = Utc.ymd(2020, 6, 6).and_hms(12, 0, 0);
@@ -466,7 +460,6 @@ mod test {
             ad_slot: Some(AdSlot {
                 categories: vec!["IAB3".into(), "IAB13-7".into(), "IAB5".into()],
                 hostname: "adex.network".into(),
-                alexa_rank: Some(2.0),
             }),
         };
 
