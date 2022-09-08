@@ -176,7 +176,7 @@ impl GetField for Global {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 /// AdSlot scope, accessible on Supermarket and AdView
 pub struct AdSlot {
