@@ -627,7 +627,7 @@ mod test {
         }
 
         // test with not allowed key
-        // event type: IMPRESSION
+        // event type: CLICK
         {
             let query = AnalyticsQuery {
                 event_type: CLICK,
@@ -1276,19 +1276,6 @@ mod test {
                     .collect::<Vec<_>>(),
             );
         }
-
-        // TODO: test with no authUid
-        // let req = Request::builder()
-        //     .uri("http://127.0.0.1/v5/analytics?limit=100&eventType=CLICK&metric=count&timeframe=day")
-        //     .body(Body::empty())
-        //     .expect("Should build Request");
-
-        // let analytics_response = analytics_router(req, &app, None, Some(AuthenticateAs::Publisher())).await;
-        // let err_msg = "auth_as_key is provided but there is no Auth object".to_string();
-        // assert!(matches!(
-        //     analytics_response,
-        //     Err(ResponseError::BadRequest(err_msg))
-        // ));
     }
 
     #[tokio::test]
@@ -1303,16 +1290,11 @@ mod test {
         // Country
         {
             let query = AnalyticsQuery {
-                limit: 1000,
-                event_type: CLICK,
-                metric: Metric::Count,
-                segment_by: None,
                 time: Time {
                     timeframe: Timeframe::Day,
                     start: base_datehour - 1,
                     end: None,
                 },
-                chains: vec![GANACHE_1337.chain_id],
                 country: Some("Bulgaria".to_string()),
                 ..Default::default()
             };
@@ -1329,16 +1311,11 @@ mod test {
         // Ad Slot Type
         {
             let query = AnalyticsQuery {
-                limit: 1000,
-                event_type: CLICK,
-                metric: Metric::Count,
-                segment_by: None,
                 time: Time {
                     timeframe: Timeframe::Day,
                     start: base_datehour - 1,
                     end: None,
                 },
-                chains: vec![GANACHE_1337.chain_id],
                 ad_slot_type: Some("legacy_300x100".to_string()),
                 ..Default::default()
             };
@@ -1356,16 +1333,11 @@ mod test {
         // CampaignId
         {
             let query = AnalyticsQuery {
-                limit: 1000,
-                event_type: CLICK,
-                metric: Metric::Count,
-                segment_by: None,
                 time: Time {
                     timeframe: Timeframe::Day,
                     start: base_datehour - 1,
                     end: None,
                 },
-                chains: vec![GANACHE_1337.chain_id],
                 campaign_id: Some(DUMMY_CAMPAIGN.id),
                 ..Default::default()
             };
@@ -1386,16 +1358,11 @@ mod test {
         // AdUnit
         {
             let query = AnalyticsQuery {
-                limit: 1000,
-                event_type: CLICK,
-                metric: Metric::Count,
-                segment_by: None,
                 time: Time {
                     timeframe: Timeframe::Day,
                     start: base_datehour - 1,
                     end: None,
                 },
-                chains: vec![GANACHE_1337.chain_id],
                 ad_unit: Some(DUMMY_IPFS[0]),
                 ..Default::default()
             };
@@ -1416,16 +1383,11 @@ mod test {
         // AdSlot
         {
             let query = AnalyticsQuery {
-                limit: 1000,
-                event_type: CLICK,
-                metric: Metric::Count,
-                segment_by: None,
                 time: Time {
                     timeframe: Timeframe::Day,
                     start: base_datehour - 1,
                     end: None,
                 },
-                chains: vec![GANACHE_1337.chain_id],
                 ad_slot: Some(DUMMY_IPFS[1]),
                 ..Default::default()
             };
@@ -1446,16 +1408,11 @@ mod test {
         // Advertiser
         {
             let query = AnalyticsQuery {
-                limit: 1000,
-                event_type: CLICK,
-                metric: Metric::Count,
-                segment_by: None,
                 time: Time {
                     timeframe: Timeframe::Day,
                     start: base_datehour - 1,
                     end: None,
                 },
-                chains: vec![GANACHE_1337.chain_id],
                 advertiser: Some(*ADVERTISER),
                 ..Default::default()
             };
@@ -1476,16 +1433,11 @@ mod test {
         // Publisher
         {
             let query = AnalyticsQuery {
-                limit: 1000,
-                event_type: CLICK,
-                metric: Metric::Count,
-                segment_by: None,
                 time: Time {
                     timeframe: Timeframe::Day,
                     start: base_datehour - 1,
                     end: None,
                 },
-                chains: vec![GANACHE_1337.chain_id],
                 publisher: Some(*PUBLISHER),
                 ..Default::default()
             };
@@ -1506,16 +1458,11 @@ mod test {
         // Hostname
         {
             let query = AnalyticsQuery {
-                limit: 1000,
-                event_type: CLICK,
-                metric: Metric::Count,
-                segment_by: None,
                 time: Time {
                     timeframe: Timeframe::Day,
                     start: base_datehour - 1,
                     end: None,
                 },
-                chains: vec![GANACHE_1337.chain_id],
                 hostname: Some("localhost".to_string()),
                 ..Default::default()
             };
@@ -1536,16 +1483,11 @@ mod test {
         // OsName
         {
             let query = AnalyticsQuery {
-                limit: 1000,
-                event_type: CLICK,
-                metric: Metric::Count,
-                segment_by: None,
                 time: Time {
                     timeframe: Timeframe::Day,
                     start: base_datehour - 1,
                     end: None,
                 },
-                chains: vec![GANACHE_1337.chain_id],
                 os_name: Some(OperatingSystem::map_os("Windows")),
                 ..Default::default()
             };
