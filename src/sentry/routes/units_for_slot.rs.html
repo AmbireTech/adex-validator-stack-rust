@@ -406,8 +406,6 @@
 <span id="406">406</span>
 <span id="407">407</span>
 <span id="408">408</span>
-<span id="409">409</span>
-<span id="410">410</span>
 </pre><pre class="rust"><code><span class="kw">use </span>std::{collections::HashSet, sync::Arc};
 
 <span class="kw">use </span>axum::{
@@ -490,7 +488,6 @@
 
     <span class="comment">// TODO: remove once we know how/where we will be fetching the rest of the information!
     </span><span class="kw">let </span>accepted_referrers: Vec&lt;Url&gt; = <span class="macro">vec!</span>[<span class="string">&quot;TODO&quot;</span>.parse().unwrap()];
-    <span class="kw">let </span>alexa_rank = <span class="prelude-val">Some</span>(<span class="number">1.0_f64</span>);
     <span class="kw">let </span>categories: Vec&lt;String&gt; = <span class="macro">vec!</span>[<span class="string">&quot;TODO&quot;</span>.into()];
 
     <span class="kw">let </span>units = <span class="kw">match </span>app
@@ -599,7 +596,6 @@
     </span><span class="kw">let </span>targeting_input_ad_slot = <span class="prelude-val">Some</span>(input::AdSlot {
         categories: categories.clone(),
         hostname,
-        alexa_rank,
     });
 
     <span class="kw">let </span><span class="kw-2">mut </span>targeting_input_base = Input {

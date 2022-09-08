@@ -482,13 +482,6 @@
 <span id="482">482</span>
 <span id="483">483</span>
 <span id="484">484</span>
-<span id="485">485</span>
-<span id="486">486</span>
-<span id="487">487</span>
-<span id="488">488</span>
-<span id="489">489</span>
-<span id="490">490</span>
-<span id="491">491</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="self">self</span>::campaign::FullCampaign;
 
 <span class="kw">use super</span>::{Error, Value};
@@ -667,13 +660,12 @@
     }
 }
 
-<span class="attribute">#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+<span class="attribute">#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]
 </span><span class="doccomment">/// AdSlot scope, accessible on Supermarket and AdView
 </span><span class="kw">pub struct </span>AdSlot {
     <span class="kw">pub </span>categories: Vec&lt;String&gt;,
     <span class="kw">pub </span>hostname: String,
-    <span class="kw">pub </span>alexa_rank: <span class="prelude-ty">Option</span>&lt;f64&gt;,
 }
 
 <span class="kw">impl </span>GetField <span class="kw">for </span>AdSlot {
@@ -689,10 +681,6 @@
                     .collect(),
             )),
             field::AdSlot::Hostname =&gt; <span class="prelude-val">Some</span>(Value::String(<span class="self">self</span>.hostname.clone())),
-            field::AdSlot::AlexaRank =&gt; <span class="self">self
-                </span>.alexa_rank
-                .and_then(serde_json::Number::from_f64)
-                .map(Value::Number),
         }
     }
 }
@@ -904,7 +892,6 @@
             <span class="comment">// adSlot scope, accessible on Supermarket and AdView
             </span><span class="string">&quot;adSlot.categories&quot;</span>: [<span class="string">&quot;IAB3&quot;</span>, <span class="string">&quot;IAB13-7&quot;</span>, <span class="string">&quot;IAB5&quot;</span>],
             <span class="string">&quot;adSlot.hostname&quot;</span>: <span class="string">&quot;adex.network&quot;</span>,
-            <span class="string">&quot;adSlot.alexaRank&quot;</span>: <span class="number">2.0</span>,
         });
 
         <span class="kw">let </span>actual_date = Utc.ymd(<span class="number">2020</span>, <span class="number">6</span>, <span class="number">6</span>).and_hms(<span class="number">12</span>, <span class="number">0</span>, <span class="number">0</span>);
@@ -957,7 +944,6 @@
             ad_slot: <span class="prelude-val">Some</span>(AdSlot {
                 categories: <span class="macro">vec!</span>[<span class="string">&quot;IAB3&quot;</span>.into(), <span class="string">&quot;IAB13-7&quot;</span>.into(), <span class="string">&quot;IAB5&quot;</span>.into()],
                 hostname: <span class="string">&quot;adex.network&quot;</span>.into(),
-                alexa_rank: <span class="prelude-val">Some</span>(<span class="number">2.0</span>),
             }),
         };
 
