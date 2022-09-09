@@ -635,6 +635,8 @@ pub mod mongodb_pool {
 
             // make the database available
             database.available = true;
+            // use the new connection's database
+            database.database = mongo_database;
 
             drop_result.expect("Should have dropped the mongodb DB successfully");
 
