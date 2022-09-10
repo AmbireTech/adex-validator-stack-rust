@@ -2,6 +2,9 @@
 
 use std::ops;
 
+use axum::{body::BoxBody, response::Response};
+use serde::de::DeserializeOwned;
+
 use adapter::{
     dummy::{Dummy, Options},
     Adapter,
@@ -87,4 +90,26 @@ pub async fn setup_dummy_app() -> ApplicationGuard {
         redis_pool: redis,
         db_pool: database,
     }
+}
+
+/// Extracts the body as a String from the Response.
+///
+/// Used when you want to check the response body or debug a response.
+pub async fn body_to_string(response: Response<BoxBody>) -> String {
+    String::from_utf8(
+        hyper::body::to_bytes(response)
+            .await
+            .expect("Should collect the full Body of the request")
+            .to_vec(),
+    )
+    .expect("Should be valid Utf-8 string!")
+}
+
+pub async fn body_to<'de, T>(response: Response<BoxBody>) -> Result<T, serde_json::Error>
+where
+    T: DeserializeOwned,
+{
+    let string_body = body_to_string(response).await;
+
+    serde_json::from_str(&string_body)
 }
