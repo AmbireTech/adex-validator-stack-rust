@@ -1765,6 +1765,18 @@
 <span id="1765">1765</span>
 <span id="1766">1766</span>
 <span id="1767">1767</span>
+<span id="1768">1768</span>
+<span id="1769">1769</span>
+<span id="1770">1770</span>
+<span id="1771">1771</span>
+<span id="1772">1772</span>
+<span id="1773">1773</span>
+<span id="1774">1774</span>
+<span id="1775">1775</span>
+<span id="1776">1776</span>
+<span id="1777">1777</span>
+<span id="1778">1778</span>
+<span id="1779">1779</span>
 </pre><pre class="rust"><code><span class="doccomment">//! `/v5/channel` routes
 //!
 
@@ -2497,39 +2509,236 @@
             }
         }
     }
+
+    <span class="attribute">#[cfg(test)]
+    </span><span class="kw">mod </span>test {
+        <span class="kw">use super</span>::<span class="kw-2">*</span>;
+        <span class="kw">use crate</span>::{
+            db::{insert_channel, validator_message::get_validator_messages},
+            test_util::setup_dummy_app,
+        };
+
+        <span class="kw">use </span>adapter::prelude::Unlocked;
+        <span class="kw">use </span>chrono::Utc;
+
+        <span class="kw">use </span>primitives::{
+            balances::UncheckedState,
+            sentry::validator_messages::ValidatorMessagesCreateRequest,
+            test_util::{ADVERTISER, CAMPAIGNS, IDS, LEADER},
+            validator::{
+                ApproveState, Heartbeat, MessageType, MessageTypes, NewState, RejectState,
+            },
+            Balances,
+        };
+
+        <span class="attribute">#[tokio::test]
+        </span><span class="kw">async fn </span>post_validator_messages() {
+            <span class="kw">let </span>app_guard = setup_dummy_app().<span class="kw">await</span>;
+            <span class="kw">let </span>app = Extension(Arc::new(app_guard.app.clone()));
+            <span class="kw">let </span>all_message_types: [MessageType; <span class="number">4</span>] = [
+                MessageType::NewState,
+                MessageType::ApproveState,
+                MessageType::RejectState,
+                MessageType::Heartbeat,
+            ];
+
+            <span class="kw">let </span>channel_context = Extension(CAMPAIGNS[<span class="number">0</span>].clone().of_channel());
+
+            insert_channel(<span class="kw-2">&amp;</span>app.pool, <span class="kw-2">&amp;</span>channel_context)
+                .<span class="kw">await
+                </span>.expect(<span class="string">&quot;should insert channel&quot;</span>);
+
+            <span class="comment">// Case when the request is not sent by a channel validator
+            </span>{
+                <span class="kw">let </span>auth = Auth {
+                    era: <span class="number">0</span>,
+                    uid: IDS[<span class="kw-2">&amp;</span>ADVERTISER],
+                    chain: channel_context.chain.clone(),
+                };
+
+                <span class="kw">let </span>req = ValidatorMessagesCreateRequest { messages: <span class="macro">vec!</span>[] };
+
+                <span class="kw">let </span>res = create_validator_messages(
+                    app.clone(),
+                    Extension(auth),
+                    channel_context.clone(),
+                    Json(req),
+                )
+                .<span class="kw">await
+                </span>.expect_err(<span class="string">&quot;We expect an error to be returned&quot;</span>);
+
+                <span class="macro">assert_eq!</span>(res, ResponseError::Unauthorized);
+            }
+
+            <span class="comment">// Cases where we insert validator messages
+            // Case with 0 messages
+            </span>{
+                <span class="kw">let </span>auth = Auth {
+                    era: <span class="number">0</span>,
+                    uid: IDS[<span class="kw-2">&amp;</span>LEADER],
+                    chain: channel_context.chain.clone(),
+                };
+
+                <span class="kw">let </span>req = ValidatorMessagesCreateRequest { messages: <span class="macro">vec!</span>[] };
+
+                create_validator_messages(
+                    app.clone(),
+                    Extension(auth),
+                    channel_context.clone(),
+                    Json(req),
+                )
+                .<span class="kw">await
+                </span>.expect(<span class="string">&quot;should work&quot;</span>);
+
+                <span class="kw">let </span>messages = get_validator_messages(
+                    <span class="kw-2">&amp;</span>app.pool,
+                    <span class="kw-2">&amp;</span>channel_context.context.id(),
+                    <span class="kw-2">&amp;</span><span class="prelude-val">Some</span>(IDS[<span class="kw-2">&amp;</span>LEADER]),
+                    <span class="kw-2">&amp;</span>all_message_types,
+                    <span class="number">100</span>,
+                )
+                .<span class="kw">await
+                </span>.expect(<span class="string">&quot;should get messages&quot;</span>);
+
+                <span class="macro">assert_eq!</span>(messages.len(), <span class="number">0</span>);
+            }
+            <span class="comment">// Case with 1 message
+            </span>{
+                <span class="kw">let </span>auth = Auth {
+                    era: <span class="number">0</span>,
+                    uid: IDS[<span class="kw-2">&amp;</span>LEADER],
+                    chain: channel_context.chain.clone(),
+                };
+
+                <span class="kw">let </span>message = MessageTypes::Heartbeat(Heartbeat {
+                    signature: String::new(),
+                    state_root: String::new(),
+                    timestamp: Utc::now(),
+                });
+
+                <span class="kw">let </span>req = ValidatorMessagesCreateRequest {
+                    messages: <span class="macro">vec!</span>[message.clone()],
+                };
+
+                create_validator_messages(
+                    app.clone(),
+                    Extension(auth),
+                    channel_context.clone(),
+                    Json(req),
+                )
+                .<span class="kw">await
+                </span>.expect(<span class="string">&quot;Should create messages&quot;</span>);
+
+                <span class="kw">let </span>messages = get_validator_messages(
+                    <span class="kw-2">&amp;</span>app.pool,
+                    <span class="kw-2">&amp;</span>channel_context.context.id(),
+                    <span class="kw-2">&amp;</span><span class="prelude-val">Some</span>(IDS[<span class="kw-2">&amp;</span>LEADER]),
+                    <span class="kw-2">&amp;</span>all_message_types,
+                    <span class="number">100</span>,
+                )
+                .<span class="kw">await
+                </span>.expect(<span class="string">&quot;should get messages&quot;</span>);
+                <span class="kw">let </span>inner_messages: Vec&lt;MessageTypes&gt; =
+                    messages.into_iter().map(|m| m.msg.clone()).collect();
+                <span class="macro">assert_eq!</span>(inner_messages, <span class="macro">vec!</span>[message]);
+            }
+            <span class="comment">// Case with 4 messages (one of each type, heartbeat is already inserted)
+            </span>{
+                <span class="kw">let </span>auth = Auth {
+                    era: <span class="number">0</span>,
+                    uid: IDS[<span class="kw-2">&amp;</span>LEADER],
+                    chain: channel_context.chain.clone(),
+                };
+
+                <span class="kw">let </span>state_root =
+                    <span class="string">&quot;b1a4fc6c1a1e1ab908a487e504006edcebea297f61b4b8ce6cad3b29e29454cc&quot;</span>.to_string();
+                <span class="kw">let </span>signature = app
+                    .adapter
+                    .clone()
+                    .unlock()
+                    .expect(<span class="string">&quot;should unlock&quot;</span>)
+                    .sign(<span class="kw-2">&amp;</span>state_root.clone())
+                    .expect(<span class="string">&quot;should sign&quot;</span>);
+                <span class="kw">let </span>new_state = MessageTypes::NewState(NewState {
+                    state_root: state_root.clone(),
+                    signature: signature.clone(),
+                    balances: Balances::&lt;UncheckedState&gt;::new(),
+                });
+
+                <span class="kw">let </span>approve_state = MessageTypes::ApproveState(ApproveState {
+                    state_root: state_root.clone(),
+                    signature: signature.clone(),
+                    is_healthy: <span class="bool-val">true</span>,
+                });
+
+                <span class="kw">let </span>reject_state = MessageTypes::RejectState(RejectState {
+                    state_root,
+                    signature: signature.clone(),
+                    timestamp: Utc::now(),
+                    reason: <span class="string">&quot;rejected&quot;</span>.to_string(),
+                    balances: <span class="prelude-val">None</span>,
+                });
+
+                <span class="kw">let </span>req = ValidatorMessagesCreateRequest {
+                    messages: <span class="macro">vec!</span>[
+                        new_state.clone(),
+                        approve_state.clone(),
+                        reject_state.clone(),
+                    ],
+                };
+
+                create_validator_messages(
+                    app.clone(),
+                    Extension(auth),
+                    channel_context.clone(),
+                    Json(req),
+                )
+                .<span class="kw">await
+                </span>.expect(<span class="string">&quot;Should create messages&quot;</span>);
+
+                <span class="kw">let </span>messages = get_validator_messages(
+                    <span class="kw-2">&amp;</span>app.pool,
+                    <span class="kw-2">&amp;</span>channel_context.context.id(),
+                    <span class="kw-2">&amp;</span><span class="prelude-val">Some</span>(IDS[<span class="kw-2">&amp;</span>LEADER]),
+                    <span class="kw-2">&amp;</span>all_message_types,
+                    <span class="number">100</span>,
+                )
+                .<span class="kw">await
+                </span>.expect(<span class="string">&quot;should get messages&quot;</span>);
+                <span class="macro">assert_eq!</span>(messages.len(), <span class="number">4</span>);
+            }
+        }
+    }
 }
 
 <span class="attribute">#[cfg(test)]
 </span><span class="kw">mod </span>test {
+    <span class="kw">use </span>std::str::FromStr;
+
     <span class="kw">use super</span>::<span class="kw-2">*</span>;
     <span class="kw">use crate</span>::{
         db::{
-            insert_campaign, insert_channel,
-            validator_message::{get_validator_messages, insert_validator_message},
+            insert_campaign, insert_channel, validator_message::insert_validator_message,
             CampaignRemaining,
         },
-        routes::channel::validator_message::create_validator_messages,
         test_util::setup_dummy_app,
     };
+
     <span class="kw">use </span>adapter::{
         ethereum::test_util::{GANACHE_INFO_1, GANACHE_INFO_1337},
         prelude::Unlocked,
         primitives::Deposit <span class="kw">as </span>AdapterDeposit,
     };
-    <span class="kw">use </span>chrono::Utc;
     <span class="kw">use </span>primitives::{
         balances::UncheckedState,
         channel::Nonce,
-        config::GANACHE_CONFIG,
-        sentry::validator_messages::ValidatorMessagesCreateRequest,
         test_util::{
             ADVERTISER, CREATOR, DUMMY_CAMPAIGN, FOLLOWER, GUARDIAN, IDS, LEADER, LEADER_2,
             PUBLISHER, PUBLISHER_2,
         },
-        validator::{ApproveState, Heartbeat, MessageType, MessageTypes, NewState, RejectState},
+        validator::{ApproveState, MessageTypes, NewState},
         BigNum, ChainId, Deposit, UnifiedMap, ValidatorId,
     };
-    <span class="kw">use </span>std::str::FromStr;
 
     <span class="attribute">#[tokio::test]
     </span><span class="kw">async fn </span>create_and_fetch_spendable() {
@@ -3346,191 +3555,6 @@
         </span><span class="macro">assert_eq!</span>(spender_proof, spender_leaf.merkle_proof);
         <span class="macro">assert_eq!</span>(earner_proof, earner_leaf.merkle_proof);
     }
-
-    <span class="attribute">#[tokio::test]
-    </span><span class="kw">async fn </span>post_validator_messages() {
-        <span class="kw">let </span>app_guard = setup_dummy_app().<span class="kw">await</span>;
-        <span class="kw">let </span>app = Extension(Arc::new(app_guard.app.clone()));
-        <span class="kw">let </span>config = GANACHE_CONFIG.clone();
-        <span class="kw">let </span>all_message_types: [MessageType; <span class="number">4</span>] = [
-            MessageType::NewState,
-            MessageType::ApproveState,
-            MessageType::RejectState,
-            MessageType::Heartbeat,
-        ];
-
-        <span class="kw">let </span>channel_context = Extension(
-            app.config
-                .find_chain_of(DUMMY_CAMPAIGN.channel.token)
-                .expect(<span class="string">&quot;Dummy channel Token should be present in config!&quot;</span>)
-                .with(DUMMY_CAMPAIGN.channel),
-        );
-
-        <span class="kw">let </span>chain_context = config
-            .find_chain_of(DUMMY_CAMPAIGN.channel.token)
-            .expect(<span class="string">&quot;Campaign&#39;s Channel.token should be set in config&quot;</span>);
-
-        insert_channel(<span class="kw-2">&amp;</span>app.pool, <span class="kw-2">&amp;</span>channel_context)
-            .<span class="kw">await
-            </span>.expect(<span class="string">&quot;should insert channel&quot;</span>);
-        <span class="comment">// Case when the request is not sent by a channel validator
-        </span>{
-            <span class="kw">let </span>auth = Auth {
-                era: <span class="number">0</span>,
-                uid: IDS[<span class="kw-2">&amp;</span>ADVERTISER],
-                chain: chain_context.chain.clone(),
-            };
-
-            <span class="kw">let </span>req = ValidatorMessagesCreateRequest { messages: <span class="macro">vec!</span>[] };
-
-            <span class="kw">let </span>res = create_validator_messages(
-                app.clone(),
-                Extension(auth),
-                channel_context.clone(),
-                Json(req),
-            )
-            .<span class="kw">await</span>;
-
-            <span class="macro">assert!</span>(<span class="macro">matches!</span>(res, <span class="prelude-val">Err</span>(ResponseError::Unauthorized)));
-        }
-        <span class="comment">// Cases where we insert validator messages
-        // Case with 0 messages
-        </span>{
-            <span class="kw">let </span>auth = Auth {
-                era: <span class="number">0</span>,
-                uid: IDS[<span class="kw-2">&amp;</span>LEADER],
-                chain: chain_context.chain.clone(),
-            };
-
-            <span class="kw">let </span>req = ValidatorMessagesCreateRequest { messages: <span class="macro">vec!</span>[] };
-
-            create_validator_messages(
-                app.clone(),
-                Extension(auth),
-                channel_context.clone(),
-                Json(req),
-            )
-            .<span class="kw">await
-            </span>.expect(<span class="string">&quot;should work&quot;</span>);
-
-            <span class="kw">let </span>messages = get_validator_messages(
-                <span class="kw-2">&amp;</span>app.pool,
-                <span class="kw-2">&amp;</span>channel_context.context.id(),
-                <span class="kw-2">&amp;</span><span class="prelude-val">Some</span>(IDS[<span class="kw-2">&amp;</span>LEADER]),
-                <span class="kw-2">&amp;</span>all_message_types,
-                <span class="number">100</span>,
-            )
-            .<span class="kw">await
-            </span>.expect(<span class="string">&quot;should get messages&quot;</span>);
-
-            <span class="macro">assert_eq!</span>(messages.len(), <span class="number">0</span>);
-        }
-        <span class="comment">// Case with 1 message
-        </span>{
-            <span class="kw">let </span>auth = Auth {
-                era: <span class="number">0</span>,
-                uid: IDS[<span class="kw-2">&amp;</span>LEADER],
-                chain: chain_context.chain.clone(),
-            };
-
-            <span class="kw">let </span>message = Heartbeat {
-                signature: String::new(),
-                state_root: String::new(),
-                timestamp: Utc::now(),
-            };
-
-            <span class="kw">let </span>req = ValidatorMessagesCreateRequest {
-                messages: <span class="macro">vec!</span>[MessageTypes::Heartbeat(message.clone())],
-            };
-
-            create_validator_messages(
-                app.clone(),
-                Extension(auth),
-                channel_context.clone(),
-                Json(req),
-            )
-            .<span class="kw">await
-            </span>.expect(<span class="string">&quot;Should create messages&quot;</span>);
-
-            <span class="kw">let </span>messages = get_validator_messages(
-                <span class="kw-2">&amp;</span>app.pool,
-                <span class="kw-2">&amp;</span>channel_context.context.id(),
-                <span class="kw-2">&amp;</span><span class="prelude-val">Some</span>(IDS[<span class="kw-2">&amp;</span>LEADER]),
-                <span class="kw-2">&amp;</span>all_message_types,
-                <span class="number">100</span>,
-            )
-            .<span class="kw">await
-            </span>.expect(<span class="string">&quot;should get messages&quot;</span>);
-            <span class="kw">let </span>inner_messages: Vec&lt;MessageTypes&gt; =
-                messages.into_iter().map(|m| m.msg.clone()).collect();
-            <span class="macro">assert_eq!</span>(inner_messages, <span class="macro">vec!</span>[MessageTypes::Heartbeat(message)]);
-        }
-        <span class="comment">// Case with 4 messages (one of each type, heartbeat is already inserted)
-        </span>{
-            <span class="kw">let </span>auth = Auth {
-                era: <span class="number">0</span>,
-                uid: IDS[<span class="kw-2">&amp;</span>LEADER],
-                chain: chain_context.chain.clone(),
-            };
-
-            <span class="kw">let </span>state_root =
-                <span class="string">&quot;b1a4fc6c1a1e1ab908a487e504006edcebea297f61b4b8ce6cad3b29e29454cc&quot;</span>.to_string();
-            <span class="kw">let </span>signature = app
-                .adapter
-                .clone()
-                .unlock()
-                .expect(<span class="string">&quot;should unlock&quot;</span>)
-                .sign(<span class="kw-2">&amp;</span>state_root.clone())
-                .expect(<span class="string">&quot;should sign&quot;</span>);
-            <span class="kw">let </span>new_state: NewState&lt;UncheckedState&gt; = NewState {
-                state_root: state_root.clone(),
-                signature: signature.clone(),
-                balances: Balances::new(),
-            };
-
-            <span class="kw">let </span>approve_state = ApproveState {
-                state_root: state_root.clone(),
-                signature: signature.clone(),
-                is_healthy: <span class="bool-val">true</span>,
-            };
-
-            <span class="kw">let </span>reject_state = RejectState {
-                state_root,
-                signature: signature.clone(),
-                timestamp: Utc::now(),
-                reason: <span class="string">&quot;rejected&quot;</span>.to_string(),
-                balances: <span class="prelude-val">None</span>,
-            };
-
-            <span class="kw">let </span>req = ValidatorMessagesCreateRequest {
-                messages: <span class="macro">vec!</span>[
-                    MessageTypes::NewState(new_state.clone()),
-                    MessageTypes::ApproveState(approve_state.clone()),
-                    MessageTypes::RejectState(reject_state.clone()),
-                ],
-            };
-
-            create_validator_messages(
-                app.clone(),
-                Extension(auth),
-                channel_context.clone(),
-                Json(req),
-            )
-            .<span class="kw">await
-            </span>.expect(<span class="string">&quot;Should create messages&quot;</span>);
-
-            <span class="kw">let </span>messages = get_validator_messages(
-                <span class="kw-2">&amp;</span>app.pool,
-                <span class="kw-2">&amp;</span>channel_context.context.id(),
-                <span class="kw-2">&amp;</span><span class="prelude-val">Some</span>(IDS[<span class="kw-2">&amp;</span>LEADER]),
-                <span class="kw-2">&amp;</span>all_message_types,
-                <span class="number">100</span>,
-            )
-            .<span class="kw">await
-            </span>.expect(<span class="string">&quot;should get messages&quot;</span>);
-            <span class="macro">assert_eq!</span>(messages.len(), <span class="number">4</span>);
-        }
-    }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (1120c5e01 2022-09-08)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (1d37ed661 2022-09-09)" ></div></body></html>

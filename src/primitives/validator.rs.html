@@ -550,6 +550,12 @@
 <span id="550">550</span>
 <span id="551">551</span>
 <span id="552">552</span>
+<span id="553">553</span>
+<span id="554">554</span>
+<span id="555">555</span>
+<span id="556">556</span>
+<span id="557">557</span>
+<span id="558">558</span>
 </pre><pre class="rust"><code><span class="kw">use </span>once_cell::sync::Lazy;
 <span class="kw">use </span>serde::{Deserialize, Serialize};
 <span class="kw">use </span>std::{borrow::Borrow, fmt, str::FromStr};
@@ -952,6 +958,12 @@
         Heartbeat(Heartbeat),
     }
 
+    <span class="kw">impl </span>MessageTypes {
+        <span class="kw">pub fn </span>message_type(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; MessageType {
+            <span class="self">self</span>.into()
+        }
+    }
+
     <span class="doccomment">/// All available message type names.
     </span><span class="attribute">#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, FromStr, Display)]
     #[display(style = <span class="string">&quot;CamelCase&quot;</span>)]
@@ -1103,4 +1115,4 @@
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="primitives" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (1120c5e01 2022-09-08)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="primitives" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (1d37ed661 2022-09-09)" ></div></body></html>

@@ -655,6 +655,9 @@
 <span id="655">655</span>
 <span id="656">656</span>
 <span id="657">657</span>
+<span id="658">658</span>
+<span id="659">659</span>
+<span id="660">660</span>
 </pre><pre class="rust"><code><span class="kw">use </span>std::sync::Arc;
 
 <span class="kw">use </span>axum::{
@@ -867,7 +870,10 @@
     };
     <span class="kw">use </span>primitives::test_util::{ADVERTISER, DUMMY_AUTH, FOLLOWER, IDS, LEADER, PUBLISHER};
 
-    <span class="kw">use crate</span>::{middleware::body_to_string, test_util::setup_dummy_app, Session};
+    <span class="kw">use crate</span>::{
+        test_util::{body_to_string, setup_dummy_app},
+        Session,
+    };
 
     <span class="kw">use super</span>::<span class="kw-2">*</span>;
 
@@ -1313,4 +1319,4 @@
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (1120c5e01 2022-09-08)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (1d37ed661 2022-09-09)" ></div></body></html>

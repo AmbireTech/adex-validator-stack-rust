@@ -1507,64 +1507,6 @@
 <span id="1507">1507</span>
 <span id="1508">1508</span>
 <span id="1509">1509</span>
-<span id="1510">1510</span>
-<span id="1511">1511</span>
-<span id="1512">1512</span>
-<span id="1513">1513</span>
-<span id="1514">1514</span>
-<span id="1515">1515</span>
-<span id="1516">1516</span>
-<span id="1517">1517</span>
-<span id="1518">1518</span>
-<span id="1519">1519</span>
-<span id="1520">1520</span>
-<span id="1521">1521</span>
-<span id="1522">1522</span>
-<span id="1523">1523</span>
-<span id="1524">1524</span>
-<span id="1525">1525</span>
-<span id="1526">1526</span>
-<span id="1527">1527</span>
-<span id="1528">1528</span>
-<span id="1529">1529</span>
-<span id="1530">1530</span>
-<span id="1531">1531</span>
-<span id="1532">1532</span>
-<span id="1533">1533</span>
-<span id="1534">1534</span>
-<span id="1535">1535</span>
-<span id="1536">1536</span>
-<span id="1537">1537</span>
-<span id="1538">1538</span>
-<span id="1539">1539</span>
-<span id="1540">1540</span>
-<span id="1541">1541</span>
-<span id="1542">1542</span>
-<span id="1543">1543</span>
-<span id="1544">1544</span>
-<span id="1545">1545</span>
-<span id="1546">1546</span>
-<span id="1547">1547</span>
-<span id="1548">1548</span>
-<span id="1549">1549</span>
-<span id="1550">1550</span>
-<span id="1551">1551</span>
-<span id="1552">1552</span>
-<span id="1553">1553</span>
-<span id="1554">1554</span>
-<span id="1555">1555</span>
-<span id="1556">1556</span>
-<span id="1557">1557</span>
-<span id="1558">1558</span>
-<span id="1559">1559</span>
-<span id="1560">1560</span>
-<span id="1561">1561</span>
-<span id="1562">1562</span>
-<span id="1563">1563</span>
-<span id="1564">1564</span>
-<span id="1565">1565</span>
-<span id="1566">1566</span>
-<span id="1567">1567</span>
 </pre><pre class="rust"><code><span class="doccomment">//! `/v5/analytics` routes
 //!
 
@@ -2194,7 +2136,7 @@
         }
 
         <span class="comment">// test with not allowed key
-        // event type: IMPRESSION
+        // event type: CLICK
         </span>{
             <span class="kw">let </span>query = AnalyticsQuery {
                 event_type: CLICK,
@@ -2843,20 +2785,7 @@
                     .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;(),
             );
         }
-
-        <span class="comment">// TODO: test with no authUid
-        // let req = Request::builder()
-        //     .uri(&quot;http://127.0.0.1/v5/analytics?limit=100&amp;eventType=CLICK&amp;metric=count&amp;timeframe=day&quot;)
-        //     .body(Body::empty())
-        //     .expect(&quot;Should build Request&quot;);
-
-        // let analytics_response = analytics_router(req, &amp;app, None, Some(AuthenticateAs::Publisher())).await;
-        // let err_msg = &quot;auth_as_key is provided but there is no Auth object&quot;.to_string();
-        // assert!(matches!(
-        //     analytics_response,
-        //     Err(ResponseError::BadRequest(err_msg))
-        // ));
-    </span>}
+    }
 
     <span class="attribute">#[tokio::test]
     </span><span class="kw">async fn </span>test_allowed_keys_for_guest() {
@@ -2870,16 +2799,11 @@
         // Country
         </span>{
             <span class="kw">let </span>query = AnalyticsQuery {
-                limit: <span class="number">1000</span>,
-                event_type: CLICK,
-                metric: Metric::Count,
-                segment_by: <span class="prelude-val">None</span>,
                 time: Time {
                     timeframe: Timeframe::Day,
                     start: base_datehour - <span class="number">1</span>,
                     end: <span class="prelude-val">None</span>,
                 },
-                chains: <span class="macro">vec!</span>[GANACHE_1337.chain_id],
                 country: <span class="prelude-val">Some</span>(<span class="string">&quot;Bulgaria&quot;</span>.to_string()),
                 ..Default::default()
             };
@@ -2896,16 +2820,11 @@
         <span class="comment">// Ad Slot Type
         </span>{
             <span class="kw">let </span>query = AnalyticsQuery {
-                limit: <span class="number">1000</span>,
-                event_type: CLICK,
-                metric: Metric::Count,
-                segment_by: <span class="prelude-val">None</span>,
                 time: Time {
                     timeframe: Timeframe::Day,
                     start: base_datehour - <span class="number">1</span>,
                     end: <span class="prelude-val">None</span>,
                 },
-                chains: <span class="macro">vec!</span>[GANACHE_1337.chain_id],
                 ad_slot_type: <span class="prelude-val">Some</span>(<span class="string">&quot;legacy_300x100&quot;</span>.to_string()),
                 ..Default::default()
             };
@@ -2923,16 +2842,11 @@
         // CampaignId
         </span>{
             <span class="kw">let </span>query = AnalyticsQuery {
-                limit: <span class="number">1000</span>,
-                event_type: CLICK,
-                metric: Metric::Count,
-                segment_by: <span class="prelude-val">None</span>,
                 time: Time {
                     timeframe: Timeframe::Day,
                     start: base_datehour - <span class="number">1</span>,
                     end: <span class="prelude-val">None</span>,
                 },
-                chains: <span class="macro">vec!</span>[GANACHE_1337.chain_id],
                 campaign_id: <span class="prelude-val">Some</span>(DUMMY_CAMPAIGN.id),
                 ..Default::default()
             };
@@ -2953,16 +2867,11 @@
         <span class="comment">// AdUnit
         </span>{
             <span class="kw">let </span>query = AnalyticsQuery {
-                limit: <span class="number">1000</span>,
-                event_type: CLICK,
-                metric: Metric::Count,
-                segment_by: <span class="prelude-val">None</span>,
                 time: Time {
                     timeframe: Timeframe::Day,
                     start: base_datehour - <span class="number">1</span>,
                     end: <span class="prelude-val">None</span>,
                 },
-                chains: <span class="macro">vec!</span>[GANACHE_1337.chain_id],
                 ad_unit: <span class="prelude-val">Some</span>(DUMMY_IPFS[<span class="number">0</span>]),
                 ..Default::default()
             };
@@ -2983,16 +2892,11 @@
         <span class="comment">// AdSlot
         </span>{
             <span class="kw">let </span>query = AnalyticsQuery {
-                limit: <span class="number">1000</span>,
-                event_type: CLICK,
-                metric: Metric::Count,
-                segment_by: <span class="prelude-val">None</span>,
                 time: Time {
                     timeframe: Timeframe::Day,
                     start: base_datehour - <span class="number">1</span>,
                     end: <span class="prelude-val">None</span>,
                 },
-                chains: <span class="macro">vec!</span>[GANACHE_1337.chain_id],
                 ad_slot: <span class="prelude-val">Some</span>(DUMMY_IPFS[<span class="number">1</span>]),
                 ..Default::default()
             };
@@ -3013,16 +2917,11 @@
         <span class="comment">// Advertiser
         </span>{
             <span class="kw">let </span>query = AnalyticsQuery {
-                limit: <span class="number">1000</span>,
-                event_type: CLICK,
-                metric: Metric::Count,
-                segment_by: <span class="prelude-val">None</span>,
                 time: Time {
                     timeframe: Timeframe::Day,
                     start: base_datehour - <span class="number">1</span>,
                     end: <span class="prelude-val">None</span>,
                 },
-                chains: <span class="macro">vec!</span>[GANACHE_1337.chain_id],
                 advertiser: <span class="prelude-val">Some</span>(<span class="kw-2">*</span>ADVERTISER),
                 ..Default::default()
             };
@@ -3043,16 +2942,11 @@
         <span class="comment">// Publisher
         </span>{
             <span class="kw">let </span>query = AnalyticsQuery {
-                limit: <span class="number">1000</span>,
-                event_type: CLICK,
-                metric: Metric::Count,
-                segment_by: <span class="prelude-val">None</span>,
                 time: Time {
                     timeframe: Timeframe::Day,
                     start: base_datehour - <span class="number">1</span>,
                     end: <span class="prelude-val">None</span>,
                 },
-                chains: <span class="macro">vec!</span>[GANACHE_1337.chain_id],
                 publisher: <span class="prelude-val">Some</span>(<span class="kw-2">*</span>PUBLISHER),
                 ..Default::default()
             };
@@ -3073,16 +2967,11 @@
         <span class="comment">// Hostname
         </span>{
             <span class="kw">let </span>query = AnalyticsQuery {
-                limit: <span class="number">1000</span>,
-                event_type: CLICK,
-                metric: Metric::Count,
-                segment_by: <span class="prelude-val">None</span>,
                 time: Time {
                     timeframe: Timeframe::Day,
                     start: base_datehour - <span class="number">1</span>,
                     end: <span class="prelude-val">None</span>,
                 },
-                chains: <span class="macro">vec!</span>[GANACHE_1337.chain_id],
                 hostname: <span class="prelude-val">Some</span>(<span class="string">&quot;localhost&quot;</span>.to_string()),
                 ..Default::default()
             };
@@ -3103,16 +2992,11 @@
         <span class="comment">// OsName
         </span>{
             <span class="kw">let </span>query = AnalyticsQuery {
-                limit: <span class="number">1000</span>,
-                event_type: CLICK,
-                metric: Metric::Count,
-                segment_by: <span class="prelude-val">None</span>,
                 time: Time {
                     timeframe: Timeframe::Day,
                     start: base_datehour - <span class="number">1</span>,
                     end: <span class="prelude-val">None</span>,
                 },
-                chains: <span class="macro">vec!</span>[GANACHE_1337.chain_id],
                 os_name: <span class="prelude-val">Some</span>(OperatingSystem::map_os(<span class="string">&quot;Windows&quot;</span>)),
                 ..Default::default()
             };
@@ -3133,4 +3017,4 @@
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (1120c5e01 2022-09-08)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (1d37ed661 2022-09-09)" ></div></body></html>
