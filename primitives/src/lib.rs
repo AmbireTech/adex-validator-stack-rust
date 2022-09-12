@@ -44,7 +44,6 @@ pub mod merkle_tree;
 pub mod platform;
 pub mod sentry;
 pub mod spender;
-pub mod supermarket;
 pub mod targeting;
 // It's not possible to enable this feature for doctest,
 // so we always must pass `--feature=test-util` or `--all-features` when running doctests:

@@ -1,7 +1,7 @@
 use std::{collections::HashSet, sync::Arc};
 
 use axum::{
-    extract::TypedHeader,
+    extract::{Path, TypedHeader},
     headers::UserAgent,
     http::header::{HeaderMap, HeaderName},
     Extension, Json,
@@ -10,23 +10,28 @@ use chrono::Utc;
 use futures::future::try_join_all;
 use once_cell::sync::Lazy;
 use reqwest::Url;
-use serde::{Deserialize, Serialize};
-use slog::{debug, error, warn, Logger};
+use slog::{debug, error, Logger};
+use thiserror::Error;
 use woothee::{parser::Parser, woothee::VALUE_UNKNOWN};
 
 use adapter::client::Locked;
 use primitives::{
-    sentry::IMPRESSION,
-    supermarket::units_for_slot::response,
-    supermarket::units_for_slot::response::Response as UnitsForSlotResponse,
+    sentry::{
+        units_for_slot::{
+            response::{self, Response},
+            Query,
+        },
+        IMPRESSION,
+    },
     targeting::{eval_with_callback, get_pricing_bounds, input, input::Input, Output},
-    AdSlot, AdUnit, Address, Campaign, Config, UnifiedNum, ValidatorId,
+    AdSlot, Address, Campaign, Config, UnifiedNum, ValidatorId, IPFS,
 };
 
 use crate::{
+    application::Qs,
     db::{
         accounting::{get_accounting, Side},
-        units_for_slot_get_campaigns, CampaignRemaining, DbPool,
+        units_for_slot_get_campaigns, CampaignRemaining, DbPool, PoolError, RedisError,
     },
     response::ResponseError,
     Application,
@@ -39,83 +44,36 @@ pub(crate) static CLOUDFLARE_IPCOUNTRY_HEADER: Lazy<HeaderName> =
 // #[path = "units_for_slot_test.rs"]
 // pub mod test;
 
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct RequestBody {
-    pub ad_slot: AdSlot,
-    pub deposit_assets: Option<HashSet<Address>>,
+#[derive(Debug, Error)]
+#[error(transparent)]
+pub enum CampaignsError {
+    Redis(#[from] RedisError),
+    Postgres(#[from] PoolError),
 }
 
-pub async fn post_units_for_slot<C>(
+pub async fn get_units_for_slot<C>(
     Extension(app): Extension<Arc<Application<C>>>,
-    Json(request_body): Json<RequestBody>,
+    Path(ad_slot): Path<IPFS>,
+    Qs(query): Qs<Query>,
     user_agent: Option<TypedHeader<UserAgent>>,
     headers: HeaderMap,
-) -> Result<Json<UnitsForSlotResponse>, ResponseError>
+) -> Result<Json<Response>, ResponseError>
 where
     C: Locked + 'static,
 {
-    let ad_slot = request_body.ad_slot.clone();
-
-    // TODO: remove once we know how/where we will be fetching the rest of the information!
-    let accepted_referrers: Vec<Url> = vec!["TODO".parse().unwrap()];
-    let categories: Vec<String> = vec!["TODO".into()];
-
-    let units = match app
+    let ad_slot_response = app
         .platform_api
-        .fetch_units(&request_body.ad_slot.ad_type)
-        .await
-    {
-        Ok(units) => units,
-        Err(error) => {
-            error!(&app.logger, "Error fetching AdUnits for AdSlot"; "AdSlot" => ?ad_slot, "error" => ?error);
+        .fetch_slot(ad_slot)
+        .await?
+        .ok_or(ResponseError::NotFound)?;
 
-            return Err(ResponseError::BadRequest(
-                "Error fetching AdUnits for AdSlot. Please try again later.".into(),
-            ));
-        }
+    debug!(&app.logger, "Fetched AdSlot from the platform"; "AdSlotResponse" => ?&ad_slot_response);
+
+    let slot = ad_slot_response.slot;
+    let (accepted_referrers, categories) = match ad_slot_response.website {
+        Some(website) => (website.accepted_referrers, website.categories),
+        None => Default::default(),
     };
-
-    let fallback_unit: Option<AdUnit> = match &ad_slot.fallback_unit {
-        Some(unit_ipfs) => {
-            let ad_unit_response = match app.platform_api.fetch_unit(*unit_ipfs).await {
-                Ok(Some(response)) => {
-                    debug!(&app.logger, "Fetched AdUnit {:?}", unit_ipfs; "AdUnit" => ?unit_ipfs);
-                    response
-                }
-                Ok(None) => {
-                    warn!(
-                        &app.logger,
-                        "AdSlot fallback AdUnit {} not found in Platform",
-                        unit_ipfs;
-                        "AdUnit" => ?unit_ipfs,
-                        "AdSlot" => ?ad_slot,
-                    );
-
-                    return Err(ResponseError::NotFound);
-                }
-                Err(error) => {
-                    error!(&app.logger,
-                        "Error when fetching AdSlot fallback AdUnit ({}) from Platform",
-                        unit_ipfs;
-                        "AdSlot" => ?ad_slot,
-                        "Fallback AdUnit" => ?unit_ipfs,
-                        "error" => ?error
-                    );
-
-                    return Err(ResponseError::BadRequest(
-                        "Error when fetching AdSlot fallback AdUnit. Please try again later."
-                            .into(),
-                    ));
-                }
-            };
-
-            Some(ad_unit_response.unit)
-        }
-        None => None,
-    };
-
-    debug!(&app.logger, "Fetched {} AdUnits for AdSlot", units.len(); "AdSlot" => ?ad_slot);
 
     // For each adUnits apply input
     let ua_parser = Parser::new();
@@ -147,38 +105,36 @@ where
         .get(CLOUDFLARE_IPCOUNTRY_HEADER.clone())
         .and_then(|h| h.to_str().map(ToString::to_string).ok());
 
-    let hostname = Url::parse(&ad_slot.website.clone().unwrap_or_default())
+    let hostname = Url::parse(&slot.website.clone().unwrap_or_default())
         .ok()
         .and_then(|url| url.host().map(|h| h.to_string()))
         .unwrap_or_default();
 
-    let publisher_id = ad_slot.owner;
+    let publisher_id = slot.owner;
 
     let campaigns_limited_by_earner = get_campaigns(
         app.pool.clone(),
         app.campaign_remaining.clone(),
         &app.config,
-        &request_body.deposit_assets,
+        &Some(query.deposit_assets),
         publisher_id,
     )
-    .await
-    // TODO: Fix mapping this error and Log the error!
-    .map_err(|err| ResponseError::BadRequest(err.to_string()))?;
+    .await?;
 
     debug!(&app.logger, "Fetched Cache campaigns limited by earner (publisher)"; "campaigns" => campaigns_limited_by_earner.len(), "publisher_id" => %publisher_id);
 
     // We return those in the result (which means AdView would have those) but we don't actually use them
     // we do that in order to have the same variables as the validator, so that the `price` is the same
     let targeting_input_ad_slot = Some(input::AdSlot {
-        categories: categories.clone(),
+        categories: categories.clone().into_iter().collect(),
         hostname,
     });
 
     let mut targeting_input_base = Input {
         ad_view: None,
         global: input::Global {
-            ad_slot_id: ad_slot.ipfs,
-            ad_slot_type: ad_slot.ad_type.clone(),
+            ad_slot_id: slot.ipfs,
+            ad_slot_type: slot.ad_type.clone(),
             publisher_id: publisher_id.to_address(),
             country,
             event_type: IMPRESSION,
@@ -197,17 +153,19 @@ where
         &app.logger,
         campaigns_limited_by_earner,
         targeting_input_base.clone(),
-        ad_slot,
+        slot,
     )
     .await;
 
     targeting_input_base.ad_slot = targeting_input_ad_slot;
 
-    let response = UnitsForSlotResponse {
+    let response = Response {
         targeting_input_base,
         accepted_referrers,
         campaigns,
-        fallback_unit: fallback_unit.map(|ad_unit| response::AdUnit::from(&ad_unit)),
+        fallback_unit: ad_slot_response
+            .fallback
+            .map(|ad_unit| response::AdUnit::from(&ad_unit)),
     };
 
     Ok(Json(response))
@@ -220,7 +178,7 @@ async fn get_campaigns(
     config: &Config,
     deposit_assets: &Option<HashSet<Address>>,
     publisher_id: ValidatorId,
-) -> Result<Vec<Campaign>, Box<dyn std::error::Error>> {
+) -> Result<Vec<Campaign>, CampaignsError> {
     // 1. Fetch active Campaigns: (postgres)
     //  Creator = publisher_id
     // if deposit asset > 0 => filter by deposit_asset

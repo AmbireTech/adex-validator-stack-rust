@@ -1,8 +1,9 @@
 //! The AdView Manager
 use adex_primitives::{
-    sentry::IMPRESSION,
-    supermarket::units_for_slot,
-    supermarket::units_for_slot::response::{AdUnit, Campaign},
+    sentry::{
+        units_for_slot::response::{AdUnit, Campaign, Response},
+        IMPRESSION,
+    },
     targeting::{self, input},
     util::ApiUrl,
     Address, BigNum, CampaignId, ToHex, UnifiedNum, IPFS,
@@ -200,7 +201,7 @@ impl Manager {
             .units_with_price
             .iter()
             .find_map(|u| {
-                if u.unit.id == sticky_entry.unit_id {
+                if u.unit.ipfs == sticky_entry.unit_id {
                     Some(u.unit.clone())
                 } else {
                     None
@@ -239,9 +240,7 @@ impl Manager {
         }
     }
 
-    pub async fn get_market_demand_resp(
-        &self,
-    ) -> Result<units_for_slot::response::Response, Error> {
+    pub async fn get_market_demand_resp(&self) -> Result<Response, Error> {
         let pub_prefix = self.options.publisher_addr.to_hex();
 
         let deposit_asset = self
@@ -320,7 +319,7 @@ impl Manager {
                     .units_with_price
                     .iter()
                     .filter(|unit_with_price| {
-                        unit_input.ad_unit_id = Some(unit_with_price.unit.id);
+                        unit_input.ad_unit_id = Some(unit_with_price.unit.ipfs);
 
                         let mut output = targeting::Output {
                             show: true,
@@ -359,7 +358,7 @@ impl Manager {
 
             let new_entry = HistoryEntry {
                 time: Utc::now(),
-                unit_id: unit_with_price.unit.id,
+                unit_id: unit_with_price.unit.ipfs,
                 campaign_id: *campaign_id,
                 slot_id: self.options.market_slot,
             };
