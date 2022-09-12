@@ -730,10 +730,212 @@ pub mod validator_message {
             }
         }
     }
+
+    #[cfg(test)]
+    mod test {
+        use super::*;
+        use crate::{
+            db::{insert_channel, validator_message::get_validator_messages},
+            test_util::setup_dummy_app,
+        };
+
+        use adapter::prelude::Unlocked;
+        use chrono::Utc;
+
+        use primitives::{
+            balances::UncheckedState,
+            sentry::validator_messages::ValidatorMessagesCreateRequest,
+            test_util::{ADVERTISER, CAMPAIGNS, IDS, LEADER},
+            validator::{
+                ApproveState, Heartbeat, MessageType, MessageTypes, NewState, RejectState,
+            },
+            Balances,
+        };
+
+        #[tokio::test]
+        async fn post_validator_messages() {
+            let app_guard = setup_dummy_app().await;
+            let app = Extension(Arc::new(app_guard.app.clone()));
+            let all_message_types: [MessageType; 4] = [
+                MessageType::NewState,
+                MessageType::ApproveState,
+                MessageType::RejectState,
+                MessageType::Heartbeat,
+            ];
+
+            let channel_context = Extension(CAMPAIGNS[0].clone().of_channel());
+
+            insert_channel(&app.pool, &channel_context)
+                .await
+                .expect("should insert channel");
+
+            // Case when the request is not sent by a channel validator
+            {
+                let auth = Auth {
+                    era: 0,
+                    uid: IDS[&ADVERTISER],
+                    chain: channel_context.chain.clone(),
+                };
+
+                let req = ValidatorMessagesCreateRequest { messages: vec![] };
+
+                let res = create_validator_messages(
+                    app.clone(),
+                    Extension(auth),
+                    channel_context.clone(),
+                    Json(req),
+                )
+                .await
+                .expect_err("We expect an error to be returned");
+
+                assert_eq!(res, ResponseError::Unauthorized);
+            }
+
+            // Cases where we insert validator messages
+            // Case with 0 messages
+            {
+                let auth = Auth {
+                    era: 0,
+                    uid: IDS[&LEADER],
+                    chain: channel_context.chain.clone(),
+                };
+
+                let req = ValidatorMessagesCreateRequest { messages: vec![] };
+
+                create_validator_messages(
+                    app.clone(),
+                    Extension(auth),
+                    channel_context.clone(),
+                    Json(req),
+                )
+                .await
+                .expect("should work");
+
+                let messages = get_validator_messages(
+                    &app.pool,
+                    &channel_context.context.id(),
+                    &Some(IDS[&LEADER]),
+                    &all_message_types,
+                    100,
+                )
+                .await
+                .expect("should get messages");
+
+                assert_eq!(messages.len(), 0);
+            }
+            // Case with 1 message
+            {
+                let auth = Auth {
+                    era: 0,
+                    uid: IDS[&LEADER],
+                    chain: channel_context.chain.clone(),
+                };
+
+                let message = MessageTypes::Heartbeat(Heartbeat {
+                    signature: String::new(),
+                    state_root: String::new(),
+                    timestamp: Utc::now(),
+                });
+
+                let req = ValidatorMessagesCreateRequest {
+                    messages: vec![message.clone()],
+                };
+
+                create_validator_messages(
+                    app.clone(),
+                    Extension(auth),
+                    channel_context.clone(),
+                    Json(req),
+                )
+                .await
+                .expect("Should create messages");
+
+                let messages = get_validator_messages(
+                    &app.pool,
+                    &channel_context.context.id(),
+                    &Some(IDS[&LEADER]),
+                    &all_message_types,
+                    100,
+                )
+                .await
+                .expect("should get messages");
+                let inner_messages: Vec<MessageTypes> =
+                    messages.into_iter().map(|m| m.msg.clone()).collect();
+                assert_eq!(inner_messages, vec![message]);
+            }
+            // Case with 4 messages (one of each type, heartbeat is already inserted)
+            {
+                let auth = Auth {
+                    era: 0,
+                    uid: IDS[&LEADER],
+                    chain: channel_context.chain.clone(),
+                };
+
+                let state_root =
+                    "b1a4fc6c1a1e1ab908a487e504006edcebea297f61b4b8ce6cad3b29e29454cc".to_string();
+                let signature = app
+                    .adapter
+                    .clone()
+                    .unlock()
+                    .expect("should unlock")
+                    .sign(&state_root.clone())
+                    .expect("should sign");
+                let new_state = MessageTypes::NewState(NewState {
+                    state_root: state_root.clone(),
+                    signature: signature.clone(),
+                    balances: Balances::<UncheckedState>::new(),
+                });
+
+                let approve_state = MessageTypes::ApproveState(ApproveState {
+                    state_root: state_root.clone(),
+                    signature: signature.clone(),
+                    is_healthy: true,
+                });
+
+                let reject_state = MessageTypes::RejectState(RejectState {
+                    state_root,
+                    signature: signature.clone(),
+                    timestamp: Utc::now(),
+                    reason: "rejected".to_string(),
+                    balances: None,
+                });
+
+                let req = ValidatorMessagesCreateRequest {
+                    messages: vec![
+                        new_state.clone(),
+                        approve_state.clone(),
+                        reject_state.clone(),
+                    ],
+                };
+
+                create_validator_messages(
+                    app.clone(),
+                    Extension(auth),
+                    channel_context.clone(),
+                    Json(req),
+                )
+                .await
+                .expect("Should create messages");
+
+                let messages = get_validator_messages(
+                    &app.pool,
+                    &channel_context.context.id(),
+                    &Some(IDS[&LEADER]),
+                    &all_message_types,
+                    100,
+                )
+                .await
+                .expect("should get messages");
+                assert_eq!(messages.len(), 4);
+            }
+        }
+    }
 }
 
 #[cfg(test)]
 mod test {
+    use std::str::FromStr;
+
     use super::*;
     use crate::{
         db::{
@@ -742,6 +944,7 @@ mod test {
         },
         test_util::setup_dummy_app,
     };
+
     use adapter::{
         ethereum::test_util::{GANACHE_INFO_1, GANACHE_INFO_1337},
         prelude::Unlocked,
@@ -757,7 +960,6 @@ mod test {
         validator::{ApproveState, MessageTypes, NewState},
         BigNum, ChainId, Deposit, UnifiedMap, ValidatorId,
     };
-    use std::str::FromStr;
 
     #[tokio::test]
     async fn create_and_fetch_spendable() {

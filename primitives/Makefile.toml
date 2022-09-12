@@ -19,7 +19,7 @@ dependencies = [
 env = { "POSTGRES_DB" = "primitives" }
 
 [tasks.services-up]
-script = "docker-compose -f ../docker-compose.harness.yml up -d adex-postgres && sleep 6"
+script = "docker-compose -f ../docker-compose.yml up -d adex-postgres && sleep 6"
 
 [tasks.services-down]
-script = "docker-compose -f ../docker-compose.harness.yml down"
+script = "docker-compose -f ../docker-compose.yml down"

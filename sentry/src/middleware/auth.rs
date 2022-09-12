@@ -210,7 +210,10 @@ mod test {
     };
     use primitives::test_util::{ADVERTISER, DUMMY_AUTH, FOLLOWER, IDS, LEADER, PUBLISHER};
 
-    use crate::{middleware::body_to_string, test_util::setup_dummy_app, Session};
+    use crate::{
+        test_util::{body_to_string, setup_dummy_app},
+        Session,
+    };
 
     use super::*;
 

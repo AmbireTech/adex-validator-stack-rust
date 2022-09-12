@@ -627,7 +627,7 @@ mod test {
         }
 
         // test with not allowed key
-        // event type: IMPRESSION
+        // event type: CLICK
         {
             let query = AnalyticsQuery {
                 event_type: CLICK,
@@ -1276,18 +1276,234 @@ mod test {
                     .collect::<Vec<_>>(),
             );
         }
+    }
 
-        // TODO: test with no authUid
-        // let req = Request::builder()
-        //     .uri("http://127.0.0.1/v5/analytics?limit=100&eventType=CLICK&metric=count&timeframe=day")
-        //     .body(Body::empty())
-        //     .expect("Should build Request");
+    #[tokio::test]
+    async fn test_allowed_keys_for_guest() {
+        let app_guard = setup_dummy_app().await;
+        let app = Arc::new(app_guard.app);
 
-        // let analytics_response = analytics_router(req, &app, None, Some(AuthenticateAs::Publisher())).await;
-        // let err_msg = "auth_as_key is provided but there is no Auth object".to_string();
-        // assert!(matches!(
-        //     analytics_response,
-        //     Err(ResponseError::BadRequest(err_msg))
-        // ));
+        let allowed_keys = GET_ANALYTICS_ALLOWED_KEYS.clone();
+        let base_datehour = DateHour::from_ymdh(2022, 1, 17, 14);
+
+        // Test for each allowed key
+        // Country
+        {
+            let query = AnalyticsQuery {
+                time: Time {
+                    timeframe: Timeframe::Day,
+                    start: base_datehour - 1,
+                    end: None,
+                },
+                country: Some("Bulgaria".to_string()),
+                ..Default::default()
+            };
+            let res = get_analytics(
+                Extension(app.clone()),
+                None,
+                Extension(allowed_keys.clone()),
+                None,
+                Qs(query),
+            )
+            .await;
+            assert!(res.is_ok());
+        }
+        // Ad Slot Type
+        {
+            let query = AnalyticsQuery {
+                time: Time {
+                    timeframe: Timeframe::Day,
+                    start: base_datehour - 1,
+                    end: None,
+                },
+                ad_slot_type: Some("legacy_300x100".to_string()),
+                ..Default::default()
+            };
+            let res = get_analytics(
+                Extension(app.clone()),
+                None,
+                Extension(allowed_keys.clone()),
+                None,
+                Qs(query),
+            )
+            .await;
+            assert!(res.is_ok());
+        }
+        // Test each not allowed key
+        // CampaignId
+        {
+            let query = AnalyticsQuery {
+                time: Time {
+                    timeframe: Timeframe::Day,
+                    start: base_datehour - 1,
+                    end: None,
+                },
+                campaign_id: Some(DUMMY_CAMPAIGN.id),
+                ..Default::default()
+            };
+            let res = get_analytics(
+                Extension(app.clone()),
+                None,
+                Extension(allowed_keys.clone()),
+                None,
+                Qs(query),
+            )
+            .await
+            .expect_err("should be an error");
+            assert_eq!(
+                ResponseError::Forbidden("Disallowed query key `campaignId`".into()),
+                res,
+            );
+        }
+        // AdUnit
+        {
+            let query = AnalyticsQuery {
+                time: Time {
+                    timeframe: Timeframe::Day,
+                    start: base_datehour - 1,
+                    end: None,
+                },
+                ad_unit: Some(DUMMY_IPFS[0]),
+                ..Default::default()
+            };
+            let res = get_analytics(
+                Extension(app.clone()),
+                None,
+                Extension(allowed_keys.clone()),
+                None,
+                Qs(query),
+            )
+            .await
+            .expect_err("should be an error");
+            assert_eq!(
+                ResponseError::Forbidden("Disallowed query key `adUnit`".into()),
+                res,
+            );
+        }
+        // AdSlot
+        {
+            let query = AnalyticsQuery {
+                time: Time {
+                    timeframe: Timeframe::Day,
+                    start: base_datehour - 1,
+                    end: None,
+                },
+                ad_slot: Some(DUMMY_IPFS[1]),
+                ..Default::default()
+            };
+            let res = get_analytics(
+                Extension(app.clone()),
+                None,
+                Extension(allowed_keys.clone()),
+                None,
+                Qs(query),
+            )
+            .await
+            .expect_err("should be an error");
+            assert_eq!(
+                ResponseError::Forbidden("Disallowed query key `adSlot`".into()),
+                res,
+            );
+        }
+        // Advertiser
+        {
+            let query = AnalyticsQuery {
+                time: Time {
+                    timeframe: Timeframe::Day,
+                    start: base_datehour - 1,
+                    end: None,
+                },
+                advertiser: Some(*ADVERTISER),
+                ..Default::default()
+            };
+            let res = get_analytics(
+                Extension(app.clone()),
+                None,
+                Extension(allowed_keys.clone()),
+                None,
+                Qs(query),
+            )
+            .await
+            .expect_err("should throw an error");
+            assert_eq!(
+                ResponseError::Forbidden("Disallowed query key `advertiser`".into()),
+                res,
+            );
+        }
+        // Publisher
+        {
+            let query = AnalyticsQuery {
+                time: Time {
+                    timeframe: Timeframe::Day,
+                    start: base_datehour - 1,
+                    end: None,
+                },
+                publisher: Some(*PUBLISHER),
+                ..Default::default()
+            };
+            let res = get_analytics(
+                Extension(app.clone()),
+                None,
+                Extension(allowed_keys.clone()),
+                None,
+                Qs(query),
+            )
+            .await
+            .expect_err("should throw an error");
+            assert_eq!(
+                ResponseError::Forbidden("Disallowed query key `publisher`".into()),
+                res,
+            );
+        }
+        // Hostname
+        {
+            let query = AnalyticsQuery {
+                time: Time {
+                    timeframe: Timeframe::Day,
+                    start: base_datehour - 1,
+                    end: None,
+                },
+                hostname: Some("localhost".to_string()),
+                ..Default::default()
+            };
+            let res = get_analytics(
+                Extension(app.clone()),
+                None,
+                Extension(allowed_keys.clone()),
+                None,
+                Qs(query),
+            )
+            .await
+            .expect_err("should throw an error");
+            assert_eq!(
+                ResponseError::Forbidden("Disallowed query key `hostname`".into()),
+                res,
+            );
+        }
+        // OsName
+        {
+            let query = AnalyticsQuery {
+                time: Time {
+                    timeframe: Timeframe::Day,
+                    start: base_datehour - 1,
+                    end: None,
+                },
+                os_name: Some(OperatingSystem::map_os("Windows")),
+                ..Default::default()
+            };
+            let res = get_analytics(
+                Extension(app.clone()),
+                None,
+                Extension(allowed_keys.clone()),
+                None,
+                Qs(query),
+            )
+            .await
+            .expect_err("should throw an error");
+            assert_eq!(
+                ResponseError::Forbidden("Disallowed query key `osName`".into()),
+                res,
+            );
+        }
     }
 }

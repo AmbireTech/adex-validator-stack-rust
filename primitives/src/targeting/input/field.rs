@@ -4,7 +4,7 @@ use std::str::FromStr;
 
 use crate::targeting::Error;
 
-pub const FIELDS: [Field; 24] = [
+pub const FIELDS: [Field; 23] = [
     // AdView scope, accessible only on the AdView
     Field::AdView(AdView::SecondsSinceCampaignImpression),
     Field::AdView(AdView::HasCustomPreferences),
@@ -35,7 +35,6 @@ pub const FIELDS: [Field; 24] = [
     // AdSlot scope, accessible on Supermarket and AdView
     Field::AdSlot(AdSlot::Categories),
     Field::AdSlot(AdSlot::Hostname),
-    Field::AdSlot(AdSlot::AlexaRank),
 ];
 
 #[derive(
@@ -174,7 +173,6 @@ impl From<Balances> for String {
 pub enum AdSlot {
     Categories,
     Hostname,
-    AlexaRank,
 }
 
 impl TryFrom<String> for AdSlot {
