@@ -31,7 +31,7 @@ use crate::{
     application::Qs,
     db::{
         accounting::{
-            get_accounting, get_all_accountings_for_channel, spend_amount, update_accounting, Side,
+            get_accounting, get_all_accountings_for_channel, spend_amount, update_accounting, update_accounting_mongo, Side,
         },
         insert_channel, list_channels,
         spendable::{fetch_spendable, get_all_spendables_for_channel, update_spendable},
@@ -282,8 +282,8 @@ pub async fn add_spender_leaf<C: Locked + 'static>(
 ) -> Result<Json<SpenderResponse>, ResponseError> {
     let spender = params.1;
 
-    update_accounting(
-        app.pool.clone(),
+    update_accounting_mongo(
+        &app.mongodb,
         channel.context.id(),
         spender,
         Side::Spender,

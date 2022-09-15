@@ -1,6 +1,12 @@
 use std::collections::HashSet;
 
 use futures::TryStreamExt;
+use mongodb::{
+    bson::{doc, document::Document},
+    error::Error as MongoDbError,
+    options::FindOneAndUpdateOptions,
+    Database
+};
 use primitives::{
     analytics::{query::AllowedKey, AnalyticsQuery, AuthenticateAs, Metric, Timeframe},
     sentry::{Analytics, FetchedAnalytics, UpdateAnalytics},
@@ -75,6 +81,70 @@ pub async fn fetch_analytics(
 
     Ok(analytics)
 }
+
+// pub async fn fetch_analytics_mongo(pool: &Client, query: AnalyticsQuery, allowed_keys: HashSet<AllowedKey>, auth_as: Option<AuthenticateAs>, limit: u32) -> Result<Vec<FetchedAnalytics>, MongoDbError> {
+//     let client = pool.get().await?;
+//     let collection = client.collection("analytics");
+
+//     let mut filter = get_fetch_filter(query, allowed_keys, auth_as);
+
+//     let mut projection = Document::new();
+//     projection.insert("time", 1);
+
+//     match &query.metric {
+//         Metric::Paid => {projection.insert("payout_amount", 1);},
+//         Metric::Count => {projection.insert("payout_count", 1);},
+//     };
+
+//     let find_options = FindOptions::builder().projection(projection).limit(Some(limit as i64));
+
+//     // TODO: Make an aggregation pipeline and use aggregate
+//     let document: Vec<FetchedAnalytics> = collection.find_one(Some(filter), Some(find_options)).await?;
+//     todo!();
+// }
+
+// fn get_fetch_filter(query: AnalyticsQuery, allowed_keys: HashSet<AllowedKey>, auth_as: Option<AuthenticateAs>) -> Document {
+//     let mut filter = Document::new();
+
+//     for allowed_key in allowed_keys.iter() {
+//         // IMPORTANT FOR SECURITY: AuthenticateAs must OVERRIDE the value passed to either query.publisher or query.advertiser respectively
+//         let value = match (allowed_key, auth_as) {
+//             (AllowedKey::Advertiser, Some(AuthenticateAs::Advertiser(advertiser))) => {
+//                 Some(Box::new(*&advertiser) as _)
+//             }
+//             (AllowedKey::Publisher, Some(AuthenticateAs::Publisher(publisher))) => {
+//                 Some(Box::new(*&publisher) as _)
+//             }
+//             _ => query.get_key(*allowed_key),
+//         };
+
+//         if let Some(value) = value {
+//             filter.insert(allowed_key.to_string(), value.to_string());
+//         }
+//     }
+
+//     if let Some(end_date) = &query.time.end {
+//         filter.insert("time", doc!{"$lte": end_date.to_string()});
+//     }
+
+//     filter.insert("event_type", query.event_type.to_string());
+
+//     if !query.chains.is_empty() {
+//         filter.insert("chain_id", doc!("$in": query
+//             .chains
+//             .iter()
+//             .map(|id| id.to_u32().to_string())
+//             .collect::<Vec<String>>()));
+//     }
+
+//     let time_group = match &query.time.timeframe {
+//         Timeframe::Year => "month",
+//         Timeframe::Month => "day",
+//         Timeframe::Week | Timeframe::Day => "hour",
+//     };
+//     filter.insert("time", doc!{"$dateTrunc": {"date": query.time.start.to_string(), "unit": time_group}});
+//     filter
+// }
 
 fn analytics_query_params(
     query: &AnalyticsQuery,
@@ -161,6 +231,59 @@ pub async fn update_analytics(
     Ok(event_analytics)
 }
 
+pub async fn update_analytics_mongo(
+    db: &Database,
+    update_analytics: UpdateAnalytics,
+) -> Result<Option<Analytics>, MongoDbError> {
+    let collection = db.collection("analytics");
+
+    let query = get_analytics_update_query(&update_analytics);
+    let amount_as_i64 =
+        i64::try_from(update_analytics.amount_to_add.to_u64()).expect("should get amount"); // TODO: Find a way to use UnifiedNum without converting to i64
+    let update = doc!{"$inc": {"payoutAmount": amount_as_i64, "payoutCount": &update_analytics.count_to_add}};
+
+    let options = FindOneAndUpdateOptions::builder()
+        .upsert(Some(true))
+        .build();
+
+    let document: Option<Analytics> = collection
+        .find_one_and_update(query, update, options)
+        .await?;
+
+    Ok(document)
+}
+
+// TODO: Use .to_bson().as_document() instead
+fn get_analytics_update_query(update_analytics: &UpdateAnalytics) -> Document {
+    let mut document = Document::new();
+
+    document.insert("campaignId", update_analytics.campaign_id.to_string());
+    document.insert("time", update_analytics.time.to_string());
+    document.insert("adUnit", update_analytics.ad_unit.to_string());
+    document.insert("adSlot", update_analytics.ad_slot.to_string());
+    document.insert(
+        "adSlotType",
+        update_analytics.ad_slot_type.clone().unwrap_or_default(),
+    );
+    document.insert("advertiser", update_analytics.advertiser.to_string());
+    document.insert("publisher", update_analytics.publisher.to_string());
+    document.insert(
+        "hostname",
+        update_analytics
+            .hostname
+            .as_ref()
+            .unwrap_or(&"".to_string()),
+    );
+    document.insert(
+        "country",
+        update_analytics.country.as_ref().unwrap_or(&"".to_string()),
+    );
+    document.insert("osName", update_analytics.os_name.to_string());
+    document.insert("chainId", update_analytics.chain_id.to_string());
+    document.insert("eventType", update_analytics.event_type.to_string());
+
+    document
+}
 #[cfg(test)]
 mod test {
     use std::collections::HashMap;
@@ -177,7 +300,9 @@ mod test {
         AdUnit, ChainId, UnifiedNum, ValidatorId, IPFS,
     };
 
-    use crate::db::tests_postgres::{setup_test_migrations, DATABASE_POOL};
+    use mongodb::{options::ClientOptions, Collection};
+
+    use crate::db::{tests_postgres::{setup_test_migrations, DATABASE_POOL}, mongodb_pool::{TESTS_POOL, Manager as MongoManager}, mongodb_connection};
 
     #[tokio::test]
     async fn insert_update_and_fetch_analytics() {
@@ -920,5 +1045,17 @@ mod test {
                     .expect("Should insert");
             }
         }
+    }
+
+    #[tokio::test]
+    async fn test_update_analytics_mongo() {
+        let opts = ClientOptions::parse("mongodb://mongodb:mongodb@0.0.0.0:27017/").await.expect("Should parse");
+        let client = mongodb_connection(opts).await.expect("should get connection");
+        let ad_unit = DUMMY_AD_UNITS[0].clone();
+        let ad_slot_ipfs = DUMMY_IPFS[0];
+        let analytics = make_impression_analytics(&ad_unit, ad_slot_ipfs, 7, 21);
+
+        let update = update_analytics_mongo(&client.database("sentry"), analytics).await;
+        assert!(update.is_ok());
     }
 }

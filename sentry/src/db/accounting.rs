@@ -2,10 +2,17 @@ use std::fmt;
 
 use chrono::{DateTime, Utc};
 use futures::future::{join, join_all};
+use mongodb::{
+    bson::{doc, document::Document},
+    error::Error as MongoDbError,
+    options::FindOneAndUpdateOptions,
+    Database
+};
 use primitives::{
     balances::{Balances, CheckedState},
     Address, ChannelId, UnifiedNum,
 };
+use serde::{Deserialize, Serialize};
 use tokio_postgres::{
     types::{FromSql, ToSql},
     Row,
@@ -30,7 +37,7 @@ impl From<tokio_postgres::Error> for Error {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct Accounting {
     pub channel_id: ChannelId,
     pub side: Side,
@@ -53,7 +60,7 @@ impl From<&Row> for Accounting {
     }
 }
 
-#[derive(Debug, Clone, Copy, ToSql, FromSql, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, ToSql, FromSql, PartialEq, Eq)]
 #[postgres(name = "accountingside")]
 pub enum Side {
     Earner,
@@ -122,6 +129,52 @@ pub async fn update_accounting(
         .await?;
 
     Ok(Accounting::from(&row))
+}
+
+// "INSERT INTO accounting(channel_id, side, address, amount, updated, created)
+// VALUES($1, $2, $3, $4, NULL, NOW()) ON CONFLICT ON CONSTRAINT accounting_pkey
+// RETURNING channel_id, side, address, amount, updated, created";
+
+pub async fn update_accounting_mongo(
+    db: &Database,
+    channel_id: ChannelId,
+    address: Address,
+    side: Side,
+    amount: UnifiedNum,
+) -> Result<Option<Accounting>, MongoDbError> {
+    let collection = db.collection("accounting");
+
+    let query = get_update_accounting_query(channel_id, address, side);
+    let amount_as_i64 = i64::try_from(amount.to_u64()).expect("should convert"); // TODO: Find a way to use UnifiedNum without converting to u64
+    let update = doc! {
+        "$inc": {"amount": amount_as_i64},
+        "$set": {
+            "updated": Utc::now().timestamp(), // TODO: Find a way to use $cond in the rust driver here, so we can set the field only when updating
+        },
+        "$setOnInsert": {"created": Utc::now().timestamp()}
+    };
+    let options = FindOneAndUpdateOptions::builder()
+        .upsert(Some(true))
+        .build();
+
+    let document: Option<Accounting> = collection
+        .find_one_and_update(query, update, options)
+        .await?;
+
+    Ok(document)
+}
+
+// static UPDATE_ACCOUNTING_STATEMENT: &str = "INSERT INTO accounting(channel_id, side, address, amount, updated, created) VALUES($1, $2, $3, $4, NULL, NOW()) ON CONFLICT ON CONSTRAINT accounting_pkey DO UPDATE SET amount = accounting.amount + EXCLUDED.amount, updated = NOW() WHERE accounting.channel_id = $1 AND accounting.side = $2 AND accounting.address = $3 RETURNING channel_id, side, address, amount, updated, created";
+pub fn get_update_accounting_query(
+    channel_id: ChannelId,
+    address: Address,
+    side: Side,
+) -> Document {
+    let mut document = Document::new();
+    document.insert("channelId", channel_id.to_string());
+    document.insert("address", address.to_string());
+    document.insert("side", side.to_string());
+    document
 }
 
 /// `delta_balances` defines the Balances that need to be added to the spending or earnings of the `Accounting`s.
@@ -196,7 +249,10 @@ mod test {
     use crate::db::{
         insert_channel,
         tests_postgres::{setup_test_migrations, DATABASE_POOL},
+        mongodb_connection
     };
+
+    use mongodb::options::ClientOptions;
 
     use super::*;
 
@@ -656,5 +712,14 @@ mod test {
                 false,
             );
         }
+    }
+
+    #[tokio::test]
+    async fn test_update_accounting_mongo() {
+        let opts = ClientOptions::parse("mongodb://mongodb:mongodb@0.0.0.0:27017/").await.expect("Should parse");
+        let client = mongodb_connection(opts).await.expect("should get connection");
+
+        let update = update_accounting_mongo(&client.database("sentry"), DUMMY_CAMPAIGN.channel.id(), *PUBLISHER, Side::Earner, UnifiedNum::from_u64(300_000_000)).await;
+        assert!(update.is_ok());
     }
 }

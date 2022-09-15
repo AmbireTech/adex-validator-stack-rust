@@ -564,6 +564,7 @@ pub mod insert_events {
     use axum::{Extension, Json};
     use slog::{error, Logger};
     use thiserror::Error;
+    use mongodb::Database;
 
     use adapter::prelude::*;
     use primitives::{
@@ -680,7 +681,7 @@ pub mod insert_events {
 
         // Record successfully paid out events to Analytics
         analytics_record_spawn(
-            app.pool.clone(),
+            app.mongodb.clone(),
             app.logger.clone(),
             campaign_context.clone(),
             session.clone(),
@@ -692,7 +693,7 @@ pub mod insert_events {
 
     /// Max retries is `5` after which an error logging message will be recorded.
     fn analytics_record_spawn(
-        pool: DbPool,
+        db: Database,
         logger: Logger,
         campaign_context: ChainOf<Campaign>,
         session: Session,
@@ -702,7 +703,7 @@ pub mod insert_events {
             let max_retries = 5;
 
             for retry in 1..=5 {
-                let result = analytics::record(&pool, &campaign_context, &session, &events).await;
+                let result = analytics::record(&db, &campaign_context, &session, &events).await;
 
                 match (result, retry) {
                     // if the recording was successful, break the loop early

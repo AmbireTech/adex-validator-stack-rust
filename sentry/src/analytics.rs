@@ -1,7 +1,8 @@
 use crate::{
-    db::{analytics::update_analytics, DbPool, PoolError},
+    db::{analytics::{update_analytics, update_analytics_mongo}, DbPool, PoolError},
     Session,
 };
+use mongodb::{Database, error::Error as MongoError};
 use futures::future::join_all;
 use primitives::{
     analytics::OperatingSystem,
@@ -12,11 +13,11 @@ use std::collections::HashMap;
 
 /// Validator fees will not be included in analytics
 pub async fn record(
-    pool: &DbPool,
+    db: &Database,
     campaign_context: &ChainOf<Campaign>,
     session: &Session,
     events_with_payouts: &[(Event, Address, UnifiedNum)],
-) -> Result<(), PoolError> {
+) -> Result<(), MongoError> {
     let os_name = session
         .os
         .as_ref()
@@ -92,7 +93,7 @@ pub async fn record(
     let batch_futures = join_all(
         batch_update
             .into_iter()
-            .map(|(_event, update)| update_analytics(pool, update)),
+            .map(|(_event, update)| update_analytics_mongo(&db, update)),
     );
 
     // execute the batched futures, collect the result afterwards,
@@ -203,7 +204,7 @@ mod test {
         let channel_context = channel_chain.with_channel(dummy_channel);
         let campaign_context = channel_context.clone().with(campaign);
 
-        record(&app.pool, &campaign_context, &session, &input_events)
+        record(&app.mongodb, &campaign_context, &session, &input_events)
             .await
             .expect("should record");
 
@@ -267,7 +268,7 @@ mod test {
             .expect("Channel token should be whitelisted in config!");
         let channel_context = channel_chain.with_channel(dummy_channel);
         let campaign_context = channel_context.clone().with(campaign);
-        record(&app.pool, &campaign_context, &session, &input_events)
+        record(&app.mongodb, &campaign_context, &session, &input_events)
             .await
             .expect("should record");
 
