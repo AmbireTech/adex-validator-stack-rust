@@ -113,6 +113,19 @@ impl ChainOf<Campaign> {
     }
 }
 
+#[cfg(feature = "mongo")]
+mod mongo {
+    use bson::Bson;
+
+    use super::ChainId;
+
+    impl From<ChainId> for Bson {
+        fn from(chain_id: ChainId) -> Self {
+            Bson::Int64(chain_id.0.into())
+        }
+    }
+}
+
 #[cfg(feature = "postgres")]
 mod postgres {
     use super::ChainId;

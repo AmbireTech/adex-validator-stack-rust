@@ -963,6 +963,20 @@ mod test {
     }
 }
 
+#[cfg(feature = "mongo")]
+mod mongo {
+    use bson::Bson;
+
+    use super::UnifiedNum;
+
+    impl From<UnifiedNum> for Bson {
+        fn from(unified_num: UnifiedNum) -> Self {
+            // TODO: Make it safe to convert to i64!
+            Bson::Int64(i64::try_from(unified_num.0).expect("should convert to i64"))
+        }
+    }
+}
+
 #[cfg(feature = "postgres")]
 mod postgres {
     use super::UnifiedNum;

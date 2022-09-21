@@ -249,6 +249,19 @@ mod test {
     }
 }
 
+#[cfg(feature = "mongo")]
+mod mongo {
+    use bson::Bson;
+
+    use super::ChannelId;
+
+    impl From<ChannelId> for Bson {
+        fn from(channel_id: ChannelId) -> Self {
+            Bson::String(channel_id.to_string())
+        }
+    }
+}
+
 #[cfg(feature = "postgres")]
 mod postgres {
     use super::{Channel, ChannelId, Nonce};

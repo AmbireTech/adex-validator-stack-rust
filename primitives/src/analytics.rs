@@ -309,6 +309,19 @@ fn default_metric() -> Metric {
     Metric::Count
 }
 
+#[cfg(feature = "mongo")]
+mod mongo {
+    use bson::Bson;
+
+    use super::OperatingSystem;
+
+    impl From<OperatingSystem> for Bson {
+        fn from(os: OperatingSystem) -> Self {
+            Bson::String(os.to_string())
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;

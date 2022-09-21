@@ -203,6 +203,19 @@ pub fn parse_bytes<T: AsRef<[u8]>>(from: T, prefix: Prefix) -> Result<[u8; 20], 
     }
 }
 
+#[cfg(feature = "mongo")]
+mod mongo {
+    use bson::Bson;
+
+    use super::Address;
+
+    impl From<Address> for Bson {
+        fn from(address: Address) -> Self {
+            Bson::String(address.to_string())
+        }
+    }
+}
+
 #[cfg(feature = "postgres")]
 mod postgres {
     use super::Address;

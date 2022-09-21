@@ -383,6 +383,19 @@ pub mod validators {
     }
 }
 
+#[cfg(feature = "mongo")]
+mod mongo {
+    use bson::Bson;
+
+    use super::CampaignId;
+
+    impl From<CampaignId> for Bson {
+        fn from(campaign_id: CampaignId) -> Self {
+            Bson::String(campaign_id.to_string())
+        }
+    }
+}
+
 #[cfg(feature = "postgres")]
 mod postgres {
     use crate::Channel;

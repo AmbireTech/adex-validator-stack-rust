@@ -298,8 +298,7 @@ mod event {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct UpdateAnalytics {
     pub time: DateHour<Utc>,
     pub campaign_id: CampaignId,
@@ -314,6 +313,45 @@ pub struct UpdateAnalytics {
     pub chain_id: ChainId,
     pub event_type: EventType,
     pub amount_to_add: UnifiedNum,
+    pub count_to_add: i32,
+}
+
+impl From<UpdateAnalyticsM> for UpdateAnalytics {
+    fn from(mongo: UpdateAnalyticsM) -> Self {
+        Self {
+            time: DateHour::try_from(mongo.time.to_chrono()).expect("Should always be parsable"),
+            campaign_id: mongo.campaign_id,
+            ad_unit: mongo.ad_unit,
+            ad_slot: mongo.ad_slot,
+            ad_slot_type: mongo.ad_slot_type,
+            advertiser: mongo.advertiser,
+            publisher: mongo.publisher,
+            hostname: mongo.hostname,
+            country: mongo.country,
+            os_name: mongo.os_name,
+            chain_id: mongo.chain_id,
+            event_type: mongo.event_type,
+            amount_to_add: mongo.amount_to_add.unsigned_abs().into(),
+            count_to_add: mongo.count_to_add,
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct UpdateAnalyticsM {
+    pub time: bson::datetime::DateTime,
+    pub campaign_id: CampaignId,
+    pub ad_unit: IPFS,
+    pub ad_slot: IPFS,
+    pub ad_slot_type: Option<String>,
+    pub advertiser: Address,
+    pub publisher: Address,
+    pub hostname: Option<String>,
+    pub country: Option<String>,
+    pub os_name: OperatingSystem,
+    pub chain_id: ChainId,
+    pub event_type: EventType,
+    pub amount_to_add: i64,
     pub count_to_add: i32,
 }
 
@@ -333,6 +371,44 @@ pub struct Analytics {
     pub event_type: EventType,
     pub payout_amount: UnifiedNum,
     pub payout_count: u32,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct AnalyticsM {
+    pub time: bson::datetime::DateTime,
+    pub campaign_id: CampaignId,
+    pub ad_unit: IPFS,
+    pub ad_slot: IPFS,
+    pub ad_slot_type: Option<String>,
+    pub advertiser: Address,
+    pub publisher: Address,
+    pub hostname: Option<String>,
+    pub country: Option<String>,
+    pub os_name: OperatingSystem,
+    pub event_type: EventType,
+    pub payout_amount: i64,
+    pub payout_count: u32,
+}
+
+impl From<AnalyticsM> for Analytics {
+    fn from(mongo: AnalyticsM) -> Self {
+        Self {
+            time: DateHour::try_from(mongo.time.to_chrono()).expect("Should parse DateHour"),
+            campaign_id: mongo.campaign_id,
+            ad_unit: mongo.ad_unit,
+            ad_slot: mongo.ad_slot,
+            ad_slot_type: mongo.ad_slot_type,
+            advertiser: mongo.advertiser,
+            publisher: mongo.publisher,
+            hostname: mongo.hostname,
+            country: mongo.country,
+            os_name: mongo.os_name,
+            event_type: mongo.event_type,
+            payout_amount: mongo.payout_amount.unsigned_abs().into(),
+            payout_count: mongo.payout_count,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -1146,6 +1222,38 @@ pub mod campaign_modify {
             }
 
             campaign
+        }
+    }
+}
+
+#[cfg(feature = "mongo")]
+mod mongo {
+    use bson::Bson;
+    use chrono::TimeZone;
+
+    use super::{DateHour, EventType};
+
+    impl<Tz> From<DateHour<Tz>> for bson::datetime::DateTime
+    where
+        Tz: TimeZone,
+    {
+        fn from(date_hour: DateHour<Tz>) -> Self {
+            bson::datetime::DateTime::from_chrono(date_hour.to_datetime())
+        }
+    }
+
+    impl<Tz> From<DateHour<Tz>> for Bson
+    where
+        Tz: TimeZone,
+    {
+        fn from(date_hour: DateHour<Tz>) -> Self {
+            Bson::DateTime(date_hour.into())
+        }
+    }
+
+    impl From<EventType> for Bson {
+        fn from(event_type: EventType) -> Self {
+            Bson::String(event_type.to_string())
         }
     }
 }

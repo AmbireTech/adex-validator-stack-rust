@@ -91,6 +91,19 @@ impl Url {
     }
 }
 
+#[cfg(feature = "mongo")]
+mod mongo {
+    use bson::Bson;
+
+    use super::IPFS;
+
+    impl From<IPFS> for Bson {
+        fn from(ipfs: IPFS) -> Self {
+            Bson::String(ipfs.to_string())
+        }
+    }
+}
+
 #[cfg(feature = "postgres")]
 mod postgres {
     use super::IPFS;
