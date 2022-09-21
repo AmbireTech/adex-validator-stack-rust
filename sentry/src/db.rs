@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use deadpool_postgres::{Manager, ManagerConfig, RecyclingMethod};
-use mongodb::Client;
+use mongodb::{Client, Database};
 use redis::{aio::MultiplexedConnection, IntoConnectionInfo};
 use tokio_postgres::{
     types::{accepts, FromSql, Type},
@@ -154,6 +154,58 @@ pub fn setup_migrations(environment: Environment) {
     let _config = config
         .reload()
         .expect("Reloading config for migration failed");
+}
+
+pub async fn setup_mongo(
+    environment: Environment,
+    db: &Database,
+) -> Result<(), mongodb::error::Error> {
+    // if we are in development
+    if let Environment::Development = environment {
+        use crate::db::accounting::AccountingM;
+        use primitives::sentry::AnalyticsM;
+
+        use mongodb::{bson::doc, options::IndexOptions, IndexModel};
+        // delete the whole database content
+        db.drop(None).await?;
+
+        let unique_index = IndexOptions::builder().unique(true).build();
+
+        // Analytics indices
+        db.collection::<AnalyticsM>("analytics")
+            .create_indexes(
+                [
+                    IndexModel::builder().keys(
+                        doc!{"campaignId": 1, "time": 1, "adUnit": 1, "adSlot": 1, "adSlotType": 1, "advertiser": 1, "publisher": 1, "hostname": 1, "country": 1, "osName": 1, "chainId": 1, "eventType": 1}
+                    ).options(unique_index.clone()).build(),
+                    IndexModel::builder()
+                        .keys(doc! {"publisher": 1, "time": 1})
+                        .build(),
+                    IndexModel::builder()
+                        .keys(doc! {"advertiser": 1, "time": 1})
+                        .build(),
+                    IndexModel::builder()
+                        .keys(doc! {"campaignId": 1, "time": 1})
+                        .build(),
+                ],
+                None,
+            )
+            .await?;
+
+        // Accounting indices
+        db.collection::<AccountingM>("accounting")
+            .create_indexes(
+                [IndexModel::builder()
+                    .keys(doc! {"channelId": 1, "side": 1, "address": 1})
+                    .options(unique_index.clone())
+                    .build()],
+                None,
+            )
+            .await?;
+    }
+    // TODO: Build index for initial run on Production as well?
+
+    Ok(())
 }
 
 #[cfg(any(test, feature = "test-util"))]
