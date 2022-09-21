@@ -4,9 +4,9 @@ use chrono::{DateTime, Utc};
 use futures::future::{join, join_all};
 use mongodb::{
     bson::{doc, document::Document},
-    error::Error as MongoDbError,
-    options::FindOneAndUpdateOptions,
-    Database
+    error::Error as MongodbError,
+    options::{FindOneAndUpdateOptions, ReturnDocument},
+    Database,
 };
 use primitives::{
     balances::{Balances, CheckedState},
@@ -38,6 +38,7 @@ impl From<tokio_postgres::Error> for Error {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct Accounting {
     pub channel_id: ChannelId,
     pub side: Side,
@@ -45,6 +46,30 @@ pub struct Accounting {
     pub amount: UnifiedNum,
     pub updated: Option<DateTime<Utc>>,
     pub created: DateTime<Utc>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct AccountingM {
+    pub channel_id: ChannelId,
+    pub side: Side,
+    pub address: Address,
+    pub amount: i64,
+    pub updated: Option<mongodb::bson::datetime::DateTime>,
+    pub created: mongodb::bson::datetime::DateTime,
+}
+
+impl From<AccountingM> for Accounting {
+    fn from(mongo: AccountingM) -> Self {
+        Self {
+            channel_id: mongo.channel_id,
+            side: mongo.side,
+            address: mongo.address,
+            amount: UnifiedNum::from_u64(mongo.amount.unsigned_abs()),
+            updated: mongo.updated.map(|dt| dt.to_chrono()),
+            created: mongo.created.to_chrono(),
+        }
+    }
 }
 
 impl From<&Row> for Accounting {
@@ -141,7 +166,7 @@ pub async fn update_accounting_mongo(
     address: Address,
     side: Side,
     amount: UnifiedNum,
-) -> Result<Option<Accounting>, MongoDbError> {
+) -> Result<Option<Accounting>, MongodbError> {
     let collection = db.collection("accounting");
 
     let query = get_update_accounting_query(channel_id, address, side);
@@ -239,6 +264,82 @@ pub async fn spend_amount(
     ))
 }
 
+pub async fn spend_amount_mongo(
+    db: Database,
+    channel_id: ChannelId,
+    delta_balances: Balances<CheckedState>,
+) -> Result<(Vec<Accounting>, Vec<Accounting>), MongodbError> {
+    let collection = db.collection::<AccountingM>("accounting");
+
+    let now = mongodb::bson::DateTime::from(Utc::now());
+    let options = FindOneAndUpdateOptions::builder()
+        .upsert(true)
+        .return_document(ReturnDocument::After)
+        .build();
+
+    let find_one_and_update = |address: Address, amount: UnifiedNum, side: Side| {
+        let query = doc! {
+            "channelId": channel_id,
+            "side": side,
+            "address": address,
+        };
+
+        let update = doc! { "$inc": { "amount": amount }, "$set": { "updated": now }, "$setOnInsert": {"created": now } };
+
+        collection.find_one_and_update(query, update, options.clone())
+    };
+
+    // Earners
+    let earners_futures = delta_balances
+        .earners
+        .into_iter()
+        .map(|(earner, amount)| find_one_and_update(earner, amount, Side::Earner));
+
+    // Spenders
+    let spenders_futures = delta_balances
+        .spenders
+        .into_iter()
+        .map(|(spender, amount)| find_one_and_update(spender, amount, Side::Spender));
+
+    let earners = join_all(earners_futures);
+    let spenders = join_all(spenders_futures);
+
+    // collect all the Accounting updates into Vectors
+    let (earners, spenders) = join(earners, spenders).await;
+
+    // Return an error if any of the Accounting updates failed
+    Ok((
+        earners
+            .into_iter()
+            // filter any Accounting that has returned `None`
+            // This should never happen because we use Upsert
+            .filter_map(|res| {
+                res.transpose()
+                    .map(|accounting_m| accounting_m.map(|a| Accounting::from(a)))
+            })
+            .collect::<Result<_, _>>()?,
+        spenders
+            .into_iter()
+            // filter any Accounting that has returned `None`
+            // This should never happen because we use Upsert
+            .filter_map(|res| res.transpose())
+            .map(|accounting_m| accounting_m.map(|a| Accounting::from(a)))
+            .collect::<Result<_, _>>()?,
+    ))
+}
+
+mod mongo {
+    use mongodb::bson::Bson;
+
+    use super::Side;
+
+    impl From<Side> for Bson {
+        fn from(side: Side) -> Self {
+            Bson::String(side.to_string())
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use primitives::{
@@ -247,9 +348,8 @@ mod test {
     };
 
     use crate::db::{
-        insert_channel,
+        insert_channel, mongodb_connection,
         tests_postgres::{setup_test_migrations, DATABASE_POOL},
-        mongodb_connection
     };
 
     use mongodb::options::ClientOptions;
@@ -716,10 +816,21 @@ mod test {
 
     #[tokio::test]
     async fn test_update_accounting_mongo() {
-        let opts = ClientOptions::parse("mongodb://mongodb:mongodb@0.0.0.0:27017/").await.expect("Should parse");
-        let client = mongodb_connection(opts).await.expect("should get connection");
+        let opts = ClientOptions::parse("mongodb://mongodb:mongodb@0.0.0.0:27017/")
+            .await
+            .expect("Should parse");
+        let client = mongodb_connection(opts)
+            .await
+            .expect("should get connection");
 
-        let update = update_accounting_mongo(&client.database("sentry"), DUMMY_CAMPAIGN.channel.id(), *PUBLISHER, Side::Earner, UnifiedNum::from_u64(300_000_000)).await;
+        let update = update_accounting_mongo(
+            &client.database("sentry"),
+            DUMMY_CAMPAIGN.channel.id(),
+            *PUBLISHER,
+            Side::Earner,
+            UnifiedNum::from_u64(300_000_000),
+        )
+        .await;
         assert!(update.is_ok());
     }
 }
