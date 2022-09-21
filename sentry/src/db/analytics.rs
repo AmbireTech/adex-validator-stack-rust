@@ -2,14 +2,11 @@ use std::collections::HashSet;
 
 use futures::TryStreamExt;
 use mongodb::{
-    bson::{doc, document::Document},
-    error::Error as MongoDbError,
-    options::FindOneAndUpdateOptions,
-    Database
+    bson::doc, error::Error as MongoDbError, options::FindOneAndUpdateOptions, Database,
 };
 use primitives::{
     analytics::{query::AllowedKey, AnalyticsQuery, AuthenticateAs, Metric, Timeframe},
-    sentry::{Analytics, FetchedAnalytics, UpdateAnalytics},
+    sentry::{Analytics, AnalyticsM, FetchedAnalytics, UpdateAnalytics, UpdateAnalyticsM},
 };
 use tokio_postgres::{types::ToSql, Row};
 
@@ -235,55 +232,52 @@ pub async fn update_analytics_mongo(
     db: &Database,
     update_analytics: UpdateAnalytics,
 ) -> Result<Option<Analytics>, MongoDbError> {
-    let collection = db.collection("analytics");
+    let update_analytics = UpdateAnalyticsM {
+        time: mongodb::bson::datetime::DateTime::from_chrono(update_analytics.time.to_datetime()),
+            campaign_id: update_analytics.campaign_id,
+            ad_unit: update_analytics.ad_unit,
+            ad_slot: update_analytics.ad_slot,
+            ad_slot_type: update_analytics.ad_slot_type,
+            advertiser: update_analytics.advertiser,
+            publisher: update_analytics.publisher,
+            hostname: update_analytics.hostname,
+            country: update_analytics.country,
+            os_name: update_analytics.os_name,
+            chain_id: update_analytics.chain_id,
+            event_type: update_analytics.event_type,
+            amount_to_add: i64::try_from(update_analytics.amount_to_add.to_u64()).expect("Should parse"),
+            count_to_add: update_analytics.count_to_add,
+    };
 
-    let query = get_analytics_update_query(&update_analytics);
-    let amount_as_i64 =
-        i64::try_from(update_analytics.amount_to_add.to_u64()).expect("should get amount"); // TODO: Find a way to use UnifiedNum without converting to i64
-    let update = doc!{"$inc": {"payoutAmount": amount_as_i64, "payoutCount": &update_analytics.count_to_add}};
+    let collection = db.collection::<AnalyticsM>("analytics");
 
-    let options = FindOneAndUpdateOptions::builder()
-        .upsert(Some(true))
-        .build();
+    let query = doc! {
+        "campaignId": update_analytics.campaign_id,
+        "time": update_analytics.time,
+        "adUnit": update_analytics.ad_unit,
+        "adSlot": update_analytics.ad_slot,
+        "adSlotType": update_analytics.ad_slot_type,
+        "advertiser": update_analytics.advertiser,
+        "publisher": update_analytics.publisher,
+        "hostname": update_analytics.hostname,
+        "country": update_analytics.country,
+        "osName": update_analytics.os_name,
+        "chainId": update_analytics.chain_id,
+        "eventType": update_analytics.event_type
+    };
+
+    let update = doc! {"$inc": {"payoutAmount": update_analytics.amount_to_add, "payoutCount": &update_analytics.count_to_add}};
+
+    let options = FindOneAndUpdateOptions::builder().upsert(true).build();
 
     let document: Option<Analytics> = collection
         .find_one_and_update(query, update, options)
-        .await?;
+        .await
+        .map(|analytics_m| analytics_m.map(Into::into))?;
 
     Ok(document)
 }
 
-// TODO: Use .to_bson().as_document() instead
-fn get_analytics_update_query(update_analytics: &UpdateAnalytics) -> Document {
-    let mut document = Document::new();
-
-    document.insert("campaignId", update_analytics.campaign_id.to_string());
-    document.insert("time", update_analytics.time.to_string());
-    document.insert("adUnit", update_analytics.ad_unit.to_string());
-    document.insert("adSlot", update_analytics.ad_slot.to_string());
-    document.insert(
-        "adSlotType",
-        update_analytics.ad_slot_type.clone().unwrap_or_default(),
-    );
-    document.insert("advertiser", update_analytics.advertiser.to_string());
-    document.insert("publisher", update_analytics.publisher.to_string());
-    document.insert(
-        "hostname",
-        update_analytics
-            .hostname
-            .as_ref()
-            .unwrap_or(&"".to_string()),
-    );
-    document.insert(
-        "country",
-        update_analytics.country.as_ref().unwrap_or(&"".to_string()),
-    );
-    document.insert("osName", update_analytics.os_name.to_string());
-    document.insert("chainId", update_analytics.chain_id.to_string());
-    document.insert("eventType", update_analytics.event_type.to_string());
-
-    document
-}
 #[cfg(test)]
 mod test {
     use std::collections::HashMap;
@@ -302,7 +296,11 @@ mod test {
 
     use mongodb::{options::ClientOptions, Collection};
 
-    use crate::db::{tests_postgres::{setup_test_migrations, DATABASE_POOL}, mongodb_pool::{TESTS_POOL, Manager as MongoManager}, mongodb_connection};
+    use crate::db::{
+        mongodb_connection,
+        mongodb_pool::{Manager as MongoManager, TESTS_POOL},
+        tests_postgres::{setup_test_migrations, DATABASE_POOL},
+    };
 
     #[tokio::test]
     async fn insert_update_and_fetch_analytics() {
@@ -1049,11 +1047,33 @@ mod test {
 
     #[tokio::test]
     async fn test_update_analytics_mongo() {
-        let opts = ClientOptions::parse("mongodb://mongodb:mongodb@0.0.0.0:27017/").await.expect("Should parse");
-        let client = mongodb_connection(opts).await.expect("should get connection");
+        let opts = ClientOptions::parse("mongodb://mongodb:mongodb@0.0.0.0:27017/")
+            .await
+            .expect("Should parse");
+        let client = mongodb_connection(opts)
+            .await
+            .expect("should get connection");
         let ad_unit = DUMMY_AD_UNITS[0].clone();
         let ad_slot_ipfs = DUMMY_IPFS[0];
-        let analytics = make_impression_analytics(&ad_unit, ad_slot_ipfs, 7, 21);
+        // let analytics = make_impression_analytics(&ad_unit, ad_slot_ipfs, 7, 21);
+        let day = 7;
+        let hour = 21;
+        let analytics = UpdateAnalytics {
+            time: DateHour::from_ymdh(2021, 12, day, hour),
+            campaign_id: DUMMY_CAMPAIGN.id,
+            ad_unit: ad_unit.ipfs,
+            ad_slot: ad_slot_ipfs,
+            ad_slot_type: Some(ad_unit.ad_type.clone()),
+            advertiser: *CREATOR,
+            publisher: *PUBLISHER,
+            hostname: Some("localhost".to_string()),
+            country: Some("Bulgaria".to_string()),
+            os_name: OperatingSystem::Linux,
+            chain_id: ChainId::new(1),
+            event_type: IMPRESSION,
+            amount_to_add: UnifiedNum::from_u64(day as u64 * hour as u64 * 100_000_000),
+            count_to_add: hour as i32,
+        };
 
         let update = update_analytics_mongo(&client.database("sentry"), analytics).await;
         assert!(update.is_ok());
