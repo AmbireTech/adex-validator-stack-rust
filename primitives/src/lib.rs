@@ -137,6 +137,30 @@ pub mod postgres {
     });
 }
 
+#[cfg(feature = "mongo")]
+#[cfg_attr(docsrs, doc(cfg(feature = "mongo")))]
+pub mod mongo {
+    use std::env::{self, VarError};
+
+    use once_cell::sync::Lazy;
+
+    /// `MONGO_URI` environment variable - default: `mongodb://mongodb:mongodb@localhost:27017`
+    ///
+    /// The Mongodb connection string URI to be used in the applications or tests.
+    ///
+    /// Due to the fact that we use the async client
+    /// we are unable to create the `ClientOptions` directly in the static.
+    pub static MONGO_URI: Lazy<String> =
+        Lazy::new(|| env::var("MONGO_URI").unwrap_or_else(|_| String::from("mongodb://mongodb:mongodb@localhost:27017")));
+
+    /// `MONGO_DB` environment variable - default: `mongodb`
+    pub static MONGO_DB: Lazy<String> = Lazy::new(|| match env::var("POSTGRES_DB") {
+        Ok(database) => database,
+        Err(VarError::NotPresent) => "mongodb".into(),
+        Err(err) => panic!("{err}"),
+    });
+}
+
 mod deposit {
     use crate::{BigNum, UnifiedNum};
     use serde::{Deserialize, Serialize};
