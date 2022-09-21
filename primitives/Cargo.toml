@@ -16,6 +16,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
 postgres = ["bytes", "tokio-postgres", "deadpool-postgres"]
+mongo = ["bson", "mongodb"]
 # Enables the testing utilities like addresses, dummy Campaigns, Validators, IPFSes, AdUnits, etc.
 # All Addresses and keystore files exist in the ganache-cli setup for testing with the EthereumAdapter
 test-util = []
@@ -122,6 +123,11 @@ tokio-postgres = { version = "0.7", optional = true, features = [
 ] }
 # testing FromSql & ToSql implementation of structs
 deadpool-postgres = { version = "0.10", optional = true }
+
+# mongodb for sentry. Should be the same version as the mongodb driver!
+bson = { version = "2.3", optional = true, features = ["chrono-0_4"] }
+mongodb = { version = "2.3", features = ["bson-chrono-0_4"], optional = true }
+
 
 async-trait = "0.1"
 # Other
