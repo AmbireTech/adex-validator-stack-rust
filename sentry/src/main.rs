@@ -11,7 +11,8 @@ use slog::info;
 use adapter::{primitives::AdapterTypes, Adapter};
 use primitives::{
     config::configuration,
-    postgres::{POSTGRES_CONFIG, POSTGRES_DB},
+    mongo::{MONGO_DB, MONGO_URI},
+    postgres::POSTGRES_CONFIG,
     test_util::DUMMY_AUTH,
     util::logging::new_logger,
     ValidatorId,
@@ -19,7 +20,7 @@ use primitives::{
 use sentry::{
     application::EnableTls,
     db::{
-        mongodb_connection, postgres_connection, redis_connection, setup_migrations,
+        mongodb_connection, postgres_connection, redis_connection, setup_migrations, setup_mongo,
         CampaignRemaining,
     },
     platform::PlatformApi,
@@ -144,13 +145,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     let mongodb_database = {
-        let mongodb_options =
-            ClientOptions::parse("mongodb://mongodb:mongodb@adex-mongodb:27017").await?;
-        let mongodb_client = mongodb_connection(mongodb_options)
-            .await
-            .expect("Failed to build Client for mongodb");
+        let mongodb_options = ClientOptions::parse(MONGO_URI.as_str()).await?;
+        let mongodb_client = mongodb_connection(mongodb_options).await?;
 
-        mongodb_client.database(&POSTGRES_DB)
+        let db = mongodb_client.database(&MONGO_DB);
+        
+        // sets up the indexes, deletes database (for development), etc.
+        setup_mongo(env_config.env, &db).await?;
+
+        db
     };
 
     // use the environmental variables to setup the Postgres connection
