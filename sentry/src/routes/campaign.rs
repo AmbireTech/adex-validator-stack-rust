@@ -576,7 +576,7 @@ pub mod insert_events {
     use crate::{
         access::{self, check_access},
         analytics,
-        db::{accounting::spend_amount, CampaignRemaining, DbPool, PoolError, RedisError},
+        db::{accounting::{spend_amount, spend_amount_mongo}, CampaignRemaining, DbPool, PoolError, RedisError},
         payout::get_payout,
         response::ResponseError,
         spender::fee::calculate_fee,
@@ -591,6 +591,8 @@ pub mod insert_events {
         Redis(#[from] RedisError),
         #[error(transparent)]
         Postgres(#[from] PoolError),
+        #[error(transparent)]
+        Mongodb(#[from] mongodb::error::Error),
         #[error(transparent)]
         Overflow(#[from] OverflowError),
     }
@@ -793,7 +795,8 @@ pub mod insert_events {
         // Update the Accounting records accordingly
         let channel_id = campaign.channel.id();
 
-        spend_amount(app.pool.clone(), channel_id, delta_balances).await?;
+        spend_amount_mongo(app.mongodb.clone(), channel_id, delta_balances).await?;
+        // spend_amount(app.pool.clone(), channel_id, delta_balances).await?;
 
         // check if we still have budget to spend, after we've updated both Redis and Postgres
         if remaining.is_negative() {
