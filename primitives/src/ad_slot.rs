@@ -1,4 +1,4 @@
-use crate::{targeting::Rule, Address, UnifiedNum, ValidatorId, IPFS};
+use crate::{targeting::Rules, Address, UnifiedNum, ValidatorId, IPFS};
 use chrono::{
     serde::{ts_milliseconds, ts_milliseconds_option},
     DateTime, Utc,
@@ -29,7 +29,7 @@ pub struct AdSlot {
     #[serde(default)]
     pub min_per_impression: Option<HashMap<Address, UnifiedNum>>,
     #[serde(default)]
-    pub rules: Vec<Rule>,
+    pub rules: Rules,
     /// Valid ipfs hash for Ad Unit object. It will be used as fallback data (optional)
     #[serde(default)]
     pub fallback_unit: Option<IPFS>,
