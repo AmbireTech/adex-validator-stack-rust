@@ -40,9 +40,9 @@ use crate::{
 pub(crate) static CLOUDFLARE_IPCOUNTRY_HEADER: Lazy<HeaderName> =
     Lazy::new(|| HeaderName::from_static("cf-ipcountry"));
 
-// #[cfg(test)]
-// #[path = "units_for_slot_test.rs"]
-// pub mod test;
+#[cfg(test)]
+#[path = "./units_for_slot_test.rs"]
+pub mod test;
 
 #[derive(Debug, Error)]
 #[error(transparent)]
@@ -171,7 +171,6 @@ where
     Ok(Json(response))
 }
 
-// TODO: Use error instead of std::error::Error
 async fn get_campaigns(
     pool: DbPool,
     campaign_remaining: CampaignRemaining,
@@ -182,6 +181,7 @@ async fn get_campaigns(
     // 1. Fetch active Campaigns: (postgres)
     //  Creator = publisher_id
     // if deposit asset > 0 => filter by deposit_asset
+    // TODO: limit the amount of passable deposit assets to avoid the max query size!
     let active_campaigns = units_for_slot_get_campaigns(
         &pool,
         deposit_assets.as_ref(),

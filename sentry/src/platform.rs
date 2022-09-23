@@ -10,7 +10,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 #[derive(Debug, Clone)]
 /// The `PlatformApi` is cheap to clone
 pub struct PlatformApi {
-    platform_url: ApiUrl,
+    pub(crate) platform_url: ApiUrl,
     client: Client,
 }
 
