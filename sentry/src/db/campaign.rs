@@ -234,12 +234,22 @@ pub async fn units_for_slot_get_campaigns(
         vec![Box::new(active_to_ge), Box::new(creator)];
 
     // Deposit assets
-    match deposit_assets {
+    match deposit_assets.cloned() {
         Some(assets) if !assets.is_empty() => {
-            let assets_vec = assets.iter().copied().collect::<Vec<_>>();
+            // we start from $3 parameter
+            let start_index = params.len() + 1;
 
-            where_clauses.push("channels.token IN ($3)".into());
-            params.push(Box::new(assets_vec))
+            let in_clause = assets.into_iter().enumerate().fold(
+                vec![],
+                |mut in_clause, (asset_index, asset)| {
+                    in_clause.push(format!("${}", start_index + asset_index));
+                    params.push(Box::new(asset));
+
+                    in_clause
+                },
+            );
+
+            where_clauses.push(format!("channels.token IN ({})", in_clause.join(",")));
         }
         _ => {}
     };
