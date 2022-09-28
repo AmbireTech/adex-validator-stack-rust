@@ -238,13 +238,14 @@ async fn test_targeting_input() {
     )]
     .into_iter()
     .collect();
-    
+
     let _mock_guard = Mock::given(method("GET"))
         .and(path(format!("/slot/{}", ad_slot.ipfs)))
         .respond_with(ResponseTemplate::new(200).set_body_json(platform_response))
         .expect(1)
         .named("platform_slot")
-        .mount(&mock_server).await;
+        .mount(&mock_server)
+        .await;
 
     let response = get_units_for_slot(
         Extension(app.clone()),
