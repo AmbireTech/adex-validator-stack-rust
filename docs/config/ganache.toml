@@ -47,6 +47,8 @@ admins = [
     '0x80690751969B234697e9059e04ed72195c3507fa'
 ]
 
+seed_db = true
+
 [platform]
 # This should be changed for tests and use the wiremock url
 url = "https://platform.adex.network"

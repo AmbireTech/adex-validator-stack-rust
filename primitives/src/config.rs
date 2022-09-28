@@ -182,6 +182,7 @@ pub struct Config {
     pub chains: HashMap<String, ChainInfo>,
     pub platform: PlatformConfig,
     pub limits: Limits,
+    pub seed_db: bool,
 }
 
 impl Config {

@@ -9,7 +9,7 @@ use axum::{
     http::{Method, StatusCode},
     middleware,
     routing::get,
-    Extension, Router,
+    Extension, Json, Router,
 };
 use axum_server::{tls_rustls::RustlsConfig, Handle};
 use once_cell::sync::Lazy;
@@ -19,14 +19,19 @@ use slog::{error, info, Logger};
 use tower::ServiceBuilder;
 use tower_http::cors::CorsLayer;
 
-use adapter::{client::Locked, Adapter};
-use primitives::{config::Environment, ValidatorId};
+use adapter::{client::Locked, Adapter, Dummy, Ethereum};
+use primitives::{
+    config::Environment, sentry::campaign_create::CreateCampaign, test_util::CAMPAIGNS,
+    unified_num::FromWhole, Campaign, ChainOf, Deposit, UnifiedNum, ValidatorId,
+};
 
 use crate::{
     db::{CampaignRemaining, DbPool},
     middleware::auth::authenticate,
     platform::PlatformApi,
     routes::{
+        campaign::create_campaign,
+        channel::{channel_dummy_deposit, ChannelDummyDeposit},
         get_cfg,
         routers::{analytics_router, campaigns_router, channels_router, units_for_slot_router},
     },
@@ -305,6 +310,136 @@ async fn shutdown_signal(logger: Logger, handle: Handle) {
     handle.shutdown();
 
     info!(&logger, "Received Ctrl+C signal. Shutting down..")
+}
+
+pub async fn seed_dummy(app: Application<Dummy>) -> Result<(), Box<dyn std::error::Error>> {
+    // create campaign
+    // Chain 1337
+    let campaign_1 = CAMPAIGNS[0].clone();
+    // Chain 1337
+    let campaign_2 = CAMPAIGNS[1].clone();
+    // Chain 1
+    let campaign_3 = CAMPAIGNS[2].clone();
+
+    async fn create_seed_campaign(
+        app: Application<Dummy>,
+        campaign: &ChainOf<Campaign>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let campaign_to_create = CreateCampaign::from_campaign(campaign.context.clone());
+        let auth = Auth {
+            era: 0,
+            uid: ValidatorId::from(campaign_to_create.creator),
+            chain: campaign.chain.clone(),
+        };
+        let _result = create_campaign(
+            Json(campaign_to_create),
+            Extension(auth),
+            Extension(Arc::new(app)),
+        )
+        .await
+        .expect("Should create seed campaigns");
+
+        Ok(())
+    }
+
+    async fn dummy_deposit(
+        app: Application<Dummy>,
+        campaign: &ChainOf<Campaign>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let channel = campaign.context.channel;
+        let auth = Auth {
+            era: 0,
+            uid: ValidatorId::from(campaign.context.creator),
+            chain: campaign.chain.clone(),
+        };
+
+        let request = ChannelDummyDeposit {
+            channel,
+            deposit: Deposit {
+                total: UnifiedNum::from_whole(1_000_000),
+            },
+        };
+
+        let result =
+            channel_dummy_deposit(Extension(Arc::new(app)), Extension(auth), Json(request)).await;
+
+        assert!(result.is_ok());
+
+        Ok(())
+    }
+    // chain 1337
+    dummy_deposit(app.clone(), &campaign_1).await?;
+    // chain 1337
+    dummy_deposit(app.clone(), &campaign_2).await?;
+    // chain 1
+    dummy_deposit(app.clone(), &campaign_3).await?;
+
+    create_seed_campaign(app.clone(), &campaign_1).await?;
+    create_seed_campaign(app.clone(), &campaign_2).await?;
+    create_seed_campaign(app.clone(), &campaign_3).await?;
+    Ok(())
+}
+
+pub async fn seed_ethereum(app: Application<Ethereum>) -> Result<(), Box<dyn std::error::Error>> {
+    // create campaign
+    // Chain 1337
+    let campaign_1 = CAMPAIGNS[0].clone();
+    // Chain 1337
+    let campaign_2 = CAMPAIGNS[1].clone();
+    // Chain 1
+    let campaign_3 = CAMPAIGNS[2].clone();
+
+    async fn create_seed_campaign(
+        app: Application<Ethereum>,
+        campaign: &ChainOf<Campaign>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let campaign_to_create = CreateCampaign::from_campaign(campaign.context.clone());
+        let auth = Auth {
+            era: 0,
+            uid: ValidatorId::from(campaign_to_create.creator),
+            chain: campaign.chain.clone(),
+        };
+        let _result = create_campaign(
+            Json(campaign_to_create),
+            Extension(auth),
+            Extension(Arc::new(app)),
+        )
+        .await
+        .expect("Should create seed campaigns");
+        Ok(())
+    }
+    async fn deposit(
+        app: Application<Ethereum>,
+        campaign: &ChainOf<Campaign>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let channel = campaign.context.channel;
+        let auth = Auth {
+            era: 0,
+            uid: ValidatorId::from(campaign.context.creator),
+            chain: campaign.chain.clone(),
+        };
+        let request = ChannelDummyDeposit {
+            channel,
+            deposit: Deposit {
+                total: UnifiedNum::from_whole(1_000_000),
+            },
+        };
+        let result =
+            channel_dummy_deposit(Extension(Arc::new(app)), Extension(auth), Json(request)).await;
+        assert!(result.is_ok());
+        Ok(())
+    }
+    // chain 1337
+    deposit(app.clone(), &campaign_1).await?;
+    // chain 1337
+    deposit(app.clone(), &campaign_2).await?;
+    // chain 1
+    deposit(app.clone(), &campaign_3).await?;
+
+    create_seed_campaign(app.clone(), &campaign_1).await?;
+    create_seed_campaign(app.clone(), &campaign_2).await?;
+    create_seed_campaign(app.clone(), &campaign_3).await?;
+    Ok(())
 }
 
 #[cfg(test)]

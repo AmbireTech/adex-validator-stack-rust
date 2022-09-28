@@ -13,7 +13,7 @@ use primitives::{
     util::logging::new_logger, ValidatorId,
 };
 use sentry::{
-    application::EnableTls,
+    application::{seed_dummy, seed_ethereum, EnableTls},
     db::{postgres_connection, redis_connection, setup_migrations, CampaignRemaining},
     platform::PlatformApi,
     Application,
@@ -150,32 +150,47 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     )
     .expect("Failed to build PlatformApi");
 
+    // Like dummy adapter route
     match adapter {
         AdapterTypes::Ethereum(adapter) => {
-            Application::new(
+            let app = Application::new(
                 *adapter,
-                config,
+                config.clone(),
                 logger,
-                redis,
+                redis.clone(),
                 postgres,
                 campaign_remaining,
                 platform_api,
-            )
-            .run(enable_tls)
-            .await
+            );
+
+            if config.seed_db {
+                redis::cmd("FLUSHDB")
+                    .query_async::<_, String>(&mut redis.clone())
+                    .await?;
+                seed_ethereum(app.clone()).await?;
+            }
+
+            app.run(enable_tls).await
         }
         AdapterTypes::Dummy(adapter) => {
-            Application::new(
+            let app = Application::new(
                 *adapter,
-                config,
+                config.clone(),
                 logger,
-                redis,
+                redis.clone(),
                 postgres,
                 campaign_remaining,
                 platform_api,
-            )
-            .run(enable_tls)
-            .await
+            );
+
+            if config.seed_db {
+                redis::cmd("FLUSHDB")
+                    .query_async::<_, String>(&mut redis.clone())
+                    .await?;
+                seed_dummy(app.clone()).await?;
+            }
+
+            app.run(enable_tls).await
         }
     };
 
