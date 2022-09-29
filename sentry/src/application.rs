@@ -22,11 +22,11 @@ use tower_http::cors::CorsLayer;
 use adapter::{client::Locked, Adapter, Dummy, Ethereum};
 use primitives::{
     config::Environment, sentry::campaign_create::CreateCampaign, test_util::CAMPAIGNS,
-    unified_num::FromWhole, Campaign, ChainOf, Deposit, UnifiedNum, ValidatorId,
+    unified_num::FromWhole, Campaign, ChainOf, Deposit, UnifiedNum, ValidatorId, spender::Spendable,
 };
 
 use crate::{
-    db::{CampaignRemaining, DbPool},
+    db::{CampaignRemaining, DbPool, campaign::insert_campaign, insert_channel, spendable::insert_spendable},
     middleware::auth::authenticate,
     platform::PlatformApi,
     routes::{
@@ -393,48 +393,21 @@ pub async fn seed_ethereum(app: Application<Ethereum>) -> Result<(), Box<dyn std
         app: Application<Ethereum>,
         campaign: &ChainOf<Campaign>,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let campaign_to_create = CreateCampaign::from_campaign(campaign.context.clone());
-        let auth = Auth {
-            era: 0,
-            uid: ValidatorId::from(campaign_to_create.creator),
-            chain: campaign.chain.clone(),
-        };
-        let _result = create_campaign(
-            Json(campaign_to_create),
-            Extension(auth),
-            Extension(Arc::new(app)),
-        )
-        .await
-        .expect("Should create seed campaigns");
-        Ok(())
-    }
-    async fn deposit(
-        app: Application<Ethereum>,
-        campaign: &ChainOf<Campaign>,
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        let channel = campaign.context.channel;
-        let auth = Auth {
-            era: 0,
-            uid: ValidatorId::from(campaign.context.creator),
-            chain: campaign.chain.clone(),
-        };
-        let request = ChannelDummyDeposit {
-            channel,
+        let channel_context = ChainOf::of_channel(&campaign);
+
+        let spendable = Spendable {
+            spender: campaign.context.creator,
+            channel: campaign.context.channel,
             deposit: Deposit {
-                total: UnifiedNum::from_whole(1_000_000),
-            },
+                total: UnifiedNum::from_u64(10_000_000),
+            }
         };
-        let result =
-            channel_dummy_deposit(Extension(Arc::new(app)), Extension(auth), Json(request)).await;
-        assert!(result.is_ok());
+        insert_channel(&app.pool, &channel_context).await.expect("Should insert channel of seed campaign");
+        insert_campaign(&app.pool, &campaign.context).await.expect("Should insert seed campaign");
+        insert_spendable(app.pool.clone(), &spendable).await.expect("Should insert spendable for campaign creator");
+
         Ok(())
     }
-    // chain 1337
-    deposit(app.clone(), &campaign_1).await?;
-    // chain 1337
-    deposit(app.clone(), &campaign_2).await?;
-    // chain 1
-    deposit(app.clone(), &campaign_3).await?;
 
     create_seed_campaign(app.clone(), &campaign_1).await?;
     create_seed_campaign(app.clone(), &campaign_2).await?;
