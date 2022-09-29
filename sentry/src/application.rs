@@ -21,12 +21,16 @@ use tower_http::cors::CorsLayer;
 
 use adapter::{client::Locked, Adapter, Dummy, Ethereum};
 use primitives::{
-    config::Environment, sentry::campaign_create::CreateCampaign, test_util::CAMPAIGNS,
-    unified_num::FromWhole, Campaign, ChainOf, Deposit, UnifiedNum, ValidatorId, spender::Spendable,
+    config::Environment, sentry::campaign_create::CreateCampaign, spender::Spendable,
+    test_util::CAMPAIGNS, unified_num::FromWhole, Campaign, ChainOf, Deposit, UnifiedNum,
+    ValidatorId,
 };
 
 use crate::{
-    db::{CampaignRemaining, DbPool, campaign::insert_campaign, insert_channel, spendable::insert_spendable},
+    db::{
+        campaign::insert_campaign, insert_channel, spendable::insert_spendable, CampaignRemaining,
+        DbPool,
+    },
     middleware::auth::authenticate,
     platform::PlatformApi,
     routes::{
@@ -331,7 +335,7 @@ pub async fn seed_dummy(app: Application<Dummy>) -> Result<(), Box<dyn std::erro
             uid: ValidatorId::from(campaign_to_create.creator),
             chain: campaign.chain.clone(),
         };
-        let _result = create_campaign(
+        create_campaign(
             Json(campaign_to_create),
             Extension(auth),
             Extension(Arc::new(app)),
@@ -400,11 +404,17 @@ pub async fn seed_ethereum(app: Application<Ethereum>) -> Result<(), Box<dyn std
             channel: campaign.context.channel,
             deposit: Deposit {
                 total: UnifiedNum::from_u64(10_000_000),
-            }
+            },
         };
-        insert_channel(&app.pool, &channel_context).await.expect("Should insert channel of seed campaign");
-        insert_campaign(&app.pool, &campaign.context).await.expect("Should insert seed campaign");
-        insert_spendable(app.pool.clone(), &spendable).await.expect("Should insert spendable for campaign creator");
+        insert_channel(&app.pool, &channel_context)
+            .await
+            .expect("Should insert channel of seed campaign");
+        insert_campaign(&app.pool, &campaign.context)
+            .await
+            .expect("Should insert seed campaign");
+        insert_spendable(app.pool.clone(), &spendable)
+            .await
+            .expect("Should insert spendable for campaign creator");
 
         Ok(())
     }
