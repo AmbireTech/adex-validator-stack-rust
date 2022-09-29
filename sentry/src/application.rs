@@ -397,7 +397,7 @@ pub async fn seed_ethereum(app: Application<Ethereum>) -> Result<(), Box<dyn std
         app: Application<Ethereum>,
         campaign: &ChainOf<Campaign>,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let channel_context = ChainOf::of_channel(&campaign);
+        let channel_context = ChainOf::of_channel(campaign);
 
         let spendable = Spendable {
             spender: campaign.context.creator,
