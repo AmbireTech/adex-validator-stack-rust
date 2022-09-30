@@ -5,16 +5,23 @@ use std::{env, net::SocketAddr, path::PathBuf};
 
 use clap::{crate_version, value_parser, Arg, Command};
 
+use redis::aio::MultiplexedConnection;
 use slog::info;
 
 use adapter::{primitives::AdapterTypes, Adapter};
 use primitives::{
-    config::configuration, postgres::POSTGRES_CONFIG, test_util::DUMMY_AUTH,
-    util::logging::new_logger, ValidatorId,
+    config::{configuration, Environment},
+    postgres::POSTGRES_CONFIG,
+    test_util::DUMMY_AUTH,
+    util::logging::new_logger,
+    ValidatorId,
 };
 use sentry::{
-    application::{seed_dummy, seed_ethereum, EnableTls},
-    db::{postgres_connection, redis_connection, setup_migrations, CampaignRemaining},
+    application::{
+        seed::{seed_dummy, seed_ethereum},
+        EnableTls, EnvConfig,
+    },
+    db::{postgres_connection, redis_connection, setup_migrations, CampaignRemaining, DbPool},
     platform::PlatformApi,
     Application,
 };
@@ -127,20 +134,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let logger = new_logger("sentry");
-    let redis = redis_connection(env_config.redis_url).await?;
-    info!(&logger, "Checking connection and applying migrations...");
-    // Check connection and setup migrations before setting up Postgres
-    tokio::task::block_in_place(|| {
-        // Migrations are blocking, so we need to wrap it with block_in_place
-        // otherwise we get a tokio error
-        setup_migrations(env_config.env)
-    });
 
-    // use the environmental variables to setup the Postgres connection
-    let postgres = match postgres_connection(POSTGRES_CONFIG.clone()).await {
-        Ok(pool) => pool,
-        Err(build_err) => panic!("Failed to build postgres database pool: {build_err}"),
-    };
+    let (redis, postgres) = setup_databases(&logger, &env_config).await?;
 
     let campaign_remaining = CampaignRemaining::new(redis.clone());
 
@@ -163,10 +158,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 platform_api,
             );
 
-            if config.seed_db {
-                redis::cmd("FLUSHDB")
-                    .query_async::<_, String>(&mut redis.clone())
-                    .await?;
+            if env_config.seed_db && Environment::Development == env_config.env {
                 seed_ethereum(app.clone()).await?;
             }
 
@@ -183,10 +175,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 platform_api,
             );
 
-            if config.seed_db {
-                redis::cmd("FLUSHDB")
-                    .query_async::<_, String>(&mut redis.clone())
-                    .await?;
+            if env_config.seed_db && Environment::Development == env_config.env {
                 seed_dummy(app.clone()).await?;
             }
 
@@ -195,4 +184,39 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     Ok(())
+}
+
+/// Setup the databases before use in the application:
+///
+/// 1. Runs migrations on `postgres` but if [`Environment::Development`] then it runs them down first.
+/// 2. Flushes `redis` if [`Environment::Development`].
+async fn setup_databases(
+    logger: &slog::Logger,
+    env_config: &EnvConfig,
+) -> Result<(MultiplexedConnection, DbPool), Box<dyn std::error::Error>> {
+    let redis = redis_connection(env_config.redis_url.clone()).await?;
+
+    info!(&logger, "Checking connection and applying migrations...");
+    // Check connection and setup migrations before setting up Postgres
+    tokio::task::block_in_place(|| {
+        // Migrations are blocking, so we need to wrap it with block_in_place
+        // otherwise we get a tokio error
+        setup_migrations(env_config.env)
+    });
+
+    // clearing up redis
+    if Environment::Development == env_config.env {
+        info!(&logger, "Flushing redis...");
+        redis::cmd("FLUSHDB")
+            .query_async::<_, String>(&mut redis.clone())
+            .await?;
+    }
+
+    // use the environmental variables to setup the Postgres connection
+    let postgres = match postgres_connection(POSTGRES_CONFIG.clone()).await {
+        Ok(pool) => pool,
+        Err(build_err) => panic!("Failed to build postgres database pool: {build_err}"),
+    };
+
+    Ok((redis, postgres))
 }

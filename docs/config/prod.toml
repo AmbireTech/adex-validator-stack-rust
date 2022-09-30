@@ -28,8 +28,6 @@ validators_whitelist = []
 # Galya (for analytics)
 admins = ['0x5d6A3F1AD7b124ecDFDf4841D9bB246eD5fBF04c']
 
-seed_db = false
-
 [platform]
 # This should be changed for tests and use the wiremock url
 url = "https://platform.adex.network"
