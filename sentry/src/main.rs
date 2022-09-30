@@ -17,7 +17,10 @@ use primitives::{
     ValidatorId,
 };
 use sentry::{
-    application::{seed_dummy, seed_ethereum, EnableTls, EnvConfig},
+    application::{
+        seed::{seed_dummy, seed_ethereum},
+        EnableTls, EnvConfig,
+    },
     db::{postgres_connection, redis_connection, setup_migrations, CampaignRemaining, DbPool},
     platform::PlatformApi,
     Application,
