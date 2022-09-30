@@ -320,8 +320,11 @@ pub mod seed {
         Dummy, Ethereum,
     };
     use primitives::{
-        sentry::campaign_create::CreateCampaign, spender::Spendable, test_util::CAMPAIGNS,
-        unified_num::FromWhole, Campaign, ChainOf, Deposit, UnifiedNum, ValidatorId,
+        sentry::campaign_create::CreateCampaign,
+        spender::Spendable,
+        test_util::{ADVERTISER, ADVERTISER_2, CAMPAIGNS, LEADER},
+        unified_num::FromWhole,
+        BigNum, Campaign, ChainOf, Deposit, UnifiedNum, ValidatorId,
     };
 
     use crate::{
@@ -417,19 +420,37 @@ pub mod seed {
         let web3_chain_1 = campaign_3.chain.init_web3()?;
         let token_1 = Erc20Token::new(&web3_chain_1, campaign_3.token.clone());
 
-        // TODO: Call set_balance() and set balance for ADVERTISER & ADVERTISER_2
-        // large enough for the campaigns + extra on top
+        let amount = BigNum::from(100);
+        token_1337
+            .set_balance(LEADER.to_bytes(), ADVERTISER.to_bytes(), &amount)
+            .await
+            .expect("Failed to set balance");
 
-        // token_1337.set_balance(from, address, amount)
-        // token_1.set_balance(from, address, amount)
+        token_1
+            .set_balance(LEADER.to_bytes(), ADVERTISER_2.to_bytes(), &amount)
+            .await
+            .expect("Failed to set balance");
 
         async fn create_seed_campaign(
             app: Application<Ethereum>,
             campaign: &ChainOf<Campaign>,
         ) -> Result<(), Box<dyn std::error::Error>> {
             let channel_context = ChainOf::of_channel(campaign);
+            let campaign_to_create = CreateCampaign::from_campaign(campaign.context.clone());
 
-            // TODO: call create_campaign()
+            let auth = Auth {
+                era: 0,
+                uid: ValidatorId::from(campaign.context.creator),
+                chain: campaign.chain.clone(),
+            };
+
+            create_campaign(
+                Json(campaign_to_create),
+                Extension(auth),
+                Extension(Arc::new(app.clone())),
+            )
+            .await
+            .expect("should create campaign");
 
             let spendable = Spendable {
                 spender: campaign.context.creator,
