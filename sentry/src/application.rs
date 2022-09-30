@@ -73,6 +73,10 @@ pub struct EnvConfig {
     /// Defaults to locally running Redis server: [`DEFAULT_REDIS_URL`]
     #[serde(deserialize_with = "redis_url", default = "default_redis_url")]
     pub redis_url: ConnectionInfo,
+    /// Whether or not to seed the database in [`Environment::Development`].
+    #[serde(default)]
+    pub seed_db: bool,
+    
 }
 
 impl EnvConfig {
