@@ -316,19 +316,19 @@ pub mod seed {
     use axum::{Extension, Json};
 
     use adapter::{
-        ethereum::{test_util::Erc20Token, ChainTransport},
+        ethereum::{test_util::{Erc20Token, Outpace}, ChainTransport},
         Dummy, Ethereum,
     };
     use primitives::{
         sentry::campaign_create::CreateCampaign,
         spender::Spendable,
-        test_util::{ADVERTISER, ADVERTISER_2, CAMPAIGNS, LEADER},
+        test_util::{ADVERTISER, ADVERTISER_2, CAMPAIGNS, LEADER, FOLLOWER},
         unified_num::FromWhole,
         BigNum, Campaign, ChainOf, Deposit, UnifiedNum, ValidatorId,
     };
 
     use crate::{
-        db::{campaign::insert_campaign, insert_channel, spendable::insert_spendable},
+        db::{insert_channel, spendable::insert_spendable},
         routes::{
             campaign::create_campaign,
             channel::{channel_dummy_deposit, ChannelDummyDeposit},
@@ -417,19 +417,33 @@ pub mod seed {
 
         let web3_chain_1337 = campaign_1.chain.init_web3()?;
         let token_1337 = Erc20Token::new(&web3_chain_1337, campaign_1.token.clone());
+        let outpace_1337 = Outpace::new(&web3_chain_1337, campaign_1.chain.outpace);
         let web3_chain_1 = campaign_3.chain.init_web3()?;
         let token_1 = Erc20Token::new(&web3_chain_1, campaign_3.token.clone());
+        let outpace_1 = Outpace::new(&web3_chain_1, campaign_1.chain.outpace);
 
-        let amount = BigNum::from(100);
         token_1337
-            .set_balance(LEADER.to_bytes(), ADVERTISER.to_bytes(), &amount)
+            .set_balance(LEADER.to_bytes(), ADVERTISER.to_bytes(), &BigNum::with_precision(1_000_000, token_1337.info.precision.into()))
             .await
             .expect("Failed to set balance");
+        outpace_1337
+            .deposit(&campaign_1.context.channel, ADVERTISER.to_bytes(), &BigNum::with_precision(1_000_000, token_1337.info.precision.into()))
+            .await
+            .expect("Should deposit funds");
+        outpace_1337
+            .deposit(&campaign_2.context.channel, ADVERTISER.to_bytes(), &BigNum::with_precision(1_000_000, token_1337.info.precision.into()))
+            .await
+            .expect("Should deposit funds");
 
         token_1
-            .set_balance(LEADER.to_bytes(), ADVERTISER_2.to_bytes(), &amount)
+            .set_balance(LEADER.to_bytes(), ADVERTISER_2.to_bytes(), &BigNum::with_precision(1_000_000, token_1.info.precision.into()))
             .await
             .expect("Failed to set balance");
+
+        outpace_1
+            .deposit(&campaign_3.context.channel, ADVERTISER_2.to_bytes(), &BigNum::with_precision(1_000_000, token_1.info.precision.into()))
+            .await
+            .expect("Should deposit funds");
 
         async fn create_seed_campaign(
             app: Application<Ethereum>,
@@ -444,6 +458,20 @@ pub mod seed {
                 chain: campaign.chain.clone(),
             };
 
+            let spendable = Spendable {
+                spender: campaign.context.creator,
+                channel: campaign.context.channel,
+                deposit: Deposit {
+                    total: UnifiedNum::from_whole(10_000),
+                },
+            };
+            insert_channel(&app.pool, &channel_context)
+                .await
+                .expect("Should insert channel of seed campaign");
+            insert_spendable(app.pool.clone(), &spendable)
+                .await
+                .expect("Should insert spendable for campaign creator");
+
             create_campaign(
                 Json(campaign_to_create),
                 Extension(auth),
@@ -452,28 +480,11 @@ pub mod seed {
             .await
             .expect("should create campaign");
 
-            let spendable = Spendable {
-                spender: campaign.context.creator,
-                channel: campaign.context.channel,
-                deposit: Deposit {
-                    total: UnifiedNum::from_u64(10_000_000),
-                },
-            };
-            insert_channel(&app.pool, &channel_context)
-                .await
-                .expect("Should insert channel of seed campaign");
-            insert_campaign(&app.pool, &campaign.context)
-                .await
-                .expect("Should insert seed campaign");
-            insert_spendable(app.pool.clone(), &spendable)
-                .await
-                .expect("Should insert spendable for campaign creator");
-
             Ok(())
         }
 
-        create_seed_campaign(app.clone(), &campaign_1).await?;
-        create_seed_campaign(app.clone(), &campaign_2).await?;
+        // create_seed_campaign(app.clone(), &campaign_1).await?;
+        // create_seed_campaign(app.clone(), &campaign_2).await?;
         create_seed_campaign(app.clone(), &campaign_3).await?;
         Ok(())
     }
