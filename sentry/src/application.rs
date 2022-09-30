@@ -423,7 +423,7 @@ pub mod seed {
         let outpace_1 = Outpace::new(&web3_chain_1, campaign_1.chain.outpace);
 
         token_1337
-            .set_balance(LEADER.to_bytes(), ADVERTISER.to_bytes(), &BigNum::with_precision(1_000_000, token_1337.info.precision.into()))
+            .set_balance(LEADER.to_bytes(), ADVERTISER.to_bytes(), &BigNum::with_precision(3_000_000, token_1337.info.precision.into()))
             .await
             .expect("Failed to set balance");
         outpace_1337
@@ -436,7 +436,7 @@ pub mod seed {
             .expect("Should deposit funds");
 
         token_1
-            .set_balance(LEADER.to_bytes(), ADVERTISER_2.to_bytes(), &BigNum::with_precision(1_000_000, token_1.info.precision.into()))
+            .set_balance(LEADER.to_bytes(), ADVERTISER_2.to_bytes(), &BigNum::with_precision(2_000_000, token_1.info.precision.into()))
             .await
             .expect("Failed to set balance");
 
@@ -483,8 +483,8 @@ pub mod seed {
             Ok(())
         }
 
-        // create_seed_campaign(app.clone(), &campaign_1).await?;
-        // create_seed_campaign(app.clone(), &campaign_2).await?;
+        create_seed_campaign(app.clone(), &campaign_1).await?;
+        create_seed_campaign(app.clone(), &campaign_2).await?;
         create_seed_campaign(app.clone(), &campaign_3).await?;
         Ok(())
     }
