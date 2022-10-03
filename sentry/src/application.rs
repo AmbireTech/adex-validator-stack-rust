@@ -420,7 +420,7 @@ pub mod seed {
         let outpace_1337 = Outpace::new(&web3_chain_1337, campaign_1.chain.outpace);
         let web3_chain_1 = campaign_3.chain.init_web3()?;
         let token_1 = Erc20Token::new(&web3_chain_1, campaign_3.token.clone());
-        let outpace_1 = Outpace::new(&web3_chain_1, campaign_1.chain.outpace);
+        let outpace_1 = Outpace::new(&web3_chain_1, campaign_3.chain.outpace);
 
         token_1337
             .set_balance(LEADER.to_bytes(), ADVERTISER.to_bytes(), &BigNum::with_precision(3_000_000, token_1337.info.precision.into()))
