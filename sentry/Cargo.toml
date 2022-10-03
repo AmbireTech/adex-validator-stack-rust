@@ -15,6 +15,14 @@ default-run = "sentry"
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
+[[bin]]
+name = "seed"
+test = false # Is tested by default.
+doctest = false # Documentation examples are tested by default.
+bench = false # Is benchmarked by default.
+doc = false # Is documented by default.
+required-features = ["test-util"]
+
 [features]
 
 test-util = ["primitives/test-util", "adapter/test-util", "dashmap"]
