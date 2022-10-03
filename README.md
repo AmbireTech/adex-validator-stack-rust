@@ -76,7 +76,7 @@ These examples use the Leader and Follower addresses for testing locally with
 Sentry API will be accessible at `localhost:8005`
 
 ```bash
-IP_ADDR=127.0.0.1 REDIS_URL="redis://127.0.0.1:6379/1" \
+IP_ADDR=127.0.0.1 SEED_DB=true REDIS_URL="redis://127.0.0.1:6379/1" \
 POSTGRES_DB="sentry_leader" PORT=8005 KEYSTORE_PWD=ganache0 \
 cargo run -p sentry -- \
     --adapter ethereum \
@@ -89,7 +89,7 @@ cargo run -p sentry -- \
 Sentry API will be accessible at `localhost:8006`
 
 ```bash
-IP_ADDR=127.0.0.1 REDIS_URL="redis://127.0.0.1:6379/2" \
+IP_ADDR=127.0.0.1 SEED_DB=true REDIS_URL="redis://127.0.0.1:6379/2" \
 POSTGRES_DB="sentry_follower" PORT=8006 KEYSTORE_PWD=ganache1 cargo run -p sentry -- \
     --adapter ethereum \
     --keystoreFile ./adapter/tests/resources/0xf3f583AEC5f7C030722Fe992A5688557e1B86ef7_keystore.json \
@@ -118,7 +118,7 @@ Request body (`JSON`):
 ##### Leader (`0x80690751969B234697e9059e04ed72195c3507fa`)
 
 ```bash
-IP_ADDR=127.0.0.1 REDIS_URL="redis://127.0.0.1:6379/1" \
+IP_ADDR=127.0.0.1 SEED_DB=true REDIS_URL="redis://127.0.0.1:6379/1" \
 POSTGRES_DB="sentry_leader" PORT=8005 cargo run -p sentry -- \
     --adapter dummy \
     --dummyIdentity 0x80690751969B234697e9059e04ed72195c3507fa \
@@ -127,7 +127,7 @@ POSTGRES_DB="sentry_leader" PORT=8005 cargo run -p sentry -- \
 ##### Follower (`0xf3f583AEC5f7C030722Fe992A5688557e1B86ef7`)
 
 ```bash
-IP_ADDR=127.0.0.1 REDIS_URL="redis://127.0.0.1:6379/2" \
+IP_ADDR=127.0.0.1 SEED_DB=true REDIS_URL="redis://127.0.0.1:6379/2" \
 POSTGRES_DB="sentry_follower" PORT=8006 cargo run -p sentry -- \
     --adapter dummy \
     --dummyIdentity 0xf3f583AEC5f7C030722Fe992A5688557e1B86ef7 \
@@ -139,6 +139,7 @@ POSTGRES_DB="sentry_follower" PORT=8006 cargo run -p sentry -- \
 - `ENV` - `production` or `development`; *default*: `development` - passing this env. variable will use the default configuration paths - [`docs/config/ganache.toml`](./docs/config/ganache.toml) (for `development`) or [`docs/config/prod.toml`](./docs/config/prod.toml) (for `production`). Otherwise you can pass your own configuration file path to the binary (check `cargo run -p sentry --help` for more information). ~~In `development` it will make sure Sentry to seed the database~~ (seeding is disabled, see #514).
 - `PORT` - *default*: `8005` - The local port that Sentry API will be accessible at
 - `IP_ADDR` - *default*: `0.0.0.0` - the IP address that the API should be listening to
+- `SEED_DB` - *default*: `false` - Flag telling us whether we should seed the database, it can only be turned on for `development`
 
 ##### Adapter
 
