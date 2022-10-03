@@ -316,16 +316,21 @@ pub mod seed {
     use axum::{Extension, Json};
 
     use adapter::{
-        ethereum::{test_util::{Erc20Token, Outpace}, ChainTransport},
+        ethereum::{
+            test_util::{Erc20Token, Outpace},
+            ChainTransport,
+        },
         Dummy, Ethereum,
     };
     use primitives::{
         sentry::campaign_create::CreateCampaign,
         spender::Spendable,
-        test_util::{ADVERTISER, ADVERTISER_2, CAMPAIGNS, LEADER, FOLLOWER},
+        test_util::{ADVERTISER, ADVERTISER_2, CAMPAIGNS, LEADER},
         unified_num::FromWhole,
         BigNum, Campaign, ChainOf, Deposit, UnifiedNum, ValidatorId,
     };
+
+    use slog::info;
 
     use crate::{
         db::{insert_channel, spendable::insert_spendable},
@@ -337,6 +342,8 @@ pub mod seed {
     };
 
     pub async fn seed_dummy(app: Application<Dummy>) -> Result<(), Box<dyn std::error::Error>> {
+        info!(&app.logger, "Seeding sentry with Dummy adapter");
+
         // create campaign
         // Chain 1337
         let campaign_1 = CAMPAIGNS[0].clone();
@@ -408,6 +415,7 @@ pub mod seed {
     pub async fn seed_ethereum(
         app: Application<Ethereum>,
     ) -> Result<(), Box<dyn std::error::Error>> {
+        info!(&app.logger, "Seeding sentry with Ethereum adapter");
         // Chain 1337
         let campaign_1 = CAMPAIGNS[0].clone();
         // Chain 1337
@@ -423,25 +431,45 @@ pub mod seed {
         let outpace_1 = Outpace::new(&web3_chain_1, campaign_3.chain.outpace);
 
         token_1337
-            .set_balance(LEADER.to_bytes(), ADVERTISER.to_bytes(), &BigNum::with_precision(3_000_000, token_1337.info.precision.into()))
+            .set_balance(
+                LEADER.to_bytes(),
+                ADVERTISER.to_bytes(),
+                &BigNum::with_precision(3_000_000, token_1337.info.precision.into()),
+            )
             .await
             .expect("Failed to set balance");
         outpace_1337
-            .deposit(&campaign_1.context.channel, ADVERTISER.to_bytes(), &BigNum::with_precision(1_000_000, token_1337.info.precision.into()))
+            .deposit(
+                &campaign_1.context.channel,
+                ADVERTISER.to_bytes(),
+                &BigNum::with_precision(1_000_000, token_1337.info.precision.into()),
+            )
             .await
             .expect("Should deposit funds");
         outpace_1337
-            .deposit(&campaign_2.context.channel, ADVERTISER.to_bytes(), &BigNum::with_precision(1_000_000, token_1337.info.precision.into()))
+            .deposit(
+                &campaign_2.context.channel,
+                ADVERTISER.to_bytes(),
+                &BigNum::with_precision(1_000_000, token_1337.info.precision.into()),
+            )
             .await
             .expect("Should deposit funds");
 
         token_1
-            .set_balance(LEADER.to_bytes(), ADVERTISER_2.to_bytes(), &BigNum::with_precision(2_000_000, token_1.info.precision.into()))
+            .set_balance(
+                LEADER.to_bytes(),
+                ADVERTISER_2.to_bytes(),
+                &BigNum::with_precision(2_000_000, token_1.info.precision.into()),
+            )
             .await
             .expect("Failed to set balance");
 
         outpace_1
-            .deposit(&campaign_3.context.channel, ADVERTISER_2.to_bytes(), &BigNum::with_precision(1_000_000, token_1.info.precision.into()))
+            .deposit(
+                &campaign_3.context.channel,
+                ADVERTISER_2.to_bytes(),
+                &BigNum::with_precision(1_000_000, token_1.info.precision.into()),
+            )
             .await
             .expect("Should deposit funds");
 
