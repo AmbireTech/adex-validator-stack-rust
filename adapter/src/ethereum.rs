@@ -8,7 +8,7 @@ use web3::signing::keccak256;
 use crate::{Adapter, LockedState, UnlockedState};
 
 pub use {
-    client::{Ethereum, Options},
+    client::{ChainTransport, Ethereum, Options},
     error::Error,
 };
 

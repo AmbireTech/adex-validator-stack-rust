@@ -300,7 +300,7 @@ pub static DUMMY_IPFS: Lazy<[IPFS; 5]> = Lazy::new(|| {
     ]
 });
 
-/// List of test campaigns with keys `Campaign {Chain id} #{Number campaign}`
+/// List of test campaigns
 pub static CAMPAIGNS: Lazy<[ChainOf<Campaign>; 3]> = Lazy::new(|| {
     let campaign_1337_1 = {
         let ganache_chain_info = GANACHE_CONFIG.chains["Ganache #1337"].clone();

@@ -64,6 +64,9 @@ pub struct EnvConfig {
     /// Defaults to locally running Redis server: [`DEFAULT_REDIS_URL`]
     #[serde(deserialize_with = "redis_url", default = "default_redis_url")]
     pub redis_url: ConnectionInfo,
+    /// Whether or not to seed the database in [`Environment::Development`].
+    #[serde(default)]
+    pub seed_db: bool,
 }
 
 impl EnvConfig {
@@ -305,6 +308,214 @@ async fn shutdown_signal(logger: Logger, handle: Handle) {
     handle.shutdown();
 
     info!(&logger, "Received Ctrl+C signal. Shutting down..")
+}
+
+pub mod seed {
+    use std::sync::Arc;
+
+    use axum::{Extension, Json};
+
+    use adapter::{
+        ethereum::{
+            test_util::{Erc20Token, Outpace},
+            ChainTransport,
+        },
+        Dummy, Ethereum,
+    };
+    use primitives::{
+        sentry::campaign_create::CreateCampaign,
+        spender::Spendable,
+        test_util::{ADVERTISER, ADVERTISER_2, CAMPAIGNS, LEADER},
+        unified_num::FromWhole,
+        BigNum, Campaign, ChainOf, Deposit, UnifiedNum, ValidatorId,
+    };
+
+    use slog::info;
+
+    use crate::{
+        db::{insert_channel, spendable::insert_spendable},
+        routes::{
+            campaign::create_campaign,
+            channel::{channel_dummy_deposit, ChannelDummyDeposit},
+        },
+        Application, Auth,
+    };
+
+    pub async fn seed_dummy(app: Application<Dummy>) -> Result<(), Box<dyn std::error::Error>> {
+        info!(&app.logger, "Seeding sentry with Dummy adapter");
+
+        // create campaign
+        // Chain 1337
+        let campaign_1 = CAMPAIGNS[0].clone();
+        // Chain 1337
+        let campaign_2 = CAMPAIGNS[1].clone();
+        // Chain 1
+        let campaign_3 = CAMPAIGNS[2].clone();
+
+        async fn create_seed_campaign(
+            app: Application<Dummy>,
+            campaign: &ChainOf<Campaign>,
+        ) -> Result<(), Box<dyn std::error::Error>> {
+            let campaign_to_create = CreateCampaign::from_campaign(campaign.context.clone());
+            let auth = Auth {
+                era: 0,
+                uid: ValidatorId::from(campaign_to_create.creator),
+                chain: campaign.chain.clone(),
+            };
+            create_campaign(
+                Json(campaign_to_create),
+                Extension(auth),
+                Extension(Arc::new(app)),
+            )
+            .await
+            .expect("Should create seed campaigns");
+
+            Ok(())
+        }
+
+        async fn dummy_deposit(
+            app: Application<Dummy>,
+            campaign: &ChainOf<Campaign>,
+        ) -> Result<(), Box<dyn std::error::Error>> {
+            let channel = campaign.context.channel;
+            let auth = Auth {
+                era: 0,
+                uid: ValidatorId::from(campaign.context.creator),
+                chain: campaign.chain.clone(),
+            };
+
+            let request = ChannelDummyDeposit {
+                channel,
+                deposit: Deposit {
+                    total: UnifiedNum::from_whole(1_000_000),
+                },
+            };
+
+            let result =
+                channel_dummy_deposit(Extension(Arc::new(app)), Extension(auth), Json(request))
+                    .await;
+
+            assert!(result.is_ok());
+
+            Ok(())
+        }
+        // chain 1337
+        dummy_deposit(app.clone(), &campaign_1).await?;
+        // chain 1337
+        dummy_deposit(app.clone(), &campaign_2).await?;
+        // chain 1
+        dummy_deposit(app.clone(), &campaign_3).await?;
+
+        create_seed_campaign(app.clone(), &campaign_1).await?;
+        create_seed_campaign(app.clone(), &campaign_2).await?;
+        create_seed_campaign(app.clone(), &campaign_3).await?;
+        Ok(())
+    }
+
+    pub async fn seed_ethereum(
+        app: Application<Ethereum>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        info!(&app.logger, "Seeding sentry with Ethereum adapter");
+        // Chain 1337
+        let campaign_1 = CAMPAIGNS[0].clone();
+        // Chain 1337
+        let campaign_2 = CAMPAIGNS[1].clone();
+        // Chain 1
+        let campaign_3 = CAMPAIGNS[2].clone();
+
+        let web3_chain_1337 = campaign_1.chain.init_web3()?;
+        let token_1337 = Erc20Token::new(&web3_chain_1337, campaign_1.token.clone());
+        let outpace_1337 = Outpace::new(&web3_chain_1337, campaign_1.chain.outpace);
+        let web3_chain_1 = campaign_3.chain.init_web3()?;
+        let token_1 = Erc20Token::new(&web3_chain_1, campaign_3.token.clone());
+        let outpace_1 = Outpace::new(&web3_chain_1, campaign_3.chain.outpace);
+
+        token_1337
+            .set_balance(
+                LEADER.to_bytes(),
+                ADVERTISER.to_bytes(),
+                &BigNum::with_precision(3_000_000, token_1337.info.precision.into()),
+            )
+            .await
+            .expect("Failed to set balance");
+        outpace_1337
+            .deposit(
+                &campaign_1.context.channel,
+                ADVERTISER.to_bytes(),
+                &BigNum::with_precision(1_000_000, token_1337.info.precision.into()),
+            )
+            .await
+            .expect("Should deposit funds");
+        outpace_1337
+            .deposit(
+                &campaign_2.context.channel,
+                ADVERTISER.to_bytes(),
+                &BigNum::with_precision(1_000_000, token_1337.info.precision.into()),
+            )
+            .await
+            .expect("Should deposit funds");
+
+        token_1
+            .set_balance(
+                LEADER.to_bytes(),
+                ADVERTISER_2.to_bytes(),
+                &BigNum::with_precision(2_000_000, token_1.info.precision.into()),
+            )
+            .await
+            .expect("Failed to set balance");
+
+        outpace_1
+            .deposit(
+                &campaign_3.context.channel,
+                ADVERTISER_2.to_bytes(),
+                &BigNum::with_precision(1_000_000, token_1.info.precision.into()),
+            )
+            .await
+            .expect("Should deposit funds");
+
+        async fn create_seed_campaign(
+            app: Application<Ethereum>,
+            campaign: &ChainOf<Campaign>,
+        ) -> Result<(), Box<dyn std::error::Error>> {
+            let channel_context = ChainOf::of_channel(campaign);
+            let campaign_to_create = CreateCampaign::from_campaign(campaign.context.clone());
+
+            let auth = Auth {
+                era: 0,
+                uid: ValidatorId::from(campaign.context.creator),
+                chain: campaign.chain.clone(),
+            };
+
+            let spendable = Spendable {
+                spender: campaign.context.creator,
+                channel: campaign.context.channel,
+                deposit: Deposit {
+                    total: UnifiedNum::from_whole(10_000),
+                },
+            };
+            insert_channel(&app.pool, &channel_context)
+                .await
+                .expect("Should insert channel of seed campaign");
+            insert_spendable(app.pool.clone(), &spendable)
+                .await
+                .expect("Should insert spendable for campaign creator");
+
+            create_campaign(
+                Json(campaign_to_create),
+                Extension(auth),
+                Extension(Arc::new(app.clone())),
+            )
+            .await
+            .expect("should create campaign");
+
+            Ok(())
+        }
+
+        create_seed_campaign(app.clone(), &campaign_1).await?;
+        create_seed_campaign(app.clone(), &campaign_2).await?;
+        create_seed_campaign(app.clone(), &campaign_3).await?;
+        Ok(())
+    }
 }
 
 #[cfg(test)]
