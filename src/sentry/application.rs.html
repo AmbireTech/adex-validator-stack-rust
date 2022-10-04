@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `sentry/src/application.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>application.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../sentry/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div></a><h2 class="location"></h2></nav><nav class="sidebar"><a class="sidebar-logo" href="../../sentry/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div></a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../sentry/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `sentry/src/application.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>application.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../sentry/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div></a><h2 class="location"></h2></nav><nav class="sidebar"><a class="sidebar-logo" href="../../sentry/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div></a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../sentry/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -324,6 +324,217 @@
 <span id="324">324</span>
 <span id="325">325</span>
 <span id="326">326</span>
+<span id="327">327</span>
+<span id="328">328</span>
+<span id="329">329</span>
+<span id="330">330</span>
+<span id="331">331</span>
+<span id="332">332</span>
+<span id="333">333</span>
+<span id="334">334</span>
+<span id="335">335</span>
+<span id="336">336</span>
+<span id="337">337</span>
+<span id="338">338</span>
+<span id="339">339</span>
+<span id="340">340</span>
+<span id="341">341</span>
+<span id="342">342</span>
+<span id="343">343</span>
+<span id="344">344</span>
+<span id="345">345</span>
+<span id="346">346</span>
+<span id="347">347</span>
+<span id="348">348</span>
+<span id="349">349</span>
+<span id="350">350</span>
+<span id="351">351</span>
+<span id="352">352</span>
+<span id="353">353</span>
+<span id="354">354</span>
+<span id="355">355</span>
+<span id="356">356</span>
+<span id="357">357</span>
+<span id="358">358</span>
+<span id="359">359</span>
+<span id="360">360</span>
+<span id="361">361</span>
+<span id="362">362</span>
+<span id="363">363</span>
+<span id="364">364</span>
+<span id="365">365</span>
+<span id="366">366</span>
+<span id="367">367</span>
+<span id="368">368</span>
+<span id="369">369</span>
+<span id="370">370</span>
+<span id="371">371</span>
+<span id="372">372</span>
+<span id="373">373</span>
+<span id="374">374</span>
+<span id="375">375</span>
+<span id="376">376</span>
+<span id="377">377</span>
+<span id="378">378</span>
+<span id="379">379</span>
+<span id="380">380</span>
+<span id="381">381</span>
+<span id="382">382</span>
+<span id="383">383</span>
+<span id="384">384</span>
+<span id="385">385</span>
+<span id="386">386</span>
+<span id="387">387</span>
+<span id="388">388</span>
+<span id="389">389</span>
+<span id="390">390</span>
+<span id="391">391</span>
+<span id="392">392</span>
+<span id="393">393</span>
+<span id="394">394</span>
+<span id="395">395</span>
+<span id="396">396</span>
+<span id="397">397</span>
+<span id="398">398</span>
+<span id="399">399</span>
+<span id="400">400</span>
+<span id="401">401</span>
+<span id="402">402</span>
+<span id="403">403</span>
+<span id="404">404</span>
+<span id="405">405</span>
+<span id="406">406</span>
+<span id="407">407</span>
+<span id="408">408</span>
+<span id="409">409</span>
+<span id="410">410</span>
+<span id="411">411</span>
+<span id="412">412</span>
+<span id="413">413</span>
+<span id="414">414</span>
+<span id="415">415</span>
+<span id="416">416</span>
+<span id="417">417</span>
+<span id="418">418</span>
+<span id="419">419</span>
+<span id="420">420</span>
+<span id="421">421</span>
+<span id="422">422</span>
+<span id="423">423</span>
+<span id="424">424</span>
+<span id="425">425</span>
+<span id="426">426</span>
+<span id="427">427</span>
+<span id="428">428</span>
+<span id="429">429</span>
+<span id="430">430</span>
+<span id="431">431</span>
+<span id="432">432</span>
+<span id="433">433</span>
+<span id="434">434</span>
+<span id="435">435</span>
+<span id="436">436</span>
+<span id="437">437</span>
+<span id="438">438</span>
+<span id="439">439</span>
+<span id="440">440</span>
+<span id="441">441</span>
+<span id="442">442</span>
+<span id="443">443</span>
+<span id="444">444</span>
+<span id="445">445</span>
+<span id="446">446</span>
+<span id="447">447</span>
+<span id="448">448</span>
+<span id="449">449</span>
+<span id="450">450</span>
+<span id="451">451</span>
+<span id="452">452</span>
+<span id="453">453</span>
+<span id="454">454</span>
+<span id="455">455</span>
+<span id="456">456</span>
+<span id="457">457</span>
+<span id="458">458</span>
+<span id="459">459</span>
+<span id="460">460</span>
+<span id="461">461</span>
+<span id="462">462</span>
+<span id="463">463</span>
+<span id="464">464</span>
+<span id="465">465</span>
+<span id="466">466</span>
+<span id="467">467</span>
+<span id="468">468</span>
+<span id="469">469</span>
+<span id="470">470</span>
+<span id="471">471</span>
+<span id="472">472</span>
+<span id="473">473</span>
+<span id="474">474</span>
+<span id="475">475</span>
+<span id="476">476</span>
+<span id="477">477</span>
+<span id="478">478</span>
+<span id="479">479</span>
+<span id="480">480</span>
+<span id="481">481</span>
+<span id="482">482</span>
+<span id="483">483</span>
+<span id="484">484</span>
+<span id="485">485</span>
+<span id="486">486</span>
+<span id="487">487</span>
+<span id="488">488</span>
+<span id="489">489</span>
+<span id="490">490</span>
+<span id="491">491</span>
+<span id="492">492</span>
+<span id="493">493</span>
+<span id="494">494</span>
+<span id="495">495</span>
+<span id="496">496</span>
+<span id="497">497</span>
+<span id="498">498</span>
+<span id="499">499</span>
+<span id="500">500</span>
+<span id="501">501</span>
+<span id="502">502</span>
+<span id="503">503</span>
+<span id="504">504</span>
+<span id="505">505</span>
+<span id="506">506</span>
+<span id="507">507</span>
+<span id="508">508</span>
+<span id="509">509</span>
+<span id="510">510</span>
+<span id="511">511</span>
+<span id="512">512</span>
+<span id="513">513</span>
+<span id="514">514</span>
+<span id="515">515</span>
+<span id="516">516</span>
+<span id="517">517</span>
+<span id="518">518</span>
+<span id="519">519</span>
+<span id="520">520</span>
+<span id="521">521</span>
+<span id="522">522</span>
+<span id="523">523</span>
+<span id="524">524</span>
+<span id="525">525</span>
+<span id="526">526</span>
+<span id="527">527</span>
+<span id="528">528</span>
+<span id="529">529</span>
+<span id="530">530</span>
+<span id="531">531</span>
+<span id="532">532</span>
+<span id="533">533</span>
+<span id="534">534</span>
+<span id="535">535</span>
+<span id="536">536</span>
+<span id="537">537</span>
 </pre><pre class="rust"><code><span class="kw">use </span>std::{
     net::{IpAddr, Ipv4Addr, SocketAddr},
     path::Path,
@@ -390,6 +601,9 @@
     <span class="doccomment">/// Defaults to locally running Redis server: [`DEFAULT_REDIS_URL`]
     </span><span class="attribute">#[serde(deserialize_with = <span class="string">&quot;redis_url&quot;</span>, default = <span class="string">&quot;default_redis_url&quot;</span>)]
     </span><span class="kw">pub </span>redis_url: ConnectionInfo,
+    <span class="doccomment">/// Whether or not to seed the database in [`Environment::Development`].
+    </span><span class="attribute">#[serde(default)]
+    </span><span class="kw">pub </span>seed_db: bool,
 }
 
 <span class="kw">impl </span>EnvConfig {
@@ -633,6 +847,214 @@
     <span class="macro">info!</span>(<span class="kw-2">&amp;</span>logger, <span class="string">&quot;Received Ctrl+C signal. Shutting down..&quot;</span>)
 }
 
+<span class="kw">pub mod </span>seed {
+    <span class="kw">use </span>std::sync::Arc;
+
+    <span class="kw">use </span>axum::{Extension, Json};
+
+    <span class="kw">use </span>adapter::{
+        ethereum::{
+            test_util::{Erc20Token, Outpace},
+            ChainTransport,
+        },
+        Dummy, Ethereum,
+    };
+    <span class="kw">use </span>primitives::{
+        sentry::campaign_create::CreateCampaign,
+        spender::Spendable,
+        test_util::{ADVERTISER, ADVERTISER_2, CAMPAIGNS, LEADER},
+        unified_num::FromWhole,
+        BigNum, Campaign, ChainOf, Deposit, UnifiedNum, ValidatorId,
+    };
+
+    <span class="kw">use </span>slog::info;
+
+    <span class="kw">use crate</span>::{
+        db::{insert_channel, spendable::insert_spendable},
+        routes::{
+            campaign::create_campaign,
+            channel::{channel_dummy_deposit, ChannelDummyDeposit},
+        },
+        Application, Auth,
+    };
+
+    <span class="kw">pub async fn </span>seed_dummy(app: Application&lt;Dummy&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;(), Box&lt;<span class="kw">dyn </span>std::error::Error&gt;&gt; {
+        <span class="macro">info!</span>(<span class="kw-2">&amp;</span>app.logger, <span class="string">&quot;Seeding sentry with Dummy adapter&quot;</span>);
+
+        <span class="comment">// create campaign
+        // Chain 1337
+        </span><span class="kw">let </span>campaign_1 = CAMPAIGNS[<span class="number">0</span>].clone();
+        <span class="comment">// Chain 1337
+        </span><span class="kw">let </span>campaign_2 = CAMPAIGNS[<span class="number">1</span>].clone();
+        <span class="comment">// Chain 1
+        </span><span class="kw">let </span>campaign_3 = CAMPAIGNS[<span class="number">2</span>].clone();
+
+        <span class="kw">async fn </span>create_seed_campaign(
+            app: Application&lt;Dummy&gt;,
+            campaign: <span class="kw-2">&amp;</span>ChainOf&lt;Campaign&gt;,
+        ) -&gt; <span class="prelude-ty">Result</span>&lt;(), Box&lt;<span class="kw">dyn </span>std::error::Error&gt;&gt; {
+            <span class="kw">let </span>campaign_to_create = CreateCampaign::from_campaign(campaign.context.clone());
+            <span class="kw">let </span>auth = Auth {
+                era: <span class="number">0</span>,
+                uid: ValidatorId::from(campaign_to_create.creator),
+                chain: campaign.chain.clone(),
+            };
+            create_campaign(
+                Json(campaign_to_create),
+                Extension(auth),
+                Extension(Arc::new(app)),
+            )
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;Should create seed campaigns&quot;</span>);
+
+            <span class="prelude-val">Ok</span>(())
+        }
+
+        <span class="kw">async fn </span>dummy_deposit(
+            app: Application&lt;Dummy&gt;,
+            campaign: <span class="kw-2">&amp;</span>ChainOf&lt;Campaign&gt;,
+        ) -&gt; <span class="prelude-ty">Result</span>&lt;(), Box&lt;<span class="kw">dyn </span>std::error::Error&gt;&gt; {
+            <span class="kw">let </span>channel = campaign.context.channel;
+            <span class="kw">let </span>auth = Auth {
+                era: <span class="number">0</span>,
+                uid: ValidatorId::from(campaign.context.creator),
+                chain: campaign.chain.clone(),
+            };
+
+            <span class="kw">let </span>request = ChannelDummyDeposit {
+                channel,
+                deposit: Deposit {
+                    total: UnifiedNum::from_whole(<span class="number">1_000_000</span>),
+                },
+            };
+
+            <span class="kw">let </span>result =
+                channel_dummy_deposit(Extension(Arc::new(app)), Extension(auth), Json(request))
+                    .<span class="kw">await</span>;
+
+            <span class="macro">assert!</span>(result.is_ok());
+
+            <span class="prelude-val">Ok</span>(())
+        }
+        <span class="comment">// chain 1337
+        </span>dummy_deposit(app.clone(), <span class="kw-2">&amp;</span>campaign_1).<span class="kw">await</span><span class="question-mark">?</span>;
+        <span class="comment">// chain 1337
+        </span>dummy_deposit(app.clone(), <span class="kw-2">&amp;</span>campaign_2).<span class="kw">await</span><span class="question-mark">?</span>;
+        <span class="comment">// chain 1
+        </span>dummy_deposit(app.clone(), <span class="kw-2">&amp;</span>campaign_3).<span class="kw">await</span><span class="question-mark">?</span>;
+
+        create_seed_campaign(app.clone(), <span class="kw-2">&amp;</span>campaign_1).<span class="kw">await</span><span class="question-mark">?</span>;
+        create_seed_campaign(app.clone(), <span class="kw-2">&amp;</span>campaign_2).<span class="kw">await</span><span class="question-mark">?</span>;
+        create_seed_campaign(app.clone(), <span class="kw-2">&amp;</span>campaign_3).<span class="kw">await</span><span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
+    }
+
+    <span class="kw">pub async fn </span>seed_ethereum(
+        app: Application&lt;Ethereum&gt;,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;(), Box&lt;<span class="kw">dyn </span>std::error::Error&gt;&gt; {
+        <span class="macro">info!</span>(<span class="kw-2">&amp;</span>app.logger, <span class="string">&quot;Seeding sentry with Ethereum adapter&quot;</span>);
+        <span class="comment">// Chain 1337
+        </span><span class="kw">let </span>campaign_1 = CAMPAIGNS[<span class="number">0</span>].clone();
+        <span class="comment">// Chain 1337
+        </span><span class="kw">let </span>campaign_2 = CAMPAIGNS[<span class="number">1</span>].clone();
+        <span class="comment">// Chain 1
+        </span><span class="kw">let </span>campaign_3 = CAMPAIGNS[<span class="number">2</span>].clone();
+
+        <span class="kw">let </span>web3_chain_1337 = campaign_1.chain.init_web3()<span class="question-mark">?</span>;
+        <span class="kw">let </span>token_1337 = Erc20Token::new(<span class="kw-2">&amp;</span>web3_chain_1337, campaign_1.token.clone());
+        <span class="kw">let </span>outpace_1337 = Outpace::new(<span class="kw-2">&amp;</span>web3_chain_1337, campaign_1.chain.outpace);
+        <span class="kw">let </span>web3_chain_1 = campaign_3.chain.init_web3()<span class="question-mark">?</span>;
+        <span class="kw">let </span>token_1 = Erc20Token::new(<span class="kw-2">&amp;</span>web3_chain_1, campaign_3.token.clone());
+        <span class="kw">let </span>outpace_1 = Outpace::new(<span class="kw-2">&amp;</span>web3_chain_1, campaign_3.chain.outpace);
+
+        token_1337
+            .set_balance(
+                LEADER.to_bytes(),
+                ADVERTISER.to_bytes(),
+                <span class="kw-2">&amp;</span>BigNum::with_precision(<span class="number">3_000_000</span>, token_1337.info.precision.into()),
+            )
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;Failed to set balance&quot;</span>);
+        outpace_1337
+            .deposit(
+                <span class="kw-2">&amp;</span>campaign_1.context.channel,
+                ADVERTISER.to_bytes(),
+                <span class="kw-2">&amp;</span>BigNum::with_precision(<span class="number">1_000_000</span>, token_1337.info.precision.into()),
+            )
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;Should deposit funds&quot;</span>);
+        outpace_1337
+            .deposit(
+                <span class="kw-2">&amp;</span>campaign_2.context.channel,
+                ADVERTISER.to_bytes(),
+                <span class="kw-2">&amp;</span>BigNum::with_precision(<span class="number">1_000_000</span>, token_1337.info.precision.into()),
+            )
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;Should deposit funds&quot;</span>);
+
+        token_1
+            .set_balance(
+                LEADER.to_bytes(),
+                ADVERTISER_2.to_bytes(),
+                <span class="kw-2">&amp;</span>BigNum::with_precision(<span class="number">2_000_000</span>, token_1.info.precision.into()),
+            )
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;Failed to set balance&quot;</span>);
+
+        outpace_1
+            .deposit(
+                <span class="kw-2">&amp;</span>campaign_3.context.channel,
+                ADVERTISER_2.to_bytes(),
+                <span class="kw-2">&amp;</span>BigNum::with_precision(<span class="number">1_000_000</span>, token_1.info.precision.into()),
+            )
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;Should deposit funds&quot;</span>);
+
+        <span class="kw">async fn </span>create_seed_campaign(
+            app: Application&lt;Ethereum&gt;,
+            campaign: <span class="kw-2">&amp;</span>ChainOf&lt;Campaign&gt;,
+        ) -&gt; <span class="prelude-ty">Result</span>&lt;(), Box&lt;<span class="kw">dyn </span>std::error::Error&gt;&gt; {
+            <span class="kw">let </span>channel_context = ChainOf::of_channel(campaign);
+            <span class="kw">let </span>campaign_to_create = CreateCampaign::from_campaign(campaign.context.clone());
+
+            <span class="kw">let </span>auth = Auth {
+                era: <span class="number">0</span>,
+                uid: ValidatorId::from(campaign.context.creator),
+                chain: campaign.chain.clone(),
+            };
+
+            <span class="kw">let </span>spendable = Spendable {
+                spender: campaign.context.creator,
+                channel: campaign.context.channel,
+                deposit: Deposit {
+                    total: UnifiedNum::from_whole(<span class="number">10_000</span>),
+                },
+            };
+            insert_channel(<span class="kw-2">&amp;</span>app.pool, <span class="kw-2">&amp;</span>channel_context)
+                .<span class="kw">await
+                </span>.expect(<span class="string">&quot;Should insert channel of seed campaign&quot;</span>);
+            insert_spendable(app.pool.clone(), <span class="kw-2">&amp;</span>spendable)
+                .<span class="kw">await
+                </span>.expect(<span class="string">&quot;Should insert spendable for campaign creator&quot;</span>);
+
+            create_campaign(
+                Json(campaign_to_create),
+                Extension(auth),
+                Extension(Arc::new(app.clone())),
+            )
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;should create campaign&quot;</span>);
+
+            <span class="prelude-val">Ok</span>(())
+        }
+
+        create_seed_campaign(app.clone(), <span class="kw-2">&amp;</span>campaign_1).<span class="kw">await</span><span class="question-mark">?</span>;
+        create_seed_campaign(app.clone(), <span class="kw-2">&amp;</span>campaign_2).<span class="kw">await</span><span class="question-mark">?</span>;
+        create_seed_campaign(app.clone(), <span class="kw-2">&amp;</span>campaign_3).<span class="kw">await</span><span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
+    }
+}
+
 <span class="attribute">#[cfg(test)]
 </span><span class="kw">mod </span>test {
     <span class="kw">use </span>serde_json::json;
@@ -651,4 +1073,4 @@
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (1d37ed661 2022-09-09)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.0-nightly (f83e0266c 2022-10-03)" ></div></body></html>

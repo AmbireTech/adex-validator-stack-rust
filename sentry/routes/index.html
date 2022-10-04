@@ -44,13 +44,13 @@ REST API and the corresponding requests, responses and parameters.</p>
 <h4 id="route-parameters"><a href="#route-parameters">Route parameters</a></h4>
 <p>Paths which include these parameters are validated as follows:</p>
 <ul>
-<li><code>:id</code> - <a href="../../primitives/channel/struct.ChannelId.html"><code>ChannelId</code></a></li>
-<li><code>:addr</code> - a valid <a href="../../primitives/address/struct.Address.html"><code>Address</code></a> or <a href="../../primitives/validator/struct.ValidatorId.html"><code>ValidatorId</code></a>.</li>
+<li><code>:id</code> - <a href="primitives::ChannelId"><code>ChannelId</code></a></li>
+<li><code>:addr</code> - a valid <a href="primitives::Address"><code>Address</code></a> or <a href="primitives::ValidatorId"><code>ValidatorId</code></a>.</li>
 </ul>
 <h4 id="routes"><a href="#routes">Routes</a></h4><h5 id="get-v5channellist"><a href="#get-v5channellist">GET <code>/v5/channel/list</code></a></h5>
 <p>The route is handled by <a href="channel/fn.channel_list.html" title="channel::channel_list()"><code>channel::channel_list()</code></a>.</p>
-<p>Request query parameters: <a href="../../primitives/sentry/channel_list/struct.ChannelListQuery.html"><code>ChannelListQuery</code></a></p>
-<p>Response: <a href="../../primitives/sentry/channel_list/struct.ChannelListResponse.html"><code>ChannelListResponse</code></a></p>
+<p>Request query parameters: <a href="primitives::sentry::channel_list::ChannelListQuery"><code>ChannelListQuery</code></a></p>
+<p>Response: <a href="primitives::sentry::channel_list::ChannelListResponse"><code>ChannelListResponse</code></a></p>
 <h6 id="examples"><a href="#examples">Examples</a></h6>
 <p>Query:</p>
 
@@ -128,7 +128,7 @@ REST API and the corresponding requests, responses and parameters.</p>
 <h5 id="get-v5channelidaccounting"><a href="#get-v5channelidaccounting">GET <code>/v5/channel/:id/accounting</code></a></h5>
 <p>Gets all of the accounting entries for a channel from the database and checks the balances.</p>
 <p>The route is handled by <a href="channel/fn.get_accounting_for_channel.html" title="channel::get_accounting_for_channel()"><code>channel::get_accounting_for_channel()</code></a>.</p>
-<p>Response: <a href="../../primitives/sentry/struct.AccountingResponse.html"><code>AccountingResponse</code></a></p>
+<p>Response: <a href="primitives::sentry::AccountingResponse"><code>AccountingResponse</code></a></p>
 <h6 id="examples-1"><a href="#examples-1">Examples</a></h6>
 <p>Response:</p>
 
@@ -162,12 +162,12 @@ REST API and the corresponding requests, responses and parameters.</p>
     }
 }</code></pre></div>
 <h5 id="get-v5channelidspenderaddr-auth-required"><a href="#get-v5channelidspenderaddr-auth-required">GET <code>/v5/channel/:id/spender/:addr</code> (auth required)</a></h5>
-<p>Gets the spender limits for a spender on a <a href="../../primitives/channel/struct.Channel.html"><code>Channel</code></a>. It does so by fetching the
+<p>Gets the spender limits for a spender on a <a href="primitives::Channel"><code>Channel</code></a>. It does so by fetching the
 latest Spendable entry from the database (or creating one if it doesn’t exist yet) from which
 the total deposited amount is retrieved, and the latest NewState from which the total spent
 amount is retrieved.</p>
 <p>The route is handled by <a href="channel/fn.get_spender_limits.html" title="channel::get_spender_limits()"><code>channel::get_spender_limits()</code></a>.</p>
-<p>Response: <a href="../../primitives/sentry/struct.SpenderResponse.html"><code>SpenderResponse</code></a></p>
+<p>Response: <a href="primitives::sentry::SpenderResponse"><code>SpenderResponse</code></a></p>
 <h6 id="examples-2"><a href="#examples-2">Examples</a></h6>
 <p>Response:</p>
 
@@ -185,14 +185,14 @@ amount is retrieved.</p>
 }</code></pre></div>
 <h5 id="post-v5channelidspenderaddr-auth-required"><a href="#post-v5channelidspenderaddr-auth-required">POST <code>/v5/channel/:id/spender/:addr</code> (auth required)</a></h5>
 <p>This route forces the addition of a spender <a href="../db/accounting/struct.Accounting.html"><code>Accounting</code></a>
-(if one does not exist) to the given <a href="../../primitives/channel/struct.Channel.html"><code>Channel</code></a> with <code>spent = 0</code>.
-This will also ensure that the spender is added to the <a href="../../primitives/validator/messages/struct.NewState.html"><code>NewState</code></a> as well.</p>
+(if one does not exist) to the given <a href="primitives::Channel"><code>Channel</code></a> with <code>spent = 0</code>.
+This will also ensure that the spender is added to the <a href="primitives::validator::NewState"><code>NewState</code></a> as well.</p>
 <p>The route is handled by <a href="channel/fn.add_spender_leaf.html" title="channel::add_spender_leaf()"><code>channel::add_spender_leaf()</code></a>.</p>
-<p>Response: <a href="../../primitives/sentry/struct.SuccessResponse.html"><code>SuccessResponse</code></a></p>
+<p>Response: <a href="primitives::sentry::SuccessResponse"><code>SuccessResponse</code></a></p>
 <h5 id="get-v5channelidspenderall-auth-required"><a href="#get-v5channelidspenderall-auth-required">GET <code>/v5/channel/:id/spender/all</code> (auth required)</a></h5>
-<p>This routes gets total_deposited and total_spent for every spender on a <a href="../../primitives/channel/struct.Channel.html"><code>Channel</code></a></p>
+<p>This routes gets total_deposited and total_spent for every spender on a <a href="primitives::Channel"><code>Channel</code></a></p>
 <p>The route is handled by <a href="channel/fn.get_all_spender_limits.html" title="channel::get_all_spender_limits()"><code>channel::get_all_spender_limits()</code></a>.</p>
-<p>Response: <a href="../../primitives/sentry/struct.AllSpendersResponse.html"><code>AllSpendersResponse</code></a></p>
+<p>Response: <a href="primitives::sentry::AllSpendersResponse"><code>AllSpendersResponse</code></a></p>
 <h6 id="examples-3"><a href="#examples-3">Examples</a></h6>
 <p>Response:</p>
 
@@ -221,25 +221,25 @@ This will also ensure that the spender is added to the <a href="../../primitives
     <span class="macro">assert!</span>(from_value::&lt;AllSpendersResponse&gt;(json).is_ok());
 }</code></pre></div>
 <h5 id="get-v5channelidvalidator-messages"><a href="#get-v5channelidvalidator-messages">GET <code>/v5/channel/:id/validator-messages</code></a></h5>
-<p>Retrieve the latest validator <a href="../../primitives/validator/messages/enum.MessageTypes.html"><code>MessageTypes</code></a> for a given <a href="../../primitives/channel/struct.Channel.html"><code>Channel</code></a>.</p>
-<p>The query <code>limit</code> parameter is constraint to a maximum of <a href="../../primitives/config/struct.Config.html#structfield.msgs_find_limit"><code>Config.msgs_find_limit</code></a>,
-if a large value is passed it will use the <a href="../../primitives/config/struct.Config.html#structfield.msgs_find_limit"><code>Config.msgs_find_limit</code></a> instead.</p>
+<p>Retrieve the latest validator <a href="primitives::validator::MessageTypes"><code>MessageTypes</code></a> for a given <a href="primitives::Channel"><code>Channel</code></a>.</p>
+<p>The query <code>limit</code> parameter is constraint to a maximum of <a href="primitives::Config::msgs_find_limit"><code>Config.msgs_find_limit</code></a>,
+if a large value is passed it will use the <a href="primitives::Config::msgs_find_limit"><code>Config.msgs_find_limit</code></a> instead.</p>
 <p><strong>Sub-routes</strong> with additional filtering:</p>
 <ul>
-<li>GET <code>/v5/channel/:id/validator-messages/:addr</code> - filter by the given <a href="../../primitives/validator/struct.ValidatorId.html"><code>ValidatorId</code></a></li>
-<li>GET <code>/v5/channel/:id/validator-messages/:addr/:validator_messages</code> - filters by the given <a href="../../primitives/validator/struct.ValidatorId.html"><code>ValidatorId</code></a> and
-validator <a href="../../primitives/validator/messages/enum.MessageTypes.html"><code>MessageTypes</code></a>.
+<li>GET <code>/v5/channel/:id/validator-messages/:addr</code> - filter by the given <a href="primitives::ValidatorId"><code>ValidatorId</code></a></li>
+<li>GET <code>/v5/channel/:id/validator-messages/:addr/:validator_messages</code> - filters by the given <a href="primitives::ValidatorId"><code>ValidatorId</code></a> and
+validator <a href="primitives::validator::MessageTypes"><code>MessageTypes</code></a>.
 <ul>
 <li>
-<p><code>:validator_messages</code> - url encoded list of Validator <a href="../../primitives/validator/messages/enum.MessageTypes.html"><code>MessageTypes</code></a> separated by a <code>+</code>.</p>
+<p><code>:validator_messages</code> - url encoded list of Validator <a href="primitives::validator::MessageTypes"><code>MessageTypes</code></a> separated by a <code>+</code>.</p>
 <p>E.g. <code>NewState+ApproveState</code> becomes <code>NewState%2BApproveState</code></p>
 </li>
 </ul>
 </li>
 </ul>
 <p>The route is handled by <a href="channel/validator_message/fn.list_validator_messages.html" title="channel::validator_message::list_validator_messages()"><code>channel::validator_message::list_validator_messages()</code></a>.</p>
-<p>Request query parameters: <a href="../../primitives/sentry/validator_messages/struct.ValidatorMessagesListQuery.html"><code>ValidatorMessagesListQuery</code></a></p>
-<p>Response: <a href="../../primitives/sentry/validator_messages/struct.ValidatorMessagesListResponse.html"><code>ValidatorMessagesListResponse</code></a></p>
+<p>Request query parameters: <a href="primitives::sentry::validator_messages::ValidatorMessagesListQuery"><code>ValidatorMessagesListQuery</code></a></p>
+<p>Response: <a href="primitives::sentry::validator_messages::ValidatorMessagesListResponse"><code>ValidatorMessagesListResponse</code></a></p>
 <h6 id="examples-4"><a href="#examples-4">Examples</a></h6>
 <p>Query:</p>
 
@@ -316,13 +316,13 @@ validator <a href="../../primitives/validator/messages/enum.MessageTypes.html"><
     <span class="macro">println!</span>(<span class="string">&quot;{response:#?}&quot;</span>);
 }</code></pre></div>
 <h5 id="post-v5channelidvalidator-messages-auth-required"><a href="#post-v5channelidvalidator-messages-auth-required">POST <code>/v5/channel/:id/validator-messages</code> (auth required)</a></h5>
-<p>Create new validator <a href="../../primitives/validator/messages/enum.MessageTypes.html"><code>MessageTypes</code></a> for the given <a href="../../primitives/channel/struct.Channel.html"><code>Channel</code></a>,
+<p>Create new validator <a href="primitives::validator::MessageTypes"><code>MessageTypes</code></a> for the given <a href="primitives::Channel"><code>Channel</code></a>,
 used when propagating messages from the validator worker.</p>
 <p><strong>Authentication is required</strong> to validate that the <a href="../struct.Auth.html#structfield.uid"><code>Auth.uid</code></a> is either
-the <a href="../../primitives/channel/struct.Channel.html#structfield.leader"><code>Channel.leader</code></a> or <a href="../../primitives/channel/struct.Channel.html#structfield.follower"><code>Channel.follower</code></a>.</p>
+the <a href="primitives::Channel::leader"><code>Channel.leader</code></a> or <a href="primitives::Channel::follower"><code>Channel.follower</code></a>.</p>
 <p>The route is handled by <a href="channel/validator_message/fn.create_validator_messages.html" title="channel::validator_message::create_validator_messages()"><code>channel::validator_message::create_validator_messages()</code></a>.</p>
-<p>Request body (json): <a href="../../primitives/sentry/validator_messages/struct.ValidatorMessagesCreateRequest.html"><code>ValidatorMessagesCreateRequest</code></a></p>
-<p>Response: <a href="../../primitives/sentry/struct.SuccessResponse.html"><code>SuccessResponse</code></a></p>
+<p>Request body (json): <a href="primitives::sentry::validator_messages::ValidatorMessagesCreateRequest"><code>ValidatorMessagesCreateRequest</code></a></p>
+<p>Response: <a href="primitives::sentry::SuccessResponse"><code>SuccessResponse</code></a></p>
 <h6 id="examples-5"><a href="#examples-5">Examples</a></h6>
 <p>Request:</p>
 
@@ -367,17 +367,17 @@ the <a href="../../primitives/channel/struct.Channel.html#structfield.leader"><c
     <span class="macro">println!</span>(<span class="string">&quot;{request:#?}&quot;</span>);
 }</code></pre></div>
 <h5 id="get-v5channelidlast-approved"><a href="#get-v5channelidlast-approved">GET <code>/v5/channel/:id/last-approved</code></a></h5>
-<p>Retrieves the latest <a href="../../primitives/validator/messages/struct.ApproveState.html"><code>ApproveState</code></a> and the corresponding <a href="../../primitives/validator/messages/struct.NewState.html"><code>NewState</code></a>
-validator messages for the given <a href="../../primitives/channel/struct.Channel.html"><code>Channel</code></a>.</p>
-<p>If the <a href="../../primitives/channel/struct.Channel.html"><code>Channel</code></a> is new one or both of the states might have not been generated yet.</p>
-<p>The same is true of the <a href="../../primitives/validator/messages/struct.Heartbeat.html"><code>Heartbeat</code></a>s messages if they are requested with the query parameter.</p>
-<p>Retrieves the latest <a href="../../primitives/validator/messages/struct.ApproveState.html"><code>ApproveState</code></a> and the corresponding <a href="../../primitives/validator/messages/struct.NewState.html"><code>NewState</code></a>
-validator messages for the given <a href="../../primitives/channel/struct.Channel.html"><code>Channel</code></a>.</p>
-<p>If the <a href="../../primitives/channel/struct.Channel.html"><code>Channel</code></a> is new one or both of the states might have not been generated yet.</p>
-<p>The same is true of the <a href="../../primitives/validator/messages/struct.Heartbeat.html"><code>Heartbeat</code></a>s messages if they are requested with the query parameter.</p>
+<p>Retrieves the latest <a href="primitives::validator::ApproveState"><code>ApproveState</code></a> and the corresponding <a href="primitives::validator::NewState"><code>NewState</code></a>
+validator messages for the given <a href="primitives::Channel"><code>Channel</code></a>.</p>
+<p>If the <a href="primitives::Channel"><code>Channel</code></a> is new one or both of the states might have not been generated yet.</p>
+<p>The same is true of the <a href="primitives::validator::Heartbeat"><code>Heartbeat</code></a>s messages if they are requested with the query parameter.</p>
+<p>Retrieves the latest <a href="primitives::validator::ApproveState"><code>ApproveState</code></a> and the corresponding <a href="primitives::validator::NewState"><code>NewState</code></a>
+validator messages for the given <a href="primitives::Channel"><code>Channel</code></a>.</p>
+<p>If the <a href="primitives::Channel"><code>Channel</code></a> is new one or both of the states might have not been generated yet.</p>
+<p>The same is true of the <a href="primitives::validator::Heartbeat"><code>Heartbeat</code></a>s messages if they are requested with the query parameter.</p>
 <p>The route is handled by <a href="channel/fn.last_approved.html" title="channel::last_approved()"><code>channel::last_approved()</code></a>.</p>
-<p>Request query parameters: <a href="../../primitives/sentry/struct.LastApprovedQuery.html" title="primitives::sentry::LastApprovedQuery"><code>LastApprovedQuery</code></a></p>
-<p>Response: <a href="../../primitives/sentry/struct.LastApprovedResponse.html" title="primitives::sentry::LastApprovedResponse"><code>LastApprovedResponse</code></a></p>
+<p>Request query parameters: [<code>LastApprovedQuery</code>][primitives::sentry::LastApprovedQuery]</p>
+<p>Response: [<code>LastApprovedResponse</code>][primitives::sentry::LastApprovedResponse]</p>
 <h6 id="examples-6"><a href="#examples-6">Examples</a></h6>
 <p>Query:</p>
 
@@ -560,8 +560,8 @@ It needs to ensure all campaigns are closed. It accepts a JSON body in the reque
 all of the earners and updates their balances accordingly. Used when an advertiser/spender wants
 to get their remaining funds back.</p>
 <p>The route is handled by <a href="channel/fn.channel_payout.html" title="channel::channel_payout()"><code>channel::channel_payout()</code></a>.</p>
-<p>Request JSON body: <a href="../../primitives/sentry/struct.ChannelPayRequest.html"><code>ChannelPayRequest</code></a></p>
-<p>Response: <a href="../../primitives/sentry/struct.SuccessResponse.html"><code>SuccessResponse</code></a></p>
+<p>Request JSON body: <a href="primitives::sentry::ChannelPayRequest"><code>ChannelPayRequest</code></a></p>
+<p>Response: <a href="primitives::sentry::SuccessResponse"><code>SuccessResponse</code></a></p>
 <h6 id="examples-7"><a href="#examples-7">Examples</a></h6>
 <p>Request (json):</p>
 
@@ -582,11 +582,11 @@ to get their remaining funds back.</p>
     <span class="macro">assert!</span>(serde_json::from_str::&lt;ChannelPayRequest&gt;(<span class="kw-2">&amp;</span>channel_pay_json).is_ok());
 }</code></pre></div>
 <h5 id="get-v5channelidget-leaf"><a href="#get-v5channelidget-leaf">GET `/v5/channel/:id/get-leaf</a></h5>
-<p>This route gets the latest approved state (<a href="../../primitives/validator/messages/struct.NewState.html"><code>NewState</code></a>/<a href="../../primitives/validator/messages/struct.ApproveState.html"><code>ApproveState</code></a> pair),
+<p>This route gets the latest approved state (<a href="primitives::validator::NewState"><code>NewState</code></a>/<a href="primitives::validator::ApproveState"><code>ApproveState</code></a> pair),
 finds the given <code>spender</code> or <code>earner</code> in the balances tree and produces a Merkle proof for it.
 This is useful for the Platform to verify if a spender leaf really exists.</p>
 <p>The route is handled by <a href="channel/fn.get_leaf.html" title="channel::get_leaf()"><code>channel::get_leaf()</code></a>.</p>
-<p>Response: <a href="../../primitives/sentry/struct.GetLeafResponse.html"><code>GetLeafResponse</code></a></p>
+<p>Response: <a href="primitives::sentry::GetLeafResponse"><code>GetLeafResponse</code></a></p>
 <h6 id="routes-1"><a href="#routes-1">Routes:</a></h6>
 <ul>
 <li>GET <code>/v5/channel/:id/get-leaf/spender/:addr</code></li>
@@ -615,7 +615,7 @@ This is useful for the Platform to verify if a spender leaf really exists.</p>
 an official production route!</p>
 <p>The route is handled by <a href="channel/fn.channel_dummy_deposit.html" title="channel::channel_dummy_deposit()"><code>channel::channel_dummy_deposit()</code></a>.</p>
 <p>Request body (json): <a href="channel/struct.ChannelDummyDeposit.html"><code>ChannelDummyDeposit</code></a></p>
-<p>Response: <a href="../../primitives/sentry/struct.SuccessResponse.html"><code>SuccessResponse</code></a></p>
+<p>Response: <a href="primitives::sentry::SuccessResponse"><code>SuccessResponse</code></a></p>
 <h6 id="examples-9"><a href="#examples-9">Examples</a></h6>
 <p>Request:</p>
 
@@ -648,7 +648,7 @@ an official production route!</p>
 <h4 id="route-parameters-1"><a href="#route-parameters-1">Route parameters</a></h4>
 <p>Paths which include these parameters are validated as follow:</p>
 <ul>
-<li><code>:id</code> - <a href="../../primitives/campaign/campaign_id/struct.CampaignId.html"><code>CampaignId</code></a></li>
+<li><code>:id</code> - <a href="primitives::CampaignId"><code>CampaignId</code></a></li>
 </ul>
 <h4 id="routes-2"><a href="#routes-2">Routes</a></h4><h5 id="get-v5campaignlist"><a href="#get-v5campaignlist">GET <code>/v5/campaign/list</code></a></h5>
 <p>Lists all campaigns with pagination and orders them in
@@ -656,7 +656,7 @@ ascending order (<code>ASC</code>) by <code>Campaign.created</code>.
 This ensures that the order in the pages will not change if a new
 <code>Campaign</code> is created while still retrieving a page.</p>
 <p>The route is handled by <a href="campaign/fn.campaign_list.html" title="campaign::campaign_list()"><code>campaign::campaign_list()</code></a>.</p>
-<p>Request query parameters: <a href="../../primitives/sentry/campaign_list/struct.CampaignListQuery.html"><code>CampaignListQuery</code></a></p>
+<p>Request query parameters: <a href="primitives::sentry::campaign_list::CampaignListQuery"><code>CampaignListQuery</code></a></p>
 <ul>
 <li><code>page=[integer]</code> (optional) default: <code>0</code></li>
 <li><code>creator=[0x....]</code> (optional) - address of the creator to be filtered by</li>
@@ -668,7 +668,7 @@ This ensures that the order in the pages will not change if a new
 </ul>
 </li>
 </ul>
-<p>Response: <a href="../../primitives/sentry/campaign_list/struct.CampaignListResponse.html"><code>CampaignListResponse</code></a></p>
+<p>Response: <a href="primitives::sentry::campaign_list::CampaignListResponse"><code>CampaignListResponse</code></a></p>
 <h6 id="examples-10"><a href="#examples-10">Examples</a></h6>
 <p>Query:</p>
 
@@ -1006,13 +1006,13 @@ This ensures that the order in the pages will not change if a new
     <span class="macro">assert!</span>(from_value::&lt;CampaignListResponse&gt;(json).is_ok());
 }</code></pre></div>
 <h5 id="post-v5campaign-auth-required"><a href="#post-v5campaign-auth-required">POST <code>/v5/campaign</code> (auth required)</a></h5>
-<p>Create a new Campaign. Request must be sent by the <a href="../../primitives/campaign/struct.Campaign.html#structfield.creator"><code>Campaign.creator</code></a>.</p>
-<p><strong>Authentication is required</strong> to validate <a href="../../primitives/campaign/struct.Campaign.html#structfield.creator"><code>Campaign.creator</code></a> == <a href="../struct.Auth.html#structfield.uid"><code>Auth.uid</code></a></p>
+<p>Create a new Campaign. Request must be sent by the <a href="primitives::Campaign::creator"><code>Campaign.creator</code></a>.</p>
+<p><strong>Authentication is required</strong> to validate <a href="primitives::Campaign::creator"><code>Campaign.creator</code></a> == <a href="../struct.Auth.html#structfield.uid"><code>Auth.uid</code></a></p>
 <p>It will make sure the <code>Channel</code> is created if new and it will update
-the spendable amount using the <a href="../../adapter/client/trait.Locked.html#tymethod.get_deposit"><code>Adapter.get_deposit()</code></a>.</p>
+the spendable amount using the <a href="adapter::client::Locked::get_deposit"><code>Adapter.get_deposit()</code></a>.</p>
 <p>The route is handled by <a href="campaign/fn.create_campaign.html" title="campaign::create_campaign()"><code>campaign::create_campaign()</code></a>.</p>
-<p>Request body (json): <a href="../../primitives/sentry/campaign_create/struct.CreateCampaign.html" title="primitives::sentry::campaign_create::CreateCampaign"><code>CreateCampaign</code></a></p>
-<p>Response: <a href="../../primitives/campaign/struct.Campaign.html"><code>Campaign</code></a></p>
+<p>Request body (json): [<code>CreateCampaign</code>][primitives::sentry::campaign_create::CreateCampaign]</p>
+<p>Response: <a href="primitives::Campaign"><code>Campaign</code></a></p>
 <h6 id="examples-11"><a href="#examples-11">Examples</a></h6>
 <div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>primitives::{sentry::campaign_create::CreateCampaign, test_util::DUMMY_CAMPAIGN, CampaignId};
 <span class="kw">use </span>serde_json::json;
@@ -1117,11 +1117,11 @@ the spendable amount using the <a href="../../adapter/client/trait.Locked.html#t
     }
 }</code></pre></div>
 <h5 id="post-v5campaignid-auth-required"><a href="#post-v5campaignid-auth-required">POST <code>/v5/campaign/:id</code> (auth required)</a></h5>
-<p>Modify the <a href="../../primitives/campaign/struct.Campaign.html"><code>Campaign</code></a>. Request must be sent by the <a href="../../primitives/campaign/struct.Campaign.html#structfield.creator"><code>Campaign.creator</code></a>.</p>
-<p><strong>Authentication is required</strong> to validate <a href="../../primitives/campaign/struct.Campaign.html#structfield.creator"><code>Campaign.creator</code></a> == <a href="../struct.Auth.html#structfield.uid"><code>Auth.uid</code></a></p>
+<p>Modify the <a href="primitives::Campaign"><code>Campaign</code></a>. Request must be sent by the <a href="primitives::Campaign::creator"><code>Campaign.creator</code></a>.</p>
+<p><strong>Authentication is required</strong> to validate <a href="primitives::Campaign::creator"><code>Campaign.creator</code></a> == <a href="../struct.Auth.html#structfield.uid"><code>Auth.uid</code></a></p>
 <p>The route is handled by <a href="campaign/update_campaign/fn.handle_route.html" title="campaign::update_campaign::handle_route()"><code>campaign::update_campaign::handle_route()</code></a>.</p>
-<p>Request body (json): <a href="../../primitives/sentry/campaign_modify/struct.ModifyCampaign.html" title="primitives::sentry::campaign_modify::ModifyCampaign"><code>ModifyCampaign</code></a></p>
-<p>Response: <a href="../../primitives/campaign/struct.Campaign.html"><code>Campaign</code></a></p>
+<p>Request body (json): [<code>ModifyCampaign</code>][primitives::sentry::campaign_modify::ModifyCampaign]</p>
+<p>Response: <a href="primitives::Campaign"><code>Campaign</code></a></p>
 <h6 id="examples-12"><a href="#examples-12">Examples</a></h6>
 <div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>primitives::{sentry::campaign_modify::ModifyCampaign, unified_num::FromWhole, UnifiedNum};
 <span class="kw">use </span>serde_json::json;
@@ -1157,22 +1157,22 @@ the spendable amount using the <a href="../../adapter/client/trait.Locked.html#t
     }
 }</code></pre></div>
 <h5 id="post-v5campaignidevents"><a href="#post-v5campaignidevents">POST <code>/v5/campaign/:id/events</code></a></h5>
-<p>Add new <a href="../../primitives/sentry/event/enum.Event.html"><code>Event</code></a>s (<code>IMPRESSION</code>s &amp; <code>CLICK</code>s) to the <a href="../../primitives/campaign/struct.Campaign.html"><code>Campaign</code></a>.
-Applies <a href="../../primitives/campaign/struct.Campaign.html#structfield.event_submission"><code>Campaign.event_submission</code></a> rules and additional validation using <a href="../access/fn.check_access.html"><code>check_access()</code></a>.</p>
+<p>Add new <a href="primitives::sentry::Event"><code>Event</code></a>s (<code>IMPRESSION</code>s &amp; <code>CLICK</code>s) to the <a href="primitives::Campaign"><code>Campaign</code></a>.
+Applies <a href="primitives::Campaign::event_submission"><code>Campaign.event_submission</code></a> rules and additional validation using <a href="../access/fn.check_access.html"><code>check_access()</code></a>.</p>
 <p>The route is handled by <a href="campaign/insert_events/fn.handle_route.html" title="campaign::insert_events::handle_route()"><code>campaign::insert_events::handle_route()</code></a>.</p>
-<p>Request body (json): <a href="../../primitives/sentry/struct.InsertEventsRequest.html"><code>InsertEventsRequest</code></a></p>
-<p>Response: <a href="../../primitives/sentry/struct.SuccessResponse.html"><code>SuccessResponse</code></a></p>
+<p>Request body (json): <a href="primitives::sentry::InsertEventsRequest"><code>InsertEventsRequest</code></a></p>
+<p>Response: <a href="primitives::sentry::SuccessResponse"><code>SuccessResponse</code></a></p>
 <h5 id="post-v5campaignidclose-auth-required"><a href="#post-v5campaignidclose-auth-required">POST <code>/v5/campaign/:id/close</code> (auth required)</a></h5>
 <p>Close the campaign.</p>
 <p>The route is handled by <a href="campaign/fn.close_campaign.html" title="campaign::close_campaign()"><code>campaign::close_campaign()</code></a>.</p>
-<p>Request must be sent by the <a href="../../primitives/campaign/struct.Campaign.html#structfield.creator"><code>Campaign.creator</code></a>.</p>
-<p><strong>Authentication is required</strong> to validate <a href="../../primitives/campaign/struct.Campaign.html#structfield.creator"><code>Campaign.creator</code></a> == <a href="../struct.Auth.html#structfield.uid"><code>Auth.uid</code></a></p>
-<p>Closes the campaign by setting <a href="../../primitives/campaign/struct.Campaign.html#structfield.budget"><code>Campaign.budget</code></a> so that <code>remaining budget = 0</code>.</p>
-<p>Response: <a href="../../primitives/sentry/struct.SuccessResponse.html"><code>SuccessResponse</code></a></p>
+<p>Request must be sent by the <a href="primitives::Campaign::creator"><code>Campaign.creator</code></a>.</p>
+<p><strong>Authentication is required</strong> to validate <a href="primitives::Campaign::creator"><code>Campaign.creator</code></a> == <a href="../struct.Auth.html#structfield.uid"><code>Auth.uid</code></a></p>
+<p>Closes the campaign by setting <a href="primitives::Campaign::budget"><code>Campaign.budget</code></a> so that <code>remaining budget = 0</code>.</p>
+<p>Response: <a href="primitives::sentry::SuccessResponse"><code>SuccessResponse</code></a></p>
 <h3 id="analytics"><a href="#analytics">Analytics</a></h3><h5 id="get-v5analytics"><a href="#get-v5analytics">GET <code>/v5/analytics</code></a></h5>
-<p>Allowed keys: <a href="../../primitives/analytics/query/enum.AllowedKey.html#variant.Country" title="primitives::analytics::query::AllowedKey::Country"><code>AllowedKey::Country</code></a>, <a href="../../primitives/analytics/query/enum.AllowedKey.html#variant.AdSlotType" title="primitives::analytics::query::AllowedKey::AdSlotType"><code>AllowedKey::AdSlotType</code></a></p>
-<p>Request query parameters: <a href="../../primitives/analytics/struct.AnalyticsQuery.html"><code>AnalyticsQuery</code></a></p>
-<p>Response: <a href="../../primitives/sentry/struct.AnalyticsResponse.html"><code>AnalyticsResponse</code></a></p>
+<p>Allowed keys: [<code>AllowedKey::Country</code>][primitives::analytics::query::AllowedKey::Country], [<code>AllowedKey::AdSlotType</code>][primitives::analytics::query::AllowedKey::AdSlotType]</p>
+<p>Request query parameters: <a href="primitives::analytics::AnalyticsQuery"><code>AnalyticsQuery</code></a></p>
+<p>Response: <a href="primitives::sentry::AnalyticsResponse"><code>AnalyticsResponse</code></a></p>
 <h6 id="examples-13"><a href="#examples-13">Examples</a></h6>
 <p>Query:</p>
 
@@ -1316,33 +1316,33 @@ Applies <a href="../../primitives/campaign/struct.Campaign.html#structfield.even
 }</code></pre></div>
 <h5 id="get-v5analyticsfor-publisher-auth-required"><a href="#get-v5analyticsfor-publisher-auth-required">GET <code>/v5/analytics/for-publisher</code> (auth required)</a></h5>
 <p>Returns all analytics where the currently authenticated address <a href="../struct.Auth.html#structfield.uid"><code>Auth.uid</code></a> is a <strong>publisher</strong>.</p>
-<p>All <a href="../../primitives/analytics/query/static.ALLOWED_KEYS.html"><code>ALLOWED_KEYS</code></a> are allowed for this route.</p>
+<p>All <a href="primitives::analytics::query::ALLOWED_KEYS"><code>ALLOWED_KEYS</code></a> are allowed for this route.</p>
 <p>The route is handled by <a href="fn.get_analytics.html" title="get_analytics()"><code>get_analytics()</code></a>.</p>
-<p>Request query parameters: <a href="../../primitives/analytics/struct.AnalyticsQuery.html"><code>AnalyticsQuery</code></a></p>
-<p>Response: <a href="../../primitives/sentry/struct.AnalyticsResponse.html"><code>AnalyticsResponse</code></a></p>
+<p>Request query parameters: <a href="primitives::analytics::AnalyticsQuery"><code>AnalyticsQuery</code></a></p>
+<p>Response: <a href="primitives::sentry::AnalyticsResponse"><code>AnalyticsResponse</code></a></p>
 <h6 id="examples-14"><a href="#examples-14">Examples</a></h6>
 <p>See <a href="#get-v5analytics">GET <code>/v5/analytics</code></a></p>
 <h5 id="get-v5analyticsfor-advertiser-auth-required"><a href="#get-v5analyticsfor-advertiser-auth-required">GET <code>/v5/analytics/for-advertiser</code> (auth required)</a></h5>
 <p>Returns all analytics where the currently authenticated address <a href="../struct.Auth.html#structfield.uid"><code>Auth.uid</code></a> is an <strong>advertiser</strong>.</p>
-<p>All <a href="../../primitives/analytics/query/static.ALLOWED_KEYS.html"><code>ALLOWED_KEYS</code></a> are allowed for this route.</p>
+<p>All <a href="primitives::analytics::query::ALLOWED_KEYS"><code>ALLOWED_KEYS</code></a> are allowed for this route.</p>
 <p>The route is handled by <a href="fn.get_analytics.html" title="get_analytics()"><code>get_analytics()</code></a>.</p>
-<p>Request query parameters: <a href="../../primitives/analytics/struct.AnalyticsQuery.html"><code>AnalyticsQuery</code></a></p>
-<p>Response: <a href="../../primitives/sentry/struct.AnalyticsResponse.html"><code>AnalyticsResponse</code></a></p>
+<p>Request query parameters: <a href="primitives::analytics::AnalyticsQuery"><code>AnalyticsQuery</code></a></p>
+<p>Response: <a href="primitives::sentry::AnalyticsResponse"><code>AnalyticsResponse</code></a></p>
 <h6 id="examples-15"><a href="#examples-15">Examples</a></h6>
 <p>See <a href="#get-v5analytics">GET <code>/v5/analytics</code></a></p>
 <h5 id="get-v5analyticsfor-admin-auth-required"><a href="#get-v5analyticsfor-admin-auth-required">GET <code>/v5/analytics/for-admin</code> (auth required)</a></h5>
 <p>Admin access to the analytics with no restrictions on the keys for filtering.</p>
-<p>All <a href="../../primitives/analytics/query/static.ALLOWED_KEYS.html"><code>ALLOWED_KEYS</code></a> are allowed for admins.</p>
-<p>Admin addresses are configured in the <a href="../../primitives/config/struct.Config.html#structfield.admins"><code>Config.admins</code></a>.</p>
+<p>All <a href="primitives::analytics::query::ALLOWED_KEYS"><code>ALLOWED_KEYS</code></a> are allowed for admins.</p>
+<p>Admin addresses are configured in the <a href="primitives::Config::admins"><code>Config.admins</code></a>.</p>
 <p>The route is handled by <a href="fn.get_analytics.html" title="get_analytics()"><code>get_analytics()</code></a>.</p>
-<p>Request query parameters: <a href="../../primitives/analytics/struct.AnalyticsQuery.html"><code>AnalyticsQuery</code></a></p>
-<p>Response: <a href="../../primitives/sentry/struct.AnalyticsResponse.html"><code>AnalyticsResponse</code></a></p>
+<p>Request query parameters: <a href="primitives::analytics::AnalyticsQuery"><code>AnalyticsQuery</code></a></p>
+<p>Response: <a href="primitives::sentry::AnalyticsResponse"><code>AnalyticsResponse</code></a></p>
 <h6 id="examples-16"><a href="#examples-16">Examples</a></h6>
 <p>See <a href="#get-v5analytics">GET <code>/v5/analytics</code></a></p>
 <h3 id="get-cfg"><a href="#get-cfg">GET <code>/cfg</code></a></h3>
 <p>Gets the config that the validator is running on.</p>
 <p>The route is handled by <a href="fn.get_cfg.html" title="get_cfg()"><code>get_cfg()</code></a></p>
-<p>Response: <a href="../../primitives/config/struct.Config.html"><code>Config</code></a></p>
+<p>Response: <a href="primitives::Config"><code>Config</code></a></p>
 <h6 id="examples-17"><a href="#examples-17">Examples</a></h6>
 <p>Response:</p>
 
@@ -1427,10 +1427,5 @@ Applies <a href="../../primitives/campaign/struct.Campaign.html#structfield.even
         GANACHE_CONFIG.clone()
     );
 }</code></pre></div>
-</div></details><h2 id="modules" class="small-section-header"><a href="#modules">Modules</a></h2><div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="mod" href="campaign/index.html" title="sentry::routes::campaign mod">campaign</a></div><div class="item-right docblock-short"><p><code>/v5/campaign</code> routes</p>
-</div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="channel/index.html" title="sentry::routes::channel mod">channel</a></div><div class="item-right docblock-short"><p><code>/v5/channel</code> routes</p>
-</div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="routers/index.html" title="sentry::routes::routers mod">routers</a></div><div class="item-right docblock-short"><p>This module contains all the Sentry REST API routers.</p>
-</div></div></div><h2 id="functions" class="small-section-header"><a href="#functions">Functions</a></h2><div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.get_analytics.html" title="sentry::routes::get_analytics fn">get_analytics</a></div><div class="item-right docblock-short"><p>GET <code>/v5/analytics</code> routes
-Request query parameters: <a href="../../primitives/analytics/struct.AnalyticsQuery.html" title="AnalyticsQuery"><code>AnalyticsQuery</code></a>.</p>
-</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.get_cfg.html" title="sentry::routes::get_cfg fn">get_cfg</a></div><div class="item-right docblock-short"><p>GET <code>/cfg</code> request</p>
-</div></div></div></section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (1d37ed661 2022-09-09)" ></div></body></html>
+</div></details><h2 id="modules" class="small-section-header"><a href="#modules">Modules</a></h2><div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="mod" href="campaign/index.html" title="sentry::routes::campaign mod">campaign</a></div><div class="item-right docblock-short"><code>/v5/campaign</code> routes</div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="channel/index.html" title="sentry::routes::channel mod">channel</a></div><div class="item-right docblock-short"><code>/v5/channel</code> routes</div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="routers/index.html" title="sentry::routes::routers mod">routers</a></div><div class="item-right docblock-short">This module contains all the Sentry REST API routers.</div></div></div><h2 id="functions" class="small-section-header"><a href="#functions">Functions</a></h2><div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.get_analytics.html" title="sentry::routes::get_analytics fn">get_analytics</a></div><div class="item-right docblock-short">GET <code>/v5/analytics</code> routes
+Request query parameters: [<code>AnalyticsQuery</code>].</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.get_cfg.html" title="sentry::routes::get_cfg fn">get_cfg</a></div><div class="item-right docblock-short">GET <code>/cfg</code> request</div></div></div></section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.0-nightly (f83e0266c 2022-10-03)" ></div></body></html>
