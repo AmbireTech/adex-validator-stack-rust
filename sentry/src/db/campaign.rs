@@ -219,7 +219,7 @@ pub async fn update_campaign(pool: &DbPool, campaign: &Campaign) -> Result<Campa
 pub async fn units_for_slot_get_campaigns(
     pool: &DbPool,
     deposit_assets: Option<&HashSet<Address>>,
-    creator: Address,
+    not_creator: Address,
     active_to_ge: DateTime<Utc>,
 ) -> Result<Vec<Campaign>, PoolError> {
     let client = pool.get().await?;
@@ -227,11 +227,11 @@ pub async fn units_for_slot_get_campaigns(
     let mut where_clauses = vec![
         // Campaign.active.to
         "active_to >= $1".to_string(),
-        // Campaign.creator
-        "creator = $2".into(),
+        // Campaign.creator != not_creator
+        "creator != $2".into(),
     ];
     let mut params: Vec<Box<(dyn ToSql + Sync + Send)>> =
-        vec![Box::new(active_to_ge), Box::new(creator)];
+        vec![Box::new(active_to_ge), Box::new(not_creator)];
 
     // Deposit assets
     match deposit_assets.cloned() {

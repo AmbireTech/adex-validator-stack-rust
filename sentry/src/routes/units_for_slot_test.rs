@@ -14,10 +14,16 @@ use primitives::{
             AdUnit as ResponseAdUnit, Campaign as ResponseCampaign, UnitsWithPrice,
         },
     },
-    targeting::{Function, Rules, Value},
+    targeting::Rules,
     test_util::{CAMPAIGNS, DUMMY_AD_UNITS, DUMMY_IPFS, IDS, PUBLISHER},
     unified_num::FromWhole,
+    util::logging::new_logger,
     AdSlot,
+};
+
+use wiremock::{
+    matchers::{method, path},
+    Mock, MockServer, ResponseTemplate,
 };
 
 use super::*;
@@ -25,12 +31,6 @@ use crate::{
     routes::campaign::create_campaign,
     test_util::{setup_dummy_app, ApplicationGuard},
     Auth,
-};
-
-// use url::Url;
-use wiremock::{
-    matchers::{method, path},
-    Mock, MockServer, ResponseTemplate,
 };
 
 // User Agent OS: Linux (only in `woothee`)
@@ -47,13 +47,18 @@ async fn setup_mocked_platform_dummy_app() -> (MockServer, ApplicationGuard) {
     let platform_url = mock_server.uri().parse().unwrap();
 
     let mut app_guard = setup_dummy_app().await;
+    app_guard.app.logger = new_logger("sentry-dummy-app");
+    debug!(
+        &app_guard.app.logger,
+        "With platform mocker server at {}", &platform_url
+    );
+
     app_guard.app.platform_api.platform_url = platform_url;
 
     (mock_server, app_guard)
 }
 
 #[tokio::test]
-#[ignore = "Fix test"]
 async fn test_targeting_input() {
     let (mock_server, app_guard) = setup_mocked_platform_dummy_app().await;
     let app = Arc::new(app_guard.app);
@@ -71,7 +76,7 @@ async fn test_targeting_input() {
             [
                 (
                     GANACHE_INFO_1.tokens["Mocked TOKEN 1"].address,
-                    UnifiedNum::from_whole(0.0007),
+                    UnifiedNum::from_whole(0.010),
                 ),
                 (
                     GANACHE_INFO_1337.tokens["Mocked TOKEN 1337"].address,
@@ -103,8 +108,7 @@ async fn test_targeting_input() {
                 deposit,
             );
 
-            CAMPAIGNS[0] /* .context */
-                .clone()
+            CAMPAIGNS[0].clone()
         };
 
         let campaign_1 = {
@@ -119,8 +123,7 @@ async fn test_targeting_input() {
                 deposit,
             );
 
-            CAMPAIGNS[1] /* .context */
-                .clone()
+            CAMPAIGNS[1].clone()
         };
 
         let matching_campaign_2 = {
@@ -135,14 +138,7 @@ async fn test_targeting_input() {
                 deposit,
             );
 
-            let min_impression_price =
-                Function::new_only_show_if(Function::new_get("eventMinPrice"));
-
-            let mut campaign_2 = CAMPAIGNS[2] /* .context */
-                .clone();
-            campaign_2.context.targeting_rules = Rules(vec![min_impression_price.into()]);
-
-            campaign_2
+            CAMPAIGNS[2].clone()
         };
 
         [campaign_0, campaign_1, matching_campaign_2]
@@ -253,8 +249,12 @@ async fn test_targeting_input() {
     .expect("Should return response")
     .0;
 
-    // pub targeting_input_base: Input,
-    // assert_eq!(response.targeting_input_base);
+    debug!(&app.logger, "{:?}", response.targeting_input_base);
+    assert_eq!(
+        response.targeting_input_base.global.publisher_id,
+        *PUBLISHER
+    );
+
     assert!(response.accepted_referrers.is_empty());
     let expected_fallback_until = ResponseAdUnit {
         ipfs: fallback_unit.ipfs,

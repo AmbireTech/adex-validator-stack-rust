@@ -118,10 +118,11 @@ where
         &app.config,
         &Some(query.deposit_assets),
         publisher_id,
+        &app.logger,
     )
     .await?;
 
-    debug!(&app.logger, "Fetched Cache campaigns limited by earner (publisher)"; "campaigns" => campaigns_limited_by_earner.len(), "publisher_id" => %publisher_id);
+    debug!(&app.logger, "Fetched campaigns limited by earner (publisher)"; "campaigns" => campaigns_limited_by_earner.len(), "publisher_id" => %publisher_id);
 
     // We return those in the result (which means AdView would have those) but we don't actually use them
     // we do that in order to have the same variables as the validator, so that the `price` is the same
@@ -177,6 +178,7 @@ async fn get_campaigns(
     config: &Config,
     deposit_assets: &Option<HashSet<Address>>,
     publisher_id: ValidatorId,
+    logger: &Logger,
 ) -> Result<Vec<Campaign>, CampaignsError> {
     // 1. Fetch active Campaigns: (postgres)
     //  Creator = publisher_id
@@ -200,6 +202,11 @@ async fn get_campaigns(
         .get_multiple_with_ids(active_campaign_ids)
         .await?;
 
+    debug!(
+        logger,
+        "Active Campaigns: {:?}\nRemaining: {:?}", &active_campaign_ids, &campaigns_remaining
+    );
+
     let campaigns_with_remaining = campaigns_remaining
         .into_iter()
         .filter_map(|(campaign_id, remaining)| {
@@ -208,9 +215,14 @@ async fn get_campaigns(
                 // and we have to find the `Campaign` instance
                 active_campaigns
                     .iter()
-                    .find(|campaign| campaign.id == campaign_id)
+                    .find(|campaign| {
+                        debug!(logger, "Take {:?} because it's active and not exhausted, i.e. {} (remaining budget) > 0", remaining, campaign_id);
+
+                        campaign.id == campaign_id
+                    })
                     .cloned()
             } else {
+                debug!(logger, "Skip {:?} because there's no remaining budget", campaign_id);
                 None
             }
         })
@@ -233,6 +245,11 @@ async fn get_campaigns(
     .into_iter()
     .flatten()
     .collect::<Vec<_>>();
+
+    debug!(
+        logger,
+        "Publishers Accounting for channels: {:?}", &publisher_accountings
+    );
 
     // 3. Filter `Campaign`s, that include the `publisher_id` in the Channel balances.
     let (mut campaigns_by_earner, rest_of_campaigns): (Vec<Campaign>, Vec<Campaign>) =
