@@ -127,7 +127,7 @@ where
     // We return those in the result (which means AdView would have those) but we don't actually use them
     // we do that in order to have the same variables as the validator, so that the `price` is the same
     let targeting_input_ad_slot = Some(input::AdSlot {
-        categories: categories.clone().into_iter().collect(),
+        categories,
         hostname,
     });
 
@@ -181,9 +181,8 @@ async fn get_campaigns(
     logger: &Logger,
 ) -> Result<Vec<Campaign>, CampaignsError> {
     // 1. Fetch active Campaigns: (postgres)
-    //  Creator = publisher_id
+    // where Creator != publisher_id
     // if deposit asset > 0 => filter by deposit_asset
-    // TODO: limit the amount of passable deposit assets to avoid the max query size!
     let active_campaigns = units_for_slot_get_campaigns(
         &pool,
         deposit_assets.as_ref(),
@@ -216,7 +215,7 @@ async fn get_campaigns(
                 active_campaigns
                     .iter()
                     .find(|campaign| {
-                        debug!(logger, "Take {:?} because it's active and not exhausted, i.e. {} (remaining budget) > 0", remaining, campaign_id);
+                        debug!(logger, "Take {:?} because it's active and not exhausted, i.e. {} (remaining budget) > 0", campaign_id, remaining);
 
                         campaign.id == campaign_id
                     })
@@ -294,6 +293,7 @@ async fn apply_targeting(
                     .collect::<Vec<_>>();
 
                 if ad_units.is_empty() {
+                    debug!(logger, "Skipping {:?} because of no matching AdUnits types to AdSlot type {}", campaign.id, ad_slot.ad_type);
                     None
                 } else {
                     let campaign_input = input_base.clone().with_campaign(campaign.clone());
@@ -328,6 +328,7 @@ async fn apply_targeting(
                             let price = pricing_bounds.min.max(max_price);
 
                             if price < config.limits.units_for_slot.global_min_impression_price {
+                                debug!(logger, "Max IMPRESSION price is less than the global minium ({} < {}) for AdUnit {:?} and campaign {:?}", price, config.limits.units_for_slot.global_min_impression_price, ad_unit.ipfs, campaign.id);
                                 return None;
                             }
 

@@ -958,7 +958,6 @@ mod test {
         for i in (0..generated.len()).rev() {
             let deposit_assets = generated[0..i].iter().copied().collect::<HashSet<_>>();
 
-            
             match units_for_slot_get_campaigns(
                 &database,
                 Some(&deposit_assets),
