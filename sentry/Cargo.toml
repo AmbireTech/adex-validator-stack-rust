@@ -33,7 +33,7 @@ futures = "0.3"
 async-trait = "0.1"
 # Primitives
 primitives = { version = "0.2", path = "../primitives", features = ["postgres"] }
-adapter = { version = "0.2", path = "../adapter" }
+adapter = { version = "0.2", path = "../adapter", features = ["test-util"] }
 chrono = { version = "0.4", features = ["serde"] }
 # used for redis test pool
 dashmap = { version = "5", optional = true }
@@ -79,11 +79,9 @@ woothee = "0.13"
 reqwest = { version = "0.11", features = ["json", "cookies"] }
 
 [dev-dependencies]
+primitives = { version = "0.2", path = "../primitives", features = ["postgres", "test-util"] }
 pretty_assertions = "1"
 wiremock = "0.5"
-
-primitives = { version = "0.2", path = "../primitives", features = ["postgres", "test-util"] }
-adapter = { version = "0.2", path = "../adapter", features = ["test-util"] }
 
 # we only require `hyper` for `hyper::body::to_bytes` function
 hyper = { version = "0.14", default-features = false }

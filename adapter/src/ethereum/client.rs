@@ -37,7 +37,7 @@ pub struct Ethereum<S = LockedWallet> {
     pub(crate) state: S,
 }
 
-pub(crate) trait ChainTransport {
+pub trait ChainTransport {
     fn init_web3(&self) -> web3::Result<Web3<Http>>;
 }
 
