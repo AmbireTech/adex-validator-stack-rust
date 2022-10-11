@@ -1157,9 +1157,10 @@ pub mod units_for_slot {
 
     use crate::Address;
 
-    #[derive(Debug, Clone, Serialize, Deserialize)]
+    #[derive(Debug, Clone, Serialize, Deserialize, Default)]
     #[serde(rename_all = "camelCase")]
     pub struct Query {
+        #[serde(default)]
         pub deposit_assets: HashSet<Address>,
     }
 
