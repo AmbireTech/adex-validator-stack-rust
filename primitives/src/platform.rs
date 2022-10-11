@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use serde::{Deserialize, Serialize};
 use url::Url;
 
@@ -8,7 +6,7 @@ use crate::{AdSlot, AdUnit};
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Website {
     #[serde(default)]
-    pub categories: HashSet<String>,
+    pub categories: Vec<String>,
     #[serde(default)]
     pub accepted_referrers: Vec<Url>,
 }
