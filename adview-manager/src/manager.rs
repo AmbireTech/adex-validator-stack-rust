@@ -6,7 +6,8 @@ use adex_primitives::{
     },
     targeting::{self, input},
     util::ApiUrl,
-    Address, BigNum, CampaignId, ToHex, UnifiedNum, IPFS,
+    validator::ValidatorDesc,
+    Address, BigNum, CampaignId, UnifiedNum, IPFS,
 };
 use async_std::{sync::RwLock, task::block_on};
 use chrono::{DateTime, Duration, Utc};
@@ -49,10 +50,12 @@ pub static DEFAULT_TOKENS: Lazy<HashSet<Address>> = Lazy::new(|| {
 
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error("Request to the Market failed: status {status} at url {url}")]
-    Market { status: StatusCode, url: Url },
+    #[error("Request to the Sentry failed: status {status} at url {url}")]
+    Sentry { status: StatusCode, url: Url },
     #[error(transparent)]
     Request(#[from] reqwest::Error),
+    #[error("No validators provided")]
+    NoValidators,
 }
 
 /// The Ad [`Manager`]'s options for showing ads.
@@ -77,6 +80,11 @@ pub struct Options {
     /// default: `false`
     #[serde(default)]
     pub disabled_sticky: bool,
+    /// List of validators to query /units-for-slot from
+    ///
+    /// default: `[]`
+    #[serde(default)]
+    pub validators: Vec<ValidatorDesc>,
 }
 
 /// [`AdSlot`](adex_primitives::AdSlot) size `width x height` in pixels (`px`)
@@ -240,36 +248,45 @@ impl Manager {
         }
     }
 
+    // Test with different units with price
+    // Test if first campaign is not overwritten
     pub async fn get_market_demand_resp(&self) -> Result<Response, Error> {
-        let pub_prefix = self.options.publisher_addr.to_hex();
-
         let deposit_asset = self
             .options
             .whitelisted_tokens
             .iter()
-            .map(|token| format!("depositAsset={}", token))
+            .map(|token| format!("depositAssets[]={}", token))
             .collect::<Vec<_>>()
             .join("&");
 
-        // ApiUrl handles endpoint path (with or without `/`)
-        let url = self
+        let first_validator = self
             .options
-            .market_url
-            .join(&format!(
-                "units-for-slot/{ad_slot}?pubPrefix={pub_prefix}&{deposit_asset}",
-                ad_slot = self.options.market_slot
-            ))
-            .expect("Valid URL endpoint!");
+            .validators
+            .clone()
+            .into_iter()
+            .next()
+            .ok_or(Error::NoValidators)?;
 
-        let market_response = self.client.get(url.clone()).send().await?;
+        let url = format!(
+            "{}/units-for-slot/{}?{}",
+            first_validator.url, self.options.market_slot, deposit_asset
+        );
+        let mut first_res: Response = self.client.get(url).send().await?.json().await?;
 
-        match market_response.status() {
-            StatusCode::OK => Ok(market_response.json().await?),
-            _ => Err(Error::Market {
-                status: market_response.status(),
-                url,
-            }),
+        for validator in self.options.validators.iter().skip(1) {
+            let url = format!(
+                "{}/units-for-slot/{}?{}",
+                validator.url, self.options.market_slot, deposit_asset
+            );
+            let new_res: Response = self.client.get(url).send().await?.json().await?;
+            for campaign in new_res.campaigns {
+                if !first_res.campaigns.contains(&campaign) {
+                    first_res.campaigns.push(campaign);
+                }
+            }
         }
+
+        Ok(first_res)
     }
 
     pub async fn get_next_ad_unit(&self) -> Result<Option<NextAdUnit>, Error> {

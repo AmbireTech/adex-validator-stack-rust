@@ -3,7 +3,7 @@ use std::sync::Arc;
 use adex_primitives::{
     sentry::{units_for_slot, IMPRESSION},
     targeting::{input::Global, Input},
-    test_util::{DUMMY_CAMPAIGN, DUMMY_IPFS},
+    test_util::{DUMMY_CAMPAIGN, DUMMY_IPFS, DUMMY_VALIDATOR_FOLLOWER, DUMMY_VALIDATOR_LEADER},
     ToHex,
 };
 use adview_manager::{
@@ -55,6 +55,10 @@ pub async fn get_preview_ad(Extension(state): Extension<Arc<State>>) -> Html<Str
         /// Defaulted
         disabled_video,
         disabled_sticky: false,
+        validators: vec![
+            DUMMY_VALIDATOR_LEADER.clone(),
+            DUMMY_VALIDATOR_FOLLOWER.clone(),
+        ],
     };
 
     let manager =
@@ -159,6 +163,10 @@ pub async fn get_preview_video(Extension(state): Extension<Arc<State>>) -> Html<
         /// Defaulted
         disabled_video,
         disabled_sticky: false,
+        validators: vec![
+            DUMMY_VALIDATOR_LEADER.clone(),
+            DUMMY_VALIDATOR_FOLLOWER.clone(),
+        ],
     };
 
     // legacy_728x90
