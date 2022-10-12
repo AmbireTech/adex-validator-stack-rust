@@ -183,6 +183,8 @@ pub async fn get_campaign_ids_by_channel(
     Ok(campaign_ids)
 }
 
+/// Updates the campaign fields:
+/// budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules
 /// ```text
 /// UPDATE campaigns SET budget = $1, validators = $2, title = $3, pricing_bounds = $4, event_submission = $5, ad_units = $6, targeting_rules = $7
 /// FROM channels WHERE campaigns.id = $8 AND campaigns.channel_id=channels.id

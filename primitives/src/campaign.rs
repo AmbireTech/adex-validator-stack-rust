@@ -255,10 +255,13 @@ mod pricing {
 
     #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
     pub struct Pricing {
+        /// The minimum payable amount for a single event
         pub min: UnifiedNum,
+        /// The maximum payable amount for a single event
         pub max: UnifiedNum,
     }
 
+    /// The pricing bounds (minimum and maximum payable amount) per event type for 1 event.
     #[derive(Default, Debug, PartialEq, Eq, Serialize, Deserialize, Clone)]
     #[serde(transparent)]
     pub struct PricingBounds(HashMap<EventType, Pricing>);

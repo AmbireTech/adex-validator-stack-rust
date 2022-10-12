@@ -215,9 +215,13 @@ async fn get_campaigns(
                 active_campaigns
                     .iter()
                     .find(|campaign| {
-                        debug!(logger, "Take {:?} because it's active and not exhausted, i.e. {} (remaining budget) > 0", campaign_id, remaining);
+                        if campaign.id == campaign_id {
+                            debug!(logger, "Take {:?} because it's active and not exhausted, i.e. {:?} (remaining budget) > 0", campaign_id, remaining);
 
-                        campaign.id == campaign_id
+                            true
+                        } else {
+                            false
+                        }
                     })
                     .cloned()
             } else {
@@ -321,7 +325,7 @@ async fn apply_targeting(
                                 return None;
                             }
 
-                            let max_price = match output.price.get(IMPRESSION.as_str()) {
+                            let max_price = match output.price.get(&IMPRESSION) {
                                 Some(output_price) => *output_price.min(&pricing_bounds.max),
                                 None => pricing_bounds.max,
                             };
