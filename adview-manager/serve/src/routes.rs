@@ -33,7 +33,7 @@ pub async fn get_index(Extension(state): Extension<Arc<State>>) -> Html<String> 
 
 /// `GET /preview/ad`
 pub async fn get_preview_ad(Extension(state): Extension<Arc<State>>) -> Html<String> {
-    // For mocking the `get_market_demand_resp` call
+    // For mocking the `get_units_for_slot_resp` call
     let mock_server = MockServer::start().await;
 
     let market_url = mock_server.uri().parse().unwrap();
@@ -88,7 +88,7 @@ pub async fn get_preview_ad(Extension(state): Extension<Arc<State>>) -> Html<Str
         campaigns: vec![],
     };
 
-    // Mock the `get_market_demand_resp` call
+    // Mock the `get_units_for_slot_resp` call
     let mock_call = Mock::given(method("GET"))
         // &depositAsset={}&depositAsset={}
         .and(path(format!("units-for-slot/{}", options.market_slot)))
@@ -101,13 +101,13 @@ pub async fn get_preview_ad(Extension(state): Extension<Arc<State>>) -> Html<Str
         // .and(query_param("depositAsset[]", "0x6B175474E89094C44Da98b954EedeAC495271d03"))
         .respond_with(ResponseTemplate::new(200).set_body_json(units_for_slot_resp))
         .expect(1)
-        .named("get_market_demand_resp");
+        .named("get_units_for_slot_resp");
 
     // Mounting the mock on the mock server - it's now effective!
     mock_call.mount(&mock_server).await;
 
     let demand_resp = manager
-        .get_market_demand_resp()
+        .get_units_for_slot_resp()
         .await
         .expect("Should return Mocked response");
 

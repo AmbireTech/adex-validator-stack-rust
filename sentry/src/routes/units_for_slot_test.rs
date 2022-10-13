@@ -84,7 +84,7 @@ const TEST_AD_SLOT: Lazy<(AdSlot, AdUnit)> = Lazy::new(|| {
 });
 
 async fn setup_mocked_platform_dummy_app() -> (MockServer, ApplicationGuard) {
-    // For mocking the `get_market_demand_resp` call
+    // For mocking the `get_units_for_slot_resp` call
     let mock_server = MockServer::start().await;
 
     let platform_url = mock_server.uri().parse().unwrap();

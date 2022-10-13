@@ -250,7 +250,7 @@ impl Manager {
 
     // Test with different units with price
     // Test if first campaign is not overwritten
-    pub async fn get_market_demand_resp(&self) -> Result<Response, Error> {
+    pub async fn get_units_for_slot_resp(&self) -> Result<Response, Error> {
         let deposit_asset = self
             .options
             .whitelisted_tokens
@@ -268,14 +268,18 @@ impl Manager {
             .ok_or(Error::NoValidators)?;
 
         let url = format!(
-            "{}/units-for-slot/{}?{}",
+            "{}/v5/units-for-slot/{}?{}",
             first_validator.url, self.options.market_slot, deposit_asset
         );
-        let mut first_res: Response = self.client.get(url).send().await?.json().await?;
+
+        // Ordering of the campaigns matters so we will just push them to the first result
+        // We reuse `targeting_input_base`, `accepted_referrers` and `fallback_unit`
+        let json_res: String = self.client.get(url).send().await?.text().await?;
+        let mut first_res: Response = serde_json::from_str(&json_res).expect("Should convert");
 
         for validator in self.options.validators.iter().skip(1) {
             let url = format!(
-                "{}/units-for-slot/{}?{}",
+                "{}/v5/units-for-slot/{}?{}",
                 validator.url, self.options.market_slot, deposit_asset
             );
             let new_res: Response = self.client.get(url).send().await?.json().await?;
@@ -290,7 +294,7 @@ impl Manager {
     }
 
     pub async fn get_next_ad_unit(&self) -> Result<Option<NextAdUnit>, Error> {
-        let units_for_slot = self.get_market_demand_resp().await?;
+        let units_for_slot = self.get_units_for_slot_resp().await?;
         let m_campaigns = &units_for_slot.campaigns;
         let fallback_unit = units_for_slot.fallback_unit;
         let targeting_input = units_for_slot.targeting_input_base;
@@ -433,5 +437,195 @@ impl Manager {
         } else {
             Ok(None)
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::manager::input::Input;
+    use adex_primitives::{
+        sentry::CLICK,
+        test_util::{
+            CAMPAIGNS, DUMMY_AD_UNITS, DUMMY_IPFS, DUMMY_VALIDATOR_FOLLOWER,
+            DUMMY_VALIDATOR_LEADER, IDS, LEADER_2, PUBLISHER,
+        },
+    };
+    use wiremock::{
+        matchers::{method, path},
+        Mock, MockServer, ResponseTemplate,
+    };
+
+    #[tokio::test]
+    async fn test_querying_for_units_for_slot() {
+        // 1. Set up mock servers for each validator
+        let server = MockServer::start().await;
+        let slot = DUMMY_IPFS[0];
+        let seconds_since_epoch = Utc::now();
+
+        let original_input = Input {
+            ad_view: None,
+            global: input::Global {
+                ad_slot_id: DUMMY_IPFS[0],
+                ad_slot_type: "legacy_250x250".to_string(),
+                publisher_id: *PUBLISHER,
+                country: None,
+                event_type: IMPRESSION,
+                // we can't know only the timestamp
+                seconds_since_epoch,
+                user_agent_os: Some("Linux".to_string()),
+                user_agent_browser_family: Some("Firefox".to_string()),
+            },
+            // no AdUnit should be present
+            ad_unit_id: None,
+            // no balances
+            balances: None,
+            // no campaign
+            campaign: None,
+            ad_slot: Some(input::AdSlot {
+                categories: vec!["IAB3".into(), "IAB13-7".into(), "IAB5".into()],
+                hostname: "adex.network".to_string(),
+            }),
+        };
+
+        let modified_input = Input {
+            ad_view: None,
+            global: input::Global {
+                ad_slot_id: DUMMY_IPFS[1],
+                ad_slot_type: "legacy_250x250".to_string(),
+                publisher_id: *PUBLISHER,
+                country: None,
+                event_type: CLICK,
+                // we can't know only the timestamp
+                seconds_since_epoch,
+                user_agent_os: Some("Linux".to_string()),
+                user_agent_browser_family: Some("Firefox".to_string()),
+            },
+            // no AdUnit should be present
+            ad_unit_id: None,
+            // no balances
+            balances: None,
+            // no campaign
+            campaign: None,
+            ad_slot: Some(input::AdSlot {
+                categories: vec!["IAB3".into(), "IAB13-7".into(), "IAB5".into()],
+                hostname: "adex.network".to_string(),
+            }),
+        };
+
+        let original_referrers = vec![Url::parse("https://ambire.com").expect("should parse")];
+        let modified_referrers =
+            vec![Url::parse("https://www.google.com/adsense/start/").expect("should parse")];
+
+        let unit_0 = DUMMY_AD_UNITS[0].clone();
+        let original_ad_unit = AdUnit {
+            ipfs: unit_0.ipfs,
+            media_url: unit_0.media_url,
+            media_mime: unit_0.media_mime,
+            target_url: unit_0.target_url,
+        };
+
+        let unit_1 = DUMMY_AD_UNITS[1].clone();
+        let modified_ad_unit = AdUnit {
+            ipfs: unit_1.ipfs,
+            media_url: unit_1.media_url,
+            media_mime: unit_1.media_mime,
+            target_url: unit_1.target_url,
+        };
+
+        let campaign_0 = Campaign {
+            campaign: CAMPAIGNS[0].clone().context,
+            units_with_price: Vec::new(),
+        };
+
+        let campaign_1 = Campaign {
+            campaign: CAMPAIGNS[1].clone().context,
+            units_with_price: Vec::new(),
+        };
+
+        let campaign_2 = Campaign {
+            campaign: CAMPAIGNS[2].clone().context,
+            units_with_price: Vec::new(),
+        };
+
+        // Original response
+        let response_1 = Response {
+            targeting_input_base: original_input.clone(),
+            accepted_referrers: original_referrers.clone(),
+            fallback_unit: Some(original_ad_unit.clone()),
+            campaigns: vec![campaign_0.clone()],
+        };
+
+        // Different targeting_input_base, fallback_unit, accepted_referrers, 1 new campaign and 1 repeating campaign
+        let response_2 = Response {
+            targeting_input_base: modified_input.clone(),
+            accepted_referrers: modified_referrers.clone(),
+            fallback_unit: Some(modified_ad_unit.clone()),
+            campaigns: vec![campaign_0.clone(), campaign_1.clone()],
+        };
+
+        // 1 new campaigns, 2 repeating campaigns
+        let response_3 = Response {
+            targeting_input_base: modified_input,
+            accepted_referrers: modified_referrers,
+            fallback_unit: Some(modified_ad_unit),
+            campaigns: vec![campaign_0.clone(), campaign_1.clone(), campaign_2.clone()],
+        };
+
+        Mock::given(method("GET"))
+            .and(path(format!("1/v5/units-for-slot/{}", slot,)))
+            .respond_with(ResponseTemplate::new(200).set_body_json(&response_1))
+            .mount(&server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path(format!("2/v5/units-for-slot/{}", slot,)))
+            .respond_with(ResponseTemplate::new(200).set_body_json(&response_2))
+            .mount(&server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path(format!("3/v5/units-for-slot/{}", slot,)))
+            .respond_with(ResponseTemplate::new(200).set_body_json(&response_3))
+            .mount(&server)
+            .await;
+
+        // 2. Set up a manager
+        let market_url = server.uri().parse().unwrap();
+        let whitelisted_tokens = DEFAULT_TOKENS.clone();
+        let publisher_addr = "0x0000000000000000626f62627973686d75726461"
+            .parse()
+            .unwrap();
+        let mut validator_1 = DUMMY_VALIDATOR_LEADER.clone();
+        validator_1.url = format!("{}/1", server.uri());
+        let mut validator_2 = DUMMY_VALIDATOR_FOLLOWER.clone();
+        validator_2.url = format!("{}/2", server.uri());
+        let mut validator_3 = DUMMY_VALIDATOR_LEADER.clone();
+        validator_3.id = IDS[&LEADER_2];
+        validator_3.url = format!("{}/3", server.uri());
+        let options = Options {
+            market_url,
+            market_slot: DUMMY_IPFS[0],
+            publisher_addr,
+            // All passed tokens must be of the same price and decimals, so that the amounts can be accurately compared
+            whitelisted_tokens,
+            size: Some(Size::new(300, 100)),
+            navigator_language: Some("bg".into()),
+            disabled_video: false,
+            disabled_sticky: false,
+            validators: vec![validator_1, validator_2, validator_3],
+        };
+
+        let manager = Manager::new(options.clone(), Default::default())
+            .expect("Failed to create AdView Manager");
+
+        let res = manager
+            .get_units_for_slot_resp()
+            .await
+            .expect("Should get response");
+        assert_eq!(res.targeting_input_base.global.ad_slot_id, DUMMY_IPFS[0]);
+        assert_eq!(res.accepted_referrers, original_referrers);
+        assert_eq!(res.fallback_unit, Some(original_ad_unit));
+        assert_eq!(res.campaigns, vec![campaign_0, campaign_1, campaign_2]);
     }
 }
