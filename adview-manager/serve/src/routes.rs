@@ -4,6 +4,7 @@ use adex_primitives::{
     sentry::{units_for_slot, IMPRESSION},
     targeting::{input::Global, Input},
     test_util::{DUMMY_CAMPAIGN, DUMMY_IPFS, DUMMY_VALIDATOR_FOLLOWER, DUMMY_VALIDATOR_LEADER},
+    util::ApiUrl,
     ToHex,
 };
 use adview_manager::{
@@ -56,8 +57,8 @@ pub async fn get_preview_ad(Extension(state): Extension<Arc<State>>) -> Html<Str
         disabled_video,
         disabled_sticky: false,
         validators: vec![
-            DUMMY_VALIDATOR_LEADER.clone(),
-            DUMMY_VALIDATOR_FOLLOWER.clone(),
+            ApiUrl::parse(&DUMMY_VALIDATOR_LEADER.url).expect("should parse"),
+            ApiUrl::parse(&DUMMY_VALIDATOR_FOLLOWER.url).expect("should parse"),
         ],
     };
 
@@ -90,15 +91,15 @@ pub async fn get_preview_ad(Extension(state): Extension<Arc<State>>) -> Html<Str
 
     // Mock the `get_units_for_slot_resp` call
     let mock_call = Mock::given(method("GET"))
-        // &depositAsset={}&depositAsset={}
+        // &depositAssets[]={}&depositAssets[]={}
         .and(path(format!("units-for-slot/{}", options.market_slot)))
-        // pubPrefix=HEX&depositAsset=0xASSET1&depositAsset=0xASSET2
+        // pubPrefix=HEX&depositAssets[]=0xASSET1&depositAssets[]=0xASSET2
         .and(query_param("pubPrefix", pub_prefix))
         .and(query_param(
-            "depositAsset",
+            "depositAssets[]",
             "0x6B175474E89094C44Da98b954EedeAC495271d0F",
         ))
-        // .and(query_param("depositAsset[]", "0x6B175474E89094C44Da98b954EedeAC495271d03"))
+        // .and(query_param("depositAssets[]", "0x6B175474E89094C44Da98b954EedeAC495271d03"))
         .respond_with(ResponseTemplate::new(200).set_body_json(units_for_slot_resp))
         .expect(1)
         .named("get_units_for_slot_resp");
@@ -164,8 +165,8 @@ pub async fn get_preview_video(Extension(state): Extension<Arc<State>>) -> Html<
         disabled_video,
         disabled_sticky: false,
         validators: vec![
-            DUMMY_VALIDATOR_LEADER.clone(),
-            DUMMY_VALIDATOR_FOLLOWER.clone(),
+            ApiUrl::parse(&DUMMY_VALIDATOR_LEADER.url).expect("should parse"),
+            ApiUrl::parse(&DUMMY_VALIDATOR_FOLLOWER.url).expect("should parse"),
         ],
     };
 

@@ -6,7 +6,6 @@ use adex_primitives::{
     },
     targeting::{self, input},
     util::ApiUrl,
-    validator::ValidatorDesc,
     Address, BigNum, CampaignId, UnifiedNum, IPFS,
 };
 use async_std::{sync::RwLock, task::block_on};
@@ -56,6 +55,8 @@ pub enum Error {
     Request(#[from] reqwest::Error),
     #[error("No validators provided")]
     NoValidators,
+    #[error("Invalid validator URL")]
+    InvalidValidatorUrl,
 }
 
 /// The Ad [`Manager`]'s options for showing ads.
@@ -84,7 +85,7 @@ pub struct Options {
     ///
     /// default: `[]`
     #[serde(default)]
-    pub validators: Vec<ValidatorDesc>,
+    pub validators: Vec<ApiUrl>,
 }
 
 /// [`AdSlot`](adex_primitives::AdSlot) size `width x height` in pixels (`px`)
@@ -251,7 +252,7 @@ impl Manager {
     // Test with different units with price
     // Test if first campaign is not overwritten
     pub async fn get_units_for_slot_resp(&self) -> Result<Response, Error> {
-        let deposit_asset = self
+        let deposit_assets = self
             .options
             .whitelisted_tokens
             .iter()
@@ -267,25 +268,32 @@ impl Manager {
             .next()
             .ok_or(Error::NoValidators)?;
 
-        let url = format!(
-            "{}/v5/units-for-slot/{}?{}",
-            first_validator.url, self.options.market_slot, deposit_asset
-        );
-
+        let url = first_validator
+            .join(&format!(
+                "v5/units-for-slot/{}?{}",
+                self.options.market_slot, deposit_assets
+            ))
+            .map_err(|_| Error::InvalidValidatorUrl)?;
         // Ordering of the campaigns matters so we will just push them to the first result
         // We reuse `targeting_input_base`, `accepted_referrers` and `fallback_unit`
-        let json_res: String = self.client.get(url).send().await?.text().await?;
-        let mut first_res: Response = serde_json::from_str(&json_res).expect("Should convert");
-
+        let mut first_res: Response = self.client.get(url.as_str()).send().await?.json().await?;
+        // let mut first_res: Response = serde_json::from_str(&json_res).expect("Should convert");
         for validator in self.options.validators.iter().skip(1) {
-            let url = format!(
-                "{}/v5/units-for-slot/{}?{}",
-                validator.url, self.options.market_slot, deposit_asset
-            );
-            let new_res: Response = self.client.get(url).send().await?.json().await?;
-            for campaign in new_res.campaigns {
-                if !first_res.campaigns.contains(&campaign) {
-                    first_res.campaigns.push(campaign);
+            let url = validator
+                .join(&format!(
+                    "v5/units-for-slot/{}?{}",
+                    self.options.market_slot, deposit_assets
+                ))
+                .map_err(|_| Error::InvalidValidatorUrl)?;
+            let new_res: Response = self.client.get(url.as_str()).send().await?.json().await?;
+            for response_campaign in new_res.campaigns {
+                if !first_res
+                    .campaigns
+                    .iter()
+                    .map(|rc| rc.campaign.id)
+                    .any(|x| x == response_campaign.campaign.id)
+                {
+                    first_res.campaigns.push(response_campaign);
                 }
             }
         }
@@ -446,10 +454,7 @@ mod test {
     use crate::manager::input::Input;
     use adex_primitives::{
         sentry::CLICK,
-        test_util::{
-            CAMPAIGNS, DUMMY_AD_UNITS, DUMMY_IPFS, DUMMY_VALIDATOR_FOLLOWER,
-            DUMMY_VALIDATOR_LEADER, IDS, LEADER_2, PUBLISHER,
-        },
+        test_util::{CAMPAIGNS, DUMMY_AD_UNITS, DUMMY_IPFS, PUBLISHER},
     };
     use wiremock::{
         matchers::{method, path},
@@ -517,34 +522,21 @@ mod test {
         let modified_referrers =
             vec![Url::parse("https://www.google.com/adsense/start/").expect("should parse")];
 
-        let unit_0 = DUMMY_AD_UNITS[0].clone();
-        let original_ad_unit = AdUnit {
-            ipfs: unit_0.ipfs,
-            media_url: unit_0.media_url,
-            media_mime: unit_0.media_mime,
-            target_url: unit_0.target_url,
-        };
-
-        let unit_1 = DUMMY_AD_UNITS[1].clone();
-        let modified_ad_unit = AdUnit {
-            ipfs: unit_1.ipfs,
-            media_url: unit_1.media_url,
-            media_mime: unit_1.media_mime,
-            target_url: unit_1.target_url,
-        };
+        let original_ad_unit = AdUnit::from(&DUMMY_AD_UNITS[0]);
+        let modified_ad_unit = AdUnit::from(&DUMMY_AD_UNITS[1]);
 
         let campaign_0 = Campaign {
-            campaign: CAMPAIGNS[0].clone().context,
+            campaign: CAMPAIGNS[0].context.clone(),
             units_with_price: Vec::new(),
         };
 
         let campaign_1 = Campaign {
-            campaign: CAMPAIGNS[1].clone().context,
+            campaign: CAMPAIGNS[1].context.clone(),
             units_with_price: Vec::new(),
         };
 
         let campaign_2 = Campaign {
-            campaign: CAMPAIGNS[2].clone().context,
+            campaign: CAMPAIGNS[2].context.clone(),
             units_with_price: Vec::new(),
         };
 
@@ -573,19 +565,19 @@ mod test {
         };
 
         Mock::given(method("GET"))
-            .and(path(format!("1/v5/units-for-slot/{}", slot,)))
+            .and(path(format!("validator-1/v5/units-for-slot/{}", slot)))
             .respond_with(ResponseTemplate::new(200).set_body_json(&response_1))
             .mount(&server)
             .await;
 
         Mock::given(method("GET"))
-            .and(path(format!("2/v5/units-for-slot/{}", slot,)))
+            .and(path(format!("validator-2/v5/units-for-slot/{}", slot)))
             .respond_with(ResponseTemplate::new(200).set_body_json(&response_2))
             .mount(&server)
             .await;
 
         Mock::given(method("GET"))
-            .and(path(format!("3/v5/units-for-slot/{}", slot,)))
+            .and(path(format!("validator-3/v5/units-for-slot/{}", slot,)))
             .respond_with(ResponseTemplate::new(200).set_body_json(&response_3))
             .mount(&server)
             .await;
@@ -596,13 +588,12 @@ mod test {
         let publisher_addr = "0x0000000000000000626f62627973686d75726461"
             .parse()
             .unwrap();
-        let mut validator_1 = DUMMY_VALIDATOR_LEADER.clone();
-        validator_1.url = format!("{}/1", server.uri());
-        let mut validator_2 = DUMMY_VALIDATOR_FOLLOWER.clone();
-        validator_2.url = format!("{}/2", server.uri());
-        let mut validator_3 = DUMMY_VALIDATOR_LEADER.clone();
-        validator_3.id = IDS[&LEADER_2];
-        validator_3.url = format!("{}/3", server.uri());
+        let validator_1_url =
+            ApiUrl::parse(&format!("{}/validator-1", server.uri())).expect("should parse");
+        let validator_2_url =
+            ApiUrl::parse(&format!("{}/validator-2", server.uri())).expect("should parse");
+        let validator_3_url =
+            ApiUrl::parse(&format!("{}/validator-3", server.uri())).expect("should parse");
         let options = Options {
             market_url,
             market_slot: DUMMY_IPFS[0],
@@ -613,7 +604,7 @@ mod test {
             navigator_language: Some("bg".into()),
             disabled_video: false,
             disabled_sticky: false,
-            validators: vec![validator_1, validator_2, validator_3],
+            validators: vec![validator_1_url, validator_2_url, validator_3_url],
         };
 
         let manager = Manager::new(options.clone(), Default::default())
