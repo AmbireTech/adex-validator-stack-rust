@@ -220,11 +220,13 @@ pub async fn update_campaign(pool: &DbPool, campaign: &Campaign) -> Result<Campa
 
 /// Get Campaigns for GET `/v5/units-for-slot` route.
 ///
+/// We fetch all campaigns where the `Campaign.creator` != the publisher [`Address`].
+///
 /// This method was tested with **5099** deposit assets and it does not reach the postgres query limit.
 pub async fn units_for_slot_get_campaigns(
     pool: &DbPool,
     deposit_assets: Option<&HashSet<Address>>,
-    not_creator: Address,
+    publisher: Address,
     active_to_ge: DateTime<Utc>,
 ) -> Result<Vec<Campaign>, PoolError> {
     let client = pool.get().await?;
@@ -232,11 +234,11 @@ pub async fn units_for_slot_get_campaigns(
     let mut where_clauses = vec![
         // Campaign.active.to
         "active_to >= $1".to_string(),
-        // Campaign.creator != not_creator
+        // Campaign.creator != publisher
         "creator != $2".into(),
     ];
     let mut params: Vec<Box<(dyn ToSql + Sync + Send)>> =
-        vec![Box::new(active_to_ge), Box::new(not_creator)];
+        vec![Box::new(active_to_ge), Box::new(publisher)];
 
     // Deposit assets
     match deposit_assets.cloned() {
