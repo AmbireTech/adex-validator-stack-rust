@@ -25,6 +25,7 @@ fn main() {
       "creators_whitelist": [
         "0xaCBaDA2d5830d1875ae3D2de207A1363B316Df2F",
         "0xDd589B43793934EF6Ad266067A0d1D4896b0dff0",
+        "0xE882ebF439207a70dDcCb39E13CA8506c9F45fD9",
         "0x541b401362Ea1D489D322579552B099e801F3632"
       ],
       "validators_whitelist": [
@@ -70,7 +71,7 @@ fn main() {
       "limits": {
         "units_for_slot": {
           "max_campaigns_earning_from": 25,
-          "global_min_impression_price": "1000000"
+          "global_min_impression_price": "10000"
         }
       }
     });

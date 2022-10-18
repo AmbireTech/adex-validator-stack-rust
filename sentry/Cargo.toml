@@ -81,6 +81,7 @@ reqwest = { version = "0.11", features = ["json", "cookies"] }
 [dev-dependencies]
 primitives = { version = "0.2", path = "../primitives", features = ["postgres", "test-util"] }
 pretty_assertions = "1"
+wiremock = "0.5"
 
 # we only require `hyper` for `hyper::body::to_bytes` function
 hyper = { version = "0.14", default-features = false }

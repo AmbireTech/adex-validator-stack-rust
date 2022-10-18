@@ -43,7 +43,7 @@ use crate::{
             last_approved,
             validator_message::{create_validator_messages, list_validator_messages},
         },
-        units_for_slot::post_units_for_slot,
+        units_for_slot::get_units_for_slot,
     },
     Application,
 };
@@ -176,7 +176,7 @@ pub fn campaigns_router<C: Locked + 'static>() -> Router {
 
 /// `/v5/units-for-slot` router
 pub fn units_for_slot_router<C: Locked + 'static>() -> Router {
-    Router::new().route("/", post(post_units_for_slot::<C>))
+    Router::new().route("/", get(get_units_for_slot::<C>))
 }
 
 /// `/v5/analytics` router

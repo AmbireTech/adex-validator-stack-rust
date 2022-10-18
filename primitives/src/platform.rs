@@ -1,16 +1,28 @@
-pub use ad_unit::{AdUnitResponse, AdUnitsResponse};
+use serde::{Deserialize, Serialize};
+use url::Url;
 
-mod ad_unit {
-    use crate::AdUnit;
-    use serde::{Deserialize, Serialize};
+use crate::{AdSlot, AdUnit};
 
-    #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-    #[serde(rename_all = "camelCase")]
-    pub struct AdUnitsResponse(pub Vec<AdUnit>);
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Website {
+    #[serde(default)]
+    pub categories: Vec<String>,
+    #[serde(default)]
+    pub accepted_referrers: Vec<Url>,
+}
 
-    #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-    #[serde(rename_all = "camelCase")]
-    pub struct AdUnitResponse {
-        pub unit: AdUnit,
-    }
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AdSlotResponse {
+    pub slot: AdSlot,
+    /// The fetched Fallback [`AdUnit`] ( [`AdSlot.fallback_unit`] ) of the [`AdSlot`] if set.
+    ///
+    /// [`AdSlot.fallback_unit`]: AdSlot::fallback_unit
+    #[serde(default)]
+    pub fallback: Option<AdUnit>,
+    /// The [`AdSlot.website`] information if it's provided and information is available for it.
+    ///
+    /// [`AdSlot.website`]: AdSlot::website
+    #[serde(default, flatten)]
+    pub website: Option<Website>,
 }

@@ -1,8 +1,7 @@
 use std::sync::Arc;
 
 use adex_primitives::{
-    sentry::IMPRESSION,
-    supermarket::units_for_slot,
+    sentry::{units_for_slot, IMPRESSION},
     targeting::{input::Global, Input},
     test_util::{DUMMY_CAMPAIGN, DUMMY_IPFS},
     ToHex,
@@ -110,9 +109,9 @@ pub async fn get_preview_ad(Extension(state): Extension<Arc<State>>) -> Html<Str
 
     debug!("Mocked response: {demand_resp:?}");
 
-    let supermarket_ad_unit = adex_primitives::supermarket::units_for_slot::response::AdUnit {
+    let supermarket_ad_unit = adex_primitives::sentry::units_for_slot::response::AdUnit {
         /// Same as `ipfs`
-        id: DUMMY_IPFS[1],
+        ipfs: DUMMY_IPFS[1],
         media_url: "ipfs://QmcUVX7fvoLMM93uN2bD3wGTH8MXSxeL8hojYfL2Lhp7mR".to_string(),
         media_mime: "image/jpeg".to_string(),
         target_url: "https://www.adex.network/?stremio-test-banner-1".to_string(),
@@ -163,9 +162,9 @@ pub async fn get_preview_video(Extension(state): Extension<Arc<State>>) -> Html<
     };
 
     // legacy_728x90
-    let video_ad_unit = adex_primitives::supermarket::units_for_slot::response::AdUnit {
+    let video_ad_unit = adex_primitives::sentry::units_for_slot::response::AdUnit {
         /// Same as `ipfs`
-        id: "QmShJ6tsJ7LHLiYGX4EAmPyCPWJuCnvm6AKjweQPnw9qfh"
+        ipfs: "QmShJ6tsJ7LHLiYGX4EAmPyCPWJuCnvm6AKjweQPnw9qfh"
             .parse()
             .expect("Valid IPFS"),
         media_url: "ipfs://Qmevmms1AZgYXS27A9ghSjHn4DSaHMfgYcD2SoGW14RYGy".to_string(),

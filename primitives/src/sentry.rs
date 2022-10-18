@@ -1150,6 +1150,73 @@ pub mod campaign_modify {
     }
 }
 
+pub mod units_for_slot {
+    use std::collections::HashSet;
+
+    use serde::{Deserialize, Serialize};
+
+    use crate::Address;
+
+    #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+    #[serde(rename_all = "camelCase")]
+    pub struct Query {
+        #[serde(default)]
+        pub deposit_assets: HashSet<Address>,
+    }
+
+    pub mod response {
+        use serde::{Deserialize, Serialize};
+        use url::Url;
+
+        use crate::{targeting::Input, UnifiedNum, IPFS};
+
+        #[derive(Debug, Serialize, Deserialize, PartialEq)]
+        #[serde(rename_all = "camelCase")]
+        pub struct Response {
+            pub targeting_input_base: Input,
+            pub accepted_referrers: Vec<Url>,
+            pub fallback_unit: Option<AdUnit>,
+            pub campaigns: Vec<Campaign>,
+        }
+
+        #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+        #[serde(rename_all = "camelCase")]
+        pub struct UnitsWithPrice {
+            pub unit: AdUnit,
+            pub price: UnifiedNum,
+        }
+
+        #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+        #[serde(rename_all = "camelCase")]
+        pub struct Campaign {
+            #[serde(flatten)]
+            pub campaign: crate::Campaign,
+            /// units-for-slot Specific Campaign field
+            pub units_with_price: Vec<UnitsWithPrice>,
+        }
+
+        #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
+        #[serde(rename_all = "camelCase")]
+        pub struct AdUnit {
+            pub ipfs: IPFS,
+            pub media_url: String,
+            pub media_mime: String,
+            pub target_url: String,
+        }
+
+        impl From<&crate::AdUnit> for AdUnit {
+            fn from(ad_unit: &crate::AdUnit) -> Self {
+                Self {
+                    ipfs: ad_unit.ipfs,
+                    media_url: ad_unit.media_url.clone(),
+                    media_mime: ad_unit.media_mime.clone(),
+                    target_url: ad_unit.target_url.clone(),
+                }
+            }
+        }
+    }
+}
+
 #[cfg(feature = "postgres")]
 mod postgres {
     use bytes::BytesMut;

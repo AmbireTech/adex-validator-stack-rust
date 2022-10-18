@@ -183,6 +183,8 @@ pub async fn get_campaign_ids_by_channel(
     Ok(campaign_ids)
 }
 
+/// Updates the campaign fields:
+/// budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules
 /// ```text
 /// UPDATE campaigns SET budget = $1, validators = $2, title = $3, pricing_bounds = $4, event_submission = $5, ad_units = $6, targeting_rules = $7
 /// FROM channels WHERE campaigns.id = $8 AND campaigns.channel_id=channels.id
@@ -216,10 +218,15 @@ pub async fn update_campaign(pool: &DbPool, campaign: &Campaign) -> Result<Campa
     Ok(Campaign::from(&updated_row))
 }
 
+/// Get Campaigns for GET `/v5/units-for-slot` route.
+///
+/// We fetch all campaigns where the `Campaign.creator` != the publisher [`Address`].
+///
+/// This method was tested with **5099** deposit assets and it does not reach the postgres query limit.
 pub async fn units_for_slot_get_campaigns(
     pool: &DbPool,
     deposit_assets: Option<&HashSet<Address>>,
-    creator: Address,
+    publisher: Address,
     active_to_ge: DateTime<Utc>,
 ) -> Result<Vec<Campaign>, PoolError> {
     let client = pool.get().await?;
@@ -227,19 +234,29 @@ pub async fn units_for_slot_get_campaigns(
     let mut where_clauses = vec![
         // Campaign.active.to
         "active_to >= $1".to_string(),
-        // Campaign.creator
-        "creator = $2".into(),
+        // Campaign.creator != publisher
+        "creator != $2".into(),
     ];
     let mut params: Vec<Box<(dyn ToSql + Sync + Send)>> =
-        vec![Box::new(active_to_ge), Box::new(creator)];
+        vec![Box::new(active_to_ge), Box::new(publisher)];
 
     // Deposit assets
-    match deposit_assets {
+    match deposit_assets.cloned() {
         Some(assets) if !assets.is_empty() => {
-            let assets_vec = assets.iter().copied().collect::<Vec<_>>();
+            // we start from $3 parameter
+            let start_index = params.len() + 1;
 
-            where_clauses.push("channels.token IN ($3)".into());
-            params.push(Box::new(assets_vec))
+            let in_clause = assets.into_iter().enumerate().fold(
+                vec![],
+                |mut in_clause, (asset_index, asset)| {
+                    in_clause.push(format!("${}", start_index + asset_index));
+                    params.push(Box::new(asset));
+
+                    in_clause
+                },
+            );
+
+            where_clauses.push(format!("channels.token IN ({})", in_clause.join(",")));
         }
         _ => {}
     };
@@ -894,5 +911,68 @@ mod test {
             first_page.campaigns,
             vec![campaign_new_id.clone(), campaign.clone()]
         );
+    }
+
+    #[tokio::test]
+    async fn test_units_for_slot_query_max_length_with_deposit_assets() {
+        use primitives::test_util::{CREATOR, PUBLISHER};
+        let database = DATABASE_POOL.get().await.expect("Should get a DB pool");
+
+        setup_test_migrations(database.pool.clone())
+            .await
+            .expect("Migrations should succeed");
+
+        let token_addr = *CREATOR;
+        // generate addresses
+        let generate = |for_byte: usize| {
+            (0..255_u8)
+                .map(|byte| {
+                    let mut bytes = token_addr.to_bytes();
+                    bytes[for_byte] = byte;
+
+                    Address::from_bytes(&bytes)
+                })
+                .collect::<Vec<_>>()
+        };
+        let mut generated = vec![];
+        generated.extend(generate(19));
+        generated.extend(generate(18));
+        generated.extend(generate(17));
+        generated.extend(generate(16));
+        generated.extend(generate(15));
+        generated.extend(generate(14));
+        generated.extend(generate(13));
+        generated.extend(generate(12));
+        generated.extend(generate(11));
+        generated.extend(generate(10));
+        generated.extend(generate(9));
+        generated.extend(generate(8));
+        generated.extend(generate(7));
+        generated.extend(generate(6));
+        generated.extend(generate(5));
+        generated.extend(generate(4));
+        generated.extend(generate(3));
+        generated.extend(generate(2));
+        generated.extend(generate(1));
+        generated.extend(generate(0));
+
+        // start from the largest to the smallest and if it successes with the largest value,
+        // then we just break the look.
+        // Otherwise continues to try out other amount of deposit assets before it succeeds.
+        for i in (0..generated.len()).rev() {
+            let deposit_assets = generated[0..i].iter().copied().collect::<HashSet<_>>();
+
+            match units_for_slot_get_campaigns(
+                &database,
+                Some(&deposit_assets),
+                *PUBLISHER,
+                Utc::now(),
+            )
+            .await
+            {
+                Ok(_success) => break,
+                Err(_err) => panic!("Failed with {} deposit assets", i),
+            };
+        }
     }
 }

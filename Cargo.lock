@@ -3292,6 +3292,7 @@ dependencies = [
  "tokio-postgres",
  "tower",
  "tower-http",
+ "wiremock",
  "woothee",
 ]
 

@@ -181,6 +181,7 @@ pub struct Config {
     #[serde(rename = "chain")]
     pub chains: HashMap<String, ChainInfo>,
     pub platform: PlatformConfig,
+    /// Any limits applied to Sentry or Validator.
     pub limits: Limits,
 }
 

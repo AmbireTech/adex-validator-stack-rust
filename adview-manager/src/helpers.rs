@@ -2,8 +2,9 @@ use std::ops::{Add, Mul};
 
 use adex_primitives::{
     campaign::Validators,
-    sentry::{Event, EventType, InsertEventsRequest, CLICK, IMPRESSION},
-    supermarket::units_for_slot::response::AdUnit,
+    sentry::{
+        units_for_slot::response::AdUnit, Event, EventType, InsertEventsRequest, CLICK, IMPRESSION,
+    },
     BigNum, CampaignId,
 };
 use num_integer::Integer;
@@ -68,7 +69,7 @@ pub(crate) fn is_video(ad_unit: &AdUnit) -> bool {
 
 /// Does not copy the JS impl, instead it generates the BigNum from the IPFS CID bytes
 pub(crate) fn randomized_sort_pos(ad_unit: &AdUnit, seed: BigNum) -> BigNum {
-    let bytes = ad_unit.id.0.to_bytes();
+    let bytes = ad_unit.ipfs.0.to_bytes();
 
     let unit_id = BigNum::from_bytes_be(&bytes);
 
@@ -138,13 +139,13 @@ pub fn get_unit_html_with_events(
         let event = match event_type {
             EventType::Impression => Event::Impression {
                 publisher: options.publisher_addr,
-                ad_unit: ad_unit.id,
+                ad_unit: ad_unit.ipfs,
                 ad_slot: options.market_slot,
                 referrer: Some("document.referrer".to_string()),
             },
             EventType::Click => Event::Click {
                 publisher: options.publisher_addr,
-                ad_unit: ad_unit.id,
+                ad_unit: ad_unit.ipfs,
                 ad_slot: options.market_slot,
                 referrer: Some("document.referrer".to_string()),
             },
@@ -204,7 +205,7 @@ mod test {
 
     fn get_ad_unit(media_mime: &str) -> AdUnit {
         AdUnit {
-            id: DUMMY_IPFS[0],
+            ipfs: DUMMY_IPFS[0],
             media_url: "".to_string(),
             media_mime: media_mime.to_string(),
             target_url: "".to_string(),
@@ -237,7 +238,7 @@ mod test {
         #[test]
         fn test_randomized_position() {
             let ad_unit = AdUnit {
-                id: DUMMY_IPFS[0],
+                ipfs: DUMMY_IPFS[0],
                 media_url: "ipfs://QmWWQSuPMS6aXCbZKpEjPHPUZN2NjB3YrhJTHsV4X3vb2t".to_string(),
                 media_mime: "image/jpeg".to_string(),
                 target_url: "https://google.com".to_string(),
