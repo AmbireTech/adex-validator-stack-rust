@@ -257,11 +257,7 @@ impl Manager {
             .collect::<Vec<_>>()
             .join("&");
 
-        let first_validator = self
-            .options
-            .validators
-            .get(0)
-            .ok_or(Error::NoValidators)?;
+        let first_validator = self.options.validators.get(0).ok_or(Error::NoValidators)?;
 
         let url = first_validator
             .join(&format!(
