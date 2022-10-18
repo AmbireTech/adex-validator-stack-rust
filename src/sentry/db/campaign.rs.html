@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `sentry/src/db/campaign.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>campaign.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../../normalize.css"><link rel="stylesheet" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../../ayu.css" disabled><link rel="stylesheet" href="../../../dark.css" disabled><link rel="stylesheet" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script defer src="../../../source-script.js"></script><script defer src="../../../source-files.js"></script><script defer src="../../../main.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><a class="sidebar-logo" href="../../../sentry/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div></a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../sentry/index.html"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../wheel.svg"></a></div></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `sentry/src/db/campaign.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>campaign.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../../normalize.css"><link rel="stylesheet" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../../ayu.css" disabled><link rel="stylesheet" href="../../../dark.css" disabled><link rel="stylesheet" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script defer src="../../../source-script.js"></script><script defer src="../../../source-files.js"></script><script defer src="../../../main.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><a class="sidebar-logo" href="../../../sentry/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div></a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../sentry/index.html"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../wheel.svg"></a></div></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -896,6 +896,86 @@
 <span id="896">896</span>
 <span id="897">897</span>
 <span id="898">898</span>
+<span id="899">899</span>
+<span id="900">900</span>
+<span id="901">901</span>
+<span id="902">902</span>
+<span id="903">903</span>
+<span id="904">904</span>
+<span id="905">905</span>
+<span id="906">906</span>
+<span id="907">907</span>
+<span id="908">908</span>
+<span id="909">909</span>
+<span id="910">910</span>
+<span id="911">911</span>
+<span id="912">912</span>
+<span id="913">913</span>
+<span id="914">914</span>
+<span id="915">915</span>
+<span id="916">916</span>
+<span id="917">917</span>
+<span id="918">918</span>
+<span id="919">919</span>
+<span id="920">920</span>
+<span id="921">921</span>
+<span id="922">922</span>
+<span id="923">923</span>
+<span id="924">924</span>
+<span id="925">925</span>
+<span id="926">926</span>
+<span id="927">927</span>
+<span id="928">928</span>
+<span id="929">929</span>
+<span id="930">930</span>
+<span id="931">931</span>
+<span id="932">932</span>
+<span id="933">933</span>
+<span id="934">934</span>
+<span id="935">935</span>
+<span id="936">936</span>
+<span id="937">937</span>
+<span id="938">938</span>
+<span id="939">939</span>
+<span id="940">940</span>
+<span id="941">941</span>
+<span id="942">942</span>
+<span id="943">943</span>
+<span id="944">944</span>
+<span id="945">945</span>
+<span id="946">946</span>
+<span id="947">947</span>
+<span id="948">948</span>
+<span id="949">949</span>
+<span id="950">950</span>
+<span id="951">951</span>
+<span id="952">952</span>
+<span id="953">953</span>
+<span id="954">954</span>
+<span id="955">955</span>
+<span id="956">956</span>
+<span id="957">957</span>
+<span id="958">958</span>
+<span id="959">959</span>
+<span id="960">960</span>
+<span id="961">961</span>
+<span id="962">962</span>
+<span id="963">963</span>
+<span id="964">964</span>
+<span id="965">965</span>
+<span id="966">966</span>
+<span id="967">967</span>
+<span id="968">968</span>
+<span id="969">969</span>
+<span id="970">970</span>
+<span id="971">971</span>
+<span id="972">972</span>
+<span id="973">973</span>
+<span id="974">974</span>
+<span id="975">975</span>
+<span id="976">976</span>
+<span id="977">977</span>
+<span id="978">978</span>
 </pre><pre class="rust"><code><span class="kw">use </span>std::collections::HashSet;
 
 <span class="kw">use </span><span class="kw">crate</span>::db::{DbPool, PoolError, TotalCount};
@@ -1081,7 +1161,9 @@
     <span class="prelude-val">Ok</span>(campaign_ids)
 }
 
-<span class="doccomment">/// ```text
+<span class="doccomment">/// Updates the campaign fields:
+/// budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules
+/// ```text
 /// UPDATE campaigns SET budget = $1, validators = $2, title = $3, pricing_bounds = $4, event_submission = $5, ad_units = $6, targeting_rules = $7
 /// FROM channels WHERE campaigns.id = $8 AND campaigns.channel_id=channels.id
 /// RETURNING campaigns.id, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, campaigns.created, active_from, active_to,
@@ -1114,10 +1196,15 @@
     <span class="prelude-val">Ok</span>(Campaign::from(<span class="kw-2">&amp;</span>updated_row))
 }
 
-<span class="kw">pub async fn </span>units_for_slot_get_campaigns(
+<span class="doccomment">/// Get Campaigns for GET `/v5/units-for-slot` route.
+///
+/// We fetch all campaigns where the `Campaign.creator` != the publisher [`Address`].
+///
+/// This method was tested with **5099** deposit assets and it does not reach the postgres query limit.
+</span><span class="kw">pub async fn </span>units_for_slot_get_campaigns(
     pool: <span class="kw-2">&amp;</span>DbPool,
     deposit_assets: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>HashSet&lt;Address&gt;&gt;,
-    creator: Address,
+    publisher: Address,
     active_to_ge: DateTime&lt;Utc&gt;,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;Campaign&gt;, PoolError&gt; {
     <span class="kw">let </span>client = pool.get().<span class="kw">await</span><span class="question-mark">?</span>;
@@ -1125,19 +1212,29 @@
     <span class="kw">let </span><span class="kw-2">mut </span>where_clauses = <span class="macro">vec!</span>[
         <span class="comment">// Campaign.active.to
         </span><span class="string">&quot;active_to &gt;= $1&quot;</span>.to_string(),
-        <span class="comment">// Campaign.creator
-        </span><span class="string">&quot;creator = $2&quot;</span>.into(),
+        <span class="comment">// Campaign.creator != publisher
+        </span><span class="string">&quot;creator != $2&quot;</span>.into(),
     ];
     <span class="kw">let </span><span class="kw-2">mut </span>params: Vec&lt;Box&lt;(<span class="kw">dyn </span>ToSql + Sync + Send)&gt;&gt; =
-        <span class="macro">vec!</span>[Box::new(active_to_ge), Box::new(creator)];
+        <span class="macro">vec!</span>[Box::new(active_to_ge), Box::new(publisher)];
 
     <span class="comment">// Deposit assets
-    </span><span class="kw">match </span>deposit_assets {
+    </span><span class="kw">match </span>deposit_assets.cloned() {
         <span class="prelude-val">Some</span>(assets) <span class="kw">if </span>!assets.is_empty() =&gt; {
-            <span class="kw">let </span>assets_vec = assets.iter().copied().collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
+            <span class="comment">// we start from $3 parameter
+            </span><span class="kw">let </span>start_index = params.len() + <span class="number">1</span>;
 
-            where_clauses.push(<span class="string">&quot;channels.token IN ($3)&quot;</span>.into());
-            params.push(Box::new(assets_vec))
+            <span class="kw">let </span>in_clause = assets.into_iter().enumerate().fold(
+                <span class="macro">vec!</span>[],
+                |<span class="kw-2">mut </span>in_clause, (asset_index, asset)| {
+                    in_clause.push(<span class="macro">format!</span>(<span class="string">&quot;${}&quot;</span>, start_index + asset_index));
+                    params.push(Box::new(asset));
+
+                    in_clause
+                },
+            );
+
+            where_clauses.push(<span class="macro">format!</span>(<span class="string">&quot;channels.token IN ({})&quot;</span>, in_clause.join(<span class="string">&quot;,&quot;</span>)));
         }
         <span class="kw">_ </span>=&gt; {}
     };
@@ -1793,6 +1890,69 @@
             <span class="macro">vec!</span>[campaign_new_id.clone(), campaign.clone()]
         );
     }
+
+    <span class="attribute">#[tokio::test]
+    </span><span class="kw">async fn </span>test_units_for_slot_query_max_length_with_deposit_assets() {
+        <span class="kw">use </span>primitives::test_util::{CREATOR, PUBLISHER};
+        <span class="kw">let </span>database = DATABASE_POOL.get().<span class="kw">await</span>.expect(<span class="string">&quot;Should get a DB pool&quot;</span>);
+
+        setup_test_migrations(database.pool.clone())
+            .<span class="kw">await
+            </span>.expect(<span class="string">&quot;Migrations should succeed&quot;</span>);
+
+        <span class="kw">let </span>token_addr = <span class="kw-2">*</span>CREATOR;
+        <span class="comment">// generate addresses
+        </span><span class="kw">let </span>generate = |for_byte: usize| {
+            (<span class="number">0</span>..<span class="number">255_u8</span>)
+                .map(|byte| {
+                    <span class="kw">let </span><span class="kw-2">mut </span>bytes = token_addr.to_bytes();
+                    bytes[for_byte] = byte;
+
+                    Address::from_bytes(<span class="kw-2">&amp;</span>bytes)
+                })
+                .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;()
+        };
+        <span class="kw">let </span><span class="kw-2">mut </span>generated = <span class="macro">vec!</span>[];
+        generated.extend(generate(<span class="number">19</span>));
+        generated.extend(generate(<span class="number">18</span>));
+        generated.extend(generate(<span class="number">17</span>));
+        generated.extend(generate(<span class="number">16</span>));
+        generated.extend(generate(<span class="number">15</span>));
+        generated.extend(generate(<span class="number">14</span>));
+        generated.extend(generate(<span class="number">13</span>));
+        generated.extend(generate(<span class="number">12</span>));
+        generated.extend(generate(<span class="number">11</span>));
+        generated.extend(generate(<span class="number">10</span>));
+        generated.extend(generate(<span class="number">9</span>));
+        generated.extend(generate(<span class="number">8</span>));
+        generated.extend(generate(<span class="number">7</span>));
+        generated.extend(generate(<span class="number">6</span>));
+        generated.extend(generate(<span class="number">5</span>));
+        generated.extend(generate(<span class="number">4</span>));
+        generated.extend(generate(<span class="number">3</span>));
+        generated.extend(generate(<span class="number">2</span>));
+        generated.extend(generate(<span class="number">1</span>));
+        generated.extend(generate(<span class="number">0</span>));
+
+        <span class="comment">// start from the largest to the smallest and if it successes with the largest value,
+        // then we just break the look.
+        // Otherwise continues to try out other amount of deposit assets before it succeeds.
+        </span><span class="kw">for </span>i <span class="kw">in </span>(<span class="number">0</span>..generated.len()).rev() {
+            <span class="kw">let </span>deposit_assets = generated[<span class="number">0</span>..i].iter().copied().collect::&lt;HashSet&lt;<span class="kw">_</span>&gt;&gt;();
+
+            <span class="kw">match </span>units_for_slot_get_campaigns(
+                <span class="kw-2">&amp;</span>database,
+                <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>deposit_assets),
+                <span class="kw-2">*</span>PUBLISHER,
+                Utc::now(),
+            )
+            .<span class="kw">await
+            </span>{
+                <span class="prelude-val">Ok</span>(_success) =&gt; <span class="kw">break</span>,
+                <span class="prelude-val">Err</span>(_err) =&gt; <span class="macro">panic!</span>(<span class="string">&quot;Failed with {} deposit assets&quot;</span>, i),
+            };
+        }
+    }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.0-nightly (a6b7274a4 2022-10-10)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.0-nightly (06f049a35 2022-10-17)" ></div></body></html>

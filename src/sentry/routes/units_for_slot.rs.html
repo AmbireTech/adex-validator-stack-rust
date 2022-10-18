@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `sentry/src/routes/units_for_slot.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>units_for_slot.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../../normalize.css"><link rel="stylesheet" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../../ayu.css" disabled><link rel="stylesheet" href="../../../dark.css" disabled><link rel="stylesheet" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script defer src="../../../source-script.js"></script><script defer src="../../../source-files.js"></script><script defer src="../../../main.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><a class="sidebar-logo" href="../../../sentry/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div></a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../sentry/index.html"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../wheel.svg"></a></div></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `sentry/src/routes/units_for_slot.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>units_for_slot.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../../normalize.css"><link rel="stylesheet" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../../ayu.css" disabled><link rel="stylesheet" href="../../../dark.css" disabled><link rel="stylesheet" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script defer src="../../../source-script.js"></script><script defer src="../../../source-files.js"></script><script defer src="../../../main.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><a class="sidebar-logo" href="../../../sentry/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div></a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../sentry/index.html"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../wheel.svg"></a></div></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -366,79 +366,40 @@
 <span id="366">366</span>
 <span id="367">367</span>
 <span id="368">368</span>
-<span id="369">369</span>
-<span id="370">370</span>
-<span id="371">371</span>
-<span id="372">372</span>
-<span id="373">373</span>
-<span id="374">374</span>
-<span id="375">375</span>
-<span id="376">376</span>
-<span id="377">377</span>
-<span id="378">378</span>
-<span id="379">379</span>
-<span id="380">380</span>
-<span id="381">381</span>
-<span id="382">382</span>
-<span id="383">383</span>
-<span id="384">384</span>
-<span id="385">385</span>
-<span id="386">386</span>
-<span id="387">387</span>
-<span id="388">388</span>
-<span id="389">389</span>
-<span id="390">390</span>
-<span id="391">391</span>
-<span id="392">392</span>
-<span id="393">393</span>
-<span id="394">394</span>
-<span id="395">395</span>
-<span id="396">396</span>
-<span id="397">397</span>
-<span id="398">398</span>
-<span id="399">399</span>
-<span id="400">400</span>
-<span id="401">401</span>
-<span id="402">402</span>
-<span id="403">403</span>
-<span id="404">404</span>
-<span id="405">405</span>
-<span id="406">406</span>
-<span id="407">407</span>
-<span id="408">408</span>
 </pre><pre class="rust"><code><span class="kw">use </span>std::{collections::HashSet, sync::Arc};
 
 <span class="kw">use </span>axum::{
-    body::Body,
-    extract::TypedHeader,
+    extract::{Path, TypedHeader},
     headers::UserAgent,
-    http::{
-        header::{HeaderMap, HeaderName, CONTENT_TYPE},
-        Response, StatusCode,
-    },
+    http::header::{HeaderMap, HeaderName},
     Extension, Json,
 };
 <span class="kw">use </span>chrono::Utc;
 <span class="kw">use </span>futures::future::try_join_all;
 <span class="kw">use </span>once_cell::sync::Lazy;
 <span class="kw">use </span>reqwest::Url;
-<span class="kw">use </span>serde::{Deserialize, Serialize};
-<span class="kw">use </span>slog::{debug, error, warn, Logger};
+<span class="kw">use </span>slog::{debug, error, Logger};
+<span class="kw">use </span>thiserror::Error;
 <span class="kw">use </span>woothee::{parser::Parser, woothee::VALUE_UNKNOWN};
 
 <span class="kw">use </span>adapter::client::Locked;
 <span class="kw">use </span>primitives::{
-    sentry::IMPRESSION,
-    supermarket::units_for_slot::response,
-    supermarket::units_for_slot::response::Response <span class="kw">as </span>UnitsForSlotResponse,
+    sentry::{
+        units_for_slot::{
+            response::{<span class="self">self</span>, Response},
+            Query,
+        },
+        IMPRESSION,
+    },
     targeting::{eval_with_callback, get_pricing_bounds, input, input::Input, Output},
-    AdSlot, AdUnit, Address, Campaign, Config, UnifiedNum, ValidatorId,
+    AdSlot, Address, Campaign, Config, UnifiedNum, ValidatorId, IPFS,
 };
 
 <span class="kw">use crate</span>::{
+    application::Qs,
     db::{
         accounting::{get_accounting, Side},
-        units_for_slot_get_campaigns, CampaignRemaining, DbPool,
+        units_for_slot_get_campaigns, CampaignRemaining, DbPool, PoolError, RedisError,
     },
     response::ResponseError,
     Application,
@@ -447,99 +408,40 @@
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">static </span>CLOUDFLARE_IPCOUNTRY_HEADER: Lazy&lt;HeaderName&gt; =
     Lazy::new(|| HeaderName::from_static(<span class="string">&quot;cf-ipcountry&quot;</span>));
 
-<span class="comment">// #[cfg(test)]
-// #[path = &quot;units_for_slot_test.rs&quot;]
-// pub mod test;
+<span class="attribute">#[cfg(test)]
+#[path = <span class="string">&quot;./units_for_slot_test.rs&quot;</span>]
+</span><span class="kw">pub mod </span>test;
 
-</span><span class="attribute">#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]
-</span><span class="kw">pub struct </span>RequestBody {
-    <span class="kw">pub </span>ad_slot: AdSlot,
-    <span class="kw">pub </span>deposit_assets: <span class="prelude-ty">Option</span>&lt;HashSet&lt;Address&gt;&gt;,
+<span class="attribute">#[derive(Debug, Error)]
+#[error(transparent)]
+</span><span class="kw">pub enum </span>CampaignsError {
+    Redis(<span class="attribute">#[from] </span>RedisError),
+    Postgres(<span class="attribute">#[from] </span>PoolError),
 }
 
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>not_found() -&gt; Response&lt;Body&gt; {
-    Response::builder()
-        .status(StatusCode::NOT_FOUND)
-        .body(Body::empty())
-        .expect(<span class="string">&quot;Not Found response should be valid&quot;</span>)
-}
-
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>service_unavailable() -&gt; Response&lt;Body&gt; {
-    Response::builder()
-        .status(StatusCode::SERVICE_UNAVAILABLE)
-        .body(Body::empty())
-        .expect(<span class="string">&quot;Bad Request response should be valid&quot;</span>)
-}
-
-<span class="kw">pub async fn </span>post_units_for_slot&lt;C&gt;(
+<span class="kw">pub async fn </span>get_units_for_slot&lt;C&gt;(
     Extension(app): Extension&lt;Arc&lt;Application&lt;C&gt;&gt;&gt;,
-    Json(request_body): Json&lt;RequestBody&gt;,
+    Path(ad_slot): Path&lt;IPFS&gt;,
+    Qs(query): Qs&lt;Query&gt;,
     user_agent: <span class="prelude-ty">Option</span>&lt;TypedHeader&lt;UserAgent&gt;&gt;,
     headers: HeaderMap,
-) -&gt; <span class="prelude-ty">Result</span>&lt;Response&lt;Body&gt;, ResponseError&gt;
+) -&gt; <span class="prelude-ty">Result</span>&lt;Json&lt;Response&gt;, ResponseError&gt;
 <span class="kw">where
     </span>C: Locked + <span class="lifetime">&#39;static</span>,
 {
-    <span class="kw">let </span>logger = <span class="kw-2">&amp;</span>app.logger;
-    <span class="kw">let </span>config = <span class="kw-2">&amp;</span>app.config;
-
-    <span class="kw">let </span>ad_slot = request_body.ad_slot.clone();
-
-    <span class="comment">// TODO: remove once we know how/where we will be fetching the rest of the information!
-    </span><span class="kw">let </span>accepted_referrers: Vec&lt;Url&gt; = <span class="macro">vec!</span>[<span class="string">&quot;TODO&quot;</span>.parse().unwrap()];
-    <span class="kw">let </span>categories: Vec&lt;String&gt; = <span class="macro">vec!</span>[<span class="string">&quot;TODO&quot;</span>.into()];
-
-    <span class="kw">let </span>units = <span class="kw">match </span>app
+    <span class="kw">let </span>ad_slot_response = app
         .platform_api
-        .fetch_units(<span class="kw-2">&amp;</span>request_body.ad_slot.ad_type)
-        .<span class="kw">await
-    </span>{
-        <span class="prelude-val">Ok</span>(units) =&gt; units,
-        <span class="prelude-val">Err</span>(error) =&gt; {
-            <span class="macro">error!</span>(<span class="kw-2">&amp;</span>logger, <span class="string">&quot;Error fetching AdUnits for AdSlot&quot;</span>; <span class="string">&quot;AdSlot&quot; </span>=&gt; <span class="question-mark">?</span>ad_slot, <span class="string">&quot;error&quot; </span>=&gt; <span class="question-mark">?</span>error);
+        .fetch_slot(ad_slot)
+        .<span class="kw">await</span><span class="question-mark">?
+        </span>.ok_or(ResponseError::NotFound)<span class="question-mark">?</span>;
 
-            <span class="kw">return </span><span class="prelude-val">Ok</span>(service_unavailable());
-        }
+    <span class="macro">debug!</span>(<span class="kw-2">&amp;</span>app.logger, <span class="string">&quot;Fetched AdSlot from the platform&quot;</span>; <span class="string">&quot;AdSlotResponse&quot; </span>=&gt; <span class="question-mark">?</span><span class="kw-2">&amp;</span>ad_slot_response);
+
+    <span class="kw">let </span>slot = ad_slot_response.slot;
+    <span class="kw">let </span>(accepted_referrers, categories) = <span class="kw">match </span>ad_slot_response.website {
+        <span class="prelude-val">Some</span>(website) =&gt; (website.accepted_referrers, website.categories),
+        <span class="prelude-val">None </span>=&gt; Default::default(),
     };
-
-    <span class="kw">let </span>fallback_unit: <span class="prelude-ty">Option</span>&lt;AdUnit&gt; = <span class="kw">match </span><span class="kw-2">&amp;</span>ad_slot.fallback_unit {
-        <span class="prelude-val">Some</span>(unit_ipfs) =&gt; {
-            <span class="kw">let </span>ad_unit_response = <span class="kw">match </span>app.platform_api.fetch_unit(<span class="kw-2">*</span>unit_ipfs).<span class="kw">await </span>{
-                <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(response)) =&gt; {
-                    <span class="macro">debug!</span>(<span class="kw-2">&amp;</span>logger, <span class="string">&quot;Fetched AdUnit {:?}&quot;</span>, unit_ipfs; <span class="string">&quot;AdUnit&quot; </span>=&gt; <span class="question-mark">?</span>unit_ipfs);
-                    response
-                }
-                <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>) =&gt; {
-                    <span class="macro">warn!</span>(
-                        <span class="kw-2">&amp;</span>logger,
-                        <span class="string">&quot;AdSlot fallback AdUnit {} not found in Platform&quot;</span>,
-                        unit_ipfs;
-                        <span class="string">&quot;AdUnit&quot; </span>=&gt; <span class="question-mark">?</span>unit_ipfs,
-                        <span class="string">&quot;AdSlot&quot; </span>=&gt; <span class="question-mark">?</span>ad_slot,
-                    );
-
-                    <span class="kw">return </span><span class="prelude-val">Ok</span>(not_found());
-                }
-                <span class="prelude-val">Err</span>(error) =&gt; {
-                    <span class="macro">error!</span>(<span class="kw-2">&amp;</span>logger,
-                        <span class="string">&quot;Error when fetching AdSlot fallback AdUnit ({}) from Platform&quot;</span>,
-                        unit_ipfs;
-                        <span class="string">&quot;AdSlot&quot; </span>=&gt; <span class="question-mark">?</span>ad_slot,
-                        <span class="string">&quot;Fallback AdUnit&quot; </span>=&gt; <span class="question-mark">?</span>unit_ipfs,
-                        <span class="string">&quot;error&quot; </span>=&gt; <span class="question-mark">?</span>error
-                    );
-
-                    <span class="kw">return </span><span class="prelude-val">Ok</span>(service_unavailable());
-                }
-            };
-
-            <span class="prelude-val">Some</span>(ad_unit_response.unit)
-        }
-        <span class="prelude-val">None </span>=&gt; <span class="prelude-val">None</span>,
-    };
-
-    <span class="macro">debug!</span>(<span class="kw-2">&amp;</span>logger, <span class="string">&quot;Fetched {} AdUnits for AdSlot&quot;</span>, units.len(); <span class="string">&quot;AdSlot&quot; </span>=&gt; <span class="question-mark">?</span>ad_slot);
 
     <span class="comment">// For each adUnits apply input
     </span><span class="kw">let </span>ua_parser = Parser::new();
@@ -571,38 +473,37 @@
         .get(CLOUDFLARE_IPCOUNTRY_HEADER.clone())
         .and_then(|h| h.to_str().map(ToString::to_string).ok());
 
-    <span class="kw">let </span>hostname = Url::parse(<span class="kw-2">&amp;</span>ad_slot.website.clone().unwrap_or_default())
+    <span class="kw">let </span>hostname = Url::parse(<span class="kw-2">&amp;</span>slot.website.clone().unwrap_or_default())
         .ok()
         .and_then(|url| url.host().map(|h| h.to_string()))
         .unwrap_or_default();
 
-    <span class="kw">let </span>publisher_id = ad_slot.owner;
+    <span class="kw">let </span>publisher_id = slot.owner;
 
     <span class="kw">let </span>campaigns_limited_by_earner = get_campaigns(
         app.pool.clone(),
         app.campaign_remaining.clone(),
-        config,
-        <span class="kw-2">&amp;</span>request_body.deposit_assets,
+        <span class="kw-2">&amp;</span>app.config,
+        <span class="kw-2">&amp;</span><span class="prelude-val">Some</span>(query.deposit_assets),
         publisher_id,
+        <span class="kw-2">&amp;</span>app.logger,
     )
-    .<span class="kw">await
-    </span><span class="comment">// TODO: Fix mapping this error and Log the error!
-    </span>.map_err(|err| ResponseError::BadRequest(err.to_string()))<span class="question-mark">?</span>;
+    .<span class="kw">await</span><span class="question-mark">?</span>;
 
-    <span class="macro">debug!</span>(<span class="kw-2">&amp;</span>logger, <span class="string">&quot;Fetched Cache campaigns limited by earner (publisher)&quot;</span>; <span class="string">&quot;campaigns&quot; </span>=&gt; campaigns_limited_by_earner.len(), <span class="string">&quot;publisher_id&quot; </span>=&gt; %publisher_id);
+    <span class="macro">debug!</span>(<span class="kw-2">&amp;</span>app.logger, <span class="string">&quot;Fetched campaigns limited by earner (publisher)&quot;</span>; <span class="string">&quot;campaigns&quot; </span>=&gt; campaigns_limited_by_earner.len(), <span class="string">&quot;publisher_id&quot; </span>=&gt; %publisher_id);
 
     <span class="comment">// We return those in the result (which means AdView would have those) but we don&#39;t actually use them
     // we do that in order to have the same variables as the validator, so that the `price` is the same
     </span><span class="kw">let </span>targeting_input_ad_slot = <span class="prelude-val">Some</span>(input::AdSlot {
-        categories: categories.clone(),
+        categories,
         hostname,
     });
 
     <span class="kw">let </span><span class="kw-2">mut </span>targeting_input_base = Input {
         ad_view: <span class="prelude-val">None</span>,
         global: input::Global {
-            ad_slot_id: ad_slot.ipfs,
-            ad_slot_type: ad_slot.ad_type.clone(),
+            ad_slot_id: slot.ipfs,
+            ad_slot_type: slot.ad_type.clone(),
             publisher_id: publisher_id.to_address(),
             country,
             event_type: IMPRESSION,
@@ -617,40 +518,38 @@
     };
 
     <span class="kw">let </span>campaigns = apply_targeting(
-        config,
-        logger,
+        <span class="kw-2">&amp;</span>app.config,
+        <span class="kw-2">&amp;</span>app.logger,
         campaigns_limited_by_earner,
         targeting_input_base.clone(),
-        ad_slot,
+        slot,
     )
     .<span class="kw">await</span>;
 
     targeting_input_base.ad_slot = targeting_input_ad_slot;
 
-    <span class="kw">let </span>response = UnitsForSlotResponse {
+    <span class="kw">let </span>response = Response {
         targeting_input_base,
         accepted_referrers,
         campaigns,
-        fallback_unit: fallback_unit.map(|ad_unit| response::AdUnit::from(<span class="kw-2">&amp;</span>ad_unit)),
+        fallback_unit: ad_slot_response
+            .fallback
+            .map(|ad_unit| response::AdUnit::from(<span class="kw-2">&amp;</span>ad_unit)),
     };
 
-    <span class="prelude-val">Ok</span>(Response::builder()
-        .status(StatusCode::OK)
-        .header(CONTENT_TYPE, <span class="string">&quot;application/json&quot;</span>)
-        .body(Body::from(serde_json::to_string(<span class="kw-2">&amp;</span>response)<span class="question-mark">?</span>))
-        .expect(<span class="string">&quot;Should create response&quot;</span>))
+    <span class="prelude-val">Ok</span>(Json(response))
 }
 
-<span class="comment">// TODO: Use error instead of std::error::Error
-</span><span class="kw">async fn </span>get_campaigns(
+<span class="kw">async fn </span>get_campaigns(
     pool: DbPool,
     campaign_remaining: CampaignRemaining,
     config: <span class="kw-2">&amp;</span>Config,
     deposit_assets: <span class="kw-2">&amp;</span><span class="prelude-ty">Option</span>&lt;HashSet&lt;Address&gt;&gt;,
     publisher_id: ValidatorId,
-) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;Campaign&gt;, Box&lt;<span class="kw">dyn </span>std::error::Error&gt;&gt; {
+    logger: <span class="kw-2">&amp;</span>Logger,
+) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;Campaign&gt;, CampaignsError&gt; {
     <span class="comment">// 1. Fetch active Campaigns: (postgres)
-    //  Creator = publisher_id
+    // where Creator != publisher_id
     // if deposit asset &gt; 0 =&gt; filter by deposit_asset
     </span><span class="kw">let </span>active_campaigns = units_for_slot_get_campaigns(
         <span class="kw-2">&amp;</span>pool,
@@ -670,6 +569,11 @@
         .get_multiple_with_ids(active_campaign_ids)
         .<span class="kw">await</span><span class="question-mark">?</span>;
 
+    <span class="macro">debug!</span>(
+        logger,
+        <span class="string">&quot;Active Campaigns: {:?}\nRemaining: {:?}&quot;</span>, <span class="kw-2">&amp;</span>active_campaign_ids, <span class="kw-2">&amp;</span>campaigns_remaining
+    );
+
     <span class="kw">let </span>campaigns_with_remaining = campaigns_remaining
         .into_iter()
         .filter_map(|(campaign_id, remaining)| {
@@ -678,9 +582,18 @@
                 <span class="comment">// and we have to find the `Campaign` instance
                 </span>active_campaigns
                     .iter()
-                    .find(|campaign| campaign.id == campaign_id)
+                    .find(|campaign| {
+                        <span class="kw">if </span>campaign.id == campaign_id {
+                            <span class="macro">debug!</span>(logger, <span class="string">&quot;Take {:?} because it&#39;s active and not exhausted, i.e. {:?} (remaining budget) &gt; 0&quot;</span>, campaign_id, remaining);
+
+                            <span class="bool-val">true
+                        </span>} <span class="kw">else </span>{
+                            <span class="bool-val">false
+                        </span>}
+                    })
                     .cloned()
             } <span class="kw">else </span>{
+                <span class="macro">debug!</span>(logger, <span class="string">&quot;Skip {:?} because there&#39;s no remaining budget&quot;</span>, campaign_id);
                 <span class="prelude-val">None
             </span>}
         })
@@ -703,6 +616,11 @@
     </span>.into_iter()
     .flatten()
     .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
+
+    <span class="macro">debug!</span>(
+        logger,
+        <span class="string">&quot;Publishers Accounting for channels: {:?}&quot;</span>, <span class="kw-2">&amp;</span>publisher_accountings
+    );
 
     <span class="comment">// 3. Filter `Campaign`s, that include the `publisher_id` in the Channel balances.
     </span><span class="kw">let </span>(<span class="kw-2">mut </span>campaigns_by_earner, rest_of_campaigns): (Vec&lt;Campaign&gt;, Vec&lt;Campaign&gt;) =
@@ -747,6 +665,7 @@
                     .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
 
                 <span class="kw">if </span>ad_units.is_empty() {
+                    <span class="macro">debug!</span>(logger, <span class="string">&quot;Skipping {:?} because of no matching AdUnits types to AdSlot type {}&quot;</span>, campaign.id, ad_slot.ad_type);
                     <span class="prelude-val">None
                 </span>} <span class="kw">else </span>{
                     <span class="kw">let </span>campaign_input = input_base.clone().with_campaign(campaign.clone());
@@ -774,13 +693,14 @@
                                 <span class="kw">return </span><span class="prelude-val">None</span>;
                             }
 
-                            <span class="kw">let </span>max_price = <span class="kw">match </span>output.price.get(IMPRESSION.as_str()) {
+                            <span class="kw">let </span>max_price = <span class="kw">match </span>output.price.get(<span class="kw-2">&amp;</span>IMPRESSION) {
                                 <span class="prelude-val">Some</span>(output_price) =&gt; <span class="kw-2">*</span>output_price.min(<span class="kw-2">&amp;</span>pricing_bounds.max),
                                 <span class="prelude-val">None </span>=&gt; pricing_bounds.max,
                             };
                             <span class="kw">let </span>price = pricing_bounds.min.max(max_price);
 
                             <span class="kw">if </span>price &lt; config.limits.units_for_slot.global_min_impression_price {
+                                <span class="macro">debug!</span>(logger, <span class="string">&quot;Max IMPRESSION price is less than the global minium ({} &lt; {}) for AdUnit {:?} and campaign {:?}&quot;</span>, price, config.limits.units_for_slot.global_min_impression_price, ad_unit.ipfs, campaign.id);
                                 <span class="kw">return </span><span class="prelude-val">None</span>;
                             }
 
@@ -815,4 +735,4 @@
             .collect()
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.0-nightly (a6b7274a4 2022-10-10)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.0-nightly (06f049a35 2022-10-17)" ></div></body></html>

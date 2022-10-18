@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":[["AdUnitResponse",""],["AdUnitsResponse",""]]};
+window.SIDEBAR_ITEMS = {"struct":[["AdSlotResponse",""],["Website",""]]};
