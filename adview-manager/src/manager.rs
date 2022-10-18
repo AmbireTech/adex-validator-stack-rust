@@ -82,9 +82,6 @@ pub struct Options {
     #[serde(default)]
     pub disabled_sticky: bool,
     /// List of validators to query /units-for-slot from
-    ///
-    /// default: `[]`
-    #[serde(default)]
     pub validators: Vec<ApiUrl>,
 }
 
@@ -263,9 +260,7 @@ impl Manager {
         let first_validator = self
             .options
             .validators
-            .clone()
-            .into_iter()
-            .next()
+            .get(0)
             .ok_or(Error::NoValidators)?;
 
         let url = first_validator
@@ -277,7 +272,7 @@ impl Manager {
         // Ordering of the campaigns matters so we will just push them to the first result
         // We reuse `targeting_input_base`, `accepted_referrers` and `fallback_unit`
         let mut first_res: Response = self.client.get(url.as_str()).send().await?.json().await?;
-        // let mut first_res: Response = serde_json::from_str(&json_res).expect("Should convert");
+
         for validator in self.options.validators.iter().skip(1) {
             let url = validator
                 .join(&format!(
@@ -290,8 +285,7 @@ impl Manager {
                 if !first_res
                     .campaigns
                     .iter()
-                    .map(|rc| rc.campaign.id)
-                    .any(|x| x == response_campaign.campaign.id)
+                    .any(|c| c.campaign.id == response_campaign.campaign.id)
                 {
                     first_res.campaigns.push(response_campaign);
                 }
@@ -585,9 +579,7 @@ mod test {
         // 2. Set up a manager
         let market_url = server.uri().parse().unwrap();
         let whitelisted_tokens = DEFAULT_TOKENS.clone();
-        let publisher_addr = "0x0000000000000000626f62627973686d75726461"
-            .parse()
-            .unwrap();
+
         let validator_1_url =
             ApiUrl::parse(&format!("{}/validator-1", server.uri())).expect("should parse");
         let validator_2_url =
@@ -597,7 +589,7 @@ mod test {
         let options = Options {
             market_url,
             market_slot: DUMMY_IPFS[0],
-            publisher_addr,
+            publisher_addr: *PUBLISHER,
             // All passed tokens must be of the same price and decimals, so that the amounts can be accurately compared
             whitelisted_tokens,
             size: Some(Size::new(300, 100)),

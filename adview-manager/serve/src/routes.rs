@@ -91,7 +91,6 @@ pub async fn get_preview_ad(Extension(state): Extension<Arc<State>>) -> Html<Str
 
     // Mock the `get_units_for_slot_resp` call
     let mock_call = Mock::given(method("GET"))
-        // &depositAssets[]={}&depositAssets[]={}
         .and(path(format!("units-for-slot/{}", options.market_slot)))
         // pubPrefix=HEX&depositAssets[]=0xASSET1&depositAssets[]=0xASSET2
         .and(query_param("pubPrefix", pub_prefix))
@@ -99,7 +98,6 @@ pub async fn get_preview_ad(Extension(state): Extension<Arc<State>>) -> Html<Str
             "depositAssets[]",
             "0x6B175474E89094C44Da98b954EedeAC495271d0F",
         ))
-        // .and(query_param("depositAssets[]", "0x6B175474E89094C44Da98b954EedeAC495271d03"))
         .respond_with(ResponseTemplate::new(200).set_body_json(units_for_slot_resp))
         .expect(1)
         .named("get_units_for_slot_resp");
