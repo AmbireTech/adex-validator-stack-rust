@@ -12,7 +12,7 @@ a publisher websites.
 
 Running the local server:
 
-`RUST_LOG=debug cargo run -p serve`
+`RUST_LOG=debug cargo run -p adview-serve`
 
 This will start a server at `127.0.0.1:3030`
 
@@ -21,4 +21,7 @@ for the server.
 
 Routes:
 
-- `GET /ad` - visualizes a single ad
+- `GET /` - landing page
+- `GET /preview/ad` - preview a single example ad
+- `GET /preview/video` - preview a single example ad
+- `POST /:slot` - preview a single example ad

@@ -12,7 +12,6 @@ use async_std::{sync::RwLock, task::block_on};
 use chrono::{DateTime, Duration, Utc};
 use log::error;
 use once_cell::sync::Lazy;
-use rand::Rng;
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -63,12 +62,11 @@ pub enum Error {
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct Options {
-    #[serde(rename = "marketURL")]
-    pub market_url: ApiUrl,
     pub market_slot: IPFS,
     pub publisher_addr: Address,
     /// All passed tokens must be of the same price and decimals, so that the amounts can be accurately compared
     pub whitelisted_tokens: HashSet<Address>,
+    /// Optional size to be set on the generated HTML for serving the ad.
     pub size: Option<Size>,
     pub navigator_language: Option<String>,
     /// Whether or not to disable Video ads.
@@ -99,7 +97,7 @@ impl Size {
 }
 
 /// The next [`AdUnit`] to be shown
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NextAdUnit {
     pub unit: AdUnit,
     pub price: UnifiedNum,
@@ -119,9 +117,13 @@ pub struct StickyAdUnit {
 /// History entry of impressions (won auctions) which the [`Manager`] holds.
 #[derive(Debug, Clone)]
 pub struct HistoryEntry {
+    /// The time when this auction was won and the ad was shown.
     pub time: DateTime<Utc>,
+    /// The `AdUnit` shown
     pub unit_id: IPFS,
+    // The `Campaign` for which this `AdUnit` was show.
     pub campaign_id: CampaignId,
+    // The `AdSlot` for which the `AdUnit` was show.
     pub slot_id: IPFS,
 }
 
@@ -267,7 +269,14 @@ impl Manager {
             .map_err(|_| Error::InvalidValidatorUrl)?;
         // Ordering of the campaigns matters so we will just push them to the first result
         // We reuse `targeting_input_base`, `accepted_referrers` and `fallback_unit`
-        let mut first_res: Response = self.client.get(url.as_str()).send().await?.json().await?;
+        let mut first_res: Response = self
+            .client
+            .get(url.as_str())
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?;
 
         for validator in self.options.validators.iter().skip(1) {
             let url = validator
@@ -316,9 +325,10 @@ impl Manager {
         }
 
         // If two or more units result in the same price, apply random selection between them: this is why we need the seed
-        let mut rng = rand::thread_rng();
+        // let mut rng = rand::thread_rng();
+        // let random: f64 = rng.gen::<f64>() * (0x80000000_u64 as f64 - 1.0);
+        let random: f64 = rand::random::<f64>() * (0x80000000_u64 as f64 - 1.0);
 
-        let random: f64 = rng.gen::<f64>() * (0x80000000_u64 as f64 - 1.0);
         let seed = BigNum::from(random as u64);
 
         // Apply targeting, now with adView.* variables, and sort the resulting ad units
@@ -573,7 +583,6 @@ mod test {
             .await;
 
         // 2. Set up a manager
-        let market_url = server.uri().parse().unwrap();
         let whitelisted_tokens = DEFAULT_TOKENS.clone();
 
         let validator_1_url =
@@ -583,7 +592,6 @@ mod test {
         let validator_3_url =
             ApiUrl::parse(&format!("{}/validator-3", server.uri())).expect("should parse");
         let options = Options {
-            market_url,
             market_slot: DUMMY_IPFS[0],
             publisher_addr: *PUBLISHER,
             // All passed tokens must be of the same price and decimals, so that the amounts can be accurately compared
