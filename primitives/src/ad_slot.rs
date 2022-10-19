@@ -54,6 +54,6 @@ pub struct AdSlot {
     #[serde(default)]
     pub archived: bool,
     /// UTC timestamp in milliseconds, changed every time modifiable property is changed
-    #[serde(with = "ts_milliseconds_option")]
+    #[serde(default, with = "ts_milliseconds_option")]
     pub modified: Option<DateTime<Utc>>,
 }
