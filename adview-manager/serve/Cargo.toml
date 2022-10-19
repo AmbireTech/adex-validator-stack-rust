@@ -12,13 +12,17 @@ publish = false
 # Domain
 adex_primitives = { version = "0.2.0", path = "../../primitives", package = "primitives", features = ["test-util"] }
 adview-manager = { path = "../" }
+
+# Application errors
+anyhow = "1"
+# Time
 chrono = "0.4"
 
 # Async runtime
 tokio = { version = "1", features = ["macros", "time", "rt-multi-thread"] }
 
 # Web Server
-axum = "0.5"
+axum = {version = "0.5", features = ["headers", "macros"]}
 
 # Template engine
 tera = { version = "1" }
@@ -29,6 +33,8 @@ wiremock = { version = "0.5" }
 # (De)Serialization
 serde = { version = "^1.0", features = ["derive"] }
 
-# Logging
-log = "0.4"
-env_logger = { version = "0.9" }
+# Tracing
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+pretty_assertions = "1"
