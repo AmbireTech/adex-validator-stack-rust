@@ -194,12 +194,20 @@
 <span id="194">194</span>
 <span id="195">195</span>
 <span id="196">196</span>
+<span id="197">197</span>
+<span id="198">198</span>
+<span id="199">199</span>
+<span id="200">200</span>
+<span id="201">201</span>
+<span id="202">202</span>
+<span id="203">203</span>
 </pre><pre class="rust"><code><span class="kw">use </span>std::sync::Arc;
 
 <span class="kw">use </span>adex_primitives::{
     sentry::{units_for_slot, IMPRESSION},
     targeting::{input::Global, Input},
-    test_util::{DUMMY_CAMPAIGN, DUMMY_IPFS},
+    test_util::{DUMMY_CAMPAIGN, DUMMY_IPFS, DUMMY_VALIDATOR_FOLLOWER, DUMMY_VALIDATOR_LEADER},
+    util::ApiUrl,
     ToHex,
 };
 <span class="kw">use </span>adview_manager::{
@@ -229,7 +237,7 @@
 
 <span class="doccomment">/// `GET /preview/ad`
 </span><span class="kw">pub async fn </span>get_preview_ad(Extension(state): Extension&lt;Arc&lt;State&gt;&gt;) -&gt; Html&lt;String&gt; {
-    <span class="comment">// For mocking the `get_market_demand_resp` call
+    <span class="comment">// For mocking the `get_units_for_slot_resp` call
     </span><span class="kw">let </span>mock_server = MockServer::start().<span class="kw">await</span>;
 
     <span class="kw">let </span>market_url = mock_server.uri().parse().unwrap();
@@ -251,6 +259,10 @@
         <span class="doccomment">/// Defaulted
         </span>disabled_video,
         disabled_sticky: <span class="bool-val">false</span>,
+        validators: <span class="macro">vec!</span>[
+            ApiUrl::parse(<span class="kw-2">&amp;</span>DUMMY_VALIDATOR_LEADER.url).expect(<span class="string">&quot;should parse&quot;</span>),
+            ApiUrl::parse(<span class="kw-2">&amp;</span>DUMMY_VALIDATOR_FOLLOWER.url).expect(<span class="string">&quot;should parse&quot;</span>),
+        ],
     };
 
     <span class="kw">let </span>manager =
@@ -280,26 +292,24 @@
         campaigns: <span class="macro">vec!</span>[],
     };
 
-    <span class="comment">// Mock the `get_market_demand_resp` call
+    <span class="comment">// Mock the `get_units_for_slot_resp` call
     </span><span class="kw">let </span>mock_call = Mock::given(method(<span class="string">&quot;GET&quot;</span>))
-        <span class="comment">// &amp;depositAsset={}&amp;depositAsset={}
-        </span>.and(path(<span class="macro">format!</span>(<span class="string">&quot;units-for-slot/{}&quot;</span>, options.market_slot)))
-        <span class="comment">// pubPrefix=HEX&amp;depositAsset=0xASSET1&amp;depositAsset=0xASSET2
+        .and(path(<span class="macro">format!</span>(<span class="string">&quot;units-for-slot/{}&quot;</span>, options.market_slot)))
+        <span class="comment">// pubPrefix=HEX&amp;depositAssets[]=0xASSET1&amp;depositAssets[]=0xASSET2
         </span>.and(query_param(<span class="string">&quot;pubPrefix&quot;</span>, pub_prefix))
         .and(query_param(
-            <span class="string">&quot;depositAsset&quot;</span>,
+            <span class="string">&quot;depositAssets[]&quot;</span>,
             <span class="string">&quot;0x6B175474E89094C44Da98b954EedeAC495271d0F&quot;</span>,
         ))
-        <span class="comment">// .and(query_param(&quot;depositAsset[]&quot;, &quot;0x6B175474E89094C44Da98b954EedeAC495271d03&quot;))
-        </span>.respond_with(ResponseTemplate::new(<span class="number">200</span>).set_body_json(units_for_slot_resp))
+        .respond_with(ResponseTemplate::new(<span class="number">200</span>).set_body_json(units_for_slot_resp))
         .expect(<span class="number">1</span>)
-        .named(<span class="string">&quot;get_market_demand_resp&quot;</span>);
+        .named(<span class="string">&quot;get_units_for_slot_resp&quot;</span>);
 
     <span class="comment">// Mounting the mock on the mock server - it&#39;s now effective!
     </span>mock_call.mount(<span class="kw-2">&amp;</span>mock_server).<span class="kw">await</span>;
 
     <span class="kw">let </span>demand_resp = manager
-        .get_market_demand_resp()
+        .get_units_for_slot_resp()
         .<span class="kw">await
         </span>.expect(<span class="string">&quot;Should return Mocked response&quot;</span>);
 
@@ -355,6 +365,10 @@
         <span class="doccomment">/// Defaulted
         </span>disabled_video,
         disabled_sticky: <span class="bool-val">false</span>,
+        validators: <span class="macro">vec!</span>[
+            ApiUrl::parse(<span class="kw-2">&amp;</span>DUMMY_VALIDATOR_LEADER.url).expect(<span class="string">&quot;should parse&quot;</span>),
+            ApiUrl::parse(<span class="kw-2">&amp;</span>DUMMY_VALIDATOR_FOLLOWER.url).expect(<span class="string">&quot;should parse&quot;</span>),
+        ],
     };
 
     <span class="comment">// legacy_728x90
@@ -391,4 +405,4 @@
     Html(html)
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="adview_serve" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.0-nightly (06f049a35 2022-10-17)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="adview_serve" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.0-nightly (a24a020e6 2022-10-18)" ></div></body></html>
