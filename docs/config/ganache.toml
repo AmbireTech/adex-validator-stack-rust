@@ -51,7 +51,7 @@ admins = [
 
 [platform]
 # This should be changed for tests and use the wiremock url
-url = "https://platform.adex.network"
+url = "http://localhost:8004"
 # 20 minutes in milliseconds
 keep_alive_interval = 1200000
 
