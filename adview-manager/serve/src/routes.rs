@@ -7,6 +7,7 @@ use axum::{
     Extension, Json,
 };
 use chrono::Utc;
+use reqwest::Client;
 use tera::Context;
 use tracing::debug;
 use wiremock::{
@@ -16,10 +17,12 @@ use wiremock::{
 
 use adex_primitives::{
     config::GANACHE_CONFIG,
+    platform::{AdSlotResponse, Website},
     sentry::{units_for_slot, IMPRESSION},
     targeting::{input::Global, Input},
     test_util::{
-        DUMMY_CAMPAIGN, DUMMY_IPFS, DUMMY_VALIDATOR_FOLLOWER, DUMMY_VALIDATOR_LEADER, PUBLISHER,
+        DUMMY_AD_UNITS, DUMMY_CAMPAIGN, DUMMY_IPFS, DUMMY_VALIDATOR_FOLLOWER,
+        DUMMY_VALIDATOR_LEADER, PUBLISHER,
     },
     util::ApiUrl,
     AdSlot, ToHex,
@@ -47,9 +50,7 @@ pub async fn get_preview_ad(Extension(state): Extension<Arc<State>>) -> Html<Str
 
     let whitelisted_tokens = DEFAULT_TOKENS.clone();
     let disabled_video = false;
-    let publisher_addr = "0x0000000000000000626f62627973686d75726461"
-        .parse()
-        .unwrap();
+    let publisher_addr = *PUBLISHER;
 
     let options = Options {
         market_slot: DUMMY_IPFS[0],
@@ -152,9 +153,7 @@ pub async fn get_preview_ad(Extension(state): Extension<Arc<State>>) -> Html<Str
 pub async fn get_preview_video(Extension(state): Extension<Arc<State>>) -> Html<String> {
     let whitelisted_tokens = DEFAULT_TOKENS.clone();
     let disabled_video = false;
-    let publisher_addr = "0x0000000000000000626f62627973686d75726461"
-        .parse()
-        .unwrap();
+    let publisher_addr = *PUBLISHER;
 
     let options = Options {
         market_slot: DUMMY_IPFS[0],
@@ -206,65 +205,6 @@ pub async fn get_preview_video(Extension(state): Extension<Arc<State>>) -> Html<
     Html(html)
 }
 
-/// `GET /preview/:slot`
-// pub async fn get_slot_preview(
-//     Extension(state): Extension<Arc<State>>,
-//     Path(slot): Path<IPFS>,
-//     headers: HeaderMap,
-// ) -> Result<Html<String>, Error> {
-//     let config = GANACHE_CONFIG.clone();
-
-//     // extracted from Accept-language header
-//     let navigator_language = headers
-//         .get(ACCEPT_LANGUAGE)
-//         .map(|value| value.to_str())
-//         .transpose()?
-//         .map(|s| parse_navigator_language(s))
-//         .transpose()?
-//         .flatten()
-//         // TODO: make configurable?
-//         .unwrap_or("en".into());
-
-//     let whitelisted_tokens = config
-//         .chains
-//         .iter()
-//         .map(|(_, chain)| chain.tokens.iter().map(|(_, token)| token.address))
-//         .flatten()
-//         .collect();
-
-//         let options = Options {
-//             market_slot: ad_slot.ipfs,
-//             publisher_addr: *PUBLISHER,
-//             // All passed tokens must be of the same price, so that the amounts can be accurately compared
-//             whitelisted_tokens,
-//             size: Some(
-//                 size_from_type(&ad_slot.ad_type)
-//                     .map_err(|error| Error::anyhow_status(error, StatusCode::BAD_REQUEST))?,
-//             ),
-//             navigator_language: Some(navigator_language),
-//             /// Defaulted
-//             disabled_video: false,
-//             disabled_sticky: false,
-//         };
-
-//         let manager = Manager::new(options, Default::default())?;
-
-//         let next_ad_unit = manager.get_next_ad_unit().await?;
-
-//         let html = {
-//             let mut context = Context::new();
-//             context.insert("next_ad_unit", &next_ad_unit);
-//             context.insert("ad_slot", &ad_slot);
-
-//             state
-//                 .tera
-//                 .render("next_ad.html", &context)
-//                 .expect("Should render")
-//         };
-
-//         Ok(Html(html))
-// }
-
 /// `POST /preview`
 ///
 /// Uses the provided with the POST data [`AdSlot`] and get's a matching [`AdUnit`] html
@@ -272,6 +212,7 @@ pub async fn get_preview_video(Extension(state): Extension<Arc<State>>) -> Html<
 ///
 /// Uses the Ganache config to select all the whitelisted tokens in all chains.
 /// It's configured to use locally running sentry validators at ports `8005` and `8006`.
+/// Alongside locally running mocked platform at `8004`.
 #[axum::debug_handler]
 pub async fn post_slot_preview(
     Extension(state): Extension<Arc<State>>,
@@ -279,6 +220,21 @@ pub async fn post_slot_preview(
     headers: HeaderMap,
 ) -> Result<Html<String>, Error> {
     let config = GANACHE_CONFIG.clone();
+
+    // setup the `AdSlotResponse` from the Platform
+    let response = AdSlotResponse {
+        slot: ad_slot.clone(),
+        fallback: Some(DUMMY_AD_UNITS[0].clone()),
+        website: Some(Website {
+            categories: vec![
+                "IAB3".to_string(),
+                "IAB13-7".to_string(),
+                "IAB5".to_string(),
+            ],
+            accepted_referrers: vec![],
+        }),
+    };
+    setup_platform_response(&response).await?;
 
     // extracted from Accept-language header
     let navigator_language = headers
@@ -371,6 +327,19 @@ fn parse_navigator_language(accept_language: &str) -> anyhow::Result<Option<Stri
     }
 
     Ok(Some(first_language))
+}
+
+async fn setup_platform_response(response: &AdSlotResponse) -> anyhow::Result<()> {
+    let client = Client::builder().build()?;
+
+    client
+        .post("http://localhost:8004/slot")
+        .json(&response)
+        .send()
+        .await?
+        .error_for_status()?;
+
+    Ok(())
 }
 
 #[cfg(test)]
