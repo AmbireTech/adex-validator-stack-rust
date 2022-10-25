@@ -9,4 +9,6 @@ members = [
     "validator_worker",
     "sentry",
     "test_harness",
+    # for mocking calls to the platform
+    "test_harness/platform",
 ]

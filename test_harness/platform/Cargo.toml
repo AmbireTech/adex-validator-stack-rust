@@ -1,25 +1,19 @@
 [package]
+name = "platform"
 authors = ["Ambire <dev@ambire.com>", "Lachezar Lechev <lachezar@ambire.com>"]
-edition = "2021"
-name = "adview-serve"
 version = "0.1.0"
+edition = "2021"
 license = "AGPL-3.0"
 publish = false
 
-[features]
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 # Domain
 adex_primitives = { version = "0.2.0", path = "../../primitives", package = "primitives", features = ["test-util"] }
-adview-manager = { path = "../" }
 
 # Application errors
 anyhow = "1"
-# Time
-chrono = "0.4"
-
-# Making requests to the Mocked Platform
-reqwest = { version = "0.11", features = ["json"] }
 
 # Async runtime
 tokio = { version = "1", features = ["macros", "time", "rt-multi-thread"] }
@@ -27,18 +21,14 @@ tokio = { version = "1", features = ["macros", "time", "rt-multi-thread"] }
 # Web Server
 axum = {version = "0.5", features = ["headers", "macros"]}
 
-# Template engine
-tera = { version = "1" }
-
-# Mocking Market calls
-wiremock = { version = "0.5" }
-
 # (De)Serialization
 serde = { version = "^1.0", features = ["derive"] }
+
+# In-memory database
+dashmap = "5"
 
 # Tracing
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 
-[dev-dependencies]
 pretty_assertions = "1"
