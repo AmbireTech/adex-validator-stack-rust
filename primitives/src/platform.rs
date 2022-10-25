@@ -4,6 +4,7 @@ use url::Url;
 use crate::{AdSlot, AdUnit};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Website {
     #[serde(default)]
     pub categories: Vec<String>,
