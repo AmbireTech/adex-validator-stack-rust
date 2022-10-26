@@ -6,3 +6,4 @@ target
 .old
 Migrant.toml
 vendor/
+.DS_Store

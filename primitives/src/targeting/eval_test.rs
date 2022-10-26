@@ -13,7 +13,7 @@ fn get_default_input() -> Input {
 
     let init_input = Input {
         ad_view: Some(input::AdView {
-            seconds_since_campaign_impression: 10,
+            seconds_since_campaign_impression: Some(10),
             has_custom_preferences: false,
             navigator_language: "bg".to_string(),
         }),

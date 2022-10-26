@@ -201,7 +201,12 @@ pub fn get_unit_html_with_events(
 #[cfg(test)]
 mod test {
     use super::*;
-    use adex_primitives::test_util::DUMMY_IPFS;
+    use crate::manager::DEFAULT_TOKENS;
+    use adex_primitives::{
+        test_util::{DUMMY_CAMPAIGN, DUMMY_IPFS, PUBLISHER},
+        util::ApiUrl,
+    };
+    use scraper::{Html, Selector};
 
     fn get_ad_unit(media_mime: &str) -> AdUnit {
         AdUnit {
@@ -229,6 +234,185 @@ mod test {
 
         // Non-IPFS case
         assert_eq!("http://123".to_string(), normalize_url("http://123"));
+    }
+
+    #[test]
+    fn getting_unit_html() {
+        let size_1 = Size {
+            width: 480,
+            height: 480,
+        };
+
+        let size_2 = Size {
+            width: 920,
+            height: 160,
+        };
+
+        let video_unit = AdUnit {
+            ipfs: DUMMY_IPFS[0],
+            media_url: "".into(),
+            media_mime: "video/avi".into(),
+            target_url: "https://ambire.com?utm_source=adex_PUBHOSTNAME".into(),
+        };
+
+        let image_unit = AdUnit {
+            ipfs: DUMMY_IPFS[1],
+            media_url: "".into(),
+            media_mime: "image/jpeg".into(),
+            target_url: "https://ambire.com?utm_source=adex_PUBHOSTNAME".into(),
+        };
+
+        // Test for first size, correct link, video inside link
+        {
+            let unit = get_unit_html(Some(size_1), &video_unit, "https://adex.network", "", "");
+            let fragment = Html::parse_fragment(&unit);
+
+            let div_selector = Selector::parse("div").unwrap();
+            let div = fragment
+                .select(&div_selector)
+                .next()
+                .expect("There should be a div");
+
+            let anchor_selector = Selector::parse("div>a").unwrap();
+            let anchor = fragment
+                .select(&anchor_selector)
+                .next()
+                .expect("There should be an anchor");
+
+            let video_selector = Selector::parse("div>a>video").unwrap();
+            let video = fragment
+                .select(&video_selector)
+                .next()
+                .expect("There should be a video");
+
+            assert_eq!("div", div.value().name());
+
+            assert_eq!("a", anchor.value().name());
+            assert_eq!(
+                Some("https://ambire.com?utm_source=AdEx+(https://adex.network)"),
+                anchor.value().attr("href")
+            );
+
+            assert_eq!("video", video.value().name());
+            assert_eq!(Some("480"), video.value().attr("width"));
+            assert_eq!(Some("480"), video.value().attr("height"));
+        }
+        // Test for another size
+        {
+            let unit = get_unit_html(Some(size_2), &video_unit, "https://adex.network", "", "");
+            let fragment = Html::parse_fragment(&unit);
+
+            let video_selector = Selector::parse("div>a>video").unwrap();
+            let video = fragment
+                .select(&video_selector)
+                .next()
+                .expect("There should be a video");
+
+            assert_eq!("video", video.value().name());
+            assert_eq!(Some("920"), video.value().attr("width"));
+            assert_eq!(Some("160"), video.value().attr("height"));
+        }
+
+        // Test for image ad_unit
+        {
+            let unit = get_unit_html(Some(size_1), &image_unit, "https://adex.network", "", "");
+            let fragment = Html::parse_fragment(&unit);
+
+            let image_selector = Selector::parse("div>a>*").unwrap();
+            let image = fragment
+                .select(&image_selector)
+                .next()
+                .expect("There should be an image");
+
+            assert_eq!("img", image.value().name());
+        }
+
+        // Test for another hostname
+        {
+            let unit = get_unit_html(
+                Some(size_1),
+                &video_unit,
+                "https://adsense.google.com",
+                "",
+                "",
+            );
+            let fragment = Html::parse_fragment(&unit);
+
+            let anchor_selector = Selector::parse("div>a").unwrap();
+            let anchor = fragment
+                .select(&anchor_selector)
+                .next()
+                .expect("There should be a second anchor");
+
+            assert_eq!("a", anchor.value().name());
+            assert_eq!(
+                Some("https://ambire.com?utm_source=AdEx+(https://adsense.google.com)"),
+                anchor.value().attr("href")
+            );
+        }
+    }
+
+    #[test]
+    fn getting_unit_html_with_events() {
+        let whitelisted_tokens = DEFAULT_TOKENS.clone();
+
+        let market_url = ApiUrl::parse("https://market.adex.network").expect("should parse");
+        let validator_1_url = ApiUrl::parse("https://tom.adex.network").expect("should parse");
+        let validator_2_url = ApiUrl::parse("https://jerry.adex.network").expect("should parse");
+        let options = Options {
+            market_url,
+            market_slot: DUMMY_IPFS[0],
+            publisher_addr: *PUBLISHER,
+            // All passed tokens must be of the same price and decimals, so that the amounts can be accurately compared
+            whitelisted_tokens,
+            size: Some(Size::new(300, 100)),
+            navigator_language: Some("bg".into()),
+            disabled_video: false,
+            disabled_sticky: false,
+            validators: vec![validator_1_url, validator_2_url],
+        };
+        let ad_unit = AdUnit {
+            ipfs: DUMMY_IPFS[0],
+            media_url: "".into(),
+            media_mime: "video/avi".into(),
+            target_url: "https://ambire.com?utm_source=adex_PUBHOSTNAME".into(),
+        };
+        let campaign_id = DUMMY_CAMPAIGN.id;
+        let validators = DUMMY_CAMPAIGN.validators.clone();
+        // Test with events
+        {
+            let unit_with_events = get_unit_html_with_events(
+                &options,
+                &ad_unit,
+                "https://adex.network",
+                campaign_id,
+                &validators,
+                false,
+            );
+            let fragment = Html::parse_fragment(&unit_with_events);
+
+            let anchor_selector = Selector::parse("div>a").unwrap();
+            let anchor = fragment
+                .select(&anchor_selector)
+                .next()
+                .expect("There should be a second anchor");
+
+            let video_selector = Selector::parse("div>a>video").unwrap();
+            let video = fragment
+                .select(&video_selector)
+                .next()
+                .expect("There should be a video");
+
+            // TODO: If campaign.validators doesn't guarantee order this might fail and become untestable
+            let expected_onclick: &str = &format!("var fetchOpts = {{ method: 'POST', headers: {{ 'content-type': 'application/json' }}, body: {{'events':[{{'type':'CLICK','publisher':'{}','adUnit':'{}','adSlot':'{}','referrer':'document.referrer'}}]}} }}; fetch('{}/campaign/{}/events?pubAddr={}', fetchOpts); fetch('{}/campaign/{}/events?pubAddr={}', fetchOpts)", options.publisher_addr, ad_unit.ipfs, options.market_slot, validators.iter().nth(0).unwrap().url, campaign_id, options.publisher_addr, validators.iter().nth(1).unwrap().url, campaign_id, options.publisher_addr);
+            assert_eq!(Some(expected_onclick), anchor.value().attr("onclick"));
+
+            let expected_onloadeddata: &str = &format!("setTimeout(function() {{ var fetchOpts = {{ method: 'POST', headers: {{ 'content-type': 'application/json' }}, body: {{'events':[{{'type':'IMPRESSION','publisher':'{}','adUnit':'{}','adSlot':'{}','referrer':'document.referrer'}}]}} }}; fetch('{}/campaign/{}/events?pubAddr={}', fetchOpts); fetch('{}/campaign/{}/events?pubAddr={}', fetchOpts) }}, 8000)", options.publisher_addr, ad_unit.ipfs, options.market_slot, validators.iter().nth(0).unwrap().url, campaign_id, options.publisher_addr, validators.iter().nth(1).unwrap().url, campaign_id, options.publisher_addr);
+            assert_eq!(
+                Some(expected_onloadeddata),
+                video.value().attr("onloadeddata")
+            );
+        }
     }
 
     mod randomized_sort_pos {
