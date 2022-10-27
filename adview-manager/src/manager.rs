@@ -197,16 +197,13 @@ impl Manager {
             .iter()
             .find(|c| c.campaign.id == sticky_entry.campaign_id)?;
 
-        let unit = stick_campaign
-            .units_with_price
-            .iter()
-            .find_map(|u| {
-                if u.unit.ipfs == sticky_entry.unit_id {
-                    Some(u.unit.clone())
-                } else {
-                    None
-                }
-            })?;
+        let unit = stick_campaign.units_with_price.iter().find_map(|u| {
+            if u.unit.ipfs == sticky_entry.unit_id {
+                Some(u.unit.clone())
+            } else {
+                None
+            }
+        })?;
 
         let html = get_unit_html_with_events(
             &self.options,
