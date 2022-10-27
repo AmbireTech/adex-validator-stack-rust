@@ -127,6 +127,8 @@ impl GetField for AdView {
 
     fn get(&self, field: &Self::Field) -> Self::Output {
         match field {
+            // We could use `Option`, however, `try_get` will return `UnknownVariable`
+            // this is why we use `u64::MAX` when returning the value of the field.
             field::AdView::SecondsSinceCampaignImpression => Value::Number(
                 self.seconds_since_campaign_impression
                     .unwrap_or(u64::MAX)

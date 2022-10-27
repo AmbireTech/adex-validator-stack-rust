@@ -163,7 +163,7 @@ pub fn get_unit_html_with_events(
             .iter()
             .map(|validator| {
                 let fetch_url = format!(
-                    "{}/campaign/{}/events?pubAddr={}",
+                    "{}/v5/campaign/{}/events?pubAddr={}",
                     validator.url, campaign_id, options.publisher_addr
                 );
 
@@ -201,12 +201,13 @@ pub fn get_unit_html_with_events(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::manager::DEFAULT_TOKENS;
     use adex_primitives::{
+        config::GANACHE_CONFIG,
         test_util::{DUMMY_CAMPAIGN, DUMMY_IPFS, PUBLISHER},
         util::ApiUrl,
     };
     use scraper::{Html, Selector};
+    use std::collections::HashSet;
 
     fn get_ad_unit(media_mime: &str) -> AdUnit {
         AdUnit {
@@ -354,7 +355,11 @@ mod test {
 
     #[test]
     fn getting_unit_html_with_events() {
-        let whitelisted_tokens = DEFAULT_TOKENS.clone();
+        let whitelisted_tokens = GANACHE_CONFIG
+            .chains
+            .values()
+            .flat_map(|chain| chain.tokens.values().map(|token| token.address))
+            .collect::<HashSet<_>>();
 
         let market_url = ApiUrl::parse("https://market.adex.network").expect("should parse");
         let validator_1_url = ApiUrl::parse("https://tom.adex.network").expect("should parse");
@@ -403,11 +408,10 @@ mod test {
                 .next()
                 .expect("There should be a video");
 
-            // TODO: If campaign.validators doesn't guarantee order this might fail and become untestable
-            let expected_onclick: &str = &format!("var fetchOpts = {{ method: 'POST', headers: {{ 'content-type': 'application/json' }}, body: {{'events':[{{'type':'CLICK','publisher':'{}','adUnit':'{}','adSlot':'{}','referrer':'document.referrer'}}]}} }}; fetch('{}/campaign/{}/events?pubAddr={}', fetchOpts); fetch('{}/campaign/{}/events?pubAddr={}', fetchOpts)", options.publisher_addr, ad_unit.ipfs, options.market_slot, validators.iter().nth(0).unwrap().url, campaign_id, options.publisher_addr, validators.iter().nth(1).unwrap().url, campaign_id, options.publisher_addr);
+            let expected_onclick: &str = &format!("var fetchOpts = {{ method: 'POST', headers: {{ 'content-type': 'application/json' }}, body: {{'events':[{{'type':'CLICK','publisher':'{}','adUnit':'{}','adSlot':'{}','referrer':'document.referrer'}}]}} }}; fetch('{}/v5/campaign/{}/events?pubAddr={}', fetchOpts); fetch('{}/v5/campaign/{}/events?pubAddr={}', fetchOpts)", options.publisher_addr, ad_unit.ipfs, options.market_slot, validators[0].url, campaign_id, options.publisher_addr, validators[1].url, campaign_id, options.publisher_addr);
             assert_eq!(Some(expected_onclick), anchor.value().attr("onclick"));
 
-            let expected_onloadeddata: &str = &format!("setTimeout(function() {{ var fetchOpts = {{ method: 'POST', headers: {{ 'content-type': 'application/json' }}, body: {{'events':[{{'type':'IMPRESSION','publisher':'{}','adUnit':'{}','adSlot':'{}','referrer':'document.referrer'}}]}} }}; fetch('{}/campaign/{}/events?pubAddr={}', fetchOpts); fetch('{}/campaign/{}/events?pubAddr={}', fetchOpts) }}, 8000)", options.publisher_addr, ad_unit.ipfs, options.market_slot, validators.iter().nth(0).unwrap().url, campaign_id, options.publisher_addr, validators.iter().nth(1).unwrap().url, campaign_id, options.publisher_addr);
+            let expected_onloadeddata: &str = &format!("setTimeout(function() {{ var fetchOpts = {{ method: 'POST', headers: {{ 'content-type': 'application/json' }}, body: {{'events':[{{'type':'IMPRESSION','publisher':'{}','adUnit':'{}','adSlot':'{}','referrer':'document.referrer'}}]}} }}; fetch('{}/v5/campaign/{}/events?pubAddr={}', fetchOpts); fetch('{}/v5/campaign/{}/events?pubAddr={}', fetchOpts) }}, 8000)", options.publisher_addr, ad_unit.ipfs, options.market_slot, validators[0].url, campaign_id, options.publisher_addr, validators[1].url, campaign_id, options.publisher_addr);
             assert_eq!(
                 Some(expected_onloadeddata),
                 video.value().attr("onloadeddata")

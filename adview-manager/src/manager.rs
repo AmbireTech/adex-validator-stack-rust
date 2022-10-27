@@ -206,8 +206,7 @@ impl Manager {
                 } else {
                     None
                 }
-            })
-            .expect("Something went terribly wrong. Data is corrupted! There should be an AdUnit");
+            })?;
 
         let html = get_unit_html_with_events(
             &self.options,
@@ -437,11 +436,13 @@ mod test {
     use super::*;
     use crate::manager::input::Input;
     use adex_primitives::{
+        config::GANACHE_CONFIG,
         sentry::{
             units_for_slot::response::{AdUnit, UnitsWithPrice},
             CLICK,
         },
         test_util::{CAMPAIGNS, DUMMY_AD_UNITS, DUMMY_CAMPAIGN, DUMMY_IPFS, PUBLISHER},
+        unified_num::FromWhole,
     };
     use wiremock::{
         matchers::{method, path},
@@ -450,7 +451,11 @@ mod test {
 
     fn setup_manager(uri: String) -> Manager {
         let market_url = uri.parse().unwrap();
-        let whitelisted_tokens = DEFAULT_TOKENS.clone();
+        let whitelisted_tokens = GANACHE_CONFIG
+            .chains
+            .values()
+            .flat_map(|chain| chain.tokens.values().map(|token| token.address))
+            .collect::<HashSet<_>>();
 
         let validator_1_url = ApiUrl::parse(&format!("{}/validator-1", uri)).expect("should parse");
         let validator_2_url = ApiUrl::parse(&format!("{}/validator-2", uri)).expect("should parse");
@@ -646,8 +651,7 @@ mod test {
     }
 
     #[tokio::test]
-    #[should_panic]
-    async fn get_sticky_ad_unit_panic_on_unit_deletion() {
+    async fn check_sticky_ad_unit() {
         let server = MockServer::start().await;
         let mut manager = setup_manager(server.uri());
         let history = vec![HistoryEntry {
@@ -663,7 +667,7 @@ mod test {
             campaign: DUMMY_CAMPAIGN.clone(),
             units_with_price: vec![UnitsWithPrice {
                 unit: AdUnit::from(&DUMMY_AD_UNITS[0]),
-                price: UnifiedNum::from_u64(10_000),
+                price: UnifiedNum::from_whole(0.0001),
             }],
         };
         let res = manager
@@ -677,13 +681,14 @@ mod test {
             campaign: DUMMY_CAMPAIGN.clone(),
             units_with_price: vec![UnitsWithPrice {
                 unit: AdUnit::from(&DUMMY_AD_UNITS[1]),
-                price: UnifiedNum::from_u64(10_000),
+                price: UnifiedNum::from_whole(0.0001),
             }],
         };
 
-        // TODO: This panics, verify that this is the correct behaviour
-        manager
+        let res = manager
             .get_sticky_ad_unit(&[campaign], "http://localhost:1337")
             .await;
+
+        assert!(res.is_none());
     }
 }
