@@ -113,14 +113,14 @@ impl TryFrom<Value> for ValidatorId {
 
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
-/// A Validator description which includes the identity, fee (pro milles) and the Sentry URL.
+/// A Validator description which includes the identity, fee (per event) and the Sentry URL.
 pub struct ValidatorDesc {
     pub id: ValidatorId,
-    /// The validator fee in pro milles (per 1000)
+    /// The validator fee in per event
     ///
     /// Each fee is calculated based on the payout for an event.
     ///
-    /// payout * fee / 1000 = event fee payout
+    /// payout * fee = event fee payout
     pub fee: UnifiedNum,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     /// The address which will receive the fees

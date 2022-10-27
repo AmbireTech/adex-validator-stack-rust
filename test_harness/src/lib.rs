@@ -299,9 +299,8 @@ mod tests {
             id: VALIDATORS[&LEADER].address.into(),
             url: VALIDATORS[&LEADER].sentry_url.to_string(),
             // min_validator_fee for token: 0.000_010
-            // fee per 1000 (pro mille) = 5.00000000 (UnifiedNum)
-            // fee per 1 payout: payout * fee / 1000 = payout * 0.00500000
-            fee: 500_000_000.into(),
+            // fee per 1 payout: payout * fee  = payout * 0.00500000
+            fee: UnifiedNum::from_whole(0.005),
             fee_addr: None,
         };
 
@@ -309,9 +308,8 @@ mod tests {
             id: VALIDATORS[&FOLLOWER].address.into(),
             url: VALIDATORS[&FOLLOWER].sentry_url.to_string(),
             // min_validator_fee for token: 0.000_010
-            // fee per 1000 (pro mille) = 4.00000000 (UnifiedNum)
-            // fee per 1 payout: payout * fee / 1000 = payout * 0.00400000
-            fee: 400_000_000.into(),
+            // fee per 1 payout: payout * fee = payout * 0.00400000
+            fee: UnifiedNum::from_whole(0.004),
             fee_addr: None,
         };
 
@@ -391,9 +389,8 @@ mod tests {
         let leader_desc = ValidatorDesc {
             id: VALIDATORS[&FOLLOWER].address.into(),
             url: VALIDATORS[&FOLLOWER].sentry_url.to_string(),
-            // fee per 1000 (pro mille) = 0.10000000 (UnifiedNum)
             // fee per 1 = 0.00010000
-            fee: UnifiedNum::from_whole(0.1),
+            fee: UnifiedNum::from_whole(0.0001),
             fee_addr: None,
         };
 
@@ -402,9 +399,8 @@ mod tests {
         let follower_desc = ValidatorDesc {
             id: VALIDATORS[&LEADER].address.into(),
             url: VALIDATORS[&LEADER].sentry_url.to_string(),
-            // fee per 1000 (pro mille) = 0.05000000 (UnifiedNum)
             // fee per 1 = 0.00005000
-            fee: UnifiedNum::from_whole(0.05),
+            fee: UnifiedNum::from_whole(0.00005),
             fee_addr: None,
         };
 
@@ -481,9 +477,8 @@ mod tests {
             id: VALIDATORS[&LEADER].address.into(),
             url: VALIDATORS[&LEADER].sentry_url.to_string(),
             // min_validator_fee for token: 0.000_010
-            // fee per 1000 (pro mille) = 2.00000000
             // fee per 1 payout: payout * fee / 1000 = payout * 0.00200000
-            fee: UnifiedNum::from_whole(2),
+            fee: UnifiedNum::from_whole(0.002),
             fee_addr: None,
         };
 
@@ -491,9 +486,8 @@ mod tests {
             id: VALIDATORS[&FOLLOWER].address.into(),
             url: VALIDATORS[&FOLLOWER].sentry_url.to_string(),
             // min_validator_fee for token: 0.000_010
-            // fee per 1000 (pro mille) = 1.75000000
-            // fee per 1 payout: payout * fee / 1000 = payout * 0.00175000
-            fee: UnifiedNum::from_whole(1.75),
+            // fee per 1 payout: payout * fee = payout * 0.00175000
+            fee: UnifiedNum::from_whole(0.00175),
             fee_addr: None,
         };
 
