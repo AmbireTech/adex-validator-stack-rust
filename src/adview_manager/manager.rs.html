@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `adview-manager/src/manager.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>manager.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><a class="sidebar-logo" href="../../adview_manager/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div></a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../adview_manager/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `adview-manager/src/manager.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>manager.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../adview_manager/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -608,6 +608,87 @@
 <span id="608">608</span>
 <span id="609">609</span>
 <span id="610">610</span>
+<span id="611">611</span>
+<span id="612">612</span>
+<span id="613">613</span>
+<span id="614">614</span>
+<span id="615">615</span>
+<span id="616">616</span>
+<span id="617">617</span>
+<span id="618">618</span>
+<span id="619">619</span>
+<span id="620">620</span>
+<span id="621">621</span>
+<span id="622">622</span>
+<span id="623">623</span>
+<span id="624">624</span>
+<span id="625">625</span>
+<span id="626">626</span>
+<span id="627">627</span>
+<span id="628">628</span>
+<span id="629">629</span>
+<span id="630">630</span>
+<span id="631">631</span>
+<span id="632">632</span>
+<span id="633">633</span>
+<span id="634">634</span>
+<span id="635">635</span>
+<span id="636">636</span>
+<span id="637">637</span>
+<span id="638">638</span>
+<span id="639">639</span>
+<span id="640">640</span>
+<span id="641">641</span>
+<span id="642">642</span>
+<span id="643">643</span>
+<span id="644">644</span>
+<span id="645">645</span>
+<span id="646">646</span>
+<span id="647">647</span>
+<span id="648">648</span>
+<span id="649">649</span>
+<span id="650">650</span>
+<span id="651">651</span>
+<span id="652">652</span>
+<span id="653">653</span>
+<span id="654">654</span>
+<span id="655">655</span>
+<span id="656">656</span>
+<span id="657">657</span>
+<span id="658">658</span>
+<span id="659">659</span>
+<span id="660">660</span>
+<span id="661">661</span>
+<span id="662">662</span>
+<span id="663">663</span>
+<span id="664">664</span>
+<span id="665">665</span>
+<span id="666">666</span>
+<span id="667">667</span>
+<span id="668">668</span>
+<span id="669">669</span>
+<span id="670">670</span>
+<span id="671">671</span>
+<span id="672">672</span>
+<span id="673">673</span>
+<span id="674">674</span>
+<span id="675">675</span>
+<span id="676">676</span>
+<span id="677">677</span>
+<span id="678">678</span>
+<span id="679">679</span>
+<span id="680">680</span>
+<span id="681">681</span>
+<span id="682">682</span>
+<span id="683">683</span>
+<span id="684">684</span>
+<span id="685">685</span>
+<span id="686">686</span>
+<span id="687">687</span>
+<span id="688">688</span>
+<span id="689">689</span>
+<span id="690">690</span>
+<span id="691">691</span>
 </pre><pre class="rust"><code><span class="doccomment">//! The AdView Manager
 </span><span class="kw">use </span>adex_primitives::{
     sentry::{
@@ -761,13 +842,8 @@
         <span class="kw-2">mut </span>input: input::Input,
         campaign_id: CampaignId,
     ) -&gt; input::Input {
-        <span class="kw">let </span>seconds_since_campaign_impression = <span class="self">self
-            </span>.history
-            .read()
-            .<span class="kw">await
-            </span>.iter()
-            .rev()
-            .find_map(|h| {
+        <span class="kw">let </span>seconds_since_campaign_impression =
+            <span class="self">self</span>.history.read().<span class="kw">await</span>.iter().rev().find_map(|h| {
                 <span class="kw">if </span>h.campaign_id == campaign_id {
                     <span class="kw">let </span>last_impression: Duration = Utc::now() - h.time;
 
@@ -775,8 +851,7 @@
                 } <span class="kw">else </span>{
                     <span class="prelude-val">None
                 </span>}
-            })
-            .unwrap_or(u64::MAX);
+            });
 
         input.ad_view = <span class="prelude-val">Some</span>(input::AdView {
             seconds_since_campaign_impression,
@@ -813,17 +888,13 @@
             .iter()
             .find(|c| c.campaign.id == sticky_entry.campaign_id)<span class="question-mark">?</span>;
 
-        <span class="kw">let </span>unit = stick_campaign
-            .units_with_price
-            .iter()
-            .find_map(|u| {
-                <span class="kw">if </span>u.unit.ipfs == sticky_entry.unit_id {
-                    <span class="prelude-val">Some</span>(u.unit.clone())
-                } <span class="kw">else </span>{
-                    <span class="prelude-val">None
-                </span>}
-            })
-            .expect(<span class="string">&quot;Something went terribly wrong. Data is corrupted! There should be an AdUnit&quot;</span>);
+        <span class="kw">let </span>unit = stick_campaign.units_with_price.iter().find_map(|u| {
+            <span class="kw">if </span>u.unit.ipfs == sticky_entry.unit_id {
+                <span class="prelude-val">Some</span>(u.unit.clone())
+            } <span class="kw">else </span>{
+                <span class="prelude-val">None
+            </span>}
+        })<span class="question-mark">?</span>;
 
         <span class="kw">let </span>html = get_unit_html_with_events(
             <span class="kw-2">&amp;</span><span class="self">self</span>.options,
@@ -903,7 +974,7 @@
 
     <span class="kw">pub async fn </span>get_next_ad_unit(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;NextAdUnit&gt;, Error&gt; {
         <span class="kw">let </span>units_for_slot = <span class="self">self</span>.get_units_for_slot_resp().<span class="kw">await</span><span class="question-mark">?</span>;
-        <span class="kw">let </span>m_campaigns = <span class="kw-2">&amp;</span>units_for_slot.campaigns;
+        <span class="kw">let </span>ufs_campaigns = <span class="kw-2">&amp;</span>units_for_slot.campaigns;
         <span class="kw">let </span>fallback_unit = units_for_slot.fallback_unit;
         <span class="kw">let </span>targeting_input = units_for_slot.targeting_input_base;
 
@@ -915,7 +986,7 @@
 
         <span class="comment">// Stickiness is when we keep showing an ad unit for a slot for some time in order to achieve fair impression value
         // see https://github.com/AdExNetwork/adex-adview-manager/issues/65
-        </span><span class="kw">let </span>sticky_result = <span class="self">self</span>.get_sticky_ad_unit(m_campaigns, <span class="kw-2">&amp;</span>hostname).<span class="kw">await</span>;
+        </span><span class="kw">let </span>sticky_result = <span class="self">self</span>.get_sticky_ad_unit(ufs_campaigns, <span class="kw-2">&amp;</span>hostname).<span class="kw">await</span>;
         <span class="kw">if let </span><span class="prelude-val">Some</span>(sticky) = sticky_result {
             <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(NextAdUnit {
                 unit: sticky.unit,
@@ -932,19 +1003,19 @@
         <span class="kw">let </span>seed = BigNum::from(random <span class="kw">as </span>u64);
 
         <span class="comment">// Apply targeting, now with adView.* variables, and sort the resulting ad units
-        </span><span class="kw">let </span><span class="kw-2">mut </span>units_with_price = m_campaigns
+        </span><span class="kw">let </span><span class="kw-2">mut </span>units_with_price = ufs_campaigns
             .iter()
-            .flat_map(|m_campaign| {
+            .flat_map(|ufs_campaign| {
                 <span class="comment">// since we are in a Iterator.map(), we can&#39;t use async, so we block
-                </span><span class="kw">if </span>block_on(<span class="self">self</span>.is_campaign_sticky(m_campaign.campaign.id)) {
+                </span><span class="kw">if </span>block_on(<span class="self">self</span>.is_campaign_sticky(ufs_campaign.campaign.id)) {
                     <span class="kw">return </span><span class="macro">vec!</span>[];
                 }
 
-                <span class="kw">let </span>campaign_id = m_campaign.campaign.id;
+                <span class="kw">let </span>campaign_id = ufs_campaign.campaign.id;
 
-                <span class="kw">let </span><span class="kw-2">mut </span>unit_input = targeting_input.clone().with_campaign(m_campaign.campaign.clone());
+                <span class="kw">let </span><span class="kw-2">mut </span>unit_input = targeting_input.clone().with_campaign(ufs_campaign.campaign.clone());
 
-                m_campaign
+                ufs_campaign
                     .units_with_price
                     .iter()
                     .filter(|unit_with_price| {
@@ -959,7 +1030,7 @@
                         <span class="kw">let </span>on_type_error = |type_error, rule| <span class="macro">error!</span>(target: <span class="string">&quot;rule-evaluation&quot;</span>, <span class="string">&quot;Rule evaluation error for {campaign_id:?}, {rule:?} with error: {type_error:?}&quot;</span>);
 
                         targeting::eval_with_callback(
-                            <span class="kw-2">&amp;</span>m_campaign.campaign.targeting_rules,
+                            <span class="kw-2">&amp;</span>ufs_campaign.campaign.targeting_rules,
                             <span class="kw-2">&amp;</span>unit_input,
                             <span class="kw-2">&amp;mut </span>output,
                             <span class="prelude-val">Some</span>(on_type_error)
@@ -1007,11 +1078,11 @@
 
         <span class="comment">// Return the results, with a fallback unit if there is one
         </span><span class="kw">if let </span><span class="prelude-val">Some</span>((unit_with_price, campaign_id)) = auction_winner {
-            <span class="kw">let </span>validators = m_campaigns
+            <span class="kw">let </span>validators = ufs_campaigns
                 .iter()
-                .find_map(|m_campaign| {
-                    <span class="kw">if </span><span class="kw-2">&amp;</span>m_campaign.campaign.id == campaign_id {
-                        <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>m_campaign.campaign.validators)
+                .find_map(|ufs_campaign| {
+                    <span class="kw">if </span><span class="kw-2">&amp;</span>ufs_campaign.campaign.id == campaign_id {
+                        <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>ufs_campaign.campaign.validators)
                     } <span class="kw">else </span>{
                         <span class="prelude-val">None
                     </span>}
@@ -1053,14 +1124,46 @@
     <span class="kw">use super</span>::<span class="kw-2">*</span>;
     <span class="kw">use </span><span class="kw">crate</span>::manager::input::Input;
     <span class="kw">use </span>adex_primitives::{
-        sentry::CLICK,
-        test_util::{CAMPAIGNS, DUMMY_AD_UNITS, DUMMY_IPFS, PUBLISHER},
+        config::GANACHE_CONFIG,
+        sentry::{
+            units_for_slot::response::{AdUnit, UnitsWithPrice},
+            CLICK,
+        },
+        test_util::{CAMPAIGNS, DUMMY_AD_UNITS, DUMMY_CAMPAIGN, DUMMY_IPFS, PUBLISHER},
+        unified_num::FromWhole,
     };
     <span class="kw">use </span>wiremock::{
         matchers::{method, path},
         Mock, MockServer, ResponseTemplate,
     };
 
+    <span class="kw">fn </span>setup_manager(uri: String) -&gt; Manager {
+        <span class="kw">let </span>market_url = uri.parse().unwrap();
+        <span class="kw">let </span>whitelisted_tokens = GANACHE_CONFIG
+            .chains
+            .values()
+            .flat_map(|chain| chain.tokens.values().map(|token| token.address))
+            .collect::&lt;HashSet&lt;<span class="kw">_</span>&gt;&gt;();
+
+        <span class="kw">let </span>validator_1_url = ApiUrl::parse(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;{}/validator-1&quot;</span>, uri)).expect(<span class="string">&quot;should parse&quot;</span>);
+        <span class="kw">let </span>validator_2_url = ApiUrl::parse(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;{}/validator-2&quot;</span>, uri)).expect(<span class="string">&quot;should parse&quot;</span>);
+        <span class="kw">let </span>validator_3_url = ApiUrl::parse(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;{}/validator-3&quot;</span>, uri)).expect(<span class="string">&quot;should parse&quot;</span>);
+
+        <span class="kw">let </span>options = Options {
+            market_url,
+            market_slot: DUMMY_IPFS[<span class="number">0</span>],
+            publisher_addr: <span class="kw-2">*</span>PUBLISHER,
+            <span class="comment">// All passed tokens must be of the same price and decimals, so that the amounts can be accurately compared
+            </span>whitelisted_tokens,
+            size: <span class="prelude-val">Some</span>(Size::new(<span class="number">300</span>, <span class="number">100</span>)),
+            navigator_language: <span class="prelude-val">Some</span>(<span class="string">&quot;bg&quot;</span>.into()),
+            disabled_video: <span class="bool-val">false</span>,
+            disabled_sticky: <span class="bool-val">false</span>,
+            validators: <span class="macro">vec!</span>[validator_1_url, validator_2_url, validator_3_url],
+        };
+
+        Manager::new(options.clone(), Default::default()).expect(<span class="string">&quot;Failed to create AdView Manager&quot;</span>)
+    }
     <span class="attribute">#[tokio::test]
     </span><span class="kw">async fn </span>test_querying_for_units_for_slot() {
         <span class="comment">// 1. Set up mock servers for each validator
@@ -1183,30 +1286,7 @@
             .<span class="kw">await</span>;
 
         <span class="comment">// 2. Set up a manager
-        </span><span class="kw">let </span>market_url = server.uri().parse().unwrap();
-        <span class="kw">let </span>whitelisted_tokens = DEFAULT_TOKENS.clone();
-
-        <span class="kw">let </span>validator_1_url =
-            ApiUrl::parse(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;{}/validator-1&quot;</span>, server.uri())).expect(<span class="string">&quot;should parse&quot;</span>);
-        <span class="kw">let </span>validator_2_url =
-            ApiUrl::parse(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;{}/validator-2&quot;</span>, server.uri())).expect(<span class="string">&quot;should parse&quot;</span>);
-        <span class="kw">let </span>validator_3_url =
-            ApiUrl::parse(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;{}/validator-3&quot;</span>, server.uri())).expect(<span class="string">&quot;should parse&quot;</span>);
-        <span class="kw">let </span>options = Options {
-            market_url,
-            market_slot: DUMMY_IPFS[<span class="number">0</span>],
-            publisher_addr: <span class="kw-2">*</span>PUBLISHER,
-            <span class="comment">// All passed tokens must be of the same price and decimals, so that the amounts can be accurately compared
-            </span>whitelisted_tokens,
-            size: <span class="prelude-val">Some</span>(Size::new(<span class="number">300</span>, <span class="number">100</span>)),
-            navigator_language: <span class="prelude-val">Some</span>(<span class="string">&quot;bg&quot;</span>.into()),
-            disabled_video: <span class="bool-val">false</span>,
-            disabled_sticky: <span class="bool-val">false</span>,
-            validators: <span class="macro">vec!</span>[validator_1_url, validator_2_url, validator_3_url],
-        };
-
-        <span class="kw">let </span>manager = Manager::new(options.clone(), Default::default())
-            .expect(<span class="string">&quot;Failed to create AdView Manager&quot;</span>);
+        </span><span class="kw">let </span>manager = setup_manager(server.uri());
 
         <span class="kw">let </span>res = manager
             .get_units_for_slot_resp()
@@ -1217,6 +1297,88 @@
         <span class="macro">assert_eq!</span>(res.fallback_unit, <span class="prelude-val">Some</span>(original_ad_unit));
         <span class="macro">assert_eq!</span>(res.campaigns, <span class="macro">vec!</span>[campaign_0, campaign_1, campaign_2]);
     }
+
+    <span class="attribute">#[tokio::test]
+    </span><span class="kw">async fn </span>check_if_campaign_is_sticky() {
+        <span class="kw">let </span><span class="kw-2">mut </span>manager = setup_manager(<span class="string">&quot;http://localhost:1337&quot;</span>.to_string());
+
+        <span class="comment">// Case 1 - options has disabled sticky
+        </span>{
+            manager.options.disabled_sticky = <span class="bool-val">true</span>;
+            <span class="macro">assert!</span>(!manager.is_campaign_sticky(DUMMY_CAMPAIGN.id).<span class="kw">await</span>);
+            manager.options.disabled_sticky = <span class="bool-val">false</span>;
+        }
+        <span class="comment">// Case 2 - time is past stickiness treshold, less than 4 minutes ago
+        </span>{
+            <span class="kw">let </span>history = <span class="macro">vec!</span>[HistoryEntry {
+                time: Utc::now() - Duration::days(<span class="number">1</span>), <span class="comment">// 24 hours ago
+                </span>unit_id: DUMMY_IPFS[<span class="number">0</span>],
+                campaign_id: DUMMY_CAMPAIGN.id,
+                slot_id: DUMMY_IPFS[<span class="number">1</span>],
+            }];
+            <span class="kw">let </span>history = Arc::new(RwLock::new(VecDeque::from(history)));
+
+            manager.history = history;
+
+            <span class="macro">assert!</span>(!manager.is_campaign_sticky(DUMMY_CAMPAIGN.id).<span class="kw">await</span>);
+        }
+        <span class="comment">// Case 3 - time isn&#39;t past stickiness treshold, Utc::now()
+        </span>{
+            <span class="kw">let </span>history = <span class="macro">vec!</span>[HistoryEntry {
+                time: Utc::now(),
+                unit_id: DUMMY_IPFS[<span class="number">0</span>],
+                campaign_id: DUMMY_CAMPAIGN.id,
+                slot_id: DUMMY_IPFS[<span class="number">1</span>],
+            }];
+            <span class="kw">let </span>history = Arc::new(RwLock::new(VecDeque::from(history)));
+
+            manager.history = history;
+
+            <span class="macro">assert!</span>(manager.is_campaign_sticky(DUMMY_CAMPAIGN.id).<span class="kw">await</span>);
+        }
+    }
+
+    <span class="attribute">#[tokio::test]
+    </span><span class="kw">async fn </span>check_sticky_ad_unit() {
+        <span class="kw">let </span>server = MockServer::start().<span class="kw">await</span>;
+        <span class="kw">let </span><span class="kw-2">mut </span>manager = setup_manager(server.uri());
+        <span class="kw">let </span>history = <span class="macro">vec!</span>[HistoryEntry {
+            time: Utc::now(),
+            unit_id: DUMMY_AD_UNITS[<span class="number">0</span>].ipfs,
+            campaign_id: DUMMY_CAMPAIGN.id,
+            slot_id: manager.options.market_slot,
+        }];
+        <span class="kw">let </span>history = Arc::new(RwLock::new(VecDeque::from(history)));
+        manager.history = history;
+
+        <span class="kw">let </span>campaign = Campaign {
+            campaign: DUMMY_CAMPAIGN.clone(),
+            units_with_price: <span class="macro">vec!</span>[UnitsWithPrice {
+                unit: AdUnit::from(<span class="kw-2">&amp;</span>DUMMY_AD_UNITS[<span class="number">0</span>]),
+                price: UnifiedNum::from_whole(<span class="number">0.0001</span>),
+            }],
+        };
+        <span class="kw">let </span>res = manager
+            .get_sticky_ad_unit(<span class="kw-2">&amp;</span>[campaign], <span class="string">&quot;http://localhost:1337&quot;</span>)
+            .<span class="kw">await</span>;
+
+        <span class="macro">assert!</span>(res.is_some());
+
+        <span class="comment">// TODO: Here we modify the campaign manually, verify that such a scenario is possible
+        </span><span class="kw">let </span>campaign = Campaign {
+            campaign: DUMMY_CAMPAIGN.clone(),
+            units_with_price: <span class="macro">vec!</span>[UnitsWithPrice {
+                unit: AdUnit::from(<span class="kw-2">&amp;</span>DUMMY_AD_UNITS[<span class="number">1</span>]),
+                price: UnifiedNum::from_whole(<span class="number">0.0001</span>),
+            }],
+        };
+
+        <span class="kw">let </span>res = manager
+            .get_sticky_ad_unit(<span class="kw-2">&amp;</span>[campaign], <span class="string">&quot;http://localhost:1337&quot;</span>)
+            .<span class="kw">await</span>;
+
+        <span class="macro">assert!</span>(res.is_none());
+    }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="adview_manager" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.0-nightly (a24a020e6 2022-10-18)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="adview_manager" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.0-nightly (0da281b60 2022-10-27)" ></div></body></html>
