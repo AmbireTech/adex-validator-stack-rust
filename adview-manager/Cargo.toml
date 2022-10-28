@@ -33,3 +33,4 @@ rand = "0.8"
 adex_primitives = { version = "0.2", path = "../primitives", package = "primitives", features = ["test-util"] }
 wiremock = "0.5"
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+scraper = "0.13"

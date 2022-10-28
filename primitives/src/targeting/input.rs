@@ -116,7 +116,7 @@ impl GetField for Input {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct AdView {
-    pub seconds_since_campaign_impression: u64,
+    pub seconds_since_campaign_impression: Option<u64>,
     pub has_custom_preferences: bool,
     pub navigator_language: String,
 }
@@ -127,9 +127,13 @@ impl GetField for AdView {
 
     fn get(&self, field: &Self::Field) -> Self::Output {
         match field {
-            field::AdView::SecondsSinceCampaignImpression => {
-                Value::Number(self.seconds_since_campaign_impression.into())
-            }
+            // We could use `Option`, however, `try_get` will return `UnknownVariable`
+            // this is why we use `u64::MAX` when returning the value of the field.
+            field::AdView::SecondsSinceCampaignImpression => Value::Number(
+                self.seconds_since_campaign_impression
+                    .unwrap_or(u64::MAX)
+                    .into(),
+            ),
             field::AdView::HasCustomPreferences => Value::Bool(self.has_custom_preferences),
             field::AdView::NavigatorLanguage => Value::String(self.navigator_language.clone()),
         }
@@ -418,7 +422,7 @@ mod test {
 
         let full_input = Input {
             ad_view: Some(AdView {
-                seconds_since_campaign_impression: 10,
+                seconds_since_campaign_impression: Some(10),
                 has_custom_preferences: true,
                 navigator_language: "en".into(),
             }),
