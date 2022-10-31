@@ -228,7 +228,7 @@ pub static DUMMY_AD_UNITS: Lazy<[AdUnit; 4]> = Lazy::new(|| {
             target_url: "https://www.adex.network/?stremio-test-banner-1".to_string(),
             archived: false,
             description: Some("Dummy AdUnit description 1".to_string()),
-            ad_type: "legacy_250x250".to_string(),
+            ad_type: "legacy_300x100".to_string(),
             /// Timestamp: 1 564 383 600
             created: Utc.ymd(2019, 7, 29).and_hms(9, 0, 0),
             min_targeting_score: None,
