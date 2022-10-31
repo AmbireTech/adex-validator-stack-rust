@@ -148,16 +148,16 @@ mod logger {
 
 pub static DUMMY_VALIDATOR_LEADER: Lazy<ValidatorDesc> = Lazy::new(|| ValidatorDesc {
     id: IDS[&LEADER],
-    url: "http://localhost:8005".to_string(),
     fee: UnifiedNum::from_whole(0.03),
     fee_addr: None,
+    url: "http://localhost:8005".to_string(),
 });
 
 pub static DUMMY_VALIDATOR_FOLLOWER: Lazy<ValidatorDesc> = Lazy::new(|| ValidatorDesc {
     id: IDS[&FOLLOWER],
-    url: "http://localhost:8006".to_string(),
     fee: UnifiedNum::from_whole(0.02),
     fee_addr: None,
+    url: "http://localhost:8006".to_string(),
 });
 
 /// Dummy Campaign uses Ganache #1337 with the mocked token
@@ -223,66 +223,66 @@ pub static DUMMY_AD_UNITS: Lazy<[AdUnit; 4]> = Lazy::new(|| {
         AdUnit {
             ipfs: IPFS::try_from("Qmasg8FrbuSQpjFu3kRnZF9beg8rEBFrqgi1uXDRwCbX5f")
                 .expect("should convert"),
+            ad_type: "legacy_250x250".to_string(),
             media_url: "ipfs://QmcUVX7fvoLMM93uN2bD3wGTH8MXSxeL8hojYfL2Lhp7mR".to_string(),
             media_mime: "image/jpeg".to_string(),
             target_url: "https://www.adex.network/?stremio-test-banner-1".to_string(),
-            archived: false,
-            description: Some("Dummy AdUnit description 1".to_string()),
-            ad_type: "legacy_250x250".to_string(),
+            min_targeting_score: None,
+            owner: IDS[&PUBLISHER],
             /// Timestamp: 1 564 383 600
             created: Utc.ymd(2019, 7, 29).and_hms(9, 0, 0),
-            min_targeting_score: None,
-            modified: None,
-            owner: IDS[&PUBLISHER],
             title: Some("Dummy AdUnit 1".to_string()),
+            description: Some("Dummy AdUnit description 1".to_string()),
+            archived: false,
+            modified: None,
         },
         AdUnit {
             ipfs: IPFS::try_from("QmVhRDGXoM3Fg3HZD5xwMuxtb9ZErwC8wHt8CjsfxaiUbZ")
                 .expect("should convert"),
+            ad_type: "legacy_250x250".to_string(),
             media_url: "ipfs://QmQB7uz7Gxfy7wqAnrnBcZFaVJLos8J9gn8mRcHQU6dAi1".to_string(),
             media_mime: "image/jpeg".to_string(),
             target_url: "https://www.adex.network/?adex-campaign=true&pub=stremio".to_string(),
-            archived: false,
-            description: Some("Dummy AdUnit description 2".to_string()),
-            ad_type: "legacy_250x250".to_string(),
+            min_targeting_score: None,
+            owner: IDS[&PUBLISHER],
             /// Timestamp: 1 564 383 600
             created: Utc.ymd(2019, 7, 29).and_hms(9, 0, 0),
-            min_targeting_score: None,
-            modified: None,
-            owner: IDS[&PUBLISHER],
             title: Some("Dummy AdUnit 2".to_string()),
+            description: Some("Dummy AdUnit description 2".to_string()),
+            archived: false,
+            modified: None,
         },
         AdUnit {
             ipfs: IPFS::try_from("QmYwcpMjmqJfo9ot1jGe9rfXsszFV1WbEA59QS7dEVHfJi")
                 .expect("should convert"),
+            ad_type: "legacy_250x250".to_string(),
             media_url: "ipfs://QmQB7uz7Gxfy7wqAnrnBcZFaVJLos8J9gn8mRcHQU6dAi1".to_string(),
             media_mime: "image/jpeg".to_string(),
             target_url: "https://www.adex.network/?adex-campaign=true".to_string(),
-            archived: false,
-            description: Some("Dummy AdUnit description 3".to_string()),
-            ad_type: "legacy_250x250".to_string(),
+            min_targeting_score: None,
+            owner: IDS[&PUBLISHER],
             /// Timestamp: 1 564 383 600
             created: Utc.ymd(2019, 7, 29).and_hms(9, 0, 0),
-            min_targeting_score: None,
-            modified: None,
-            owner: IDS[&PUBLISHER],
             title: Some("Dummy AdUnit 3".to_string()),
+            description: Some("Dummy AdUnit description 3".to_string()),
+            archived: false,
+            modified: None,
         },
         AdUnit {
             ipfs: IPFS::try_from("QmTAF3FsFDS7Ru8WChoD9ofiHTH8gAQfR4mYSnwxqTDpJH")
                 .expect("should convert"),
+            ad_type: "legacy_250x250".to_string(),
             media_url: "ipfs://QmQAcfBJpDDuH99A4p3pFtUmQwamS8UYStP5HxHC7bgYXY".to_string(),
             media_mime: "image/jpeg".to_string(),
             target_url: "https://adex.network".to_string(),
-            archived: false,
-            description: Some("Dummy AdUnit description 4".to_string()),
-            ad_type: "legacy_250x250".to_string(),
+            min_targeting_score: None,
+            owner: IDS[&PUBLISHER],
             /// Timestamp: 1 564 383 600
             created: Utc.ymd(2019, 7, 29).and_hms(9, 0, 0),
-            min_targeting_score: None,
-            modified: None,
-            owner: IDS[&PUBLISHER],
             title: Some("Dummy AdUnit 4".to_string()),
+            description: Some("Dummy AdUnit description 4".to_string()),
+            archived: false,
+            modified: None,
         },
     ]
 });

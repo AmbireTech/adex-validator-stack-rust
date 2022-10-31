@@ -50,10 +50,6 @@ const TEST_AD_SLOT: Lazy<(AdSlot, AdUnit)> = Lazy::new(|| {
     let ad_slot = AdSlot {
         ipfs: DUMMY_IPFS[0],
         ad_type: "legacy_250x250".to_string(),
-        archived: false,
-        created: Utc.ymd(2019, 7, 29).and_hms(7, 0, 0),
-        description: Some("Test slot for running integration tests".to_string()),
-        fallback_unit: Some(fallback_unit.ipfs),
         min_per_impression: Some(
             [
                 (
@@ -68,11 +64,15 @@ const TEST_AD_SLOT: Lazy<(AdSlot, AdUnit)> = Lazy::new(|| {
             .into_iter()
             .collect(),
         ),
-        modified: Some(Utc.ymd(2019, 7, 29).and_hms(7, 0, 0)),
-        owner: IDS[&PUBLISHER],
-        title: Some("Test slot 1".to_string()),
-        website: Some("https://adex.network".to_string()),
         rules: Rules::default(),
+        fallback_unit: Some(fallback_unit.ipfs),
+        owner: IDS[&PUBLISHER],
+        created: Utc.ymd(2019, 7, 29).and_hms(7, 0, 0),
+        title: Some("Test slot 1".to_string()),
+        description: Some("Test slot for running integration tests".to_string()),
+        website: Some("https://adex.network".to_string()),
+        archived: false,
+        modified: Some(Utc.ymd(2019, 7, 29).and_hms(7, 0, 0)),
     };
 
     assert_ne!(
