@@ -1,37 +1,41 @@
-use std::sync::Arc;
+use std::{collections::HashSet, fmt::Display, ops::Deref, str::FromStr, sync::Arc};
 
 use anyhow::{anyhow, bail};
 use axum::{
     http::{header::ACCEPT_LANGUAGE, HeaderMap, StatusCode},
     response::Html,
-    Extension, Json,
+    Extension,
 };
-use chrono::Utc;
+use axum_extra::extract::Form;
+use chrono::{TimeZone, Utc};
+use once_cell::sync::Lazy;
 use reqwest::Client;
+use serde::{de::Error as _, Deserialize, Deserializer, Serialize};
 use tera::Context;
-use tracing::debug;
-use wiremock::{
-    matchers::{method, path, query_param},
-    Mock, MockServer, ResponseTemplate,
-};
 
 use adex_primitives::{
     config::GANACHE_CONFIG,
     platform::{AdSlotResponse, Website},
-    sentry::{units_for_slot, IMPRESSION},
-    targeting::{input::Global, Input},
+    targeting::Rules,
     test_util::{
         DUMMY_AD_UNITS, DUMMY_CAMPAIGN, DUMMY_IPFS, DUMMY_VALIDATOR_FOLLOWER,
-        DUMMY_VALIDATOR_LEADER, PUBLISHER,
+        DUMMY_VALIDATOR_LEADER, IDS, PUBLISHER,
     },
     util::ApiUrl,
-    AdSlot, ToHex,
+    AdSlot, Address,
 };
-use adview_manager::{
-    get_unit_html_with_events, manager::Size, manager::DEFAULT_TOKENS, Manager, Options,
-};
+use adview_manager::{get_unit_html_with_events, manager::Size, Manager, Options};
 
 use crate::app::{Error, State};
+
+/// All the configured tokens in the `ganache.toml` config file
+pub static WHITELISTED_TOKENS: Lazy<HashSet<Address>> = Lazy::new(|| {
+    GANACHE_CONFIG
+        .chains
+        .values()
+        .flat_map(|chain| chain.tokens.values().map(|token| token.address))
+        .collect()
+});
 
 /// `GET /`
 pub async fn get_index(Extension(state): Extension<Arc<State>>) -> Html<String> {
@@ -45,79 +49,27 @@ pub async fn get_index(Extension(state): Extension<Arc<State>>) -> Html<String> 
 
 /// `GET /preview/ad`
 pub async fn get_preview_ad(Extension(state): Extension<Arc<State>>) -> Html<String> {
-    // For mocking the `get_units_for_slot_resp` call
-    let mock_server = MockServer::start().await;
-
-    let whitelisted_tokens = DEFAULT_TOKENS.clone();
     let disabled_video = false;
     let publisher_addr = *PUBLISHER;
+    let campaign = DUMMY_CAMPAIGN.clone();
+    // ordering matters
+    let validators_url = vec![
+        ApiUrl::parse(&campaign.leader().unwrap().url).expect("should parse"),
+        ApiUrl::parse(&campaign.leader().unwrap().url).expect("should parse"),
+    ];
 
     let options = Options {
         market_slot: DUMMY_IPFS[0],
         publisher_addr,
         // All passed tokens must be of the same price and decimals, so that the amounts can be accurately compared
-        whitelisted_tokens,
+        whitelisted_tokens: WHITELISTED_TOKENS.clone(),
         size: Some(Size::new(300, 100)),
-        // TODO: Check this value
         navigator_language: Some("bg".into()),
         /// Defaulted
         disabled_video,
         disabled_sticky: false,
-        validators: vec![
-            ApiUrl::parse(&DUMMY_VALIDATOR_LEADER.url).expect("should parse"),
-            ApiUrl::parse(&DUMMY_VALIDATOR_FOLLOWER.url).expect("should parse"),
-        ],
+        validators: validators_url,
     };
-
-    let manager =
-        Manager::new(options.clone(), Default::default()).expect("Failed to create AdView Manager");
-    let pub_prefix = publisher_addr.to_hex();
-
-    let units_for_slot_resp = units_for_slot::response::Response {
-        targeting_input_base: Input {
-            ad_view: None,
-            global: Global {
-                ad_slot_id: options.market_slot,
-                ad_slot_type: "".into(),
-                publisher_id: publisher_addr,
-                country: Some("Bulgaria".into()),
-                event_type: IMPRESSION,
-                seconds_since_epoch: Utc::now(),
-                user_agent_os: None,
-                user_agent_browser_family: None,
-            },
-            campaign: None,
-            balances: None,
-            ad_unit_id: None,
-            ad_slot: None,
-        },
-        accepted_referrers: vec![],
-        fallback_unit: None,
-        campaigns: vec![],
-    };
-
-    // Mock the `get_units_for_slot_resp` call
-    let mock_call = Mock::given(method("GET"))
-        .and(path(format!("units-for-slot/{}", options.market_slot)))
-        // pubPrefix=HEX&depositAssets[]=0xASSET1&depositAssets[]=0xASSET2
-        .and(query_param("pubPrefix", pub_prefix))
-        .and(query_param(
-            "depositAssets[]",
-            "0x6B175474E89094C44Da98b954EedeAC495271d0F",
-        ))
-        .respond_with(ResponseTemplate::new(200).set_body_json(units_for_slot_resp))
-        .expect(1)
-        .named("get_units_for_slot_resp");
-
-    // Mounting the mock on the mock server - it's now effective!
-    mock_call.mount(&mock_server).await;
-
-    let demand_resp = manager
-        .get_units_for_slot_resp()
-        .await
-        .expect("Should return Mocked response");
-
-    debug!("Mocked response: {demand_resp:?}");
 
     let ufs_ad_unit = adex_primitives::sentry::units_for_slot::response::AdUnit {
         /// Same as `ipfs`
@@ -131,8 +83,8 @@ pub async fn get_preview_ad(Extension(state): Extension<Arc<State>>) -> Html<Str
         &options,
         &ufs_ad_unit,
         "localhost",
-        DUMMY_CAMPAIGN.id,
-        &DUMMY_CAMPAIGN.validators,
+        campaign.id,
+        &campaign.validators,
         false,
     );
 
@@ -151,7 +103,6 @@ pub async fn get_preview_ad(Extension(state): Extension<Arc<State>>) -> Html<Str
 
 /// `GET /preview/video`
 pub async fn get_preview_video(Extension(state): Extension<Arc<State>>) -> Html<String> {
-    let whitelisted_tokens = DEFAULT_TOKENS.clone();
     let disabled_video = false;
     let publisher_addr = *PUBLISHER;
 
@@ -159,9 +110,8 @@ pub async fn get_preview_video(Extension(state): Extension<Arc<State>>) -> Html<
         market_slot: DUMMY_IPFS[0],
         publisher_addr,
         // All passed tokens must be of the same price and decimals, so that the amounts can be accurately compared
-        whitelisted_tokens,
+        whitelisted_tokens: WHITELISTED_TOKENS.clone(),
         size: Some(Size::new(728, 90)),
-        // TODO: Check this value
         navigator_language: Some("bg".into()),
         /// Defaulted
         disabled_video,
@@ -205,25 +155,108 @@ pub async fn get_preview_video(Extension(state): Extension<Arc<State>>) -> Html<
     Html(html)
 }
 
-/// `POST /preview`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AdSlotPreview {
+    #[serde(with = "form_json")]
+    adslot_response: AdSlotResponse,
+    #[serde(default)]
+    disabled_video: bool,
+    #[serde(default)]
+    disabled_sticky: bool,
+    publisher: Address,
+    #[serde(deserialize_with = "empty_field_string::<_, ApiUrl>")]
+    validators: Vec<ApiUrl>,
+    #[serde(deserialize_with = "empty_field_string::<_, Address>")]
+    whitelisted_tokens: Vec<Address>,
+}
+
+mod form_json {
+    use serde::{
+        de::{DeserializeOwned, Error as _},
+        ser::Error as _,
+        Deserialize, Deserializer, Serialize, Serializer,
+    };
+
+    pub fn serialize<S, T>(value: &T, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+        T: Serialize,
+    {
+        let json = serde_json::to_string(value).map_err(S::Error::custom)?;
+        serializer.serialize_str(&json)
+    }
+
+    pub fn deserialize<'de, D, T>(deserializer: D) -> Result<T, D::Error>
+    where
+        D: Deserializer<'de>,
+        T: DeserializeOwned,
+    {
+        let json = String::deserialize(deserializer)?;
+
+        serde_json::from_str::<T>(&json).map_err(D::Error::custom)
+    }
+}
+
+pub fn empty_field_string<'de, D, T>(deserializer: D) -> Result<Vec<T>, D::Error>
+where
+    D: Deserializer<'de>,
+    T: FromStr,
+    <T as FromStr>::Err: Display,
+{
+    let vec_of_string = <Vec<String>>::deserialize(deserializer)?;
+
+    vec_of_string
+        .into_iter()
+        .filter_map(|string| {
+            if string.is_empty() {
+                None
+            } else {
+                Some(string.parse::<T>())
+            }
+        })
+        .collect::<Result<_, _>>()
+        .map_err(D::Error::custom)
+}
+
+/// `GET /preview`
 ///
-/// Uses the provided with the POST data [`AdSlot`] and get's a matching [`AdUnit`] html
-/// with the manager.
+/// Shows a form to submit a JSON [`AdSlot`] Response ([`AdSlotResponse`])
+/// from the platform and preview the html with the matching of an [`AdUnit`]
+/// using the manager.
 ///
 /// Uses the Ganache config to select all the whitelisted tokens in all chains.
 /// It's configured to use locally running sentry validators at ports `8005` and `8006`.
 /// Alongside locally running mocked platform at `8004`.
+///
+/// [`AdUnit`]: adex_primitives::AdUnit
 #[axum::debug_handler]
-pub async fn post_slot_preview(
+pub async fn get_slot_preview_form(
     Extension(state): Extension<Arc<State>>,
-    Json(ad_slot): Json<AdSlot>,
-    headers: HeaderMap,
 ) -> Result<Html<String>, Error> {
-    let config = GANACHE_CONFIG.clone();
+    // let config = GANACHE_CONFIG.clone();
 
-    // setup the `AdSlotResponse` from the Platform
-    let response = AdSlotResponse {
-        slot: ad_slot.clone(),
+    let validators = vec![
+        ApiUrl::parse(&DUMMY_VALIDATOR_LEADER.url).expect("should parse"),
+        ApiUrl::parse(&DUMMY_VALIDATOR_FOLLOWER.url).expect("should parse"),
+    ];
+
+    let ad_slot = AdSlot {
+        ipfs: DUMMY_IPFS[0],
+        ad_type: "legacy_300x100".to_string(),
+        min_per_impression: None,
+        rules: Rules::default(),
+        fallback_unit: Some(DUMMY_AD_UNITS[0].ipfs),
+        owner: IDS[&PUBLISHER],
+        created: Utc.ymd(2019, 7, 29).and_hms(7, 0, 0),
+        title: Some("Test slot 1".to_string()),
+        description: Some("Test slot for running integration tests".to_string()),
+        website: Some("https://adex.network".to_string()),
+        archived: false,
+        modified: Some(Utc.ymd(2019, 7, 29).and_hms(7, 0, 0)),
+    };
+
+    let adslot_response = AdSlotResponse {
+        slot: ad_slot,
         fallback: Some(DUMMY_AD_UNITS[0].clone()),
         website: Some(Website {
             categories: vec![
@@ -234,7 +267,43 @@ pub async fn post_slot_preview(
             accepted_referrers: vec![],
         }),
     };
-    setup_platform_response(&response).await?;
+
+    let html = {
+        let mut context = Context::new();
+        context.insert("default_publisher", &*PUBLISHER);
+        context.insert("default_validators", &validators);
+        context.insert("default_adslot_response", &adslot_response);
+        context.insert("default_whitelisted_tokens", WHITELISTED_TOKENS.deref());
+
+        state
+            .tera
+            .render("preview_form.html", &context)
+            .expect("Should render")
+    };
+
+    Ok(Html(html))
+}
+
+/// `POST /preview`
+///
+/// Uses the provided with the POST data and gets a matching [`AdUnit`] html
+/// with the manager.
+///
+/// Uses the Ganache config to select all the whitelisted tokens in all chains.
+/// It's configured to use locally running sentry validators at ports `8005` and `8006`.
+/// Alongside locally running mocked platform at `8004`.
+///
+/// [`AdUnit`]: adex_primitives::AdUnit
+#[axum::debug_handler]
+pub async fn post_slot_preview(
+    Extension(state): Extension<Arc<State>>,
+    headers: HeaderMap,
+    Form(adslot_preview): Form<AdSlotPreview>,
+) -> Result<Html<String>, Error> {
+    let ad_slot = adslot_preview.adslot_response.slot.clone();
+
+    // setup the `AdSlotResponse` from the Platform
+    setup_platform_response(&adslot_preview.adslot_response).await?;
 
     // extracted from Accept-language header
     let navigator_language = headers
@@ -247,29 +316,20 @@ pub async fn post_slot_preview(
         // TODO: make configurable?
         .unwrap_or_else(|| "en".into());
 
-    let whitelisted_tokens = config
-        .chains
-        .iter()
-        .flat_map(|(_, chain)| chain.tokens.iter().map(|(_, token)| token.address))
-        .collect();
-
     let options = Options {
         market_slot: ad_slot.ipfs,
         publisher_addr: *PUBLISHER,
         // All passed tokens must be of the same price, so that the amounts can be accurately compared
-        whitelisted_tokens,
+        whitelisted_tokens: adslot_preview.whitelisted_tokens.into_iter().collect(),
         size: Some(
             size_from_type(&ad_slot.ad_type)
                 .map_err(|error| Error::anyhow_status(error, StatusCode::BAD_REQUEST))?,
         ),
         navigator_language: Some(navigator_language),
         /// Defaulted
-        disabled_video: false,
-        disabled_sticky: false,
-        validators: vec![
-            ApiUrl::parse(&DUMMY_VALIDATOR_LEADER.url).expect("should parse"),
-            ApiUrl::parse(&DUMMY_VALIDATOR_FOLLOWER.url).expect("should parse"),
-        ],
+        disabled_video: adslot_preview.disabled_video,
+        disabled_sticky: adslot_preview.disabled_sticky,
+        validators: adslot_preview.validators,
     };
 
     let manager = Manager::new(options, Default::default())?;
