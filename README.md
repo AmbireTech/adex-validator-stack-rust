@@ -136,10 +136,10 @@ POSTGRES_DB="sentry_follower" PORT=8006 cargo run -p sentry -- \
 
 #### Environment variables
 
-- `ENV` - `production` or `development`; *default*: `development` - passing this env. variable will use the default configuration paths - [`docs/config/ganache.toml`](./docs/config/ganache.toml) (for `development`) or [`docs/config/prod.toml`](./docs/config/prod.toml) (for `production`). Otherwise you can pass your own configuration file path to the binary (check `cargo run -p sentry --help` for more information). ~~In `development` it will make sure Sentry to seed the database~~ (seeding is disabled, see #514).
+- `ENV` - `production` or `development`; *default*: `development` - passing this env. variable will use the default configuration paths - [`docs/config/ganache.toml`](./docs/config/ganache.toml) (for `development`) or [`docs/config/prod.toml`](./docs/config/prod.toml) (for `production`). Otherwise you can pass your own configuration file path to the binary (check `cargo run -p sentry --help` for more information)..
 - `PORT` - *default*: `8005` - The local port that Sentry API will be accessible at
 - `IP_ADDR` - *default*: `0.0.0.0` - the IP address that the API should be listening to
-- `SEED_DB` - *default*: `false` - Flag telling us whether we should seed the database, it can only be turned on for `development`
+- `SEED_DB` - *default*: `false` - Flag telling sentry to seed the database, it can only be turned on for `development`
 
 ##### Adapter
 
