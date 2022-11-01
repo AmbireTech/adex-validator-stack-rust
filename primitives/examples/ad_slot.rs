@@ -1,66 +1,48 @@
-use primitives::AdSlot;
+use chrono::{TimeZone, Utc};
+use primitives::{
+    targeting::Rules,
+    test_util::{DUMMY_AD_UNITS, DUMMY_IPFS, IDS, PUBLISHER},
+    AdSlot,
+};
 use serde_json::{from_value, json};
 
 fn main() {
     let json = json!({
         "ipfs": "QmcUVX7fvoLMM93uN2bD3wGTH8MXSxeL8hojYfL2Lhp7mR",
-        "type": "legacy_250x250",
-        "minPerImpression": {
-            // `Mocked TOKEN 1: 0.1`
-            "0x12a28f2bfBFfDf5842657235cC058242f40fDEa6": "10000000"
-        },
+        "type": "legacy_300x100",
+        "minPerImpression": null,
         "rules": [],
-        "fallbackUnit": null,
+        "fallbackUnit": "Qmasg8FrbuSQpjFu3kRnZF9beg8rEBFrqgi1uXDRwCbX5f",
         "owner": "0xE882ebF439207a70dDcCb39E13CA8506c9F45fD9",
         // milliseconds
-        "created": "1564372800000",
+        "created": 1564372800000_u64,
         "title": "Test AdSlot",
-        "website": "adex.network",
+        "description": null,
+        "website": "https://adex.network",
         "archived": false,
+        // milliseconds
+        "modified": 1564372800000_u64
     });
 
-    // let ad_slot = AdSlot {
-    //     ipfs: DUMMY_IPFS[0],
-    //     ad_type: "legacy_250x250".to_string(),
-    //     archived: false,
-    //     created: Utc.ymd(2019, 7, 29).and_hms(7, 0, 0),
-    //     description: Some("Test slot for running integration tests".to_string()),
-    //     fallback_unit: Some(fallback_unit.ipfs),
-    //     min_per_impression: Some(
-    //         [
-    //             (
-    //                 GANACHE_INFO_1.tokens["Mocked TOKEN 1"].address,
-    //                 UnifiedNum::from_whole(0.010),
-    //             ),
-    //             (
-    //                 GANACHE_INFO_1337.tokens["Mocked TOKEN 1337"].address,
-    //                 UnifiedNum::from_whole(0.001),
-    //             ),
-    //         ]
-    //         .into_iter()
-    //         .collect(),
-    //     ),
-    //     modified: Some(Utc.ymd(2019, 7, 29).and_hms(7, 0, 0)),
-    //     owner: IDS[&PUBLISHER],
-    //     title: Some("Test slot 1".to_string()),
-    //     website: Some("https://adex.network".to_string()),
-    //     rules: Rules::default(),
-    // }
+    let fallback_unit = DUMMY_AD_UNITS[0].ipfs;
 
-    // let expected = AdSlot {
-    //     ipfs: DUMMY_IPFS[0],
-    //     ad_type: String,
-    //     min_per_impression: Option<HashMap<Address, UnifiedNum>>,
-    //     rules: Rules::default(),
-    //      fallback_unit: Some(),
-    //      owner: ValidatorId,
-    //      created: DateTime<Utc>,
-    //      title: Option<String>,
-    //      description: Option<String>,
-    //      website: Option<String>,
-    //     archived: false,
-    //     modified: Option<DateTime<Utc>>,
-    // };
+    let expected_ad_slot = AdSlot {
+        ipfs: DUMMY_IPFS[0],
+        ad_type: "legacy_300x100".to_string(),
+        min_per_impression: None,
+        rules: Rules::default(),
+        fallback_unit: Some(fallback_unit),
+        owner: IDS[&PUBLISHER],
+        created: Utc.ymd(2019, 7, 29).and_hms(4, 0, 0),
+        title: Some("Test AdSlot".to_string()),
+        description: None,
+        website: Some("https://adex.network".to_string()),
+        archived: false,
+        modified: Some(Utc.ymd(2019, 7, 29).and_hms(4, 0, 0)),
+    };
 
-    assert!(from_value::<AdSlot>(json).is_ok());
+    pretty_assertions::assert_eq!(
+        from_value::<AdSlot>(json).expect("Should deserialize"),
+        expected_ad_slot
+    );
 }
