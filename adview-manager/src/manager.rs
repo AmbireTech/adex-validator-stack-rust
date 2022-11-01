@@ -443,12 +443,13 @@ mod test {
     use super::*;
     use crate::manager::input::Input;
     use adex_primitives::{
-        config::GANACHE_CONFIG,
         sentry::{
             units_for_slot::response::{AdUnit, UnitsWithPrice},
             CLICK,
         },
-        test_util::{CAMPAIGNS, DUMMY_AD_UNITS, DUMMY_CAMPAIGN, DUMMY_IPFS, PUBLISHER},
+        test_util::{
+            CAMPAIGNS, DUMMY_AD_UNITS, DUMMY_CAMPAIGN, DUMMY_IPFS, PUBLISHER, WHITELISTED_TOKENS,
+        },
         unified_num::FromWhole,
     };
     use wiremock::{
@@ -456,24 +457,19 @@ mod test {
         Mock, MockServer, ResponseTemplate,
     };
 
-    fn setup_manager(uri: String) -> Manager {
-        let market_url = uri.parse().unwrap();
-        let whitelisted_tokens = GANACHE_CONFIG
-            .chains
-            .values()
-            .flat_map(|chain| chain.tokens.values().map(|token| token.address))
-            .collect::<HashSet<_>>();
-
-        let validator_1_url = ApiUrl::parse(&format!("{}/validator-1", uri)).expect("should parse");
-        let validator_2_url = ApiUrl::parse(&format!("{}/validator-2", uri)).expect("should parse");
-        let validator_3_url = ApiUrl::parse(&format!("{}/validator-3", uri)).expect("should parse");
+    fn setup_manager(mock_url: ApiUrl) -> Manager {
+        let validator_1_url =
+            ApiUrl::parse(&format!("{mock_url}validator-1")).expect("should parse");
+        let validator_2_url =
+            ApiUrl::parse(&format!("{mock_url}validator-2")).expect("should parse");
+        let validator_3_url =
+            ApiUrl::parse(&format!("{mock_url}validator-3")).expect("should parse");
 
         let options = Options {
-            market_url,
             market_slot: DUMMY_IPFS[0],
             publisher_addr: *PUBLISHER,
             // All passed tokens must be of the same price and decimals, so that the amounts can be accurately compared
-            whitelisted_tokens,
+            whitelisted_tokens: WHITELISTED_TOKENS.clone(),
             size: Some(Size::new(300, 100)),
             navigator_language: Some("bg".into()),
             disabled_video: false,
@@ -605,7 +601,7 @@ mod test {
             .await;
 
         // 2. Set up a manager
-        let manager = setup_manager(server.uri());
+        let manager = setup_manager(server.uri().parse().unwrap());
 
         let res = manager
             .get_units_for_slot_resp()
@@ -619,7 +615,7 @@ mod test {
 
     #[tokio::test]
     async fn check_if_campaign_is_sticky() {
-        let mut manager = setup_manager("http://localhost:1337".to_string());
+        let mut manager = setup_manager("http://localhost:8000".parse().unwrap());
 
         // Case 1 - options has disabled sticky
         {
@@ -627,7 +623,7 @@ mod test {
             assert!(!manager.is_campaign_sticky(DUMMY_CAMPAIGN.id).await);
             manager.options.disabled_sticky = false;
         }
-        // Case 2 - time is past stickiness treshold, less than 4 minutes ago
+        // Case 2 - time is past stickiness threshold, less than 4 minutes ago
         {
             let history = vec![HistoryEntry {
                 time: Utc::now() - Duration::days(1), // 24 hours ago
@@ -660,7 +656,7 @@ mod test {
     #[tokio::test]
     async fn check_sticky_ad_unit() {
         let server = MockServer::start().await;
-        let mut manager = setup_manager(server.uri());
+        let mut manager = setup_manager(server.uri().parse().unwrap());
         let history = vec![HistoryEntry {
             time: Utc::now(),
             unit_id: DUMMY_AD_UNITS[0].ipfs,
@@ -677,9 +673,7 @@ mod test {
                 price: UnifiedNum::from_whole(0.0001),
             }],
         };
-        let res = manager
-            .get_sticky_ad_unit(&[campaign], "http://localhost:1337")
-            .await;
+        let res = manager.get_sticky_ad_unit(&[campaign], "localhost").await;
 
         assert!(res.is_some());
 
@@ -692,9 +686,7 @@ mod test {
             }],
         };
 
-        let res = manager
-            .get_sticky_ad_unit(&[campaign], "http://localhost:1337")
-            .await;
+        let res = manager.get_sticky_ad_unit(&[campaign], "localhost").await;
 
         assert!(res.is_none());
     }

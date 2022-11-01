@@ -1,4 +1,7 @@
-use std::{collections::HashMap, ops::Deref};
+use std::{
+    collections::{HashMap, HashSet},
+    ops::Deref,
+};
 
 use chrono::{TimeZone, Utc};
 use once_cell::sync::Lazy;
@@ -499,4 +502,14 @@ pub static CAMPAIGNS: Lazy<[ChainOf<Campaign>; 3]> = Lazy::new(|| {
     };
 
     [campaign_1337_1, campaign_1337_2, campaign_1_1]
+});
+
+/// All the configured tokens in the `ganache.toml` config file
+/// in all chains.
+pub static WHITELISTED_TOKENS: Lazy<HashSet<Address>> = Lazy::new(|| {
+    GANACHE_CONFIG
+        .chains
+        .values()
+        .flat_map(|chain| chain.tokens.values().map(|token| token.address))
+        .collect()
 });

@@ -1,4 +1,4 @@
-use std::{collections::HashSet, fmt::Display, ops::Deref, str::FromStr, sync::Arc};
+use std::{fmt::Display, ops::Deref, str::FromStr, sync::Arc};
 
 use anyhow::{anyhow, bail};
 use axum::{
@@ -8,18 +8,16 @@ use axum::{
 };
 use axum_extra::extract::Form;
 use chrono::{TimeZone, Utc};
-use once_cell::sync::Lazy;
 use reqwest::Client;
 use serde::{de::Error as _, Deserialize, Deserializer, Serialize};
 use tera::Context;
 
 use adex_primitives::{
-    config::GANACHE_CONFIG,
     platform::{AdSlotResponse, Website},
     targeting::Rules,
     test_util::{
         DUMMY_AD_UNITS, DUMMY_CAMPAIGN, DUMMY_IPFS, DUMMY_VALIDATOR_FOLLOWER,
-        DUMMY_VALIDATOR_LEADER, IDS, PUBLISHER,
+        DUMMY_VALIDATOR_LEADER, IDS, PUBLISHER, WHITELISTED_TOKENS,
     },
     util::ApiUrl,
     AdSlot, Address,
@@ -27,15 +25,6 @@ use adex_primitives::{
 use adview_manager::{get_unit_html_with_events, manager::Size, Manager, Options};
 
 use crate::app::{Error, State};
-
-/// All the configured tokens in the `ganache.toml` config file
-pub static WHITELISTED_TOKENS: Lazy<HashSet<Address>> = Lazy::new(|| {
-    GANACHE_CONFIG
-        .chains
-        .values()
-        .flat_map(|chain| chain.tokens.values().map(|token| token.address))
-        .collect()
-});
 
 /// `GET /`
 pub async fn get_index(Extension(state): Extension<Arc<State>>) -> Html<String> {
@@ -233,8 +222,6 @@ where
 pub async fn get_slot_preview_form(
     Extension(state): Extension<Arc<State>>,
 ) -> Result<Html<String>, Error> {
-    // let config = GANACHE_CONFIG.clone();
-
     let validators = vec![
         ApiUrl::parse(&DUMMY_VALIDATOR_LEADER.url).expect("should parse"),
         ApiUrl::parse(&DUMMY_VALIDATOR_FOLLOWER.url).expect("should parse"),
