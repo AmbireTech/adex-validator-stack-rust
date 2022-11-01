@@ -12,7 +12,7 @@ a publisher websites.
 
 Running the local server:
 
-`RUST_LOG=debug cargo run -p serve`
+`RUST_LOG=debug cargo run -p adview-serve`
 
 This will start a server at `127.0.0.1:3030`
 
@@ -21,4 +21,16 @@ for the server.
 
 Routes:
 
-- `GET /ad` - visualizes a single ad
+- `GET /` - landing page
+- `GET /preview` - preview form for submitting a single AdSlot response from `platform` and see the result
+- `POST /preview` - preview of a single AdSlot Image example
+- `GET /preview/ad` - preview a single example ad
+- `GET /preview/video` - preview a single Video example ad
+
+
+### POST `/preview`
+
+You need to be running:
+- `sentry` Leader at 8005
+- `sentry` Follower at 8006
+- Mock [`Platform`](../test_harness/platform) at 8004

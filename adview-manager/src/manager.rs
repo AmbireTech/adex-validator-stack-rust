@@ -12,7 +12,6 @@ use async_std::{sync::RwLock, task::block_on};
 use chrono::{DateTime, Duration, Utc};
 use log::error;
 use once_cell::sync::Lazy;
-use rand::Rng;
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -63,12 +62,11 @@ pub enum Error {
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct Options {
-    #[serde(rename = "marketURL")]
-    pub market_url: ApiUrl,
     pub market_slot: IPFS,
     pub publisher_addr: Address,
     /// All passed tokens must be of the same price and decimals, so that the amounts can be accurately compared
     pub whitelisted_tokens: HashSet<Address>,
+    /// Optional size to be set on the generated HTML for serving the ad.
     pub size: Option<Size>,
     pub navigator_language: Option<String>,
     /// Whether or not to disable Video ads.
@@ -99,7 +97,7 @@ impl Size {
 }
 
 /// The next [`AdUnit`] to be shown
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NextAdUnit {
     pub unit: AdUnit,
     pub price: UnifiedNum,
@@ -119,9 +117,13 @@ pub struct StickyAdUnit {
 /// History entry of impressions (won auctions) which the [`Manager`] holds.
 #[derive(Debug, Clone)]
 pub struct HistoryEntry {
+    /// The time when this auction was won and the ad was shown.
     pub time: DateTime<Utc>,
+    /// The `AdUnit` shown
     pub unit_id: IPFS,
+    // The `Campaign` for which this `AdUnit` was show.
     pub campaign_id: CampaignId,
+    // The `AdSlot` for which the `AdUnit` was show.
     pub slot_id: IPFS,
 }
 
@@ -257,7 +259,14 @@ impl Manager {
             .map_err(|_| Error::InvalidValidatorUrl)?;
         // Ordering of the campaigns matters so we will just push them to the first result
         // We reuse `targeting_input_base`, `accepted_referrers` and `fallback_unit`
-        let mut first_res: Response = self.client.get(url.as_str()).send().await?.json().await?;
+        let mut first_res: Response = self
+            .client
+            .get(url.as_str())
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?;
 
         for validator in self.options.validators.iter().skip(1) {
             let url = validator
@@ -306,9 +315,10 @@ impl Manager {
         }
 
         // If two or more units result in the same price, apply random selection between them: this is why we need the seed
-        let mut rng = rand::thread_rng();
+        // let mut rng = rand::thread_rng();
+        // let random: f64 = rng.gen::<f64>() * (0x80000000_u64 as f64 - 1.0);
+        let random: f64 = rand::random::<f64>() * (0x80000000_u64 as f64 - 1.0);
 
-        let random: f64 = rng.gen::<f64>() * (0x80000000_u64 as f64 - 1.0);
         let seed = BigNum::from(random as u64);
 
         // Apply targeting, now with adView.* variables, and sort the resulting ad units
@@ -433,12 +443,13 @@ mod test {
     use super::*;
     use crate::manager::input::Input;
     use adex_primitives::{
-        config::GANACHE_CONFIG,
         sentry::{
             units_for_slot::response::{AdUnit, UnitsWithPrice},
             CLICK,
         },
-        test_util::{CAMPAIGNS, DUMMY_AD_UNITS, DUMMY_CAMPAIGN, DUMMY_IPFS, PUBLISHER},
+        test_util::{
+            CAMPAIGNS, DUMMY_AD_UNITS, DUMMY_CAMPAIGN, DUMMY_IPFS, PUBLISHER, WHITELISTED_TOKENS,
+        },
         unified_num::FromWhole,
     };
     use wiremock::{
@@ -446,24 +457,19 @@ mod test {
         Mock, MockServer, ResponseTemplate,
     };
 
-    fn setup_manager(uri: String) -> Manager {
-        let market_url = uri.parse().unwrap();
-        let whitelisted_tokens = GANACHE_CONFIG
-            .chains
-            .values()
-            .flat_map(|chain| chain.tokens.values().map(|token| token.address))
-            .collect::<HashSet<_>>();
-
-        let validator_1_url = ApiUrl::parse(&format!("{}/validator-1", uri)).expect("should parse");
-        let validator_2_url = ApiUrl::parse(&format!("{}/validator-2", uri)).expect("should parse");
-        let validator_3_url = ApiUrl::parse(&format!("{}/validator-3", uri)).expect("should parse");
+    fn setup_manager(mock_url: ApiUrl) -> Manager {
+        let validator_1_url =
+            ApiUrl::parse(&format!("{mock_url}validator-1")).expect("should parse");
+        let validator_2_url =
+            ApiUrl::parse(&format!("{mock_url}validator-2")).expect("should parse");
+        let validator_3_url =
+            ApiUrl::parse(&format!("{mock_url}validator-3")).expect("should parse");
 
         let options = Options {
-            market_url,
             market_slot: DUMMY_IPFS[0],
             publisher_addr: *PUBLISHER,
             // All passed tokens must be of the same price and decimals, so that the amounts can be accurately compared
-            whitelisted_tokens,
+            whitelisted_tokens: WHITELISTED_TOKENS.clone(),
             size: Some(Size::new(300, 100)),
             navigator_language: Some("bg".into()),
             disabled_video: false,
@@ -595,7 +601,7 @@ mod test {
             .await;
 
         // 2. Set up a manager
-        let manager = setup_manager(server.uri());
+        let manager = setup_manager(server.uri().parse().unwrap());
 
         let res = manager
             .get_units_for_slot_resp()
@@ -609,7 +615,7 @@ mod test {
 
     #[tokio::test]
     async fn check_if_campaign_is_sticky() {
-        let mut manager = setup_manager("http://localhost:1337".to_string());
+        let mut manager = setup_manager("http://localhost:8000".parse().unwrap());
 
         // Case 1 - options has disabled sticky
         {
@@ -617,7 +623,7 @@ mod test {
             assert!(!manager.is_campaign_sticky(DUMMY_CAMPAIGN.id).await);
             manager.options.disabled_sticky = false;
         }
-        // Case 2 - time is past stickiness treshold, less than 4 minutes ago
+        // Case 2 - time is past stickiness threshold, less than 4 minutes ago
         {
             let history = vec![HistoryEntry {
                 time: Utc::now() - Duration::days(1), // 24 hours ago
@@ -650,7 +656,7 @@ mod test {
     #[tokio::test]
     async fn check_sticky_ad_unit() {
         let server = MockServer::start().await;
-        let mut manager = setup_manager(server.uri());
+        let mut manager = setup_manager(server.uri().parse().unwrap());
         let history = vec![HistoryEntry {
             time: Utc::now(),
             unit_id: DUMMY_AD_UNITS[0].ipfs,
@@ -667,9 +673,7 @@ mod test {
                 price: UnifiedNum::from_whole(0.0001),
             }],
         };
-        let res = manager
-            .get_sticky_ad_unit(&[campaign], "http://localhost:1337")
-            .await;
+        let res = manager.get_sticky_ad_unit(&[campaign], "localhost").await;
 
         assert!(res.is_some());
 
@@ -682,9 +686,7 @@ mod test {
             }],
         };
 
-        let res = manager
-            .get_sticky_ad_unit(&[campaign], "http://localhost:1337")
-            .await;
+        let res = manager.get_sticky_ad_unit(&[campaign], "localhost").await;
 
         assert!(res.is_none());
     }

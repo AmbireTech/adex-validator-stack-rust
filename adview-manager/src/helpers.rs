@@ -156,7 +156,7 @@ pub fn get_unit_html_with_events(
         let body =
             serde_json::to_string(&events_body).expect("It should always serialize EventBody");
 
-        // TODO: check whether the JSON body with `''` quotes executes correctly!
+        // Be careful with JSON body and always use `'` quotes.
         let fetch_opts = format!("var fetchOpts = {{ method: 'POST', headers: {{ 'content-type': 'application/json' }}, body: {body} }};");
 
         let validators: String = validators
@@ -361,11 +361,9 @@ mod test {
             .flat_map(|chain| chain.tokens.values().map(|token| token.address))
             .collect::<HashSet<_>>();
 
-        let market_url = ApiUrl::parse("https://market.adex.network").expect("should parse");
         let validator_1_url = ApiUrl::parse("https://tom.adex.network").expect("should parse");
         let validator_2_url = ApiUrl::parse("https://jerry.adex.network").expect("should parse");
         let options = Options {
-            market_url,
             market_slot: DUMMY_IPFS[0],
             publisher_addr: *PUBLISHER,
             // All passed tokens must be of the same price and decimals, so that the amounts can be accurately compared

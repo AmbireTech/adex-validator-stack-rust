@@ -65,7 +65,7 @@ fn main() {
         }
       },
       "platform": {
-        "url": "https://platform.adex.network/",
+        "url": "http://localhost:8004",
         "keep_alive_interval": 1200000
       },
       "limits": {

@@ -176,7 +176,7 @@ pub fn campaigns_router<C: Locked + 'static>() -> Router {
 
 /// `/v5/units-for-slot` router
 pub fn units_for_slot_router<C: Locked + 'static>() -> Router {
-    Router::new().route("/", get(get_units_for_slot::<C>))
+    Router::new().route("/:slot", get(get_units_for_slot::<C>))
 }
 
 /// `/v5/analytics` router

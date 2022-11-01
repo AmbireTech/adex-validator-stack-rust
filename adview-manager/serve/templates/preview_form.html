@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}Preview an Ad form{% endblock %}
+
+{% block content %}
+<div class="flex h-100">
+    <div>
+        <form action="/preview" method="POST">
+            <div>Options</div>
+            <div>
+                <label for="disable_video">Disable video?</label>
+                <input type="checkbox" name="disable_video" id="disable_video" value="true" />
+            </div>
+            <div>
+                <label for="disable_sticky">Disable sticky ads?</label>
+                <input type="checkbox" name="disable_sticky" id="disable_sticky" value="true" />
+            </div>
+            <div>
+                <label for="publisher">Publisher address</label>
+                <input type="text" name="publisher" id="publisher" value="{{ default_publisher }}" />
+            </div>
+            {# We only create 2 validator urls for now! #}
+            <div>Validators (ordering matters - first validator has priority over second)</div>
+            {% for i in [0, 1, 2, 3, 4] %}
+            <div>
+                <label for="validators_{{ i + 1 }}">Url of validator #{{ i + 1 }}:</label>
+                <input type="text" name="validators" id="validators_{{ i + 1 }}" {% if default_whitelisted_tokens[i] %}value="{{ default_validators[i] }}"{% endif %}" />
+            </div>
+            {% endfor %}
+
+            <div>Whitelisted token addresses</div>
+            {% for i in [0, 1, 2, 3, 4] %}
+            <div>
+                <label for="whitelisted_tokens_{{ i + 1 }}">Token address #{{ i + 1 }}:</label>
+                <input type="text" name="whitelisted_tokens" id="whitelisted_tokens_{{ i + 1 }}" {% if default_whitelisted_tokens[i] %}value="{{ default_whitelisted_tokens[i] }}"{% endif %} />
+            </div>
+            {% endfor %}
+
+            <div>
+                <label>AdSlot platform response</label>
+                <textarea rows="30" style="width: 100%;" name="adslot_response">{{ default_adslot_response | json_encode(pretty=true) }}</textarea>
+            </div>
+            <div>
+                <button type="submit">Preview</button>
+            </div>
+        </form>
+    </div>
+    {# <div class="flex-6">
+        <div class="m-auto">
+            {% if next_ad_unit %}
+            {{ next_ad_unit.html | safe }}
+            {% else %}
+            <h1>No matched AdUnit</h1>
+            {% endif %}
+        </div>
+    </div> #}
+</div>
+{% endblock %}

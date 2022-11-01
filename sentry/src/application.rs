@@ -146,7 +146,10 @@ where
             ])
             // allow requests from any origin
             // "*"
-            .allow_origin(tower_http::cors::Any);
+            .allow_origin(tower_http::cors::Any)
+            // todo: Check whether we should support only the `content-type`
+            // instead of `Access-Control-Allow-Headers: *`
+            .allow_headers(tower_http::cors::Any);
 
         let router = Router::new()
             .nest("/channel", channels_router::<C>())

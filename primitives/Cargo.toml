@@ -24,6 +24,10 @@ test-util = []
 name = "accounting_response"
 
 [[example]]
+name = "ad_slot"
+required-features = ["test-util"]
+
+[[example]]
 name = "all_spenders_response"
 
 [[example]]

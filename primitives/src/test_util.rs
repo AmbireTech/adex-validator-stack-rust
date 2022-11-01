@@ -1,4 +1,7 @@
-use std::{collections::HashMap, ops::Deref};
+use std::{
+    collections::{HashMap, HashSet},
+    ops::Deref,
+};
 
 use chrono::{TimeZone, Utc};
 use once_cell::sync::Lazy;
@@ -228,7 +231,7 @@ pub static DUMMY_AD_UNITS: Lazy<[AdUnit; 4]> = Lazy::new(|| {
             target_url: "https://www.adex.network/?stremio-test-banner-1".to_string(),
             archived: false,
             description: Some("Dummy AdUnit description 1".to_string()),
-            ad_type: "legacy_250x250".to_string(),
+            ad_type: "legacy_300x100".to_string(),
             /// Timestamp: 1 564 383 600
             created: Utc.ymd(2019, 7, 29).and_hms(9, 0, 0),
             min_targeting_score: None,
@@ -499,4 +502,14 @@ pub static CAMPAIGNS: Lazy<[ChainOf<Campaign>; 3]> = Lazy::new(|| {
     };
 
     [campaign_1337_1, campaign_1337_2, campaign_1_1]
+});
+
+/// All the configured tokens in the `ganache.toml` config file
+/// in all chains.
+pub static WHITELISTED_TOKENS: Lazy<HashSet<Address>> = Lazy::new(|| {
+    GANACHE_CONFIG
+        .chains
+        .values()
+        .flat_map(|chain| chain.tokens.values().map(|token| token.address))
+        .collect()
 });

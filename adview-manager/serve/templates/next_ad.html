@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block title %}Serve an Ad{% endblock %}
+
+{% block content %}
+<div class="h-100">
+    <div class="flex">
+        <div class="m-auto">
+            {% if next_ad_unit %}
+            {{ next_ad_unit.html | safe }}
+            {% else %}
+            <h1>No matched AdUnit</h1>
+            {% endif %}
+        </div>
+    </div>
+    <div class="flex">
+        <div class="flex-6">
+        {% if next_ad_unit %}
+            <code>
+            {{ next_ad_unit | json_encode(pretty=true) }}
+            </code>
+        {% else %}
+            No matched AdUnit
+        {% endif %}
+        </div>
+        <div class="flex-6">
+            <code>
+            {{ ad_slot | json_encode(pretty=true) }}
+            </code>
+        </div>
+    </div>
+</div>
+{% endblock %}
