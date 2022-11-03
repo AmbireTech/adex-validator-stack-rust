@@ -82,6 +82,8 @@ pub struct Options {
     #[serde(default)]
     pub disabled_sticky: bool,
     /// List of validators to query /units-for-slot from
+    ///
+    /// The is a priority list, the first listed validator has priority over the rest
     pub validators: Vec<ApiUrl>,
 }
 
