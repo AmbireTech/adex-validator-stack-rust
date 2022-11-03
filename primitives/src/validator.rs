@@ -116,7 +116,7 @@ impl TryFrom<Value> for ValidatorId {
 /// A Validator description which includes the identity, fee (per event) and the Sentry URL.
 pub struct ValidatorDesc {
     pub id: ValidatorId,
-    /// The validator fee in per event
+    /// The validator fee per event
     ///
     /// Each fee is calculated based on the payout for an event.
     ///

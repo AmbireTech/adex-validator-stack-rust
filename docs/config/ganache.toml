@@ -60,10 +60,10 @@ keep_alive_interval = 1200000
 # This will limit the returned Campaigns to the set number
 max_campaigns_earning_from = 25
 
-# 0.0001 (UnifiedNum) per 1000 impressions
-# 10 * (per) 1_000 / 10^8 = 0.0001
+# 0.0001 (UnifiedNum) per 1 impression
+# 10 / 10^8 = 0.0000001
 # 0.00010000
-global_min_impression_price = '10000'
+global_min_impression_price = '10'
 
 [chain."Ganache #1"]
 chain_id = 1

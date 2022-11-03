@@ -58,11 +58,11 @@ const TEST_AD_SLOT: Lazy<(AdSlot, AdUnit)> = Lazy::new(|| {
             [
                 (
                     GANACHE_INFO_1.tokens["Mocked TOKEN 1"].address,
-                    UnifiedNum::from_whole(0.010),
+                    UnifiedNum::from_whole(0.000010),
                 ),
                 (
                     GANACHE_INFO_1337.tokens["Mocked TOKEN 1337"].address,
-                    UnifiedNum::from_whole(0.001),
+                    UnifiedNum::from_whole(0.000001),
                 ),
             ]
             .into_iter()
@@ -808,7 +808,6 @@ async fn test_price_is_less_than_min_per_impression() {
                 total: UnifiedNum::from_whole(200_000)
                     .to_precision(campaign.token.precision.into()),
             };
-
             app.adapter.client.set_deposit(
                 &campaign.of_channel(),
                 campaign.context.creator,
@@ -843,9 +842,9 @@ async fn test_price_is_less_than_min_per_impression() {
             // override the pricing bound
             let pricing_less_than_global = Pricing {
                 min: app.config.limits.units_for_slot.global_min_impression_price
-                    - UnifiedNum::from_whole(0.00003),
+                    - UnifiedNum::from_whole(0.00000003),
                 max: app.config.limits.units_for_slot.global_min_impression_price
-                    - UnifiedNum::from_whole(0.00001),
+                    - UnifiedNum::from_whole(0.00000001),
             };
             assert!(
                 pricing_less_than_global.min
@@ -860,7 +859,6 @@ async fn test_price_is_less_than_min_per_impression() {
                 .pricing_bounds
                 .insert(IMPRESSION, pricing_less_than_global)
                 .expect("Should have a pricing bound for IMPRESSION before we've overwritten it");
-
             let deposit = Deposit {
                 total: UnifiedNum::from_whole(200_000)
                     .to_precision(campaign.token.precision.into()),
@@ -908,7 +906,7 @@ async fn test_price_is_less_than_min_per_impression() {
             .as_mut()
             .expect("Should have min_per_impression set");
 
-        let min_per_impression = UnifiedNum::from_whole(0.00001);
+        let min_per_impression = UnifiedNum::from_whole(0.00000001);
         assert!(
             min_per_impression < campaign_0.context.pricing_bounds[&IMPRESSION].min,
             "AdSlot.min_per_impression should be less than Campaign 0 pricing bound in order to match it"

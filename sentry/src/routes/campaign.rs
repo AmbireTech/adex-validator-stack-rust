@@ -1006,12 +1006,12 @@ pub mod insert_events {
                     "Campaign budget has no remaining funds to spend or an error occurred"
                 );
 
-                // Payout: 0.03 (min pricing bound)
+                // Payout: 0.00003 (min pricing bound per 1 event)
                 // Leader fee: 0.03
-                // Leader payout: 0.03 * 0.03 / 1000.0 = 0.00 000 090 = UnifiedNum(90)
+                // Leader payout: 0.00003 * 0.03 = 0.00 000 090 = UnifiedNum(90_000)
                 //
                 // Follower fee: 0.02
-                // Follower payout: 0.03 * 0.02 / 1000.0 = 0.00 000 060 = UnifiedNum(60)
+                // Follower payout: 0.00003 * 0.02 = 0.00 000 060 = UnifiedNum(60_000)
                 //
                 // campaign budget left - payout - leader fee - follower fee
                 // 1000.0 - 0.03 - 0.00 000 090 - 0.00 000 060 = 999.9699985

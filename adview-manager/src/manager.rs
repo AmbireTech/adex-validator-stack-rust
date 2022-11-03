@@ -102,6 +102,7 @@ impl Size {
 #[derive(Debug, Clone)]
 pub struct NextAdUnit {
     pub unit: AdUnit,
+    // Price per 1 event
     pub price: UnifiedNum,
     pub accepted_referrers: Vec<Url>,
     pub html: String,
