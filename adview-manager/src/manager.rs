@@ -83,7 +83,7 @@ pub struct Options {
     pub disabled_sticky: bool,
     /// List of validators to query /units-for-slot from
     ///
-    /// The is a priority list, the first listed validator has priority over the rest
+    /// The list is prioritized, i.e. the validator listed on first position will have priority over the second, the second over the third and so on.
     pub validators: Vec<ApiUrl>,
 }
 
