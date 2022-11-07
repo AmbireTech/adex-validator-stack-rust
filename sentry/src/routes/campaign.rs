@@ -1008,10 +1008,10 @@ pub mod insert_events {
 
                 // Payout: 0.00003 (min pricing bound per 1 event)
                 // Leader fee: 0.03
-                // Leader payout: 0.00003 * 0.03 = 0.00 000 090 = UnifiedNum(90_000)
+                // Leader payout: 0.00003 * 0.03 = 0.00 000 090 = UnifiedNum(90)
                 //
                 // Follower fee: 0.02
-                // Follower payout: 0.00003 * 0.02 = 0.00 000 060 = UnifiedNum(60_000)
+                // Follower payout: 0.00003 * 0.02 = 0.00 000 060 = UnifiedNum(60)
                 //
                 // campaign budget left - payout - leader fee - follower fee
                 // 1000.0 - 0.03 - 0.00 000 090 - 0.00 000 060 = 999.9699985

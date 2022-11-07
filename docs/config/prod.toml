@@ -39,7 +39,7 @@ keep_alive_interval = 1200000
 # This will limit the returned Campaigns to the set number
 max_campaigns_earning_from = 25
 
-# 0.01 (UnifiedNum) per 1000 impressions
+# 0.00001 (UnifiedNum) per 1 impression
 # 1_000 / 10^8 = 0.00001
 global_min_impression_price = '1000'
 

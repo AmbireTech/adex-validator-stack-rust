@@ -321,27 +321,22 @@ mod tests {
                 .expect("Should parse"),
             channel,
             creator: *ADVERTISER,
-            // 150.00000000
-            budget: UnifiedNum::from(15_000_000_000),
+            budget: UnifiedNum::from_whole(150),
             validators,
             title: Some("Dummy Campaign".to_string()),
             pricing_bounds: vec![
                 (
                     IMPRESSION,
                     Pricing {
-                        // 0.04000000
-                        min: 4_000_000.into(),
-                        // 0.05000000
-                        max: 5_000_000.into(),
+                        min: UnifiedNum::from_whole(0.04),
+                        max: UnifiedNum::from_whole(0.05),
                     },
                 ),
                 (
                     CLICK,
                     Pricing {
-                        // 0.06000000
-                        min: 6_000_000.into(),
-                        // 0.10000000
-                        max: 10_000_000.into(),
+                        min: UnifiedNum::from_whole(0.06),
+                        max: UnifiedNum::from_whole(0.1),
                     },
                 ),
             ]
