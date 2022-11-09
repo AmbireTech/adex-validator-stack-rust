@@ -252,7 +252,7 @@ pub struct Timeouts {
     /// This includes all requests made to sentry except propagating messages.
     /// When propagating messages we make requests to foreign Sentry
     /// instances and we use a separate timeout -
-    /// [`Config.propagation`](Config::propagation).
+    /// [`Config.timeouts.propagation`](crate::config::Timeouts::propagation).
     ///
     /// In milliseconds
     #[serde(with = "std_duration_millis")]

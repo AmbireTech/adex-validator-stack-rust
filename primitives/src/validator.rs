@@ -352,7 +352,7 @@ pub mod messages {
     ///
     /// [`Channel.follower`]: crate::Channel::follower
     /// [`Channel.leader`]: crate::Channel::leader
-    /// [`Config.health_unsignable_promilles`]: crate::Config::health_unsignable_promilles
+    /// [`Config.worker.health_unsignable_promilles`]: crate::config::ValidatorWorkerConfig::health_unsignable_promilles
     #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
     #[serde(rename_all = "camelCase")]
     pub struct RejectState<S: BalancesState> {
@@ -371,7 +371,7 @@ pub mod messages {
     /// The Heartbeat is sent on regular intervals every [`Config.heartbeat_time`].
     ///
     /// [`Channel`]: crate::Channel
-    /// [`Config.heartbeat_time`]: crate::Config::heartbeat_time
+    /// [`Config.worker.heartbeat_time`]: crate::config::ValidatorWorkerConfig::heartbeat_time
     #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
     #[serde(rename_all = "camelCase")]
     pub struct Heartbeat {
