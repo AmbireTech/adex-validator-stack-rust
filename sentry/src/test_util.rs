@@ -72,7 +72,7 @@ pub async fn setup_dummy_app() -> ApplicationGuard {
     let campaign_remaining = CampaignRemaining::new(redis.connection.clone());
 
     let platform_url = "http://change-me.tm".parse().expect("Bad ApiUrl!");
-    let platform_api = PlatformApi::new(platform_url, config.platform.keep_alive_interval)
+    let platform_api = PlatformApi::new(platform_url, config.sentry.platform.keep_alive_interval)
         .expect("should build test PlatformApi");
 
     let app = Application::new(

@@ -28,7 +28,7 @@ pub async fn is_admin<C: Locked + 'static, B>(
         .expect("Application should always be present")
         .config;
 
-    if !config.admins.contains(auth.uid.as_address()) {
+    if !config.sentry.admins.contains(auth.uid.as_address()) {
         return Err(ResponseError::Unauthorized);
     }
     Ok(next.run(request).await)
@@ -224,7 +224,7 @@ mod test {
 
         let admin = {
             assert!(
-                app.config.admins.contains(&LEADER),
+                app.config.sentry.admins.contains(&LEADER),
                 "Should contain the Leader as an Admin for this test!"
             );
             IDS[&LEADER]
@@ -232,7 +232,7 @@ mod test {
 
         let not_admin = {
             assert!(
-                !app.config.admins.contains(&FOLLOWER),
+                !app.config.sentry.admins.contains(&FOLLOWER),
                 "Should not contain the Follower as an Admin for this test!"
             );
 

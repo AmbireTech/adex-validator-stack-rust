@@ -247,7 +247,7 @@ mod test {
             &database,
             &session,
             Some(&auth),
-            &config.ip_rate_limit,
+            &config.limits.ip_rate_limit,
             &campaign,
             &events,
         )
@@ -258,7 +258,7 @@ mod test {
             &database,
             &session,
             Some(&auth),
-            &config.ip_rate_limit,
+            &config.limits.ip_rate_limit,
             &campaign,
             &events,
         )
@@ -306,7 +306,7 @@ mod test {
             &database,
             &session,
             Some(&auth),
-            &config.ip_rate_limit,
+            &config.limits.ip_rate_limit,
             &campaign,
             &get_impression_events(2),
         )
@@ -323,7 +323,7 @@ mod test {
             &database,
             &session,
             Some(&auth),
-            &config.ip_rate_limit,
+            &config.limits.ip_rate_limit,
             &campaign,
             &get_impression_events(1),
         )
@@ -366,7 +366,7 @@ mod test {
             &database,
             &session,
             Some(&auth),
-            &config.ip_rate_limit,
+            &config.limits.ip_rate_limit,
             &campaign,
             &get_impression_events(2),
         )
@@ -409,7 +409,7 @@ mod test {
             &database,
             &session,
             Some(&auth),
-            &config.ip_rate_limit,
+            &config.limits.ip_rate_limit,
             &campaign,
             &get_impression_events(2),
         )
@@ -452,7 +452,7 @@ mod test {
             &database,
             &session,
             Some(&auth),
-            &config.ip_rate_limit,
+            &config.limits.ip_rate_limit,
             &campaign,
             &get_impression_events(2),
         )
@@ -492,7 +492,7 @@ mod test {
             &database,
             &session,
             Some(&auth),
-            &config.ip_rate_limit,
+            &config.limits.ip_rate_limit,
             &campaign,
             &get_impression_events(1),
         )
@@ -535,7 +535,7 @@ mod test {
             &database,
             &session,
             Some(&auth),
-            &config.ip_rate_limit,
+            &config.limits.ip_rate_limit,
             &campaign,
             &get_impression_events(1),
         )
