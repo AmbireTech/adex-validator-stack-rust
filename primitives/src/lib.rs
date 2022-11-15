@@ -2,8 +2,6 @@
 #![deny(clippy::all)]
 #![deny(rustdoc::broken_intra_doc_links)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
-// TODO: Remove once stabled and upstream num::Integer::div_floor(...) is fixed
-#![allow(unstable_name_collisions)]
 use std::{error, fmt};
 
 #[doc(inline)]

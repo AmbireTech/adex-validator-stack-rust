@@ -350,19 +350,6 @@ pub mod balances {
                         ..
                     }) => Some(Value::UnifiedNum(*campaign_total_spent)),
                 },
-                // Leave the default of `0` if the publisher is not found in the balances.
-                field::Balances::PublisherEarnedFromCampaign => {
-                    Some(Value::UnifiedNum(match self {
-                        Get::Getter(Getter {
-                            balances,
-                            publisher_id,
-                        }) => balances.get(publisher_id).cloned().unwrap_or_default(),
-                        Get::Value(Values {
-                            publisher_earned_from_campaign,
-                            ..
-                        }) => *publisher_earned_from_campaign,
-                    }))
-                }
             }
         }
     }
@@ -424,7 +411,7 @@ mod test {
             ad_view: Some(AdView {
                 seconds_since_campaign_impression: Some(10),
                 has_custom_preferences: true,
-                navigator_language: "en".into(),
+                navigator_language: "en-US".into(),
             }),
             global: Global {
                 ad_slot_id: IPFS[0],

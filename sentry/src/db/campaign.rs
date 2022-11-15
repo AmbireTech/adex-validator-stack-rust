@@ -62,7 +62,6 @@ pub async fn fetch_campaign(
     campaign: &CampaignId,
 ) -> Result<Option<Campaign>, PoolError> {
     let client = pool.get().await?;
-    // TODO: Check and update
     let statement = client.prepare("SELECT campaigns.id, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, campaigns.created, active_from, active_to, channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce FROM campaigns INNER JOIN channels
     ON campaigns.channel_id=channels.id WHERE campaigns.id = $1").await?;
 

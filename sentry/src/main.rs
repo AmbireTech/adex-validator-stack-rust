@@ -42,7 +42,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .help("the adapter for authentication and signing")
                 .required(true)
                 .default_value("ethereum")
-                .possible_values(&["ethereum", "dummy"])
+                .possible_values(["ethereum", "dummy"])
                 .takes_value(true),
         )
         .arg(

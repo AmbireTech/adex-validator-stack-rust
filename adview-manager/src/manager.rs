@@ -396,7 +396,7 @@ impl Manager {
                         None
                     }
                 })
-                // TODO: Check what should happen here if we don't find the Validator
+                // There should always be validators since we are finding the campaign from the campaigns where we obtained the campaign id in the first place
                 .unwrap();
 
             let html = get_unit_html_with_events(
@@ -465,7 +465,7 @@ mod test {
             // All passed tokens must be of the same price and decimals, so that the amounts can be accurately compared
             whitelisted_tokens,
             size: Some(Size::new(300, 100)),
-            navigator_language: Some("bg".into()),
+            navigator_language: Some("bg-BG".into()),
             disabled_video: false,
             disabled_sticky: false,
             validators: vec![validator_1_url, validator_2_url, validator_3_url],
@@ -673,7 +673,6 @@ mod test {
 
         assert!(res.is_some());
 
-        // TODO: Here we modify the campaign manually, verify that such a scenario is possible
         let campaign = Campaign {
             campaign: DUMMY_CAMPAIGN.clone(),
             units_with_price: vec![UnitsWithPrice {

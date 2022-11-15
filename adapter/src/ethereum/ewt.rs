@@ -154,7 +154,7 @@ impl Token {
 
         let payload = Payload::base64_decode(payload_encoded)?;
 
-        let decoded_signature = base64::decode_config(&signature_encoded, base64::URL_SAFE_NO_PAD)
+        let decoded_signature = base64::decode_config(signature_encoded, base64::URL_SAFE_NO_PAD)
             .map_err(EwtVerifyError::SignatureDecoding)?;
 
         // if it returns the same slice, then there was no suffix

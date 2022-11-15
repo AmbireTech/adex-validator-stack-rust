@@ -205,7 +205,6 @@ impl From<Value> for SerdeValue {
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
-// TODO: https://github.com/AdExNetwork/adex-validator-stack-rust/issues/296
 pub enum Function {
     /// Multiplies first two values and then divides product by third value
     MulDiv(Box<Rule>, Box<Rule>, Box<Rule>),

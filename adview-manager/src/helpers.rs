@@ -371,7 +371,7 @@ mod test {
             // All passed tokens must be of the same price and decimals, so that the amounts can be accurately compared
             whitelisted_tokens,
             size: Some(Size::new(300, 100)),
-            navigator_language: Some("bg".into()),
+            navigator_language: Some("bg-BG".into()),
             disabled_video: false,
             disabled_sticky: false,
             validators: vec![validator_1_url, validator_2_url],
