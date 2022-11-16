@@ -689,6 +689,8 @@
 <a href="#689" id="689">689</a>
 <a href="#690" id="690">690</a>
 <a href="#691" id="691">691</a>
+<a href="#692" id="692">692</a>
+<a href="#693" id="693">693</a>
 </pre><pre class="rust"><code><span class="doccomment">//! The AdView Manager
 </span><span class="kw">use </span>adex_primitives::{
     sentry::{
@@ -773,6 +775,8 @@
     </span><span class="attr">#[serde(default)]
     </span><span class="kw">pub </span>disabled_sticky: bool,
     <span class="doccomment">/// List of validators to query /units-for-slot from
+    ///
+    /// The list is prioritized, i.e. the validator listed on first position will have priority over the second, the second over the third and so on.
     </span><span class="kw">pub </span>validators: Vec&lt;ApiUrl&gt;,
 }
 
