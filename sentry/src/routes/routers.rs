@@ -338,7 +338,7 @@ mod test {
         {
             let not_admin = {
                 assert!(
-                    !app.config.admins.contains(&FOLLOWER),
+                    !app.config.sentry.admins.contains(&FOLLOWER),
                     "Should not contain the Follower as an Admin for this test!"
                 );
 
@@ -366,7 +366,7 @@ mod test {
         {
             let admin = {
                 assert!(
-                    app.config.admins.contains(&LEADER),
+                    app.config.sentry.admins.contains(&LEADER),
                     "Should contain the Leader as an Admin for this test!"
                 );
                 IDS[&LEADER]

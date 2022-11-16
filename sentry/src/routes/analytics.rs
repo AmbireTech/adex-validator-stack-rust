@@ -50,7 +50,7 @@ pub async fn get_analytics<C: Locked + 'static>(
         query.chains = vec![auth.chain.chain_id]
     }
 
-    let applied_limit = query.limit.min(app.config.analytics_find_limit);
+    let applied_limit = query.limit.min(app.config.limits.analytics_find);
 
     if let Some(segment_by) = query.segment_by {
         if !route_allowed_keys.contains(&segment_by) {
@@ -81,7 +81,7 @@ pub async fn get_analytics<C: Locked + 'static>(
     }
 
     let analytics = match tokio::time::timeout(
-        app.config.analytics_maxtime,
+        app.config.sentry.analytics_maxtime,
         fetch_analytics(
             &app.pool,
             query.clone(),

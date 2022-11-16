@@ -109,7 +109,7 @@ impl<C: Unlocked + 'static> SentryApi<C, ()> {
         sentry_url: ApiUrl,
     ) -> Result<SentryApi<C, ()>, Error> {
         let client = Client::builder()
-            .timeout(config.fetch_timeout)
+            .timeout(config.worker.timeouts.fetch)
             .build()
             .map_err(Error::BuildingClient)?;
 
@@ -345,7 +345,7 @@ impl<C: Unlocked + 'static, P> SentryApi<C, P> {
         &self,
     ) -> Result<(HashSet<ChainOf<Channel>>, ChainsValidators), Error> {
         let client = reqwest::Client::builder()
-            .timeout(self.config.all_campaigns_timeout)
+            .timeout(self.config.worker.timeouts.all_campaigns)
             .build()?;
 
         let campaigns =
@@ -454,7 +454,7 @@ impl<C: Unlocked + 'static> SentryApi<C> {
             |(validator_id, validator)| {
                 propagate_to::<C>(
                     &self.client,
-                    self.config.propagation_timeout,
+                    self.config.worker.timeouts.propagation,
                     channel_context.context.id(),
                     (*validator_id, validator),
                     messages,
@@ -792,7 +792,7 @@ mod test {
             },
         );
         let mut config = configuration(Environment::Development, None).expect("Should get Config");
-        config.spendable_find_limit = 2;
+        config.limits.spendable_find = 2;
 
         let leader_adapter = Adapter::with_unlocked(Dummy::init(Options {
             dummy_identity: IDS[&LEADER],
@@ -896,7 +896,7 @@ mod test {
         let sentry_url = ApiUrl::from_str(&server.uri()).expect("Should parse");
 
         let mut config = GANACHE_CONFIG.clone();
-        config.campaigns_find_limit = 2;
+        config.limits.campaigns_find = 2;
 
         // Initializing SentryApi instance
         let leader_sentry = setup_dummy_sentry(IDS[&LEADER], config.clone(), sentry_url.clone());

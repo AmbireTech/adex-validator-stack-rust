@@ -46,7 +46,7 @@ pub async fn channel_tick<C: Unlocked + 'static>(
 
     match tick {
         primitives::Validator::Leader(_v) => match timeout(
-            config.channel_tick_timeout,
+            config.worker.timeouts.channel_tick,
             leader::tick(sentry, &channel_context, accounting.balances),
         )
         .await
@@ -67,7 +67,7 @@ pub async fn channel_tick<C: Unlocked + 'static>(
         primitives::Validator::Follower(_v) => {
             let follower_fut =
                 follower::tick(sentry, &channel_context, all_spenders, accounting.balances);
-            match timeout(config.channel_tick_timeout, follower_fut).await {
+            match timeout(config.worker.timeouts.channel_tick, follower_fut).await {
                 Err(timeout_e) => Err(Error::FollowerTick(
                     channel.id(),
                     TickError::TimedOut(timeout_e),

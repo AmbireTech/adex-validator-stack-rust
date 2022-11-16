@@ -266,7 +266,7 @@ async fn on_new_state<'a, C: Unlocked + 'static>(
         &proposed_balances.earners,
     )
     .ok_or(Error::Overflow)?;
-    if health_earners < u64::from(sentry.config.health_unsignable_promilles) {
+    if health_earners < u64::from(sentry.config.worker.health_unsignable_promilles) {
         return on_error(
             sentry,
             channel_context,
@@ -282,7 +282,7 @@ async fn on_new_state<'a, C: Unlocked + 'static>(
         &proposed_balances.spenders,
     )
     .ok_or(Error::Overflow)?;
-    if health_spenders < u64::from(sentry.config.health_unsignable_promilles) {
+    if health_spenders < u64::from(sentry.config.worker.health_unsignable_promilles) {
         return on_error(
             sentry,
             channel_context,
@@ -293,7 +293,7 @@ async fn on_new_state<'a, C: Unlocked + 'static>(
     }
 
     let signature = sentry.adapter.sign(&new_state.state_root)?;
-    let health_threshold = u64::from(sentry.config.health_threshold_promilles);
+    let health_threshold = u64::from(sentry.config.worker.health_threshold_promilles);
     let is_healthy = health_earners >= health_threshold && health_spenders >= health_threshold;
 
     let propagation_result = sentry
