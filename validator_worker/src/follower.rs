@@ -294,7 +294,7 @@ async fn on_new_state<'a, C: Unlocked + 'static>(
         &accounting_balances.earners,
         &proposed_balances.earners,
     )
-    .ok_or(Error::Overflow)?;
+    .ok_or(Error::Overflow(Overflow::EarnerHealth))?;
     if health_earners < u64::from(sentry.config.worker.health_unsignable_promilles) {
         return on_error(
             sentry,
@@ -310,7 +310,7 @@ async fn on_new_state<'a, C: Unlocked + 'static>(
         &accounting_balances.spenders,
         &proposed_balances.spenders,
     )
-    .ok_or(Error::Overflow)?;
+    .ok_or(Error::Overflow(Overflow::SpenderHealth))?;
     if health_spenders < u64::from(sentry.config.worker.health_unsignable_promilles) {
         return on_error(
             sentry,
