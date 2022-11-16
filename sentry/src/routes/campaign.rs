@@ -219,7 +219,7 @@ where
     let channel_campaigns = fetch_campaign_ids_for_channel(
         &app.pool,
         campaign.channel.id(),
-        app.config.campaigns_find_limit,
+        app.config.limits.campaigns_find,
     )
     .await?;
 
@@ -289,7 +289,7 @@ pub async fn campaign_list<C: Locked + 'static>(
     Extension(app): Extension<Arc<Application<C>>>,
     Qs(query): Qs<CampaignListQuery>,
 ) -> Result<Json<CampaignListResponse>, ResponseError> {
-    let limit = app.config.campaigns_find_limit;
+    let limit = app.config.limits.campaigns_find;
     let skip = query
         .page
         .checked_mul(limit.into())
@@ -430,7 +430,7 @@ pub mod update_campaign {
             let channel_campaigns = fetch_campaign_ids_for_channel(
                 pool,
                 campaign.channel.id(),
-                config.campaigns_find_limit,
+                config.limits.campaigns_find,
             )
             .await
             .map_err(|_| Error::FailedUpdate("couldn't fetch campaigns for channel".to_string()))?;
@@ -646,7 +646,7 @@ pub mod insert_events {
             &app.redis,
             session,
             auth,
-            &app.config.ip_rate_limit,
+            &app.config.limits.ip_rate_limit,
             &campaign_context.context,
             &events,
         )
@@ -1419,7 +1419,7 @@ mod test {
     #[tokio::test]
     async fn test_campaign_list() {
         let mut app_guard = setup_dummy_app().await;
-        app_guard.config.campaigns_find_limit = 2;
+        app_guard.config.limits.campaigns_find = 2;
         let app = Extension(Arc::new(app_guard.app.clone()));
 
         // Setting up new leader and a channel and campaign which use it on Ganache #1337

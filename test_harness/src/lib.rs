@@ -2800,8 +2800,8 @@ pub mod run {
         let campaign_remaining = CampaignRemaining::new(redis.clone());
 
         let platform_api = PlatformApi::new(
-            validator.config.platform.url.clone(),
-            validator.config.platform.keep_alive_interval,
+            validator.config.sentry.platform.url.clone(),
+            validator.config.sentry.platform.keep_alive_interval,
         )
         .expect("Failed to build PlatformApi");
 

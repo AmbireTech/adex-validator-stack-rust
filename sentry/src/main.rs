@@ -140,8 +140,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let campaign_remaining = CampaignRemaining::new(redis.clone());
 
     let platform_api = PlatformApi::new(
-        config.platform.url.clone(),
-        config.platform.keep_alive_interval,
+        config.sentry.platform.url.clone(),
+        config.sentry.platform.keep_alive_interval,
     )
     .expect("Failed to build PlatformApi");
 

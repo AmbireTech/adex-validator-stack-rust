@@ -49,7 +49,7 @@ impl<C: Unlocked + 'static> Worker<C> {
 
     pub async fn infinite(&self) {
         loop {
-            let wait_time_future = sleep(self.config.wait_time);
+            let wait_time_future = sleep(self.config.worker.wait_time);
 
             let _result = join(self.all_channels_tick(), wait_time_future).await;
         }
@@ -89,8 +89,8 @@ impl<C: Unlocked + 'static> Worker<C> {
 
         info!(logger, "Processed {} channels", channels_size);
 
-        if channels_size >= self.config.max_channels as usize {
-            error!(logger, "WARNING: channel limit cfg.MAX_CHANNELS={} reached", &self.config.max_channels; "main" => "all_channels_tick");
+        if channels_size >= self.config.worker.max_channels as usize {
+            error!(logger, "WARNING: channel limit cfg.MAX_CHANNELS={} reached", &self.config.worker.max_channels; "main" => "all_channels_tick");
         }
     }
 }

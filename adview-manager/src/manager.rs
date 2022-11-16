@@ -152,13 +152,8 @@ impl Manager {
         mut input: input::Input,
         campaign_id: CampaignId,
     ) -> input::Input {
-        let seconds_since_campaign_impression = self
-            .history
-            .read()
-            .await
-            .iter()
-            .rev()
-            .find_map(|h| {
+        let seconds_since_campaign_impression =
+            self.history.read().await.iter().rev().find_map(|h| {
                 if h.campaign_id == campaign_id {
                     let last_impression: Duration = Utc::now() - h.time;
 
@@ -166,8 +161,7 @@ impl Manager {
                 } else {
                     None
                 }
-            })
-            .unwrap_or(u64::MAX);
+            });
 
         input.ad_view = Some(input::AdView {
             seconds_since_campaign_impression,
@@ -204,17 +198,13 @@ impl Manager {
             .iter()
             .find(|c| c.campaign.id == sticky_entry.campaign_id)?;
 
-        let unit = stick_campaign
-            .units_with_price
-            .iter()
-            .find_map(|u| {
-                if u.unit.ipfs == sticky_entry.unit_id {
-                    Some(u.unit.clone())
-                } else {
-                    None
-                }
-            })
-            .expect("Something went terribly wrong. Data is corrupted! There should be an AdUnit");
+        let unit = stick_campaign.units_with_price.iter().find_map(|u| {
+            if u.unit.ipfs == sticky_entry.unit_id {
+                Some(u.unit.clone())
+            } else {
+                None
+            }
+        })?;
 
         let html = get_unit_html_with_events(
             &self.options,
@@ -294,7 +284,7 @@ impl Manager {
 
     pub async fn get_next_ad_unit(&self) -> Result<Option<NextAdUnit>, Error> {
         let units_for_slot = self.get_units_for_slot_resp().await?;
-        let m_campaigns = &units_for_slot.campaigns;
+        let ufs_campaigns = &units_for_slot.campaigns;
         let fallback_unit = units_for_slot.fallback_unit;
         let targeting_input = units_for_slot.targeting_input_base;
 
@@ -306,7 +296,7 @@ impl Manager {
 
         // Stickiness is when we keep showing an ad unit for a slot for some time in order to achieve fair impression value
         // see https://github.com/AdExNetwork/adex-adview-manager/issues/65
-        let sticky_result = self.get_sticky_ad_unit(m_campaigns, &hostname).await;
+        let sticky_result = self.get_sticky_ad_unit(ufs_campaigns, &hostname).await;
         if let Some(sticky) = sticky_result {
             return Ok(Some(NextAdUnit {
                 unit: sticky.unit,
@@ -323,19 +313,19 @@ impl Manager {
         let seed = BigNum::from(random as u64);
 
         // Apply targeting, now with adView.* variables, and sort the resulting ad units
-        let mut units_with_price = m_campaigns
+        let mut units_with_price = ufs_campaigns
             .iter()
-            .flat_map(|m_campaign| {
+            .flat_map(|ufs_campaign| {
                 // since we are in a Iterator.map(), we can't use async, so we block
-                if block_on(self.is_campaign_sticky(m_campaign.campaign.id)) {
+                if block_on(self.is_campaign_sticky(ufs_campaign.campaign.id)) {
                     return vec![];
                 }
 
-                let campaign_id = m_campaign.campaign.id;
+                let campaign_id = ufs_campaign.campaign.id;
 
-                let mut unit_input = targeting_input.clone().with_campaign(m_campaign.campaign.clone());
+                let mut unit_input = targeting_input.clone().with_campaign(ufs_campaign.campaign.clone());
 
-                m_campaign
+                ufs_campaign
                     .units_with_price
                     .iter()
                     .filter(|unit_with_price| {
@@ -350,7 +340,7 @@ impl Manager {
                         let on_type_error = |type_error, rule| error!(target: "rule-evaluation", "Rule evaluation error for {campaign_id:?}, {rule:?} with error: {type_error:?}");
 
                         targeting::eval_with_callback(
-                            &m_campaign.campaign.targeting_rules,
+                            &ufs_campaign.campaign.targeting_rules,
                             &unit_input,
                             &mut output,
                             Some(on_type_error)
@@ -398,11 +388,11 @@ impl Manager {
 
         // Return the results, with a fallback unit if there is one
         if let Some((unit_with_price, campaign_id)) = auction_winner {
-            let validators = m_campaigns
+            let validators = ufs_campaigns
                 .iter()
-                .find_map(|m_campaign| {
-                    if &m_campaign.campaign.id == campaign_id {
-                        Some(&m_campaign.campaign.validators)
+                .find_map(|ufs_campaign| {
+                    if &ufs_campaign.campaign.id == campaign_id {
+                        Some(&ufs_campaign.campaign.validators)
                     } else {
                         None
                     }
@@ -444,14 +434,46 @@ mod test {
     use super::*;
     use crate::manager::input::Input;
     use adex_primitives::{
-        sentry::CLICK,
-        test_util::{CAMPAIGNS, DUMMY_AD_UNITS, DUMMY_IPFS, PUBLISHER},
+        config::GANACHE_CONFIG,
+        sentry::{
+            units_for_slot::response::{AdUnit, UnitsWithPrice},
+            CLICK,
+        },
+        test_util::{CAMPAIGNS, DUMMY_AD_UNITS, DUMMY_CAMPAIGN, DUMMY_IPFS, PUBLISHER},
+        unified_num::FromWhole,
     };
     use wiremock::{
         matchers::{method, path},
         Mock, MockServer, ResponseTemplate,
     };
 
+    fn setup_manager(uri: String) -> Manager {
+        let market_url = uri.parse().unwrap();
+        let whitelisted_tokens = GANACHE_CONFIG
+            .chains
+            .values()
+            .flat_map(|chain| chain.tokens.values().map(|token| token.address))
+            .collect::<HashSet<_>>();
+
+        let validator_1_url = ApiUrl::parse(&format!("{}/validator-1", uri)).expect("should parse");
+        let validator_2_url = ApiUrl::parse(&format!("{}/validator-2", uri)).expect("should parse");
+        let validator_3_url = ApiUrl::parse(&format!("{}/validator-3", uri)).expect("should parse");
+
+        let options = Options {
+            market_url,
+            market_slot: DUMMY_IPFS[0],
+            publisher_addr: *PUBLISHER,
+            // All passed tokens must be of the same price and decimals, so that the amounts can be accurately compared
+            whitelisted_tokens,
+            size: Some(Size::new(300, 100)),
+            navigator_language: Some("bg".into()),
+            disabled_video: false,
+            disabled_sticky: false,
+            validators: vec![validator_1_url, validator_2_url, validator_3_url],
+        };
+
+        Manager::new(options.clone(), Default::default()).expect("Failed to create AdView Manager")
+    }
     #[tokio::test]
     async fn test_querying_for_units_for_slot() {
         // 1. Set up mock servers for each validator
@@ -574,30 +596,7 @@ mod test {
             .await;
 
         // 2. Set up a manager
-        let market_url = server.uri().parse().unwrap();
-        let whitelisted_tokens = DEFAULT_TOKENS.clone();
-
-        let validator_1_url =
-            ApiUrl::parse(&format!("{}/validator-1", server.uri())).expect("should parse");
-        let validator_2_url =
-            ApiUrl::parse(&format!("{}/validator-2", server.uri())).expect("should parse");
-        let validator_3_url =
-            ApiUrl::parse(&format!("{}/validator-3", server.uri())).expect("should parse");
-        let options = Options {
-            market_url,
-            market_slot: DUMMY_IPFS[0],
-            publisher_addr: *PUBLISHER,
-            // All passed tokens must be of the same price and decimals, so that the amounts can be accurately compared
-            whitelisted_tokens,
-            size: Some(Size::new(300, 100)),
-            navigator_language: Some("bg".into()),
-            disabled_video: false,
-            disabled_sticky: false,
-            validators: vec![validator_1_url, validator_2_url, validator_3_url],
-        };
-
-        let manager = Manager::new(options.clone(), Default::default())
-            .expect("Failed to create AdView Manager");
+        let manager = setup_manager(server.uri());
 
         let res = manager
             .get_units_for_slot_resp()
@@ -607,5 +606,87 @@ mod test {
         assert_eq!(res.accepted_referrers, original_referrers);
         assert_eq!(res.fallback_unit, Some(original_ad_unit));
         assert_eq!(res.campaigns, vec![campaign_0, campaign_1, campaign_2]);
+    }
+
+    #[tokio::test]
+    async fn check_if_campaign_is_sticky() {
+        let mut manager = setup_manager("http://localhost:1337".to_string());
+
+        // Case 1 - options has disabled sticky
+        {
+            manager.options.disabled_sticky = true;
+            assert!(!manager.is_campaign_sticky(DUMMY_CAMPAIGN.id).await);
+            manager.options.disabled_sticky = false;
+        }
+        // Case 2 - time is past stickiness treshold, less than 4 minutes ago
+        {
+            let history = vec![HistoryEntry {
+                time: Utc::now() - Duration::days(1), // 24 hours ago
+                unit_id: DUMMY_IPFS[0],
+                campaign_id: DUMMY_CAMPAIGN.id,
+                slot_id: DUMMY_IPFS[1],
+            }];
+            let history = Arc::new(RwLock::new(VecDeque::from(history)));
+
+            manager.history = history;
+
+            assert!(!manager.is_campaign_sticky(DUMMY_CAMPAIGN.id).await);
+        }
+        // Case 3 - time isn't past stickiness treshold, Utc::now()
+        {
+            let history = vec![HistoryEntry {
+                time: Utc::now(),
+                unit_id: DUMMY_IPFS[0],
+                campaign_id: DUMMY_CAMPAIGN.id,
+                slot_id: DUMMY_IPFS[1],
+            }];
+            let history = Arc::new(RwLock::new(VecDeque::from(history)));
+
+            manager.history = history;
+
+            assert!(manager.is_campaign_sticky(DUMMY_CAMPAIGN.id).await);
+        }
+    }
+
+    #[tokio::test]
+    async fn check_sticky_ad_unit() {
+        let server = MockServer::start().await;
+        let mut manager = setup_manager(server.uri());
+        let history = vec![HistoryEntry {
+            time: Utc::now(),
+            unit_id: DUMMY_AD_UNITS[0].ipfs,
+            campaign_id: DUMMY_CAMPAIGN.id,
+            slot_id: manager.options.market_slot,
+        }];
+        let history = Arc::new(RwLock::new(VecDeque::from(history)));
+        manager.history = history;
+
+        let campaign = Campaign {
+            campaign: DUMMY_CAMPAIGN.clone(),
+            units_with_price: vec![UnitsWithPrice {
+                unit: AdUnit::from(&DUMMY_AD_UNITS[0]),
+                price: UnifiedNum::from_whole(0.0001),
+            }],
+        };
+        let res = manager
+            .get_sticky_ad_unit(&[campaign], "http://localhost:1337")
+            .await;
+
+        assert!(res.is_some());
+
+        // TODO: Here we modify the campaign manually, verify that such a scenario is possible
+        let campaign = Campaign {
+            campaign: DUMMY_CAMPAIGN.clone(),
+            units_with_price: vec![UnitsWithPrice {
+                unit: AdUnit::from(&DUMMY_AD_UNITS[1]),
+                price: UnifiedNum::from_whole(0.0001),
+            }],
+        };
+
+        let res = manager
+            .get_sticky_ad_unit(&[campaign], "http://localhost:1337")
+            .await;
+
+        assert!(res.is_none());
     }
 }

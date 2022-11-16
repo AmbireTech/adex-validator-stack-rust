@@ -3,25 +3,6 @@ use serde_json::{from_value, json};
 
 fn main() {
     let json = json!({
-      "max_channels": 512,
-      "channels_find_limit": 200,
-      "campaigns_find_limit": 200,
-      "spendable_find_limit": 200,
-      "wait_time": 500,
-      "msgs_find_limit": 10,
-      "analytics_find_limit": 5000,
-      "analytics_maxtime": 20000,
-      "heartbeat_time": 30000,
-      "health_threshold_promilles": 950,
-      "health_unsignable_promilles": 750,
-      "propagation_timeout": 2000,
-      "fetch_timeout": 5000,
-      "all_campaigns_timeout": 5000,
-      "channel_tick_timeout": 8000,
-      "ip_rate_limit": {
-        "type": "ip",
-        "timeframe": 1200000
-      },
       "creators_whitelist": [
         "0xaCBaDA2d5830d1875ae3D2de207A1363B316Df2F",
         "0xDd589B43793934EF6Ad266067A0d1D4896b0dff0",
@@ -32,9 +13,6 @@ fn main() {
         "0x80690751969B234697e9059e04ed72195c3507fa",
         "0xf3f583AEC5f7C030722Fe992A5688557e1B86ef7",
         "0x6B83e7D6B72c098d48968441e0d05658dc17Adb9"
-      ],
-      "admins": [
-        "0x80690751969B234697e9059e04ed72195c3507fa"
       ],
       "chain": {
         "Ganache #1337": {
@@ -64,14 +42,42 @@ fn main() {
           }
         }
       },
-      "platform": {
-        "url": "https://platform.adex.network/",
-        "keep_alive_interval": 1200000
-      },
       "limits": {
         "units_for_slot": {
           "max_campaigns_earning_from": 25,
           "global_min_impression_price": "10"
+        },
+        "channels_find": 200,
+        "campaigns_find": 200,
+        "spendable_find": 200,
+        "msgs_find": 10,
+        "analytics_find": 5000,
+        "ip_rate_limit": {
+          "type": "ip",
+          "timeframe": 1200000
+        }
+      },
+      "sentry": {
+        "analytics_maxtime": 20000,
+        "admins": [
+          "0x80690751969B234697e9059e04ed72195c3507fa"
+        ],
+        "platform": {
+          "url": "https://platform.adex.network/",
+          "keep_alive_interval": 1200000
+        },
+      },
+      "worker": {
+        "max_channels": 512,
+        "wait_time": 500,
+        "heartbeat_time": 30000,
+        "health_threshold_promilles": 950,
+        "health_unsignable_promilles": 750,
+        "timeouts": {
+          "propagation": 2000,
+          "fetch": 5000,
+          "all_campaigns": 5000,
+          "channel_tick": 8000,
         }
       }
     });
