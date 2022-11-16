@@ -1,47 +1,48 @@
-# Maximum number of channels to return per request
-max_channels = 512
-
-channels_find_limit = 512
-campaigns_find_limit = 512
-spendable_find_limit = 512
-wait_time = 40000
-
-msgs_find_limit = 10
-analytics_find_limit = 5000
-# in milliseconds
-analytics_maxtime = 15000
-
-heartbeat_time = 60000
-health_threshold_promilles = 970
-health_unsignable_promilles = 770
-propagation_timeout = 3000
-
-fetch_timeout = 10000
-all_campaigns_timeout = 10000
-channel_tick_timeout = 10000
-
-# 2h
-ip_rate_limit = { type = 'ip', timeframe = 7200000 }
-
 creators_whitelist = []
 validators_whitelist = []
-# Galya (for analytics)
-admins = ['0x5d6A3F1AD7b124ecDFDf4841D9bB246eD5fBF04c']
 
-[platform]
-# This should be changed for tests and use the wiremock url
-url = "https://platform.adex.network"
-# 20 minutes in milliseconds
-keep_alive_interval = 1200000
+[limits]
+channels_find = 512
+campaigns_find = 512
+spendable_find = 512
+msgs_find = 10
+analytics_find = 5000
+# 2h
+ip_rate_limit = { type = 'ip', timeframe = 7200000 }
 
 [limits.units_for_slot]
 # The maximum number of campaigns a publisher can earn from
 # This will limit the returned Campaigns to the set number
 max_campaigns_earning_from = 25
-
 # 0.01 (UnifiedNum) per 1000 impressions
 # 1_000 * (per) 1_000 / 10^8 = 0.01
 global_min_impression_price = '1000000'
+
+[sentry]
+# in milliseconds
+analytics_maxtime = 15000
+# Galya (for analytics)
+admins = ['0x5d6A3F1AD7b124ecDFDf4841D9bB246eD5fBF04c']
+
+[sentry.platform]
+# This should be changed for tests and use the wiremock url
+url = "https://platform.adex.network"
+# 20 minutes in milliseconds
+keep_alive_interval = 1200000
+
+[worker]
+# Maximum number of channels to return per request
+max_channels = 512
+wait_time = 40000
+heartbeat_time = 60000
+health_threshold_promilles = 970
+health_unsignable_promilles = 770
+
+[worker.timeouts]
+propagation = 3000
+fetch = 10000
+all_campaigns = 10000
+channel_tick = 10000
 
 [chain."Ethereum Mainnet"]
 chain_id = 1

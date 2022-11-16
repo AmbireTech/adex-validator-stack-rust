@@ -63,13 +63,13 @@ pub async fn channel_list<C: Locked + 'static>(
 ) -> Result<Json<ChannelListResponse>, ResponseError> {
     let skip = query
         .page
-        .checked_mul(app.config.channels_find_limit.into())
+        .checked_mul(app.config.limits.channels_find.into())
         .ok_or_else(|| ResponseError::BadRequest("Page and/or limit is too large".into()))?;
 
     let list_response = list_channels(
         &app.pool,
         skip,
-        app.config.channels_find_limit,
+        app.config.limits.channels_find,
         query.validator,
         &query.chains,
     )
@@ -226,7 +226,7 @@ pub async fn get_all_spender_limits<C: Locked + 'static>(
 ) -> Result<Json<AllSpendersResponse>, ResponseError> {
     let channel = channel_context.context;
 
-    let limit = app.config.spendable_find_limit;
+    let limit = app.config.limits.spendable_find;
     let skip = query
         .page
         .checked_mul(limit.into())
@@ -426,7 +426,7 @@ pub async fn channel_payout<C: Locked + 'static>(
     let channel_campaigns = fetch_campaign_ids_for_channel(
         &app.pool,
         channel_context.context.id(),
-        app.config.campaigns_find_limit,
+        app.config.limits.campaigns_find,
     )
     .await?;
 
@@ -674,7 +674,7 @@ pub mod validator_message {
     ) -> Result<Json<ValidatorMessagesListResponse>, ResponseError> {
         let channel = channel_context.context;
 
-        let config_limit = app.config.msgs_find_limit as u64;
+        let config_limit = app.config.limits.msgs_find as u64;
         let limit = query
             .limit
             .filter(|n| *n >= 1)
@@ -1229,7 +1229,7 @@ mod test {
     #[tokio::test]
     async fn get_channels_list() {
         let mut app_guard = setup_dummy_app().await;
-        app_guard.config.channels_find_limit = 2;
+        app_guard.config.limits.channels_find = 2;
 
         let app = Extension(Arc::new(app_guard.app.clone()));
 
@@ -1388,7 +1388,7 @@ mod test {
         {
             let limit_app = {
                 let mut limit_app = app_guard.app;
-                limit_app.config.channels_find_limit = 10; // no need to test pagination, will ease checking results for this cause
+                limit_app.config.limits.channels_find = 10; // no need to test pagination, will ease checking results for this cause
 
                 Extension(Arc::new(limit_app))
             };

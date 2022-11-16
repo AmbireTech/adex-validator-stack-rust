@@ -125,8 +125,8 @@
 //!
 //! Retrieve the latest validator [`MessageTypes`] for a given [`Channel`].
 //!
-//! The query `limit` parameter is constraint to a maximum of [`Config.msgs_find_limit`],
-//! if a large value is passed it will use the [`Config.msgs_find_limit`] instead.
+//! The query `limit` parameter is constraint to a maximum of [`Config.limits.msgs_find`],
+//! if a large value is passed it will use the [`Config.limits.msgs_find`] instead.
 //!
 //!
 //! **Sub-routes** with additional filtering:
@@ -464,7 +464,7 @@
 //!
 //! All [`ALLOWED_KEYS`] are allowed for admins.
 //!
-//! Admin addresses are configured in the [`Config.admins`](primitives::Config::admins).
+//! Admin addresses are configured in the [`Config.sentry.admins`](primitives::config::SentryConfig::admins).
 //!
 //! The route is handled by [`get_analytics()`].
 //!
@@ -513,7 +513,7 @@
 //! [`ChannelId`]: primitives::ChannelId
 //! [`ChannelPayRequest`]: primitives::sentry::ChannelPayRequest
 //! [`check_access()`]: crate::access::check_access
-//! [`Config.msgs_find_limit`]: primitives::Config::msgs_find_limit
+//! [`Config.limits.msgs_find`]: primitives::config::Limits::msgs_find
 //! [`Event`]: primitives::sentry::Event
 //! [`Heartbeat`]: primitives::validator::Heartbeat
 //! [`MessageTypes`]: primitives::validator::MessageTypes

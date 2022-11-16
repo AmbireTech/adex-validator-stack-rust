@@ -40,7 +40,7 @@ pub async fn heartbeat<C: Unlocked + 'static>(
             .to_std()
             .expect("Should never panic because Now > heartbeat.timestamp");
 
-        duration > iface.config.heartbeat_time
+        duration > iface.config.worker.heartbeat_time
     });
 
     if should_send {
