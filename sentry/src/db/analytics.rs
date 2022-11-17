@@ -337,20 +337,25 @@ mod test {
 
             // 8.12.2021 23:00
             let click_ad_slot_2 = make_click_analytics(&ad_unit, ad_slot_ipfs_2, 8, 23);
-            let click_ad_slot_2 = update_analytics(&database.pool, click_ad_slot_2).await.expect("Should update");
-
+            let click_ad_slot_2 = update_analytics(&database.pool, click_ad_slot_2)
+                .await
+                .expect("Should update");
 
             // 9.12.2021 00:00
-            let mut impression_new_slot_type = make_impression_analytics(&ad_unit, ad_slot_ipfs_2, 9, 0);
+            let mut impression_new_slot_type =
+                make_impression_analytics(&ad_unit, ad_slot_ipfs_2, 9, 0);
             impression_new_slot_type.ad_slot_type = Some("legacy_500x500".to_string());
-            let impression_new_slot_type = update_analytics(&database.pool, impression_new_slot_type).await.expect("Should update");
+            let impression_new_slot_type =
+                update_analytics(&database.pool, impression_new_slot_type)
+                    .await
+                    .expect("Should update");
 
             vec![
                 ("click_germany", click_germany),
                 ("impression_ad_unit_2", impression_ad_unit_2),
                 ("impression_publisher_2", impression_publisher_2),
                 ("click_ad_slot_2", click_ad_slot_2),
-                ("impression_new_slot_type", impression_new_slot_type)
+                ("impression_new_slot_type", impression_new_slot_type),
             ]
             .into_iter()
             .collect()
@@ -891,11 +896,7 @@ mod test {
             .await
             .expect("Should fetch");
 
-            assert_eq!(
-                1,
-                count_clicks.len(),
-                "Only single analytics is expected"
-            );
+            assert_eq!(1, count_clicks.len(), "Only single analytics is expected");
             let fetched = count_clicks.get(0).expect("Should have index 0");
             assert_eq!(
                 23,

@@ -10,7 +10,7 @@ use ethsign::{KeyFile, Signature};
 use primitives::{Address, BigNum, Chain, ChainId, ChainOf, Channel, Config, ValidatorId};
 
 use super::{
-    error::{Error, KeystoreError, VerifyError, OutpaceError},
+    error::{Error, KeystoreError, OutpaceError, VerifyError},
     ewt::{self, Payload},
     to_ethereum_signed, Electrum, LockedWallet, UnlockedWallet, WalletState, IDENTITY_ABI,
     OUTPACE_ABI,

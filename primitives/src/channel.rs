@@ -6,16 +6,11 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use hex::{FromHex, FromHexError};
 
-use crate::{Address, Validator, ValidatorId, ToHex};
+use crate::{Address, ToHex, Validator, ValidatorId};
 
 #[derive(Deserialize, PartialEq, Eq, Copy, Clone, Hash)]
 #[serde(transparent)]
-pub struct ChannelId(
-    #[serde(
-        deserialize_with = "deserialize_channel_id",
-    )]
-    [u8; 32],
-);
+pub struct ChannelId(#[serde(deserialize_with = "deserialize_channel_id")] [u8; 32]);
 
 impl ChannelId {
     pub fn as_bytes(&self) -> &[u8; 32] {

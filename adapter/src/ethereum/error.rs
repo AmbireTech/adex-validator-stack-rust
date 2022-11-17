@@ -22,7 +22,7 @@ impl From<Error> for AdapterError {
             err @ Error::ContractInitialization(..) => AdapterError::adapter(err),
             err @ Error::ContractQuerying(..) => AdapterError::adapter(err),
             err @ Error::VerifyAddress(..) => AdapterError::adapter(err),
-            err @ Error::OutpaceError( .. ) => AdapterError::adapter(err),
+            err @ Error::OutpaceError(..) => AdapterError::adapter(err),
             err @ Error::AuthenticationTokenNotIntendedForUs { .. } => {
                 AdapterError::authentication(err)
             }
@@ -152,7 +152,7 @@ pub enum EwtVerifyError {
     #[error("Error when decoding token signature")]
     InvalidSignature,
     #[error("Payload error: {0}")]
-    Payload(#[from] PayloadError)
+    Payload(#[from] PayloadError),
 }
 
 #[derive(Debug, Error)]
