@@ -87,7 +87,6 @@ impl fmt::Display for InvalidNewState {
                 Transition::Earners => "InvalidTransitionEarners",
                 Transition::Spenders => "InvalidTransitionSpenders",
             },
-            // TODO: Should we use health value?
             InvalidNewState::Health(health) => match health {
                 Health::Earners(_health) => "TooLowHealthEarners",
                 Health::Spenders(_health) => "TooLowHealthSpenders",
@@ -124,7 +123,6 @@ pub async fn tick<C: Unlocked + 'static>(
     let from = channel_context.context.leader;
     let channel_id = channel_context.context.id();
 
-    // TODO: Context for All spender sum Error when overflow occurs
     let all_spenders_sum = all_spenders
         .values()
         .map(|spender| &spender.total_deposited)
@@ -187,7 +185,6 @@ async fn on_new_state<'a, C: Unlocked + 'static>(
 
     let proposed_balances = match new_state.balances.clone().check() {
         Ok(balances) => balances,
-        // TODO: Should we show the Payout Mismatch between Spent & Earned?
         Err(balances::Error::PayoutMismatch { .. }) => {
             return on_error(
                 sentry,

@@ -10,7 +10,7 @@ use ethsign::{KeyFile, Signature};
 use primitives::{Address, BigNum, Chain, ChainId, ChainOf, Channel, Config, ValidatorId};
 
 use super::{
-    error::{Error, EwtSigningError, KeystoreError, VerifyError},
+    error::{Error, KeystoreError, VerifyError, OutpaceError},
     ewt::{self, Payload},
     to_ethereum_signed, Electrum, LockedWallet, UnlockedWallet, WalletState, IDENTITY_ABI,
     OUTPACE_ABI,
@@ -282,8 +282,7 @@ impl Unlocked for Ethereum<UnlockedWallet> {
             .state
             .wallet
             .sign(&message)
-            // TODO: This is not entirely true, we do not sign an Ethereum Web Token but Outpace state_root
-            .map_err(|err| EwtSigningError::SigningMessage(err.to_string()))?;
+            .map_err(|err| OutpaceError::SignStateroot(err.to_string()))?;
 
         Ok(format!("0x{}", hex::encode(wallet_sign.to_electrum())))
     }

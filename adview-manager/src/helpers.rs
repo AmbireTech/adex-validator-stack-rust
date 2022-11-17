@@ -156,7 +156,6 @@ pub fn get_unit_html_with_events(
         let body =
             serde_json::to_string(&events_body).expect("It should always serialize EventBody");
 
-        // TODO: check whether the JSON body with `''` quotes executes correctly!
         let fetch_opts = format!("var fetchOpts = {{ method: 'POST', headers: {{ 'content-type': 'application/json' }}, body: {body} }};");
 
         let validators: String = validators

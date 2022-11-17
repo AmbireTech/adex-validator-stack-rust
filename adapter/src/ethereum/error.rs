@@ -22,6 +22,7 @@ impl From<Error> for AdapterError {
             err @ Error::ContractInitialization(..) => AdapterError::adapter(err),
             err @ Error::ContractQuerying(..) => AdapterError::adapter(err),
             err @ Error::VerifyAddress(..) => AdapterError::adapter(err),
+            err @ Error::OutpaceError( .. ) => AdapterError::adapter(err),
             err @ Error::AuthenticationTokenNotIntendedForUs { .. } => {
                 AdapterError::authentication(err)
             }
@@ -74,6 +75,8 @@ pub enum Error {
     },
     #[error("Insufficient privilege")]
     InsufficientAuthorizationPrivilege,
+    #[error("Outpace contract error: {0}")]
+    OutpaceError(#[from] OutpaceError),
 }
 
 #[derive(Debug, Error)]
@@ -124,6 +127,12 @@ pub enum EwtSigningError {
 }
 
 #[derive(Debug, Error)]
+pub enum OutpaceError {
+    #[error("Error while signing outpace contract: {0}")]
+    SignStateroot(String),
+}
+
+#[derive(Debug, Error)]
 pub enum EwtVerifyError {
     #[error("The Ethereum Web Token header is invalid")]
     InvalidHeader,
@@ -142,12 +151,18 @@ pub enum EwtVerifyError {
     /// or if Signature V component is not in "Electrum" notation (`< 27`).
     #[error("Error when decoding token signature")]
     InvalidSignature,
+    #[error("Payload error: {0}")]
+    Payload(#[from] PayloadError)
+}
+
+#[derive(Debug, Error)]
+pub enum PayloadError {
     #[error("Payload decoding: {0}")]
-    PayloadDecoding(#[source] base64::DecodeError),
+    Decoding(#[source] base64::DecodeError),
     #[error("Payload deserialization: {0}")]
-    PayloadDeserialization(#[from] serde_json::Error),
+    Deserialization(#[from] serde_json::Error),
     #[error("Payload is not a valid UTF-8 string: {0}")]
-    PayloadUtf8(#[from] std::str::Utf8Error),
+    Utf8(#[from] std::str::Utf8Error),
 }
 
 #[cfg(test)]

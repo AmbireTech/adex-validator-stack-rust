@@ -2,19 +2,17 @@ use std::{fmt, ops::Deref, str::FromStr};
 
 use ethereum_types::U256;
 
-use serde::{Deserialize, Deserializer, Serialize};
-use serde_hex::{SerHex, StrictPfx};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use hex::{FromHex, FromHexError};
 
-use crate::{Address, Validator, ValidatorId};
+use crate::{Address, Validator, ValidatorId, ToHex};
 
-#[derive(Serialize, Deserialize, PartialEq, Eq, Copy, Clone, Hash)]
+#[derive(Deserialize, PartialEq, Eq, Copy, Clone, Hash)]
 #[serde(transparent)]
 pub struct ChannelId(
     #[serde(
         deserialize_with = "deserialize_channel_id",
-        serialize_with = "SerHex::<StrictPfx>::serialize"
     )]
     [u8; 32],
 );
@@ -37,6 +35,15 @@ where
 {
     let channel_id = String::deserialize(deserializer)?;
     validate_channel_id(&channel_id).map_err(serde::de::Error::custom)
+}
+
+impl Serialize for ChannelId {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&self.0.to_hex_prefixed())
+    }
 }
 
 fn validate_channel_id(s: &str) -> Result<[u8; 32], FromHexError> {

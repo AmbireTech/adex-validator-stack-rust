@@ -99,7 +99,6 @@ pub struct Time {
     /// - a timestamp in milliseconds
     /// **Note:** [`DateHour`] rules should be uphold, this means that passed values should always be rounded to hours
     /// And it should not contain **minutes**, **seconds** or **nanoseconds**
-    // TODO: Either Timestamp (number) or DateTime (string) de/serialization
     pub start: DateHour<Utc>,
     /// The End [`DateHour`] which will fetch `analytics_time <= end` and should be after Start [`DateHour`]!
     pub end: Option<DateHour<Utc>>,

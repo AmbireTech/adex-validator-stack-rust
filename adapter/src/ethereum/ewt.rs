@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use web3::signing::keccak256;
 
 use super::{
-    error::{EwtSigningError, EwtVerifyError},
+    error::{EwtSigningError, EwtVerifyError, PayloadError},
     to_ethereum_signed, Electrum,
 };
 
@@ -54,14 +54,13 @@ pub struct Payload {
 
 impl Payload {
     /// Decodes the [`Payload`] from a base64 encoded json string
-    // TODO: replace with own error?
-    pub fn base64_decode(encoded_json: &str) -> Result<Self, EwtVerifyError> {
+    pub fn base64_decode(encoded_json: &str) -> Result<Self, PayloadError> {
         let base64_decode = base64::decode_config(encoded_json, base64::URL_SAFE_NO_PAD)
-            .map_err(EwtVerifyError::PayloadDecoding)?;
+            .map_err(PayloadError::Decoding)?;
 
-        let json = std::str::from_utf8(&base64_decode).map_err(EwtVerifyError::PayloadUtf8)?;
+        let json = std::str::from_utf8(&base64_decode).map_err(PayloadError::Utf8)?;
 
-        serde_json::from_str(json).map_err(EwtVerifyError::PayloadDeserialization)
+        serde_json::from_str(json).map_err(PayloadError::Deserialization)
     }
 }
 
