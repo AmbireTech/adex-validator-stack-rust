@@ -33,6 +33,7 @@ pub struct Output {
     /// price.{eventType}
     /// For example: price.IMPRESSION
     /// The default is the min of the bound of event type:
+    /// The price is per one event
     /// Default: pricingBounds.IMPRESSION.min
     pub price: HashMap<EventType, UnifiedNum>,
 }

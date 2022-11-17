@@ -30,12 +30,12 @@ fn main() {
           "title": "Dummy Campaign",
           "pricingBounds": {
             "CLICK": {
-              "min": "6000000",
-              "max": "10000000"
+              "min": "6000",
+              "max": "10000"
             },
             "IMPRESSION": {
-              "min": "4000000",
-              "max": "5000000"
+              "min": "4000",
+              "max": "5000"
             }
           },
           "eventSubmission": {
@@ -97,12 +97,12 @@ fn main() {
           "title": "Dummy Campaign 2 in Chain #1337",
           "pricingBounds": {
             "CLICK": {
-              "min": "300000000",
-              "max": "500000000"
+              "min": "300000",
+              "max": "500000"
             },
             "IMPRESSION": {
-              "min": "100000000",
-              "max": "200000000"
+              "min": "100000",
+              "max": "200000"
             }
           },
           "eventSubmission": {
@@ -165,12 +165,12 @@ fn main() {
           "title": "Dummy Campaign 3 in Chain #1",
           "pricingBounds": {
             "CLICK": {
-              "min": "3500000",
-              "max": "6500000"
+              "min": "3500",
+              "max": "6500"
             },
             "IMPRESSION": {
-              "min": "1500000",
-              "max": "2500000"
+              "min": "1500",
+              "max": "2500"
             }
           },
           "eventSubmission": {

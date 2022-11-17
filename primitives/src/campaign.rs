@@ -179,7 +179,7 @@ pub struct Campaign {
     pub validators: Validators,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
-    /// Events pricing bounds
+    /// Events pricing bounds, per 1 event
     #[serde(default, skip_serializing_if = "PricingBounds::is_empty")]
     pub pricing_bounds: PricingBounds,
     /// EventSubmission object, applied to event submission
