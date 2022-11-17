@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `test_harness/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceSerif4-Regular-1f7d512b176f0f72.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceSerif4-Bold-124a1ca42af929b6.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-3dd8914bdd6e2ce5.css" id="mainThemeStyle"><link rel="stylesheet" id="themeStyle" href="../../static.files/light-1469fca9efc07bcb.css"><link rel="stylesheet" disabled href="../../static.files/dark-e9b7e5d8ba0dc980.css"><link rel="stylesheet" disabled href="../../static.files/ayu-0c1cf144240c9f40.css"><script id="default-settings" ></script><script src="../../static.files/storage-d43fa987303ecbbb.js"></script><script defer src="../../static.files/source-script-5cf2e01a42cc9858.js"></script><script defer src="../../source-files.js"></script><script defer src="../../static.files/main-799a64abec831f72.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-13285aec31fa243e.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../test_harness/index.html"><img class="rust-logo" src="../../static.files/rust-logo-151179464ae7ed46.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../static.files/wheel-5ec35bf9ca753509.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><a href="#1" id="1">1</a>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `test_harness/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceSerif4-Regular-1f7d512b176f0f72.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceSerif4-Bold-124a1ca42af929b6.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-ea97c800646ec4c5.css" id="mainThemeStyle"><link rel="stylesheet" id="themeStyle" href="../../static.files/light-1469fca9efc07bcb.css"><link rel="stylesheet" disabled href="../../static.files/dark-e9b7e5d8ba0dc980.css"><link rel="stylesheet" disabled href="../../static.files/ayu-0c1cf144240c9f40.css"><script id="default-settings" ></script><script src="../../static.files/storage-d43fa987303ecbbb.js"></script><script defer src="../../static.files/source-script-5cf2e01a42cc9858.js"></script><script defer src="../../source-files.js"></script><script defer src="../../static.files/main-2da75ee0e1909b3a.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-13285aec31fa243e.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../test_harness/index.html"><img class="rust-logo" src="../../static.files/rust-logo-151179464ae7ed46.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../static.files/wheel-5ec35bf9ca753509.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
 <a href="#4" id="4">4</a>
@@ -2888,21 +2888,6 @@
 <a href="#2888" id="2888">2888</a>
 <a href="#2889" id="2889">2889</a>
 <a href="#2890" id="2890">2890</a>
-<a href="#2891" id="2891">2891</a>
-<a href="#2892" id="2892">2892</a>
-<a href="#2893" id="2893">2893</a>
-<a href="#2894" id="2894">2894</a>
-<a href="#2895" id="2895">2895</a>
-<a href="#2896" id="2896">2896</a>
-<a href="#2897" id="2897">2897</a>
-<a href="#2898" id="2898">2898</a>
-<a href="#2899" id="2899">2899</a>
-<a href="#2900" id="2900">2900</a>
-<a href="#2901" id="2901">2901</a>
-<a href="#2902" id="2902">2902</a>
-<a href="#2903" id="2903">2903</a>
-<a href="#2904" id="2904">2904</a>
-<a href="#2905" id="2905">2905</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::{
     collections::HashMap,
     net::{IpAddr, Ipv4Addr},
@@ -3204,9 +3189,8 @@
             id: VALIDATORS[<span class="kw-2">&amp;</span>LEADER].address.into(),
             url: VALIDATORS[<span class="kw-2">&amp;</span>LEADER].sentry_url.to_string(),
             <span class="comment">// min_validator_fee for token: 0.000_010
-            // fee per 1000 (pro mille) = 5.00000000 (UnifiedNum)
-            // fee per 1 payout: payout * fee / 1000 = payout * 0.00500000
-            </span>fee: <span class="number">500_000_000</span>.into(),
+            // fee per 1 payout: payout * fee  = payout * 0.00500000
+            </span>fee: UnifiedNum::from_whole(<span class="number">0.005</span>),
             fee_addr: <span class="prelude-val">None</span>,
         };
 
@@ -3214,9 +3198,8 @@
             id: VALIDATORS[<span class="kw-2">&amp;</span>FOLLOWER].address.into(),
             url: VALIDATORS[<span class="kw-2">&amp;</span>FOLLOWER].sentry_url.to_string(),
             <span class="comment">// min_validator_fee for token: 0.000_010
-            // fee per 1000 (pro mille) = 4.00000000 (UnifiedNum)
-            // fee per 1 payout: payout * fee / 1000 = payout * 0.00400000
-            </span>fee: <span class="number">400_000_000</span>.into(),
+            // fee per 1 payout: payout * fee = payout * 0.00400000
+            </span>fee: UnifiedNum::from_whole(<span class="number">0.004</span>),
             fee_addr: <span class="prelude-val">None</span>,
         };
 
@@ -3228,31 +3211,22 @@
                 .expect(<span class="string">&quot;Should parse&quot;</span>),
             channel,
             creator: <span class="kw-2">*</span>ADVERTISER,
-            <span class="comment">// 150.00000000
-            </span>budget: UnifiedNum::from(<span class="number">15_000_000_000</span>),
+            budget: UnifiedNum::from_whole(<span class="number">150</span>),
             validators,
             title: <span class="prelude-val">Some</span>(<span class="string">&quot;Dummy Campaign&quot;</span>.to_string()),
             pricing_bounds: <span class="macro">vec!</span>[
                 (
                     IMPRESSION,
                     Pricing {
-                        <span class="comment">// 0.04000000
-                        // Per 1000 = 40.00000000
-                        </span>min: <span class="number">4_000_000</span>.into(),
-                        <span class="comment">// 0.05000000
-                        // Per 1000 = 50.00000000
-                        </span>max: <span class="number">5_000_000</span>.into(),
+                        min: UnifiedNum::from_whole(<span class="number">0.04</span>),
+                        max: UnifiedNum::from_whole(<span class="number">0.05</span>),
                     },
                 ),
                 (
                     CLICK,
                     Pricing {
-                        <span class="comment">// 0.06000000
-                        // Per 1000 = 60.00000000
-                        </span>min: <span class="number">6_000_000</span>.into(),
-                        <span class="comment">// 0.10000000
-                        // Per 1000 = 100.00000000
-                        </span>max: <span class="number">10_000_000</span>.into(),
+                        min: UnifiedNum::from_whole(<span class="number">0.06</span>),
+                        max: UnifiedNum::from_whole(<span class="number">0.1</span>),
                     },
                 ),
             ]
@@ -3296,9 +3270,8 @@
         </span><span class="kw">let </span>leader_desc = ValidatorDesc {
             id: VALIDATORS[<span class="kw-2">&amp;</span>FOLLOWER].address.into(),
             url: VALIDATORS[<span class="kw-2">&amp;</span>FOLLOWER].sentry_url.to_string(),
-            <span class="comment">// fee per 1000 (pro mille) = 0.10000000 (UnifiedNum)
-            // fee per 1 = 0.00010000
-            </span>fee: UnifiedNum::from_whole(<span class="number">0.1</span>),
+            <span class="comment">// fee per 1 = 0.00010000
+            </span>fee: UnifiedNum::from_whole(<span class="number">0.0001</span>),
             fee_addr: <span class="prelude-val">None</span>,
         };
 
@@ -3307,9 +3280,8 @@
         </span><span class="kw">let </span>follower_desc = ValidatorDesc {
             id: VALIDATORS[<span class="kw-2">&amp;</span>LEADER].address.into(),
             url: VALIDATORS[<span class="kw-2">&amp;</span>LEADER].sentry_url.to_string(),
-            <span class="comment">// fee per 1000 (pro mille) = 0.05000000 (UnifiedNum)
-            // fee per 1 = 0.00005000
-            </span>fee: UnifiedNum::from_whole(<span class="number">0.05</span>),
+            <span class="comment">// fee per 1 = 0.00005000
+            </span>fee: UnifiedNum::from_whole(<span class="number">0.00005</span>),
             fee_addr: <span class="prelude-val">None</span>,
         };
 
@@ -3386,9 +3358,8 @@
             id: VALIDATORS[<span class="kw-2">&amp;</span>LEADER].address.into(),
             url: VALIDATORS[<span class="kw-2">&amp;</span>LEADER].sentry_url.to_string(),
             <span class="comment">// min_validator_fee for token: 0.000_010
-            // fee per 1000 (pro mille) = 2.00000000
             // fee per 1 payout: payout * fee / 1000 = payout * 0.00200000
-            </span>fee: UnifiedNum::from_whole(<span class="number">2</span>),
+            </span>fee: UnifiedNum::from_whole(<span class="number">0.002</span>),
             fee_addr: <span class="prelude-val">None</span>,
         };
 
@@ -3396,9 +3367,8 @@
             id: VALIDATORS[<span class="kw-2">&amp;</span>FOLLOWER].address.into(),
             url: VALIDATORS[<span class="kw-2">&amp;</span>FOLLOWER].sentry_url.to_string(),
             <span class="comment">// min_validator_fee for token: 0.000_010
-            // fee per 1000 (pro mille) = 1.75000000
-            // fee per 1 payout: payout * fee / 1000 = payout * 0.00175000
-            </span>fee: UnifiedNum::from_whole(<span class="number">1.75</span>),
+            // fee per 1 payout: payout * fee = payout * 0.00175000
+            </span>fee: UnifiedNum::from_whole(<span class="number">0.00175</span>),
             fee_addr: <span class="prelude-val">None</span>,
         };
 
@@ -5809,4 +5779,4 @@
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="test_harness" data-themes="" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (a00f8ba7f 2022-11-15)" data-search-js="search-df80cc3cb87b6482.js" data-settings-js="settings-7873449fa8c00e11.js" data-settings-css="settings-af96d9e2fc13e081.css" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="test_harness" data-themes="" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (e9493d63c 2022-11-16)" data-search-js="search-df80cc3cb87b6482.js" data-settings-js="settings-7873449fa8c00e11.js" data-settings-css="settings-af96d9e2fc13e081.css" ></div></body></html>
