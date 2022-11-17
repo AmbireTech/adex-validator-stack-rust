@@ -85,7 +85,6 @@ mod test {
     };
 
     #[test]
-    // TODO: Double check this test - encoded value! after introducing `spenders` ("spender", address, amount)
     fn get_state_root_hash_returns_correct_hash() {
         let channel = Channel {
             leader: IDS[&LEADER],
