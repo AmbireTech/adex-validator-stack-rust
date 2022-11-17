@@ -375,7 +375,7 @@ mod test {
             // Global scope, accessible everywhere
             "adView.secondsSinceCampaignImpression": 10,
             "adView.hasCustomPreferences": true,
-            "adView.navigatorLanguage": "en",
+            "adView.navigatorLanguage": "en-US",
             "adSlotId": "QmcUVX7fvoLMM93uN2bD3wGTH8MXSxeL8hojYfL2Lhp7mR",
             "adSlotType": "legacy_300x100",
             "publisherId": "0xE882ebF439207a70dDcCb39E13CA8506c9F45fD9",
@@ -395,7 +395,6 @@ mod test {
             "campaignBudget": "100000000000",
             "eventMinPrice": "1",
             "eventMaxPrice": "10",
-            "publisherEarnedFromCampaign": "30",
             // adSlot scope, accessible on Supermarket and AdView
             "adSlot.categories": ["IAB3", "IAB13-7", "IAB5"],
             "adSlot.hostname": "adex.network",
