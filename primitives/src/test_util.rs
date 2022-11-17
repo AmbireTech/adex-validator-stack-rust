@@ -149,14 +149,14 @@ mod logger {
 pub static DUMMY_VALIDATOR_LEADER: Lazy<ValidatorDesc> = Lazy::new(|| ValidatorDesc {
     id: IDS[&LEADER],
     url: "http://localhost:8005".to_string(),
-    fee: UnifiedNum::from_whole(0.03),
+    fee: UnifiedNum::from_whole(0.00003),
     fee_addr: None,
 });
 
 pub static DUMMY_VALIDATOR_FOLLOWER: Lazy<ValidatorDesc> = Lazy::new(|| ValidatorDesc {
     id: IDS[&FOLLOWER],
     url: "http://localhost:8006".to_string(),
-    fee: UnifiedNum::from_whole(0.02),
+    fee: UnifiedNum::from_whole(0.00002),
     fee_addr: None,
 });
 
@@ -315,12 +315,12 @@ pub static CAMPAIGNS: Lazy<[ChainOf<Campaign>; 3]> = Lazy::new(|| {
         };
 
         let leader_desc = ValidatorDesc {
-            fee: UnifiedNum::from_whole(0.5),
+            fee: UnifiedNum::from_whole(0.0005),
             ..DUMMY_VALIDATOR_LEADER.clone()
         };
 
         let follower_desc = ValidatorDesc {
-            fee: UnifiedNum::from_whole(0.4),
+            fee: UnifiedNum::from_whole(0.0004),
             ..DUMMY_VALIDATOR_FOLLOWER.clone()
         };
 
@@ -378,12 +378,12 @@ pub static CAMPAIGNS: Lazy<[ChainOf<Campaign>; 3]> = Lazy::new(|| {
         };
 
         let leader_desc = ValidatorDesc {
-            fee: UnifiedNum::from_whole(0.1),
+            fee: UnifiedNum::from_whole(0.0001),
             ..DUMMY_VALIDATOR_FOLLOWER.clone()
         };
 
         let follower_desc = ValidatorDesc {
-            fee: UnifiedNum::from_whole(0.05),
+            fee: UnifiedNum::from_whole(0.00005),
             ..DUMMY_VALIDATOR_LEADER.clone()
         };
         let validators = Validators::new((leader_desc, follower_desc));
@@ -440,12 +440,12 @@ pub static CAMPAIGNS: Lazy<[ChainOf<Campaign>; 3]> = Lazy::new(|| {
         };
 
         let leader_desc = ValidatorDesc {
-            fee: UnifiedNum::from_whole(0.02),
+            fee: UnifiedNum::from_whole(0.00002),
             ..DUMMY_VALIDATOR_LEADER.clone()
         };
 
         let follower_desc = ValidatorDesc {
-            fee: UnifiedNum::from_whole(0.0175),
+            fee: UnifiedNum::from_whole(0.0000175),
             ..DUMMY_VALIDATOR_FOLLOWER.clone()
         };
 

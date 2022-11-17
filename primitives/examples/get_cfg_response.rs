@@ -45,7 +45,7 @@ fn main() {
       "limits": {
         "units_for_slot": {
           "max_campaigns_earning_from": 25,
-          "global_min_impression_price": "10000"
+          "global_min_impression_price": "10"
         },
         "channels_find": 200,
         "campaigns_find": 200,

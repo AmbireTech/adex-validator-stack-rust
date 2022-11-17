@@ -14,9 +14,10 @@ ip_rate_limit = { type = 'ip', timeframe = 7200000 }
 # The maximum number of campaigns a publisher can earn from
 # This will limit the returned Campaigns to the set number
 max_campaigns_earning_from = 25
-# 0.01 (UnifiedNum) per 1000 impressions
-# 1_000 * (per) 1_000 / 10^8 = 0.01
-global_min_impression_price = '1000000'
+
+# 0.00001 (UnifiedNum) per 1 impression
+# 1_000 / 10^8 = 0.00001
+global_min_impression_price = '1000'
 
 [sentry]
 # in milliseconds
