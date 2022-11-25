@@ -10,7 +10,7 @@ use ethsign::{KeyFile, Signature};
 use primitives::{Address, BigNum, Chain, ChainId, ChainOf, Channel, Config, ValidatorId};
 
 use super::{
-    error::{Error, KeystoreError, OutpaceError, VerifyError},
+    error::{Error, KeystoreError, SigningError, VerifyError},
     ewt::{self, Payload},
     to_ethereum_signed, Electrum, LockedWallet, UnlockedWallet, WalletState, IDENTITY_ABI,
     OUTPACE_ABI,
@@ -275,14 +275,14 @@ impl<S: WalletState> Locked for Ethereum<S> {
 #[async_trait]
 impl Unlocked for Ethereum<UnlockedWallet> {
     fn sign(&self, state_root: &str) -> Result<String, Error> {
-        let state_root = hex::decode(state_root).map_err(VerifyError::StateRootDecoding)?;
+        let state_root = hex::decode(state_root).map_err(SigningError::StateRootDecoding)?;
         let message = to_ethereum_signed(&state_root);
 
         let wallet_sign = self
             .state
             .wallet
             .sign(&message)
-            .map_err(|err| OutpaceError::SignStateroot(err.to_string()))?;
+            .map_err(|err| SigningError::SignStateRoot(err.to_string()))?;
 
         Ok(format!("0x{}", hex::encode(wallet_sign.to_electrum())))
     }
@@ -297,7 +297,7 @@ impl Unlocked for Ethereum<UnlockedWallet> {
             chain_id: for_chain,
         };
 
-        let token = ewt::Token::sign(&self.state.wallet, payload).map_err(Error::SignMessage)?;
+        let token = ewt::Token::sign(&self.state.wallet, payload).map_err(Error::TokenSign)?;
 
         Ok(token.to_string())
     }

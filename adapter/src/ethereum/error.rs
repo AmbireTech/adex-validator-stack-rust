@@ -1,4 +1,5 @@
 use crate::Error as AdapterError;
+use hex::FromHexError;
 use primitives::{
     address::Error as AddressError, big_num::ParseBigIntError, ChainId, ChannelId, ValidatorId,
 };
@@ -17,12 +18,12 @@ impl From<Error> for AdapterError {
             err @ Error::ChainNotWhitelisted(..) => AdapterError::adapter(err),
             err @ Error::InvalidDepositAsset(..) => AdapterError::adapter(err),
             err @ Error::BigNumParsing(..) => AdapterError::adapter(err),
-            err @ Error::SignMessage(..) => AdapterError::adapter(err),
+            err @ Error::TokenSign(..) => AdapterError::adapter(err),
             err @ Error::VerifyMessage(..) => AdapterError::adapter(err),
             err @ Error::ContractInitialization(..) => AdapterError::adapter(err),
             err @ Error::ContractQuerying(..) => AdapterError::adapter(err),
             err @ Error::VerifyAddress(..) => AdapterError::adapter(err),
-            err @ Error::OutpaceError(..) => AdapterError::adapter(err),
+            err @ Error::SigningMessage(..) => AdapterError::adapter(err),
             err @ Error::AuthenticationTokenNotIntendedForUs { .. } => {
                 AdapterError::authentication(err)
             }
@@ -52,7 +53,7 @@ pub enum Error {
     ChannelInactive(ChannelId),
     /// Signing of the message failed
     #[error("Signing message: {0}")]
-    SignMessage(#[from] EwtSigningError),
+    TokenSign(#[from] EwtSigningError),
     #[error("Verifying message: {0}")]
     VerifyMessage(#[from] EwtVerifyError),
     #[error("Contract initialization: {0}")]
@@ -75,8 +76,8 @@ pub enum Error {
     },
     #[error("Insufficient privilege")]
     InsufficientAuthorizationPrivilege,
-    #[error("Outpace contract error: {0}")]
-    OutpaceError(#[from] OutpaceError),
+    #[error("Signing message error: {0}")]
+    SigningMessage(#[from] SigningError),
 }
 
 #[derive(Debug, Error)]
@@ -127,9 +128,11 @@ pub enum EwtSigningError {
 }
 
 #[derive(Debug, Error)]
-pub enum OutpaceError {
-    #[error("Error while signing outpace contract: {0}")]
-    SignStateroot(String),
+pub enum SigningError {
+    #[error("Error while signing message: {0}")]
+    SignStateRoot(String),
+    #[error("Error while decoding StateRoot from hex")]
+    StateRootDecoding(#[from] FromHexError),
 }
 
 #[derive(Debug, Error)]
@@ -151,7 +154,7 @@ pub enum EwtVerifyError {
     /// or if Signature V component is not in "Electrum" notation (`< 27`).
     #[error("Error when decoding token signature")]
     InvalidSignature,
-    #[error("Payload error: {0}")]
+    #[error(transparent)]
     Payload(#[from] PayloadError),
 }
 
