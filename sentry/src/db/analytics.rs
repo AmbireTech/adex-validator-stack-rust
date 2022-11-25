@@ -299,6 +299,7 @@ mod test {
         let ad_unit = DUMMY_AD_UNITS[0].clone();
         let ad_unit_2 = DUMMY_AD_UNITS[1].clone();
         let ad_slot_ipfs = DUMMY_IPFS[0];
+        let ad_slot_ipfs_2 = DUMMY_IPFS[1];
 
         setup_test_migrations(database.pool.clone())
             .await
@@ -311,9 +312,7 @@ mod test {
         let hours = 0..=23_u32;
 
         generate_analytics_for_december_2021(&database.pool, &ad_unit, ad_slot_ipfs).await;
-        //
-        //
-        // TODO: throw a few more analytics in specific DateHours w/ unique Query and check if it filters the analytics correctly
+
         let other_analytics: HashMap<&str, Analytics> = {
             // 5.12.2021 16:00
             let mut click_germany = make_click_analytics(&ad_unit, ad_slot_ipfs, 5, 16);
@@ -336,16 +335,31 @@ mod test {
                 .await
                 .expect("Should update");
 
+            // 8.12.2021 23:00
+            let click_ad_slot_2 = make_click_analytics(&ad_unit, ad_slot_ipfs_2, 8, 23);
+            let click_ad_slot_2 = update_analytics(&database.pool, click_ad_slot_2)
+                .await
+                .expect("Should update");
+
+            // 9.12.2021 00:00
+            let mut impression_new_slot_type =
+                make_impression_analytics(&ad_unit, ad_slot_ipfs_2, 9, 0);
+            impression_new_slot_type.ad_slot_type = Some("legacy_500x500".to_string());
+            let impression_new_slot_type =
+                update_analytics(&database.pool, impression_new_slot_type)
+                    .await
+                    .expect("Should update");
+
             vec![
                 ("click_germany", click_germany),
                 ("impression_ad_unit_2", impression_ad_unit_2),
                 ("impression_publisher_2", impression_publisher_2),
+                ("click_ad_slot_2", click_ad_slot_2),
+                ("impression_new_slot_type", impression_new_slot_type),
             ]
             .into_iter()
             .collect()
         };
-        //
-        //
 
         let amount_per_day: UnifiedNum = hours
             .clone()
@@ -842,6 +856,114 @@ mod test {
                     .expect("Should be Metric::Count"),
                 "It's count should be == to the hour"
             )
+        }
+
+        // Filter by ad_slot == AdSlot2
+        //
+        // Type: Click
+        // DateHour: 8.12.2021 23:00
+        // We should get 1 analytics entry
+        {
+            let ad_slot_2_query = AnalyticsQuery {
+                limit: 1000,
+                event_type: CLICK,
+                metric: Metric::Count,
+                segment_by: Some(AllowedKey::Country),
+                time: Time {
+                    timeframe: Timeframe::Day,
+                    start: start_date,
+                    end: Some(end_date),
+                },
+                campaign_id: None,
+                ad_unit: None,
+                ad_slot: Some(ad_slot_ipfs_2),
+                ad_slot_type: None,
+                advertiser: None,
+                publisher: None,
+                hostname: None,
+                country: None,
+                os_name: None,
+                chains: vec![],
+            };
+
+            let count_clicks = fetch_analytics(
+                &database.pool,
+                ad_slot_2_query.clone(),
+                ALLOWED_KEYS.clone(),
+                None,
+                ad_slot_2_query.limit,
+            )
+            .await
+            .expect("Should fetch");
+
+            assert_eq!(1, count_clicks.len(), "Only single analytics is expected");
+            let fetched = count_clicks.get(0).expect("Should have index 0");
+            assert_eq!(
+                23,
+                fetched.value.get_count().expect("Should be Metric::Count"),
+                "The fetched count should be the same as the hour of the Analytics"
+            );
+            assert_eq!(
+                other_analytics["click_ad_slot_2"].time.to_datetime(),
+                fetched.time,
+                "The fetched analytics date should be the same as the inserted Analytics, but with no hour because Timeframe::Day"
+            );
+        }
+
+        // Filter by ad_slot_type
+        //
+        // Type: Impression
+        // DateHour: 9.12.2021 00:00
+        // We should get 1 analytics entry
+        {
+            let ad_slot_type_query = AnalyticsQuery {
+                limit: 1000,
+                event_type: IMPRESSION,
+                metric: Metric::Count,
+                segment_by: Some(AllowedKey::Country),
+                time: Time {
+                    timeframe: Timeframe::Day,
+                    start: start_date,
+                    end: Some(end_date),
+                },
+                campaign_id: None,
+                ad_unit: None,
+                ad_slot: None,
+                ad_slot_type: Some("legacy_500x500".to_string()),
+                advertiser: None,
+                publisher: None,
+                hostname: None,
+                country: None,
+                os_name: None,
+                chains: vec![],
+            };
+
+            let count_impressions = fetch_analytics(
+                &database.pool,
+                ad_slot_type_query.clone(),
+                ALLOWED_KEYS.clone(),
+                None,
+                ad_slot_type_query.limit,
+            )
+            .await
+            .expect("Should fetch");
+
+            assert_eq!(
+                1,
+                count_impressions.len(),
+                "Only single analytics is expected"
+            );
+            let fetched = count_impressions.get(0).expect("Should have index 0");
+            assert_eq!(
+                0,
+                fetched.value.get_count().expect("Should be Metric::Count"),
+                "The fetched count should be the same as the hour of the Analytics"
+            );
+            assert_eq!(
+                other_analytics["impression_new_slot_type"].time.to_datetime(),
+                fetched.time,
+                "The fetched analytics date should be the same as the inserted Analytics, but with no hour because Timeframe::Day"
+            );
         }
     }
 

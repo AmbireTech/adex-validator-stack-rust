@@ -1,4 +1,5 @@
 use crate::Error as AdapterError;
+use hex::FromHexError;
 use primitives::{
     address::Error as AddressError, big_num::ParseBigIntError, ChainId, ChannelId, ValidatorId,
 };
@@ -17,11 +18,12 @@ impl From<Error> for AdapterError {
             err @ Error::ChainNotWhitelisted(..) => AdapterError::adapter(err),
             err @ Error::InvalidDepositAsset(..) => AdapterError::adapter(err),
             err @ Error::BigNumParsing(..) => AdapterError::adapter(err),
-            err @ Error::SignMessage(..) => AdapterError::adapter(err),
+            err @ Error::TokenSign(..) => AdapterError::adapter(err),
             err @ Error::VerifyMessage(..) => AdapterError::adapter(err),
             err @ Error::ContractInitialization(..) => AdapterError::adapter(err),
             err @ Error::ContractQuerying(..) => AdapterError::adapter(err),
             err @ Error::VerifyAddress(..) => AdapterError::adapter(err),
+            err @ Error::SigningMessage(..) => AdapterError::adapter(err),
             err @ Error::AuthenticationTokenNotIntendedForUs { .. } => {
                 AdapterError::authentication(err)
             }
@@ -51,7 +53,7 @@ pub enum Error {
     ChannelInactive(ChannelId),
     /// Signing of the message failed
     #[error("Signing message: {0}")]
-    SignMessage(#[from] EwtSigningError),
+    TokenSign(#[from] EwtSigningError),
     #[error("Verifying message: {0}")]
     VerifyMessage(#[from] EwtVerifyError),
     #[error("Contract initialization: {0}")]
@@ -74,6 +76,8 @@ pub enum Error {
     },
     #[error("Insufficient privilege")]
     InsufficientAuthorizationPrivilege,
+    #[error("Signing message error: {0}")]
+    SigningMessage(#[from] SigningError),
 }
 
 #[derive(Debug, Error)]
@@ -124,6 +128,14 @@ pub enum EwtSigningError {
 }
 
 #[derive(Debug, Error)]
+pub enum SigningError {
+    #[error("Error while signing message: {0}")]
+    SignStateRoot(String),
+    #[error("Error while decoding StateRoot from hex")]
+    StateRootDecoding(#[from] FromHexError),
+}
+
+#[derive(Debug, Error)]
 pub enum EwtVerifyError {
     #[error("The Ethereum Web Token header is invalid")]
     InvalidHeader,
@@ -142,12 +154,18 @@ pub enum EwtVerifyError {
     /// or if Signature V component is not in "Electrum" notation (`< 27`).
     #[error("Error when decoding token signature")]
     InvalidSignature,
+    #[error(transparent)]
+    Payload(#[from] PayloadError),
+}
+
+#[derive(Debug, Error)]
+pub enum PayloadError {
     #[error("Payload decoding: {0}")]
-    PayloadDecoding(#[source] base64::DecodeError),
+    Decoding(#[source] base64::DecodeError),
     #[error("Payload deserialization: {0}")]
-    PayloadDeserialization(#[from] serde_json::Error),
+    Deserialization(#[from] serde_json::Error),
     #[error("Payload is not a valid UTF-8 string: {0}")]
-    PayloadUtf8(#[from] std::str::Utf8Error),
+    Utf8(#[from] std::str::Utf8Error),
 }
 
 #[cfg(test)]

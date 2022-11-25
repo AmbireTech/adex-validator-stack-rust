@@ -20,8 +20,8 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error("overflow placeholder")]
-    Overflow,
+    #[error("Overflow error: {0}")]
+    Overflow(Overflow),
     #[error("The Channel's Token is not whitelisted")]
     TokenNotWhitelisted,
     #[error("Couldn't get state root hash of the proposed balances")]
@@ -38,7 +38,7 @@ pub enum Error {
 pub enum InvalidNewState {
     RootHash,
     Signature,
-    Transition,
+    Transition(Transition),
     Health(Health),
 }
 
@@ -48,13 +48,45 @@ pub enum Health {
     Spenders(u64),
 }
 
+#[derive(Debug)]
+pub enum Transition {
+    PayoutMismatch,
+    Earners,
+    Spenders,
+}
+
+#[derive(Debug)]
+pub enum Overflow {
+    AllSpendersSum,
+    ProposedBalancesCheck,
+    SpenderBalances,
+    EarnerBalances,
+    SpenderHealth,
+    EarnerHealth,
+}
+
+impl fmt::Display for Overflow {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let string = match self {
+            Overflow::AllSpendersSum => "AllSpendersSum",
+            Overflow::ProposedBalancesCheck => "ProposedBalancesCheck",
+            _ => "Overflow",
+        };
+
+        write!(f, "{}", string)
+    }
+}
+
 impl fmt::Display for InvalidNewState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let string = match self {
             InvalidNewState::RootHash => "InvalidRootHash",
             InvalidNewState::Signature => "InvalidSignature",
-            InvalidNewState::Transition => "InvalidTransition",
-            // TODO: Should we use health value?
+            InvalidNewState::Transition(t) => match t {
+                Transition::PayoutMismatch => "InvalidTransitionPayoutMismatch",
+                Transition::Earners => "InvalidTransitionEarners",
+                Transition::Spenders => "InvalidTransitionSpenders",
+            },
             InvalidNewState::Health(health) => match health {
                 Health::Earners(_health) => "TooLowHealthEarners",
                 Health::Spenders(_health) => "TooLowHealthSpenders",
@@ -91,12 +123,11 @@ pub async fn tick<C: Unlocked + 'static>(
     let from = channel_context.context.leader;
     let channel_id = channel_context.context.id();
 
-    // TODO: Context for All spender sum Error when overflow occurs
     let all_spenders_sum = all_spenders
         .values()
         .map(|spender| &spender.total_deposited)
         .sum::<Option<_>>()
-        .ok_or(Error::Overflow)?;
+        .ok_or(Error::Overflow(Overflow::AllSpendersSum))?;
 
     // if we don't have a `NewState` return `None`
     let new_msg = sentry
@@ -154,18 +185,16 @@ async fn on_new_state<'a, C: Unlocked + 'static>(
 
     let proposed_balances = match new_state.balances.clone().check() {
         Ok(balances) => balances,
-        // TODO: Should we show the Payout Mismatch between Spent & Earned?
         Err(balances::Error::PayoutMismatch { .. }) => {
             return on_error(
                 sentry,
                 channel_context,
                 new_state,
-                InvalidNewState::Transition,
+                InvalidNewState::Transition(Transition::PayoutMismatch),
             )
             .await;
         }
-        // TODO: Add context for `proposed_balances.check()` overflow error
-        Err(_) => return Err(Error::Overflow),
+        Err(_) => return Err(Error::Overflow(Overflow::ProposedBalancesCheck)),
     };
 
     let proposed_state_root = new_state.state_root.clone();
@@ -204,13 +233,12 @@ async fn on_new_state<'a, C: Unlocked + 'static>(
     {
         Ok(Some(previous_balances)) => previous_balances,
         Ok(None) => Default::default(),
-        // TODO: Add Context for Transition error
         Err(_err) => {
             return on_error(
                 sentry,
                 channel_context,
                 new_state,
-                InvalidNewState::Transition,
+                InvalidNewState::Transition(Transition::PayoutMismatch),
             )
             .await;
         }
@@ -226,14 +254,13 @@ async fn on_new_state<'a, C: Unlocked + 'static>(
         &prev_balances.spenders,
         &proposed_balances.spenders,
     )
-    .ok_or(Error::Overflow)?
+    .ok_or(Error::Overflow(Overflow::SpenderBalances))?
     {
-        // TODO: Add context for error in Spenders transition
         return on_error(
             sentry,
             channel_context,
             new_state,
-            InvalidNewState::Transition,
+            InvalidNewState::Transition(Transition::Spenders),
         )
         .await;
     }
@@ -248,14 +275,13 @@ async fn on_new_state<'a, C: Unlocked + 'static>(
         &prev_balances.earners,
         &proposed_balances.earners,
     )
-    .ok_or(Error::Overflow)?
+    .ok_or(Error::Overflow(Overflow::EarnerBalances))?
     {
-        // TODO: Add context for error in Earners transition
         return on_error(
             sentry,
             channel_context,
             new_state,
-            InvalidNewState::Transition,
+            InvalidNewState::Transition(Transition::Earners),
         )
         .await;
     }
@@ -265,7 +291,7 @@ async fn on_new_state<'a, C: Unlocked + 'static>(
         &accounting_balances.earners,
         &proposed_balances.earners,
     )
-    .ok_or(Error::Overflow)?;
+    .ok_or(Error::Overflow(Overflow::EarnerHealth))?;
     if health_earners < u64::from(sentry.config.worker.health_unsignable_promilles) {
         return on_error(
             sentry,
@@ -281,7 +307,7 @@ async fn on_new_state<'a, C: Unlocked + 'static>(
         &accounting_balances.spenders,
         &proposed_balances.spenders,
     )
-    .ok_or(Error::Overflow)?;
+    .ok_or(Error::Overflow(Overflow::SpenderHealth))?;
     if health_spenders < u64::from(sentry.config.worker.health_unsignable_promilles) {
         return on_error(
             sentry,
@@ -667,7 +693,7 @@ mod test {
             )
             .await;
             assert!(
-                matches!(tick_res, Err(Error::Overflow)),
+                matches!(tick_res, Err(Error::Overflow(Overflow::AllSpendersSum))),
                 "Returns an Overflow error"
             );
         }
@@ -695,7 +721,7 @@ mod test {
             assert!(matches!(
                 res,
                 ApproveStateResult::RejectedState {
-                    reason: InvalidNewState::Transition,
+                    reason: InvalidNewState::Transition(Transition::PayoutMismatch),
                     ..
                 }
             ), "InvalidNewState::Transition is the rejection reason when there is a payout mismatch");
@@ -802,7 +828,7 @@ mod test {
             assert!(matches!(
                 res,
                 ApproveStateResult::RejectedState {
-                    reason: InvalidNewState::Transition,
+                    reason: InvalidNewState::Transition(Transition::PayoutMismatch),
                     ..
                 }
             ), "InvalidNewState::Transition is the rejection reason last_approved.new_state.balances have a payout mismatch");
@@ -851,7 +877,7 @@ mod test {
             assert!(matches!(
                 res,
                 ApproveStateResult::RejectedState {
-                    reason: InvalidNewState::Transition,
+                    reason: InvalidNewState::Transition(Transition::Spenders),
                     ..
                 }
             ), "InvalidNewState::Transition is the rejection reason when proposed balances are lower than the previous balances");

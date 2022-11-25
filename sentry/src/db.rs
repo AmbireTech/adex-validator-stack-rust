@@ -347,7 +347,6 @@ pub mod tests_postgres {
             let manager =
                 deadpool_postgres::Manager::from_config(config, NoTls, self.manager_config.clone());
 
-            // TODO: Fix error mapping
             let pool = deadpool_postgres::Pool::builder(manager)
                 .max_size(15)
                 .build()

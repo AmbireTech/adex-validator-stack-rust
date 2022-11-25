@@ -4,7 +4,7 @@ use std::str::FromStr;
 
 use crate::targeting::Error;
 
-pub const FIELDS: [Field; 23] = [
+pub const FIELDS: [Field; 22] = [
     // AdView scope, accessible only on the AdView
     Field::AdView(AdView::SecondsSinceCampaignImpression),
     Field::AdView(AdView::HasCustomPreferences),
@@ -31,7 +31,6 @@ pub const FIELDS: [Field; 23] = [
     Field::Campaign(Campaign::EventMaxPrice),
     // Balances
     Field::Balances(Balances::CampaignTotalSpent),
-    Field::Balances(Balances::PublisherEarnedFromCampaign),
     // AdSlot scope, accessible on Supermarket and AdView
     Field::AdSlot(AdSlot::Categories),
     Field::AdSlot(AdSlot::Hostname),
@@ -147,8 +146,6 @@ impl From<Campaign> for String {
 #[display(style = "camelCase")]
 pub enum Balances {
     CampaignTotalSpent,
-    // TODO: AIP#61 Should be dropped since we can't know
-    PublisherEarnedFromCampaign,
 }
 
 impl TryFrom<String> for Balances {
@@ -318,10 +315,6 @@ mod test {
         test_field(
             Field::Campaign(Campaign::CampaignBudget),
             SerdeValue::String("campaignBudget".into()),
-        );
-        test_field(
-            Field::Balances(Balances::PublisherEarnedFromCampaign),
-            SerdeValue::String("publisherEarnedFromCampaign".into()),
         );
         test_field(
             Field::AdSlot(AdSlot::Hostname),

@@ -83,8 +83,6 @@ required-features = ["test-util"]
 # (De)Serialization
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-# TODO: Remove once we change `ChannelId` Serialize impl
-serde-hex = "0.1"
 serde_millis = "0.1"
 # Used prefixes on field for targeting::Input, and `campaign::Active`
 serde_with = "2"

@@ -20,7 +20,7 @@ pub async fn channel_tick<C: Unlocked + 'static>(
     let tick = channel_context
         .context
         .find_validator(adapter.whoami())
-        .ok_or(Error::ChannelNotIntendedForUs)?;
+        .ok_or_else(|| Error::ChannelNotIntendedForUs(channel.id(), adapter.whoami()))?;
 
     // 1. `GET /channel/:id/spender/all`
     let all_spenders = sentry.get_all_spenders(&channel_context).await?;

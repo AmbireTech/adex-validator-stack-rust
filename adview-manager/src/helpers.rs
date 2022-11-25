@@ -156,7 +156,6 @@ pub fn get_unit_html_with_events(
         let body =
             serde_json::to_string(&events_body).expect("It should always serialize EventBody");
 
-        // TODO: check whether the JSON body with `''` quotes executes correctly!
         let fetch_opts = format!("var fetchOpts = {{ method: 'POST', headers: {{ 'content-type': 'application/json' }}, body: {body} }};");
 
         let validators: String = validators
@@ -371,7 +370,7 @@ mod test {
             // All passed tokens must be of the same price and decimals, so that the amounts can be accurately compared
             whitelisted_tokens,
             size: Some(Size::new(300, 100)),
-            navigator_language: Some("bg".into()),
+            navigator_language: Some("bg-BG".into()),
             disabled_video: false,
             disabled_sticky: false,
             validators: vec![validator_1_url, validator_2_url],

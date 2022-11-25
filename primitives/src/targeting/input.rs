@@ -350,19 +350,6 @@ pub mod balances {
                         ..
                     }) => Some(Value::UnifiedNum(*campaign_total_spent)),
                 },
-                // Leave the default of `0` if the publisher is not found in the balances.
-                field::Balances::PublisherEarnedFromCampaign => {
-                    Some(Value::UnifiedNum(match self {
-                        Get::Getter(Getter {
-                            balances,
-                            publisher_id,
-                        }) => balances.get(publisher_id).cloned().unwrap_or_default(),
-                        Get::Value(Values {
-                            publisher_earned_from_campaign,
-                            ..
-                        }) => *publisher_earned_from_campaign,
-                    }))
-                }
             }
         }
     }
@@ -388,7 +375,7 @@ mod test {
             // Global scope, accessible everywhere
             "adView.secondsSinceCampaignImpression": 10,
             "adView.hasCustomPreferences": true,
-            "adView.navigatorLanguage": "en",
+            "adView.navigatorLanguage": "en-US",
             "adSlotId": "QmcUVX7fvoLMM93uN2bD3wGTH8MXSxeL8hojYfL2Lhp7mR",
             "adSlotType": "legacy_300x100",
             "publisherId": "0xE882ebF439207a70dDcCb39E13CA8506c9F45fD9",
@@ -402,13 +389,11 @@ mod test {
             "adUnitId": "Qmasg8FrbuSQpjFu3kRnZF9beg8rEBFrqgi1uXDRwCbX5f",
             "advertiserId": "0xaCBaDA2d5830d1875ae3D2de207A1363B316Df2F",
             "campaignId": "0x936da01f9abd4d9d80c702af85c822a8",
-            "campaignTotalSpent": "40",
             "campaignSecondsActive": 40633521,
             "campaignSecondsDuration": 2509030800_u64,
             "campaignBudget": "100000000000",
             "eventMinPrice": "1",
             "eventMaxPrice": "10",
-            "publisherEarnedFromCampaign": "30",
             // adSlot scope, accessible on Supermarket and AdView
             "adSlot.categories": ["IAB3", "IAB13-7", "IAB5"],
             "adSlot.hostname": "adex.network",
@@ -424,7 +409,7 @@ mod test {
             ad_view: Some(AdView {
                 seconds_since_campaign_impression: Some(10),
                 has_custom_preferences: true,
-                navigator_language: "en".into(),
+                navigator_language: "en-US".into(),
             }),
             global: Global {
                 ad_slot_id: IPFS[0],

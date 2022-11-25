@@ -15,7 +15,7 @@ fn get_default_input() -> Input {
         ad_view: Some(input::AdView {
             seconds_since_campaign_impression: Some(10),
             has_custom_preferences: false,
-            navigator_language: "bg".to_string(),
+            navigator_language: "bg-BG".to_string(),
         }),
         global: input::Global {
             ad_slot_id: DUMMY_IPFS[0],

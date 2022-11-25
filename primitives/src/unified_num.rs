@@ -309,27 +309,22 @@ impl Integer for UnifiedNum {
         UnifiedNum::div_floor(self, other)
     }
 
-    // TODO: Check math and write tests
     fn mod_floor(&self, other: &Self) -> Self {
         self.0.mod_floor(&other.0).into()
     }
 
-    // TODO: Check math and write tests
     fn gcd(&self, other: &Self) -> Self {
         self.0.gcd(&other.0).into()
     }
 
-    // TODO: Check math and write tests
     fn lcm(&self, other: &Self) -> Self {
         self.0.lcm(&other.0).into()
     }
 
-    // TODO: Check math and write tests
     fn divides(&self, other: &Self) -> bool {
         self.0.divides(&other.0)
     }
 
-    // TODO: Check math and write tests
     fn is_multiple_of(&self, other: &Self) -> bool {
         self.0.is_multiple_of(&other.0)
     }
@@ -342,7 +337,6 @@ impl Integer for UnifiedNum {
         !self.is_even()
     }
 
-    // TODO: Check math and write tests
     fn div_rem(&self, other: &Self) -> (Self, Self) {
         let (quotient, remainder) = self.0.div_rem(&other.0);
 
@@ -958,6 +952,69 @@ mod test {
                 None,
                 UnifiedNum::from_whole(3).checked_rem(&UnifiedNum::ZERO),
                 "CheckedRem by zero should result in None"
+            );
+        }
+    }
+
+    #[test]
+    fn test_unified_num_mod_floor_gcd_lcm_divides_is_multiple_of_div_rem() {
+        // Mod floor
+        {
+            assert_eq!(
+                (UnifiedNum::from_u64(8)).mod_floor(&UnifiedNum::from_u64(3)),
+                UnifiedNum::from_u64(2)
+            );
+            assert_eq!(
+                (UnifiedNum::from_u64(1)).mod_floor(&UnifiedNum::from_u64(2)),
+                UnifiedNum::from_u64(1)
+            );
+        }
+
+        // GCD
+        {
+            assert_eq!(
+                UnifiedNum::from_u64(6).gcd(&UnifiedNum::from_u64(8)),
+                UnifiedNum::from_u64(2)
+            );
+            assert_eq!(
+                UnifiedNum::from_u64(7).gcd(&UnifiedNum::from_u64(3)),
+                UnifiedNum::from_u64(1)
+            );
+        }
+
+        // LCM
+        {
+            assert_eq!(
+                UnifiedNum::from_u64(7).lcm(&UnifiedNum::from_u64(3)),
+                UnifiedNum::from_u64(21)
+            );
+            assert_eq!(
+                UnifiedNum::from_u64(2).lcm(&UnifiedNum::from_u64(4)),
+                UnifiedNum::from_u64(4)
+            );
+        }
+
+        // Is multiple of
+        {
+            assert_eq!(
+                UnifiedNum::from_u64(9).is_multiple_of(&UnifiedNum::from_u64(3)),
+                true
+            );
+            assert_eq!(
+                UnifiedNum::from_u64(3).is_multiple_of(&UnifiedNum::from_u64(9)),
+                false
+            );
+        }
+
+        // Div rem
+        {
+            assert_eq!(
+                (UnifiedNum::from_u64(8)).div_rem(&UnifiedNum::from_u64(3)),
+                (UnifiedNum::from_u64(2), UnifiedNum::from_u64(2))
+            );
+            assert_eq!(
+                (UnifiedNum::from_u64(1)).div_rem(&UnifiedNum::from_u64(2)),
+                (UnifiedNum::from_u64(0), UnifiedNum::from_u64(1))
             );
         }
     }

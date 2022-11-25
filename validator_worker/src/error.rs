@@ -1,4 +1,4 @@
-use primitives::ChannelId;
+use primitives::{ChannelId, ValidatorId};
 use std::fmt;
 use thiserror::Error;
 
@@ -27,9 +27,8 @@ pub enum Error {
     FollowerTick(ChannelId, TickError),
     #[error("Placeholder for Validation errors")]
     Validation,
-    #[error("Whoami is neither a Leader or follower in channel")]
-    // TODO: Add channel, validatorId, etc.
-    ChannelNotIntendedForUs,
+    #[error("Whoami: {1} is neither a Leader or follower in channel: {0}")]
+    ChannelNotIntendedForUs(ChannelId, ValidatorId),
     #[error("Channel token is not whitelisted")]
     ChannelTokenNotWhitelisted,
 }

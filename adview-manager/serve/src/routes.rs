@@ -51,8 +51,7 @@ pub async fn get_preview_ad(Extension(state): Extension<Arc<State>>) -> Html<Str
         // All passed tokens must be of the same price and decimals, so that the amounts can be accurately compared
         whitelisted_tokens,
         size: Some(Size::new(300, 100)),
-        // TODO: Check this value
-        navigator_language: Some("bg".into()),
+        navigator_language: Some("bg-BG".into()),
         /// Defaulted
         disabled_video,
         disabled_sticky: false,
@@ -157,8 +156,7 @@ pub async fn get_preview_video(Extension(state): Extension<Arc<State>>) -> Html<
         // All passed tokens must be of the same price and decimals, so that the amounts can be accurately compared
         whitelisted_tokens,
         size: Some(Size::new(728, 90)),
-        // TODO: Check this value
-        navigator_language: Some("bg".into()),
+        navigator_language: Some("bg-BG".into()),
         /// Defaulted
         disabled_video,
         disabled_sticky: false,
