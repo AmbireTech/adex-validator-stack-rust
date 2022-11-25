@@ -389,7 +389,6 @@ mod test {
             "adUnitId": "Qmasg8FrbuSQpjFu3kRnZF9beg8rEBFrqgi1uXDRwCbX5f",
             "advertiserId": "0xaCBaDA2d5830d1875ae3D2de207A1363B316Df2F",
             "campaignId": "0x936da01f9abd4d9d80c702af85c822a8",
-            "campaignTotalSpent": "40",
             "campaignSecondsActive": 40633521,
             "campaignSecondsDuration": 2509030800_u64,
             "campaignBudget": "100000000000",
