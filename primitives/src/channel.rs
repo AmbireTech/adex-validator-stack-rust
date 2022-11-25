@@ -8,9 +8,8 @@ use hex::{FromHex, FromHexError};
 
 use crate::{Address, ToHex, Validator, ValidatorId};
 
-#[derive(Deserialize, PartialEq, Eq, Copy, Clone, Hash)]
-#[serde(transparent)]
-pub struct ChannelId(#[serde(deserialize_with = "deserialize_channel_id")] [u8; 32]);
+#[derive(PartialEq, Eq, Copy, Clone, Hash)]
+pub struct ChannelId([u8; 32]);
 
 impl ChannelId {
     pub fn as_bytes(&self) -> &[u8; 32] {
@@ -30,6 +29,15 @@ where
 {
     let channel_id = String::deserialize(deserializer)?;
     validate_channel_id(&channel_id).map_err(serde::de::Error::custom)
+}
+
+impl<'de> Deserialize<'de> for ChannelId {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        deserialize_channel_id(deserializer).map(ChannelId)
+    }
 }
 
 impl Serialize for ChannelId {
@@ -334,6 +342,7 @@ mod postgres {
     #[cfg(test)]
     mod test {
         use crate::{channel::Nonce, postgres::POSTGRES_POOL};
+
         #[tokio::test]
         async fn nonce_to_from_sql() {
             let client = POSTGRES_POOL.get().await.unwrap();
